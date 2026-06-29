@@ -78,8 +78,60 @@ const CONFIG = { url: '', anonKey: '' };
     }
     connected = true; status('Connected', true);
     if ($('cloudConnected')) $('cloudConnected').style.display = 'block';
+    await initEventTypes();      // shared event dictionary (live)
     await loadRecentMatches();
     return true;
+  }
+
+  /* ---------- shared event dictionary (event_types) ---------- */
+  let applyingET = false, etTimer = null, etChannel = null;
+  async function initEventTypes() {
+    const { data, error } = await sb.from('event_types').select('*').order('ord');
+    if (error) { console.warn('event_types:', error.message); return; }
+    if (!data || !data.length) {
+      await pushEventTypes(PT().state.events);   // DB empty -> seed it from this browser's list
+    } else {
+      applyToApp(data);
+    }
+    subscribeEventTypes();
+  }
+  function applyToApp(rows) {
+    const ev = { football: [], hockey: [] };
+    rows.forEach(r => { (ev[r.sport] = ev[r.sport] || []).push({ name: r.name, key: r.key || '' }); });
+    applyingET = true;
+    PT().applyEventTypes(ev);     // app sets state.events + localStorage + re-renders
+    applyingET = false;
+  }
+  async function reloadEventTypes() {
+    const { data, error } = await sb.from('event_types').select('*').order('ord');
+    if (!error && data) applyToApp(data);
+  }
+  async function pushEventTypes(events) {
+    const rows = [];
+    ['football', 'hockey'].forEach(sport =>
+      (events[sport] || []).forEach((e, i) => rows.push({ sport, name: e.name, key: e.key || null, ord: i })));
+    if (rows.length) {
+      const { error } = await sb.from('event_types').upsert(rows, { onConflict: 'sport,name' });
+      if (error) { console.warn('event_types upsert:', error.message); return; }
+    }
+    // delete rows that no longer exist locally
+    const { data: existing } = await sb.from('event_types').select('id,sport,name');
+    const keep = new Set(rows.map(r => r.sport + '|' + r.name));
+    const del = (existing || []).filter(r => !keep.has(r.sport + '|' + r.name)).map(r => r.id);
+    if (del.length) await sb.from('event_types').delete().in('id', del);
+  }
+  function subscribeEventTypes() {
+    if (etChannel) sb.removeChannel(etChannel);
+    etChannel = sb.channel('event_types')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_types' },
+        () => { clearTimeout(etTimer); etTimer = setTimeout(reloadEventTypes, 150); })
+      .subscribe();
+  }
+  // called by the app whenever the local event dictionary changes (add/delete/key)
+  function onEventTypesChanged() {
+    if (!connected || applyingET) return;
+    clearTimeout(etTimer);
+    etTimer = setTimeout(() => pushEventTypes(PT().state.events), 250);
   }
 
   /* ---------- list recent matches into the dropdown ---------- */
@@ -175,7 +227,7 @@ const CONFIG = { url: '', anonKey: '' };
   window.Cloud = {
     get connected() { return connected; },
     get matchId() { return matchId; },
-    onLocalUpsert, onLocalDelete
+    onLocalUpsert, onLocalDelete, onEventTypesChanged
   };
 
   /* ---------- UI wiring ---------- */

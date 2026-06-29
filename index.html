@@ -512,10 +512,20 @@ function saveEvents(){
   try{localStorage.setItem(EV_STORE,JSON.stringify(state.events));}catch(e){STORAGE_OK=false;}
   updateStoreStatus();
   writeEventsFile(); // auto-write pitchtagger_events.json if a file is linked
+  window.Cloud&&window.Cloud.onEventTypesChanged&&window.Cloud.onEventTypesChanged(); // push to Supabase if connected
+}
+// apply an event dictionary pushed from the cloud (other clients)
+function applyEventTypes(ev){
+  if(!ev.football)ev.football=[]; if(!ev.hockey)ev.hockey=[];
+  state.events=ev;
+  try{localStorage.setItem(EV_STORE,JSON.stringify(ev));}catch(e){}
+  if(!curEvents().some(e=>e.name===state.activeEvent))state.activeEvent=curEvents()[0]?.name||null;
+  renderEvents(); updateBanner(); updateStoreStatus();
 }
 function updateStoreStatus(){
   const el=$('storeStatus'); if(!el)return;
   const n=(state.events.football.length+state.events.hockey.length);
+  if(window.Cloud&&window.Cloud.connected){el.className='mini ok';el.textContent='☁ synced to cloud ('+n+')';return;}
   if(STORAGE_OK){el.className='mini ok';el.textContent='✓ auto-saved ('+n+')';}
   else{el.className='mini bad';el.textContent='⚠ can\'t save — use Backup';}
 }
@@ -1277,8 +1287,8 @@ if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
 renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); updateFileStatus();
 
 // bridge for the cloud-sync module (loaded next)
-window.PT={state, renderTable, eventHalf, fmt};
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus};
 </script>
-<script src="cloud-sync.js?v=3"></script>
+<script src="cloud-sync.js?v=4"></script>
 </body>
 </html>
