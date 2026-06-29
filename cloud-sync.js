@@ -7,7 +7,7 @@
    paste your project's PUBLIC values here (the anon key is safe to commit —
    it is protected by Row-Level Security):
 =========================================================================== */
-const CONFIG = { url: '', anonKey: '' };
+const CONFIG = { url: 'https://abcdxyz.supabase.co', anonKey: 'eyJ...' };
 
 (function () {
   const $ = (id) => document.getElementById(id);
