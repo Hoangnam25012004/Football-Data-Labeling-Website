@@ -1148,7 +1148,18 @@ function applyDur(){const d=state.duration;
   d.h2Start=parseTime($('durH2Start').value);
   d.h2End=parseTime($('durH2End').value);
   d.enabled=$('durEnabled').checked;
-  saveDuration(); renderTable();}
+  saveDuration(); renderTable();
+  window.Cloud&&window.Cloud.onDurationChanged&&window.Cloud.onDurationChanged(d); // save to the match (matches.config)
+}
+// apply a duration/config pushed from the cloud (opening a match or another client)
+function applyCloudDuration(cfg){
+  if(!cfg||!Object.keys(cfg).length)return;
+  state.duration=Object.assign({enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0},cfg);
+  saveDuration();
+  if($('durModal'))fillDur();
+  renderTable();
+  if(video.src)$('tcode').textContent=state.duration.enabled?'⚽ '+fmt(matchTime(video.currentTime)):fmt(video.currentTime);
+}
 function openDurModal(){fillDur();$('durModal').classList.add('show');}
 function closeDurModal(){$('durModal').classList.remove('show');$('playerInput').focus();}
 $('durBtn').onclick=openDurModal;
@@ -1251,8 +1262,8 @@ if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
 renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable();
 
 // bridge for the cloud-sync module (loaded next)
-window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast};
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration};
 </script>
-<script src="cloud-sync.js?v=9"></script>
+<script src="cloud-sync.js?v=10"></script>
 </body>
 </html>
