@@ -62,7 +62,23 @@ const CONFIG = { url: 'https://abcdxyz.supabase.co', anonKey: 'eyJ...' };
     }
     connected = true; status('Connected', true);
     if ($('cloudConnected')) $('cloudConnected').style.display = 'block';
+    await loadRecentMatches();
     return true;
+  }
+
+  /* ---------- list recent matches into the dropdown ---------- */
+  async function loadRecentMatches() {
+    if (!connected) return;
+    const sel = $('cloudMatchList'); if (!sel) return;
+    const { data, error } = await sb.from('matches')
+      .select('id,home_name,away_name,created_at')
+      .order('created_at', { ascending: false }).limit(50);
+    if (error) { console.warn('list matches:', error.message); return; }
+    sel.innerHTML = '<option value="">— select a match —</option>' +
+      (data || []).map(m => {
+        const d = (m.created_at || '').slice(0, 16).replace('T', ' ');
+        return `<option value="${m.id}">${m.home_name} vs ${m.away_name} · ${d} · ${m.id.slice(0, 8)}</option>`;
+      }).join('');
   }
 
   /* ---------- match create / join / load ---------- */
@@ -148,6 +164,8 @@ const CONFIG = { url: 'https://abcdxyz.supabase.co', anonKey: 'eyJ...' };
     $('cloudConnect').onclick = connect;
     $('cloudCreate').onclick = createMatch;
     $('cloudJoin').onclick = joinMatch;
+    if ($('cloudMatchList')) $('cloudMatchList').onchange = (e) => { if (e.target.value) openMatch(e.target.value); };
+    if ($('cloudRefresh')) $('cloudRefresh').onclick = loadRecentMatches;
     $('cloudCopy').onclick = () => { $('cloudShare').select(); document.execCommand('copy'); };
     // deep link: open the site with #match=<id> to auto-join
     const m = location.hash.match(/match=([0-9a-f-]{36})/i);

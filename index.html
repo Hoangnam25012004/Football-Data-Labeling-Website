@@ -385,7 +385,12 @@
           <div class="ev-backup">
             <button id="cloudCreate" title="Create a new shared match">＋ New shared match</button>
           </div>
-          <label class="fld" style="margin-top:10px"><span>…or join an existing match by ID</span></label>
+          <label class="fld" style="margin-top:10px"><span>Open a recent match</span></label>
+          <div class="addrow">
+            <select class="txt" id="cloudMatchList"><option value="">— select a match —</option></select>
+            <button id="cloudRefresh" title="refresh list">⟳</button>
+          </div>
+          <label class="fld" style="margin-top:10px"><span>…or join by ID</span></label>
           <div class="addrow">
             <input class="txt" id="cloudMatchId" placeholder="match UUID">
             <button id="cloudJoin" title="join">↪</button>
