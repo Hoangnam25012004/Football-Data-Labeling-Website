@@ -96,7 +96,7 @@ const CONFIG = { url: '', anonKey: '' };
     subscribeEventTypes();
   }
   function applyToApp(rows) {
-    const ev = { football: [], hockey: [] };
+    const ev = {};   // applyEventTypes() fills in any missing sports with empty arrays
     rows.forEach(r => { (ev[r.sport] = ev[r.sport] || []).push({ name: r.name, key: r.key || '' }); });
     applyingET = true;
     PT().applyEventTypes(ev);     // app sets state.events + localStorage + re-renders
@@ -108,7 +108,7 @@ const CONFIG = { url: '', anonKey: '' };
   }
   async function pushEventTypes(events) {
     const rows = [];
-    ['football', 'hockey'].forEach(sport =>
+    Object.keys(events).forEach(sport =>
       (events[sport] || []).forEach((e, i) => rows.push({ sport, name: e.name, key: e.key || null, ord: i })));
     if (rows.length) {
       const { error } = await sb.from('event_types').upsert(rows, { onConflict: 'sport,name' });
