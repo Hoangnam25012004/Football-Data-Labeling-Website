@@ -57,11 +57,24 @@ const CONFIG = { url: '', anonKey: '' };
     if (!url || !key) { alert('Enter your Supabase URL and anon key.'); return false; }
     saveCfg({ url, key });
     sb = window.supabase.createClient(url, key, { realtime: { params: { eventsPerSecond: 20 } } });
-    let { data: { session } } = await sb.auth.getSession();
-    if (!session) {
-      const { data, error } = await sb.auth.signInAnonymously();
-      if (error) { alert('Sign-in failed: ' + error.message + '\n(Enable "Allow anonymous sign-ins" in Supabase Auth.)'); return false; }
-      session = data.session;
+    let session = null;
+    try {
+      ({ data: { session } } = await sb.auth.getSession());
+      if (!session) {
+        const { data, error } = await sb.auth.signInAnonymously();
+        if (error) throw error;
+        session = data.session;
+      }
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      const net = /failed to fetch|networkerror|load failed|fetch/i.test(msg);
+      alert(net
+        ? 'Cannot reach Supabase (network / URL problem):\n'
+          + '• Check the Project URL is EXACTLY correct (Settings → API)\n'
+          + '• Make sure the project is NOT paused — free projects auto-pause after ~1 week idle (Dashboard → Resume)\n'
+          + '• Disable ad-blocker / VPN, or try another network or an incognito window'
+        : 'Sign-in failed: ' + msg + '\n(Enable "Allow anonymous sign-ins" in Supabase → Authentication.)');
+      return false;
     }
     connected = true; status('Connected', true);
     if ($('cloudConnected')) $('cloudConnected').style.display = 'block';
