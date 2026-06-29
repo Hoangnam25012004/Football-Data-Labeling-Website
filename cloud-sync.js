@@ -176,6 +176,7 @@ const CONFIG = { url: '', anonKey: '' };
   async function openMatchRow(row) {
     matchId = row.id; matchCode = row.code || '';
     if ($('cloudMatchId')) $('cloudMatchId').value = matchCode || matchId;
+    setTeamInputs(row.home_name, row.away_name);   // load this match's team names
     const { data, error } = await sb.from('events').select('*').eq('match_id', matchId).order('t_seconds');
     if (error) { alert('Load failed: ' + error.message); return; }
     applying = true;
@@ -194,7 +195,22 @@ const CONFIG = { url: '', anonKey: '' };
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'events', filter: 'match_id=eq.' + matchId },
         applyRemote)
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'matches', filter: 'id=eq.' + matchId },
+        (p) => { if (p.new) setTeamInputs(p.new.home_name, p.new.away_name); })   // live team-name sync
       .subscribe();
+  }
+
+  // set the Home/Away name boxes without re-triggering a cloud write
+  function setTeamInputs(home, away) {
+    if (home != null && $('homeName').value !== home) $('homeName').value = home;
+    if (away != null && $('awayName').value !== away) $('awayName').value = away;
+  }
+  // called by the app when the user edits a team name
+  async function onTeamNamesChanged(home, away) {
+    if (!connected || !matchId) return;
+    const { error } = await sb.from('matches').update({ home_name: home, away_name: away }).eq('id', matchId);
+    if (error) console.warn('match name update:', error.message);
   }
 
   const findIdx = (id) => PT().state.rows.findIndex((r) => r.id === id);
@@ -227,7 +243,7 @@ const CONFIG = { url: '', anonKey: '' };
   window.Cloud = {
     get connected() { return connected; },
     get matchId() { return matchId; },
-    onLocalUpsert, onLocalDelete, onEventTypesChanged
+    onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged
   };
 
   /* ---------- UI wiring ---------- */

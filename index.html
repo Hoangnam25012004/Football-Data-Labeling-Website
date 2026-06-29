@@ -292,15 +292,6 @@
         <input class="txt" id="newEvName" placeholder="New event name">
         <button id="addEvBtn" title="add">+</button>
       </div>
-      <div class="ev-backup">
-        <button id="exportEv" title="Download the event list as a .json file">⬇ Backup events</button>
-        <button id="importEv" title="Load the event list from a .json file">⬆ Restore</button>
-        <input type="file" id="importEvFile" accept="application/json,.json" style="display:none">
-      </div>
-      <div class="file-link">
-        <button id="linkFileBtn" title="Pick pitchtagger_events.json to auto-overwrite it whenever an event/hotkey changes">🔗 Auto-save to file…</button>
-        <span id="fileStatus">Not linked — saved in browser only</span>
-      </div>
     </div>
   </div>
 </div>
@@ -511,7 +502,6 @@ function loadEvents(){
 function saveEvents(){
   try{localStorage.setItem(EV_STORE,JSON.stringify(state.events));}catch(e){STORAGE_OK=false;}
   updateStoreStatus();
-  writeEventsFile(); // auto-write pitchtagger_events.json if a file is linked
   window.Cloud&&window.Cloud.onEventTypesChanged&&window.Cloud.onEventTypesChanged(); // push to Supabase if connected
 }
 // apply an event dictionary pushed from the cloud (other clients)
@@ -695,6 +685,10 @@ video.addEventListener('play',focusEntryIfDocked);
 function setTeam(t){state.team=t;$('segHome').className=t==='home'?'act-home':'';$('segAway').className=t==='away'?'act-away':''}
 $('segHome').onclick=()=>setTeam('home');
 $('segAway').onclick=()=>setTeam('away');
+// team names: push to the cloud match (matches.home_name / away_name) when changed
+['homeName','awayName'].forEach(id=>$(id).addEventListener('change',()=>{
+  window.Cloud&&window.Cloud.onTeamNamesChanged&&window.Cloud.onTeamNamesChanged($('homeName').value,$('awayName').value);
+}));
 
 /* EVENTS + HOTKEYS */
 function curEvents(){return state.events[state.sport]}
@@ -747,35 +741,12 @@ $('newEvName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefau
 $('sportSel').onchange=e=>{state.sport=e.target.value;state.activeEvent=curEvents()[0]?.name||null;renderEvents();updateBanner()};
 
 /* event modal (opened from the top bar button) */
-function openEvModal(){$('evModal').classList.add('show');renderEvents();updateStoreStatus();setTimeout(()=>$('newEvName').focus(),0);
-  syncFromFile(true);} // pull the latest list from the linked file (grants permission on this click)
+function openEvModal(){$('evModal').classList.add('show');renderEvents();updateStoreStatus();setTimeout(()=>$('newEvName').focus(),0);}
 function closeEvModal(){$('evModal').classList.remove('show');$('playerInput').focus()}
 $('eventBtn').onclick=openEvModal;
 $('evModalClose').onclick=closeEvModal;
 $('evModal').addEventListener('click',e=>{if(e.target===$('evModal'))closeEvModal()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('evModal').classList.contains('show')){e.preventDefault();closeEvModal()}});
-
-/* backup / restore the event list as a JSON file */
-$('exportEv').onclick=()=>{
-  const blob=new Blob([JSON.stringify(state.events,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='pitchtagger_events.json';a.click();
-};
-$('importEv').onclick=()=>$('importEvFile').click();
-$('importEvFile').onchange=e=>{
-  const f=e.target.files[0]; if(!f)return;
-  const r=new FileReader();
-  r.onload=()=>{
-    try{
-      const o=JSON.parse(r.result);
-      if(!o||!Array.isArray(o.football)||!Array.isArray(o.hockey))throw 0;
-      state.events=o; state.activeEvent=curEvents()[0]?.name||null;
-      saveEvents(); renderEvents(); updateBanner(); toast('Events restored');
-    }catch(err){alert('Invalid file.');}
-    e.target.value='';
-  };
-  r.readAsText(f);
-};
 
 /* event lookup by hotkey (supports multi-char like 'aa') */
 function eventForKey(k){const ev=curEvents().find(o=>o.key&&o.key===k);return ev?ev.name:null}
@@ -1222,73 +1193,12 @@ function teamStatsSheet(){
   return ws;
 }
 
-/* ===================== FILE AUTO-SAVE (pitchtagger_events.json) ===================== */
-let fileHandle=null;
-const IDB_NAME='pitchtagger',IDB_STORE='kv',HKEY='eventsFile';
-function idb(){return new Promise((res,rej)=>{const r=indexedDB.open(IDB_NAME,1);
-  r.onupgradeneeded=()=>r.result.createObjectStore(IDB_STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
-async function idbSet(k,v){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(IDB_STORE,'readwrite');
-  t.objectStore(IDB_STORE).put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
-async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction(IDB_STORE,'readonly');
-  const rq=t.objectStore(IDB_STORE).get(k);rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error);});}
-function updateFileStatus(){const el=$('fileStatus');if(!el)return;
-  if(fileHandle){el.className='on';el.textContent='✓ Synced with '+(fileHandle.name||'file');}
-  else{el.className='';el.textContent='Not linked — saved in browser only';}}
-// ensure we hold read+write permission for the handle (requestPermission needs a user gesture)
-async function ensureFilePerm(interactive){
-  if(!fileHandle)return false;
-  if(!fileHandle.queryPermission)return true;
-  let p=await fileHandle.queryPermission({mode:'readwrite'});
-  if(p==='granted')return true;
-  if(!interactive)return false;
-  p=await fileHandle.requestPermission({mode:'readwrite'});
-  return p==='granted';
-}
-async function writeEventsFile(){
-  if(!fileHandle)return;
-  try{
-    if(!await ensureFilePerm(true))return;
-    const w=await fileHandle.createWritable();
-    await w.write(JSON.stringify(state.events,null,2)); await w.close();
-  }catch(e){/* ignore transient write errors */}
-}
-// READ the linked file back and make it the source of truth (so events survive reloads / external edits)
-async function syncFromFile(interactive){
-  if(!fileHandle)return false;
-  try{
-    if(!await ensureFilePerm(interactive))return false;
-    const txt=await (await fileHandle.getFile()).text();
-    if(!txt.trim())return false;
-    const o=JSON.parse(txt);
-    if(!(o&&Array.isArray(o.football)&&Array.isArray(o.hockey)))return false;
-    state.events=o;
-    try{localStorage.setItem(EV_STORE,JSON.stringify(o));}catch(e){}
-    if(!curEvents().some(e=>e.name===state.activeEvent))state.activeEvent=curEvents()[0]?.name||null;
-    renderEvents(); updateBanner(); updateStoreStatus();
-    return true;
-  }catch(e){return false;}
-}
-$('linkFileBtn').onclick=async()=>{
-  if(!window.showSaveFilePicker){alert('This browser/protocol does not support writing to a file (open via http://localhost in Chrome/Edge). Use the Backup/Restore buttons instead.');return;}
-  try{
-    fileHandle=await window.showSaveFilePicker({suggestedName:'pitchtagger_events.json',
-      types:[{description:'JSON',accept:{'application/json':['.json']}}]});
-    await idbSet(HKEY,fileHandle);
-    const loaded=await syncFromFile(true); // if the picked file already has events, adopt them
-    if(!loaded)await writeEventsFile();    // empty/new file -> seed it with the current list
-    updateFileStatus(); toast(loaded?'Loaded events from file':'File auto-save enabled');
-  }catch(e){}
-};
-(async()=>{try{const h=await idbGet(HKEY);if(h){fileHandle=h;updateFileStatus();
-  // try to load straight from the file; if permission lapsed after reload it loads on first Event-panel open
-  await syncFromFile(false);}}catch(e){}})();
-
 if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
-renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); updateFileStatus();
+renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable();
 
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus};
 </script>
-<script src="cloud-sync.js?v=5"></script>
+<script src="cloud-sync.js?v=6"></script>
 </body>
 </html>
