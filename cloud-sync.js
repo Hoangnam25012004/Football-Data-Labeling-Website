@@ -7,12 +7,14 @@
    paste your project's PUBLIC values here (the anon key is safe to commit —
    it is protected by Row-Level Security):
 =========================================================================== */
-const CONFIG = { url: 'https://abcdxyz.supabase.co', anonKey: 'eyJ...' };
+// Paste your project's PUBLIC values here so everyone can use the site without entering keys.
+// Leave as '' to make users type their own. (Used only as a fallback — typed/saved values win.)
+const CONFIG = { url: '', anonKey: '' };
 
 (function () {
   const $ = (id) => document.getElementById(id);
   const LS = 'pitchtagger.cloud.cfg';
-  let sb = null, channel = null, matchId = null, connected = false, applying = false;
+  let sb = null, channel = null, matchId = null, matchCode = null, connected = false, applying = false;
 
   const PT = () => window.PT;                       // bridge to the app (state, renderTable, eventHalf)
   const cfg = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } };
@@ -49,8 +51,9 @@ const CONFIG = { url: 'https://abcdxyz.supabase.co', anonKey: 'eyJ...' };
   /* ---------- connect + auth ---------- */
   async function connect() {
     const c = cfg();
-    const url = CONFIG.url || ($('cloudUrl') ? $('cloudUrl').value.trim() : '') || c.url;
-    const key = CONFIG.anonKey || ($('cloudKey') ? $('cloudKey').value.trim() : '') || c.key;
+    // precedence: what the user typed -> what they saved -> CONFIG fallback (so a wrong CONFIG never locks anyone out)
+    const url = ($('cloudUrl') ? $('cloudUrl').value.trim() : '') || c.url || CONFIG.url;
+    const key = ($('cloudKey') ? $('cloudKey').value.trim() : '') || c.key || CONFIG.anonKey;
     if (!url || !key) { alert('Enter your Supabase URL and anon key.'); return false; }
     saveCfg({ url, key });
     sb = window.supabase.createClient(url, key, { realtime: { params: { eventsPerSecond: 20 } } });
@@ -71,13 +74,13 @@ const CONFIG = { url: 'https://abcdxyz.supabase.co', anonKey: 'eyJ...' };
     if (!connected) return;
     const sel = $('cloudMatchList'); if (!sel) return;
     const { data, error } = await sb.from('matches')
-      .select('id,home_name,away_name,created_at')
+      .select('id,code,home_name,away_name,created_at')
       .order('created_at', { ascending: false }).limit(50);
     if (error) { console.warn('list matches:', error.message); return; }
     sel.innerHTML = '<option value="">— select a match —</option>' +
       (data || []).map(m => {
         const d = (m.created_at || '').slice(0, 16).replace('T', ' ');
-        return `<option value="${m.id}">${m.home_name} vs ${m.away_name} · ${d} · ${m.id.slice(0, 8)}</option>`;
+        return `<option value="${m.code || m.id}">#${m.code || '?'} · ${m.home_name} vs ${m.away_name} · ${d}</option>`;
       }).join('');
   }
 
@@ -90,24 +93,33 @@ const CONFIG = { url: 'https://abcdxyz.supabase.co', anonKey: 'eyJ...' };
       sport: PT().state.sport
     }).select().single();
     if (error) { alert('Create match failed: ' + error.message); return; }
-    await openMatch(data.id);
+    await openMatchRow(data);                       // data includes the generated 5-digit code
   }
   async function joinMatch() {
-    const id = ($('cloudMatchId').value || '').trim();
-    if (id) await openMatch(id);
+    await openByInput($('cloudMatchId').value);
   }
-  async function openMatch(id) {
+  // accept a 5-digit code OR a full UUID, resolve to the match row
+  async function openByInput(input) {
     if (!connected && !(await connect())) return;
-    matchId = id; $('cloudMatchId').value = id;
-    const { data, error } = await sb.from('events').select('*').eq('match_id', id).order('t_seconds');
+    input = (input || '').trim();
+    if (!input) return;
+    const col = /^\d{5}$/.test(input) ? 'code' : 'id';
+    const { data, error } = await sb.from('matches').select('id,code').eq(col, input).maybeSingle();
+    if (error || !data) { alert('Match not found: ' + input); return; }
+    await openMatchRow(data);
+  }
+  async function openMatchRow(row) {
+    matchId = row.id; matchCode = row.code || '';
+    if ($('cloudMatchId')) $('cloudMatchId').value = matchCode || matchId;
+    const { data, error } = await sb.from('events').select('*').eq('match_id', matchId).order('t_seconds');
     if (error) { alert('Load failed: ' + error.message); return; }
     applying = true;
     PT().state.rows = (data || []).map(dbToRow);
     PT().renderTable();
     applying = false;
     subscribe();
-    status('Live · ' + id.slice(0, 8) + ' (' + PT().state.rows.length + ')', true);
-    const link = location.origin + location.pathname + '#match=' + id;
+    status('Live · #' + (matchCode || matchId.slice(0, 8)) + ' (' + PT().state.rows.length + ')', true);
+    const link = location.origin + location.pathname + '#match=' + (matchCode || matchId);
     if ($('cloudShare')) { $('cloudShare').value = link; $('cloudShareRow').style.display = 'flex'; }
   }
 
@@ -131,7 +143,7 @@ const CONFIG = { url: 'https://abcdxyz.supabase.co', anonKey: 'eyJ...' };
       const i = findIdx(payload.old.id); if (i >= 0) rows.splice(i, 1);
     }
     PT().renderTable();
-    if (matchId) status('Live · ' + matchId.slice(0, 8) + ' (' + rows.length + ')', true);
+    if (matchId) status('Live · #' + (matchCode || matchId.slice(0, 8)) + ' (' + rows.length + ')', true);
     applying = false;
   }
 
@@ -157,19 +169,19 @@ const CONFIG = { url: 'https://abcdxyz.supabase.co', anonKey: 'eyJ...' };
   function init() {
     if (!$('cloudBtn')) return;
     const c = cfg();
-    if ($('cloudUrl')) { $('cloudUrl').value = CONFIG.url || c.url || ''; $('cloudKey').value = CONFIG.anonKey || c.key || ''; }
+    if ($('cloudUrl')) { $('cloudUrl').value = c.url || CONFIG.url || ''; $('cloudKey').value = c.key || CONFIG.anonKey || ''; }
     $('cloudBtn').onclick = () => $('cloudModal').classList.add('show');
     $('cloudClose').onclick = () => $('cloudModal').classList.remove('show');
     $('cloudModal').addEventListener('click', (e) => { if (e.target === $('cloudModal')) $('cloudModal').classList.remove('show'); });
     $('cloudConnect').onclick = connect;
     $('cloudCreate').onclick = createMatch;
     $('cloudJoin').onclick = joinMatch;
-    if ($('cloudMatchList')) $('cloudMatchList').onchange = (e) => { if (e.target.value) openMatch(e.target.value); };
+    if ($('cloudMatchList')) $('cloudMatchList').onchange = (e) => { if (e.target.value) openByInput(e.target.value); };
     if ($('cloudRefresh')) $('cloudRefresh').onclick = loadRecentMatches;
     $('cloudCopy').onclick = () => { $('cloudShare').select(); document.execCommand('copy'); };
-    // deep link: open the site with #match=<id> to auto-join
-    const m = location.hash.match(/match=([0-9a-f-]{36})/i);
-    if (m && (CONFIG.url || c.url)) (async () => { if (await connect()) await openMatch(m[1]); })();
+    // deep link: open the site with #match=<code-or-uuid> to auto-join
+    const m = location.hash.match(/match=([0-9a-f-]{5,36})/i);
+    if (m && (c.url || CONFIG.url)) (async () => { if (await connect()) await openByInput(m[1]); })();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
