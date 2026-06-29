@@ -49,12 +49,12 @@ const CONFIG = { url: '', anonKey: '' };
   function status(txt, ok) { const el = $('cloudStatus'); if (el) { el.textContent = txt; el.className = 'mini' + (ok ? ' on' : ''); } }
 
   /* ---------- connect + auth ---------- */
-  async function connect() {
+  async function connect(silent) {
     const c = cfg();
     // precedence: what the user typed -> what they saved -> CONFIG fallback (so a wrong CONFIG never locks anyone out)
     const url = ($('cloudUrl') ? $('cloudUrl').value.trim() : '') || c.url || CONFIG.url;
     const key = ($('cloudKey') ? $('cloudKey').value.trim() : '') || c.key || CONFIG.anonKey;
-    if (!url || !key) { alert('Enter your Supabase URL and anon key.'); return false; }
+    if (!url || !key) { if (!silent) alert('Enter your Supabase URL and anon key.'); return false; }
     saveCfg({ url, key });
     sb = window.supabase.createClient(url, key, { realtime: { params: { eventsPerSecond: 20 } } });
     let session = null;
@@ -68,7 +68,7 @@ const CONFIG = { url: '', anonKey: '' };
     } catch (e) {
       const msg = (e && e.message) || '';
       const net = /failed to fetch|networkerror|load failed|fetch/i.test(msg);
-      alert(net
+      if (!silent) alert(net
         ? 'Cannot reach Supabase (network / URL problem):\n'
           + '• Check the Project URL is EXACTLY correct (Settings → API)\n'
           + '• Make sure the project is NOT paused — free projects auto-pause after ~1 week idle (Dashboard → Resume)\n'
@@ -238,15 +238,20 @@ const CONFIG = { url: '', anonKey: '' };
     $('cloudBtn').onclick = () => $('cloudModal').classList.add('show');
     $('cloudClose').onclick = () => $('cloudModal').classList.remove('show');
     $('cloudModal').addEventListener('click', (e) => { if (e.target === $('cloudModal')) $('cloudModal').classList.remove('show'); });
-    $('cloudConnect').onclick = connect;
+    $('cloudConnect').onclick = () => connect();
     $('cloudCreate').onclick = createMatch;
     $('cloudJoin').onclick = joinMatch;
     if ($('cloudMatchList')) $('cloudMatchList').onchange = (e) => { if (e.target.value) openByInput(e.target.value); };
     if ($('cloudRefresh')) $('cloudRefresh').onclick = loadRecentMatches;
     $('cloudCopy').onclick = () => { $('cloudShare').select(); document.execCommand('copy'); };
-    // deep link: open the site with #match=<code-or-uuid> to auto-join
-    const m = location.hash.match(/match=([0-9a-f-]{5,36})/i);
-    if (m && (c.url || CONFIG.url)) (async () => { if (await connect()) await openByInput(m[1]); })();
+    // auto-connect on load when credentials are saved/configured, so the shared event
+    // dictionary syncs without clicking Connect; also auto-join a #match=<code> link.
+    if (c.url || CONFIG.url) (async () => {
+      if (await connect(true)) {
+        const m = location.hash.match(/match=([0-9a-z-]{5,36})/i);
+        if (m) await openByInput(m[1]);
+      }
+    })();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
