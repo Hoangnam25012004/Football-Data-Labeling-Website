@@ -87,7 +87,7 @@ const CONFIG = { url: '', anonKey: '' };
     if (!connected) return;
     const sel = $('cloudMatchList'); if (!sel) return;
     const { data, error } = await sb.from('matches')
-      .select('id,code,home_name,away_name,created_at')
+      .select('*')
       .order('created_at', { ascending: false }).limit(50);
     if (error) { console.warn('list matches:', error.message); return; }
     sel.innerHTML = '<option value="">— select a match —</option>' +
@@ -117,8 +117,8 @@ const CONFIG = { url: '', anonKey: '' };
     input = (input || '').trim();
     if (!input) return;
     const col = /^\d{5}$/.test(input) ? 'code' : 'id';
-    const { data, error } = await sb.from('matches').select('id,code').eq(col, input).maybeSingle();
-    if (error || !data) { alert('Match not found: ' + input); return; }
+    const { data, error } = await sb.from('matches').select('*').eq(col, input).maybeSingle();
+    if (error || !data) { alert('Match not found: ' + input + (error ? '\n(' + error.message + ')' : '')); return; }
     await openMatchRow(data);
   }
   async function openMatchRow(row) {
