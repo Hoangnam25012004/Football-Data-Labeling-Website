@@ -527,7 +527,6 @@ function loadFile(f){
   video.src=URL.createObjectURL(f);
   video.style.display='block'; drop.style.display='none';
   $('controls').style.display='flex';
-  window.Cloud&&window.Cloud.onLocalVideo&&window.Cloud.onLocalVideo(f); // upload to share with everyone on this match
 }
 // load a video from a URL (shared match video from Supabase Storage)
 function loadVideoUrl(url){
@@ -1206,6 +1205,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast};
 </script>
-<script src="cloud-sync.js?v=7"></script>
+<script src="cloud-sync.js?v=8"></script>
 </body>
 </html>

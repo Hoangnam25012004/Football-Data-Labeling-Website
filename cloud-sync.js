@@ -209,18 +209,9 @@ const CONFIG = { url: '', anonKey: '' };
       .subscribe();
   }
 
-  // upload a dropped video to Storage and share its URL with everyone on this match
-  async function onLocalVideo(file) {
-    if (!connected || !matchId) return;     // only share when a cloud match is open
-    PT().toast('Uploading video…');
-    const path = matchId + '/' + file.name.replace(/[^\w.\-]+/g, '_');
-    const up = await sb.storage.from('match-videos').upload(path, file, { upsert: true, contentType: file.type });
-    if (up.error) { console.warn('video upload:', up.error.message); alert('Video upload failed: ' + up.error.message); return; }
-    const { data: { publicUrl } } = sb.storage.from('match-videos').getPublicUrl(path);
-    lastVideoUrl = publicUrl;                // keep playing our local copy; ignore the realtime echo
-    await sb.from('matches').update({ video_url: publicUrl, video_path: path }).eq('id', matchId);
-    PT().toast('Video shared with everyone on this match');
-  }
+  // NOTE: video upload removed — see the long-term storage plan (Cloudflare R2 / Stream).
+  // The app can still PLAY a shared video by reading matches.video_url, so once an external
+  // store is wired in (presigned upload -> set matches.video_url), playback works unchanged.
 
   // set the Home/Away name boxes without re-triggering a cloud write
   function setTeamInputs(home, away) {
@@ -264,7 +255,7 @@ const CONFIG = { url: '', anonKey: '' };
   window.Cloud = {
     get connected() { return connected; },
     get matchId() { return matchId; },
-    onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged, onLocalVideo
+    onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged
   };
 
   /* ---------- UI wiring ---------- */
