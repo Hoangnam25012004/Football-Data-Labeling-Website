@@ -33,6 +33,7 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html _site/index.html
+          cp cloud-sync.js _site/cloud-sync.js
           cp pitchtagger_events.json _site/pitchtagger_events.json || true
 
       - name: Setup Pages

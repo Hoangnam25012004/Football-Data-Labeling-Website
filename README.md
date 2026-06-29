@@ -24,8 +24,30 @@ In the repository: **Settings → Pages → Build and deployment → Source: Git
 Just open `index.html` in your browser. For the "auto-save to file" feature (File System
 Access API), serve it over `http://localhost` (e.g. `python -m http.server`) in Chrome/Edge.
 
+## Real-time cloud sync (Supabase)
+Tagged events can be saved to a shared Postgres database and synced live between everyone
+viewing the same match (video stays local — only event metadata is stored).
+
+**One-time Supabase setup:**
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Run the schema: paste [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql)
+   into the SQL Editor (or `supabase db push`).
+3. Auth → Providers → enable **Allow anonymous sign-ins**.
+4. (Optional, for zero-friction sharing) put your project **URL** and **anon key** into
+   `CONFIG` at the top of [`cloud-sync.js`](cloud-sync.js). The anon key is public and safe
+   to commit — access is protected by Row-Level Security.
+
+**Using it:**
+- Click **☁ Cloud** → Connect (enter URL + anon key if not baked into `CONFIG`).
+- **New shared match** → copy the link and send it to collaborators.
+- Anyone who opens the link sees each other's tags appear live.
+
+See [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) for the schema
+(Matches + Events with a JSONB `attributes` column for unlimited per-event metrics),
+indexes, RLS, and the realtime publication.
+
 ## Notes
-- Match events and the event/hotkey list are stored in the browser (localStorage) and can
-  be backed up to `pitchtagger_events.json`.
-- For a multi-user, cloud-stored version (shared database, video streaming), see the
-  planned architecture: static frontend + Supabase (Postgres/Realtime/Auth) + a video CDN.
+- Without cloud sync, events and the event/hotkey list stay in the browser (localStorage)
+  and can be backed up to `pitchtagger_events.json`.
+- Videos are never uploaded — for a scalable multi-user video pipeline use a CDN
+  (Cloudflare Stream / R2) as described in the architecture plan.

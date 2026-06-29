@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pitch Tagger — Sports Event Labeler</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3240;
@@ -127,6 +128,7 @@
   .file-link button{background:var(--panel2);border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:600}
   .file-link button:hover{border-color:var(--accent);color:var(--accent)}
   #fileStatus.on{color:var(--accent)}
+  #cloudStatus.on{color:var(--accent)}
 
   /* Stats modal */
   .stats-modal{max-width:96vw;width:1180px}
@@ -199,6 +201,7 @@
     <button class="ev-btn" id="statsBtn" title="Player statistics">📊 Stats</button>
     <button class="ev-btn" id="popBtn" title="Pop the video into its own window so the event table fills the screen">⧉ Open window</button>
     <button class="ev-btn" id="durBtn" title="Map original video times to the real match timeline">⏱ Duration</button>
+    <button class="ev-btn" id="cloudBtn" title="Real-time cloud sync — share a match with others">☁ Cloud</button>
     <input id="homeName" placeholder="Home team" value="Home">
     <input id="awayName" placeholder="Away team" value="Away">
     <select id="sportSel" class="txt" style="width:auto">
@@ -363,6 +366,43 @@
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="cloudModal">
+  <div class="modal">
+    <div class="modal-head">
+      <b>Cloud sync (real-time)</b>
+      <span class="mini" id="cloudStatus">Not connected</span>
+      <button class="modal-close" id="cloudClose" title="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <label class="fld"><span>Supabase URL</span></label>
+      <input class="txt" id="cloudUrl" placeholder="https://xxxx.supabase.co">
+      <label class="fld" style="margin-top:8px"><span>Anon (public) key</span></label>
+      <input class="txt" id="cloudKey" placeholder="eyJhbGciOi...">
+      <button class="addbtn" id="cloudConnect" style="margin-top:10px">Connect</button>
+
+      <div id="cloudConnected" style="display:none;margin-top:14px">
+        <div style="border-top:1px solid var(--line);padding-top:12px">
+          <div class="ev-backup">
+            <button id="cloudCreate" title="Create a new shared match">＋ New shared match</button>
+          </div>
+          <label class="fld" style="margin-top:10px"><span>…or join an existing match by ID</span></label>
+          <div class="addrow">
+            <input class="txt" id="cloudMatchId" placeholder="match UUID">
+            <button id="cloudJoin" title="join">↪</button>
+          </div>
+          <div class="file-link" id="cloudShareRow" style="display:none">
+            <input class="txt" id="cloudShare" readonly style="flex:1">
+            <button id="cloudCopy">Copy link</button>
+          </div>
+        </div>
+      </div>
+      <div class="syntax-hint" style="margin-top:12px">
+        One person clicks <b>New shared match</b> and shares the link (or match ID). Everyone who opens it
+        sees each other's tags live. Tagged events save to your Supabase database (video stays local).
+      </div>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -419,6 +459,7 @@ const state = {
 };
 let pvRedraw=null, pvTogglePitch=null, pvSyncEntry=null; // set while the video window is open
 const fmtXY=xy=>xy?Math.round(xy.x)+','+Math.round(xy.y):'—';
+const newId=()=>(crypto&&crypto.randomUUID)?crypto.randomUUID():('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16);}));
 
 /* ---- match duration mapping (original video time -> match timeline) ---- */
 const DUR_STORE='pitchtagger.duration.v1';
@@ -758,11 +799,12 @@ function pushRow({from,to,action,event,raw}){
   const pd=state.pendingDots;
   // Timeline = the moment the Player dot was placed (fall back to current video time)
   const t = pd.p ? pd.p.t : (video.src?video.currentTime:0);
-  const row={t, rt: pd.r?pd.r.t:null, team:state.team,
+  const row={id:newId(), t, rt: pd.r?pd.r.t:null, team:state.team,
     teamName:state.team==='home'?$('homeName').value:$('awayName').value,
     event,playerFrom:from,playerTo:to,action,raw,
     pXY: pd.p?{x:pd.p.x,y:pd.p.y}:null, rXY: pd.r?{x:pd.r.x,y:pd.r.y}:null};
   state.rows.push(row);
+  window.Cloud&&window.Cloud.onLocalUpsert(row); // sync new event to the cloud (if connected)
   state.pendingDots={p:null,r:null}; // consume the dots
   if(pvRedraw)pvRedraw();             // clear them from the pitch overlay
   $('halfSel').value=eventHalf(row); // jump the view to the half the new event lands in
@@ -792,7 +834,7 @@ function renderTable(){
       : b5;
     tr.innerHTML=`<td>${shown}</td>${homeCells}<td class="tl-col tlink">${fmt(matchTime(r.t))}</td>${awayCells}<td class="del">×</td>`;
     tr.querySelector('.tlink').onclick=()=>{if(video.src)video.currentTime=r.t};
-    tr.querySelector('.del').onclick=()=>{state.rows.splice(i,1);renderTable()};
+    tr.querySelector('.del').onclick=()=>{const id=state.rows[i].id;state.rows.splice(i,1);renderTable();window.Cloud&&window.Cloud.onLocalDelete(id);};
     tr.querySelectorAll('[data-edit]').forEach(td=>{td.ondblclick=()=>editPlayerCell(td,i,td.dataset.edit)});
     tr.querySelectorAll('.ed-ev').forEach(td=>{td.ondblclick=()=>editEventCell(td,i)});
     tb.appendChild(tr);
@@ -807,7 +849,7 @@ $('halfSel').onchange=renderTable;
 /* inline-edit a player number cell (double-click) */
 function editPlayerCell(td,idx,field){
   const fkey=field==='from'?'playerFrom':'playerTo';
-  const cur=state.rows[idx][fkey]||'';
+  const row=state.rows[idx], cur=row[fkey]||'';
   const inp=document.createElement('input');
   inp.className='cell-edit'; inp.value=cur; inp.maxLength=4;
   inp.onkeydown=e=>{e.stopPropagation();
@@ -815,7 +857,8 @@ function editPlayerCell(td,idx,field){
     else if(e.key==='Escape'){inp.value=cur;inp.blur();}};
   let done=false;
   inp.onblur=()=>{if(done)return;done=true;
-    state.rows[idx][fkey]=inp.value.trim(); renderTable();};
+    row[fkey]=inp.value.trim(); renderTable();
+    window.Cloud&&window.Cloud.onLocalUpsert(row);};
   td.textContent=''; td.appendChild(inp); inp.focus(); inp.select();
 }
 /* inline-edit an event cell by typing a hotkey (double-click) */
@@ -834,7 +877,7 @@ function editEventCell(td,idx){
       if(name){r.event=name; r.action=key;}
       else{alert('No event is bound to hotkey "'+key+'".');}
     }
-    renderTable();};
+    renderTable(); window.Cloud&&window.Cloud.onLocalUpsert(r);};
   td.textContent=''; td.appendChild(inp); inp.focus(); inp.select();
 }
 
@@ -1227,6 +1270,10 @@ $('linkFileBtn').onclick=async()=>{
 
 if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
 renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); updateFileStatus();
+
+// bridge for the cloud-sync module (loaded next)
+window.PT={state, renderTable, eventHalf, fmt};
 </script>
+<script src="cloud-sync.js"></script>
 </body>
 </html>
