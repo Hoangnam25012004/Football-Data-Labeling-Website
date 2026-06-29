@@ -14,7 +14,7 @@ const CONFIG = { url: '', anonKey: '' };
 (function () {
   const $ = (id) => document.getElementById(id);
   const LS = 'pitchtagger.cloud.cfg';
-  let sb = null, channel = null, matchId = null, matchCode = null, connected = false, applying = false;
+  let sb = null, channel = null, matchId = null, matchCode = null, connected = false, applying = false, lastVideoUrl = null;
 
   const PT = () => window.PT;                       // bridge to the app (state, renderTable, eventHalf)
   const cfg = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } };
@@ -177,6 +177,8 @@ const CONFIG = { url: '', anonKey: '' };
     matchId = row.id; matchCode = row.code || '';
     if ($('cloudMatchId')) $('cloudMatchId').value = matchCode || matchId;
     setTeamInputs(row.home_name, row.away_name);   // load this match's team names
+    lastVideoUrl = row.video_url || null;
+    if (row.video_url) PT().loadVideoUrl(row.video_url);   // load the shared video for this match
     const { data, error } = await sb.from('events').select('*').eq('match_id', matchId).order('t_seconds');
     if (error) { alert('Load failed: ' + error.message); return; }
     applying = true;
@@ -197,8 +199,27 @@ const CONFIG = { url: '', anonKey: '' };
         applyRemote)
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'matches', filter: 'id=eq.' + matchId },
-        (p) => { if (p.new) setTeamInputs(p.new.home_name, p.new.away_name); })   // live team-name sync
+        (p) => {                                                    // live team-name + shared-video sync
+          if (!p.new) return;
+          setTeamInputs(p.new.home_name, p.new.away_name);
+          if (p.new.video_url && p.new.video_url !== lastVideoUrl) {
+            lastVideoUrl = p.new.video_url; PT().loadVideoUrl(p.new.video_url);
+          }
+        })
       .subscribe();
+  }
+
+  // upload a dropped video to Storage and share its URL with everyone on this match
+  async function onLocalVideo(file) {
+    if (!connected || !matchId) return;     // only share when a cloud match is open
+    PT().toast('Uploading video…');
+    const path = matchId + '/' + file.name.replace(/[^\w.\-]+/g, '_');
+    const up = await sb.storage.from('match-videos').upload(path, file, { upsert: true, contentType: file.type });
+    if (up.error) { console.warn('video upload:', up.error.message); alert('Video upload failed: ' + up.error.message); return; }
+    const { data: { publicUrl } } = sb.storage.from('match-videos').getPublicUrl(path);
+    lastVideoUrl = publicUrl;                // keep playing our local copy; ignore the realtime echo
+    await sb.from('matches').update({ video_url: publicUrl, video_path: path }).eq('id', matchId);
+    PT().toast('Video shared with everyone on this match');
   }
 
   // set the Home/Away name boxes without re-triggering a cloud write
@@ -243,7 +264,7 @@ const CONFIG = { url: '', anonKey: '' };
   window.Cloud = {
     get connected() { return connected; },
     get matchId() { return matchId; },
-    onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged
+    onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged, onLocalVideo
   };
 
   /* ---------- UI wiring ---------- */

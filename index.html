@@ -527,6 +527,13 @@ function loadFile(f){
   video.src=URL.createObjectURL(f);
   video.style.display='block'; drop.style.display='none';
   $('controls').style.display='flex';
+  window.Cloud&&window.Cloud.onLocalVideo&&window.Cloud.onLocalVideo(f); // upload to share with everyone on this match
+}
+// load a video from a URL (shared match video from Supabase Storage)
+function loadVideoUrl(url){
+  if(!url||video.src===url) return;
+  video.src=url; video.style.display='block'; drop.style.display='none';
+  $('controls').style.display='flex';
 }
 drop.onclick=()=>fileInput.click();
 fileInput.onchange=e=>loadFile(e.target.files[0]);
@@ -1197,8 +1204,8 @@ if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
 renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable();
 
 // bridge for the cloud-sync module (loaded next)
-window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus};
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast};
 </script>
-<script src="cloud-sync.js?v=6"></script>
+<script src="cloud-sync.js?v=7"></script>
 </body>
 </html>
