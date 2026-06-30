@@ -26,15 +26,18 @@
   .right{display:flex;flex-direction:column;overflow:hidden;background:var(--panel)}
 
   /* video fills left column */
-  .video-wrap{background:#000;position:relative;flex:1;max-height:52vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
-  /* Formation overlay on the (smaller) video frame */
-  #formationOverlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:6}
+  .video-wrap{background:#000;position:relative;flex:none;height:36vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  /* permanent formation panel under the (smaller) video — both teams, read-only */
+  #formationPanel{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:8px;border-top:1px solid var(--line)}
   .fm-pitch{position:relative;aspect-ratio:105/68;height:100%;max-width:100%}
   .fm-pitch svg{position:absolute;inset:0;width:100%;height:100%}
-  .fm-dot{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;border:2px solid #000;z-index:2}
+  .fm-dot{position:absolute;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;border:2px solid #000;z-index:3}
   .fm-dot.away{background:var(--away)}
-  .fm-dot .lbl{position:absolute;top:27px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600}
-  .ev-btn.on{border-color:var(--accent);color:var(--accent)}
+  .fm-dot .lbl{position:absolute;top:25px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600}
+  /* position-zone grid (editor & display) */
+  .pz{position:absolute;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:rgba(255,255,255,.55);box-sizing:border-box;border:1px solid rgba(255,255,255,.10);z-index:1;pointer-events:none}
+  .pz.red{background:rgba(150,40,40,.30)} .pz.green{background:rgba(40,95,52,.30)} .pz.blue{background:rgba(45,55,115,.32)} .pz.gold{background:rgba(120,100,40,.30)} .pz.none{background:transparent;border-color:transparent}
+  .pz-arrow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:26px;color:rgba(255,255,255,.45);z-index:2;pointer-events:none}
   video{width:100%;height:100%;object-fit:contain;display:block}
   .drop{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--panel2);border:2px dashed var(--line);color:var(--mut);cursor:pointer;text-align:center;flex-direction:column;gap:8px}
   .drop.drag{border-color:var(--accent);color:var(--accent)}
@@ -245,7 +248,6 @@
     <button class="ev-btn" id="durBtn" title="Map original video times to the real match timeline">⏱ Duration</button>
     <button class="ev-btn" id="cloudBtn" title="Real-time cloud sync — share a match with others">☁ Cloud</button>
     <button class="ev-btn" id="lineupBtn" title="Player lists, starting XI, subs & formation">👥 Player lists</button>
-    <button class="ev-btn" id="formBtn" title="Show both teams' formation over the video">📋 Formation</button>
     <input id="homeName" placeholder="Home team" value="Home">
     <span class="score" id="scoreBoard" title="Goals — auto-counted from tagged events"><b class="sc-h">0</b><span class="sc-dash">-</span><b class="sc-a">0</b></span>
     <input id="awayName" placeholder="Away team" value="Away">
@@ -267,7 +269,6 @@
         <div style="font-size:11px">mp4 / webm / mov</div>
       </div>
       <video id="video" style="display:none" controls preload="auto" playsinline disablepictureinpicture></video>
-      <div id="formationOverlay"><div class="fm-pitch" id="fmPitch"></div></div>
     </div>
     <input type="file" id="fileInput" accept="video/*" style="display:none">
     <div class="controls" id="controls" style="display:none">
@@ -288,6 +289,7 @@
         <option value="2">2×</option>
       </select>
     </div>
+    <div id="formationPanel"><div class="fm-pitch" id="fmPitch"></div></div>
   </div>
 
   <div class="right">
@@ -462,7 +464,6 @@
         <div class="lu-add">
           <input id="luNo" placeholder="No" inputmode="numeric">
           <input id="luName" placeholder="Player name">
-          <input id="luPos" placeholder="Pos">
           <button id="luAdd" title="add player">+</button>
         </div>
         <div class="lu-roster" id="luRoster"></div>
@@ -542,7 +543,6 @@ const state = {
   rows:[], fps:25
 };
 let pvRedraw=null, pvTogglePitch=null, pvSyncEntry=null, pvRenderPitch=null; // set while the video window is open
-let formationOn=false; // formation overlay shown on the main video frame
 const fmtXY=xy=>xy?Math.round(xy.x)+','+Math.round(xy.y):'—';
 const newId=()=>(crypto&&crypto.randomUUID)?crypto.randomUUID():('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16);}));
 
@@ -564,6 +564,27 @@ function applyCloudLineups(l){
   if($('lineupModal')&&$('lineupModal').classList.contains('show'))renderLineup();
   refreshFormation();
 }
+/* position-zone grid (6 cols x 3 rows). Canonical: attacking LEFT, GK on the right. */
+const FORMATION_GRID=[
+  ['RF','RW','RM','RWB','RB',''],
+  ['CF','CAM','CM','CDM','CB','GK'],
+  ['LF','LW','LM','LWB','LB','']
+];
+const PZ_COLORS=['red','green','green','blue','blue','gold']; // by canonical column
+const effCol=(col,dir)=>dir==='lr'?5-col:col;
+function zoneAt(x,y,dir){
+  const col=Math.max(0,Math.min(5,Math.floor(x/100*6))), row=Math.max(0,Math.min(2,Math.floor(y/100*3)));
+  return FORMATION_GRID[row][effCol(col,dir)]||'';
+}
+function gridHTML(dir){
+  let h='';
+  for(let row=0;row<3;row++)for(let col=0;col<6;col++){
+    const ec=effCol(col,dir), lbl=FORMATION_GRID[row][ec], color=lbl?PZ_COLORS[ec]:'none';
+    h+=`<div class="pz ${color}" style="left:${col*100/6}%;top:${row*100/3}%;width:${100/6}%;height:${100/3}%">${lbl}</div>`;
+  }
+  h+=`<div class="pz-arrow">${dir==='lr'?'▶':'◀'}</div>`;
+  return h;
+}
 const MAX_XI={football:11,football7:7,futsal:5,basketball:5};
 let lineupTeam='home';
 function teamLU(){return state.lineups[lineupTeam];}
@@ -576,9 +597,9 @@ function renderLineup(){
   $('luAwayBtn').textContent=$('awayName').value||'Away';
   const t=teamLU(), ros=$('luRoster'); ros.innerHTML='';
   t.roster.forEach(p=>{
-    const inXI=t.xi.some(x=>x.no===p.no), inSub=t.subs.includes(p.no);
+    const xiE=t.xi.find(x=>x.no===p.no), inXI=!!xiE, inSub=t.subs.includes(p.no);
     const row=document.createElement('div'); row.className='lu-prow';
-    row.innerHTML=`<span class="num">${p.no}</span><span class="pname">${p.name||''}</span><span class="ppos">${p.pos||''}</span>`;
+    row.innerHTML=`<span class="num">${p.no}</span><span class="pname">${p.name||''}</span><span class="ppos">${xiE?(xiE.pos||''):''}</span>`;
     const xiB=document.createElement('button');xiB.textContent='XI';if(inXI)xiB.className='on';xiB.onclick=()=>toggleXI(p.no);
     const sB=document.createElement('button');sB.textContent='Sub';if(inSub)sB.className='on';sB.onclick=()=>toggleSub(p.no);
     const rm=document.createElement('button');rm.className='rm';rm.textContent='×';rm.title='remove';rm.onclick=()=>removeLuPlayer(p.no);
@@ -591,7 +612,7 @@ function renderLineup(){
 }
 function renderLuPitch(){
   const t=teamLU(), pit=$('luPitch');
-  pit.innerHTML=pitchSVG('football');   // football pitch backdrop for the formation editor
+  pit.innerHTML=pitchSVG('football')+gridHTML(t.dir);   // pitch + position-zone grid + arrow
   t.xi.forEach(x=>{
     const p=rosterPlayer(t,x.no);
     const dot=document.createElement('div');
@@ -604,19 +625,20 @@ function renderLuPitch(){
 function luDrag(dot,x){
   dot.onpointerdown=e=>{
     e.preventDefault(); dot.setPointerCapture(e.pointerId); dot.style.cursor='grabbing';
-    const pit=$('luPitch');
+    const pit=$('luPitch'), dir=teamLU().dir;
     const move=ev=>{const r=pit.getBoundingClientRect();
       x.x=Math.max(0,Math.min(100,(ev.clientX-r.left)/r.width*100));
       x.y=Math.max(0,Math.min(100,(ev.clientY-r.top)/r.height*100));
+      x.pos=zoneAt(x.x,x.y,dir);              // position from the zone the dot is in
       dot.style.left=x.x+'%'; dot.style.top=x.y+'%';};
-    const up=()=>{dot.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);saveLineups();};
+    const up=()=>{dot.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);saveLineups();renderLineup();};
     document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
   };
 }
 function toggleXI(no){const t=teamLU(), i=t.xi.findIndex(x=>x.no===no);
   if(i>=0)t.xi.splice(i,1);
   else{if(t.xi.length>=maxXI()){alert('Starting lineup is full ('+maxXI()+').');return;}
-    t.subs=t.subs.filter(n=>n!==no); t.xi.push({no,x:50,y:Math.min(90,12+t.xi.length*8)});}
+    t.subs=t.subs.filter(n=>n!==no); const nx=50,ny=Math.min(90,12+t.xi.length*8); t.xi.push({no,x:nx,y:ny,pos:zoneAt(nx,ny,t.dir)});}
   saveLineups();renderLineup();}
 function toggleSub(no){const t=teamLU();
   if(t.subs.includes(no))t.subs=t.subs.filter(n=>n!==no);
@@ -627,9 +649,10 @@ function removeLuPlayer(no){const t=teamLU();
   saveLineups();renderLineup();}
 function addLuPlayer(){const no=$('luNo').value.trim(); if(!no)return; const t=teamLU();
   if(t.roster.some(p=>p.no===no)){alert('No. '+no+' already exists.');return;}
-  t.roster.push({no,name:$('luName').value.trim(),pos:$('luPos').value.trim()});
-  $('luNo').value='';$('luName').value='';$('luPos').value=''; saveLineups();renderLineup(); $('luNo').focus();}
-function luSwitchDir(){const t=teamLU(); t.dir=t.dir==='rl'?'lr':'rl'; t.xi.forEach(x=>x.x=100-x.x); saveLineups();renderLineup();}
+  t.roster.push({no,name:$('luName').value.trim()});
+  $('luNo').value='';$('luName').value=''; saveLineups();renderLineup(); $('luNo').focus();}
+function luSwitchDir(){const t=teamLU(); t.dir=t.dir==='rl'?'lr':'rl';
+  t.xi.forEach(x=>{x.x=100-x.x; x.pos=zoneAt(x.x,x.y,t.dir);}); saveLineups();renderLineup();}
 /* formation overlay on the main video frame (read-only, both teams) */
 function renderFormationMain(){
   const pit=$('fmPitch'); if(!pit)return;
@@ -645,14 +668,7 @@ function renderFormationMain(){
     });
   });
 }
-function refreshFormation(){ if(formationOn)renderFormationMain(); }
-function toggleFormation(){
-  formationOn=!formationOn;
-  $('formationOverlay').style.display=formationOn?'flex':'none';
-  $('formBtn').classList.toggle('on',formationOn);
-  if(formationOn)renderFormationMain();
-}
-$('formBtn').onclick=toggleFormation;
+function refreshFormation(){ renderFormationMain(); }   // formation is always shown on the main tab
 $('lineupBtn').onclick=()=>{$('lineupModal').classList.add('show');renderLineup();};
 $('lineupClose').onclick=()=>$('lineupModal').classList.remove('show');
 $('lineupModal').addEventListener('click',e=>{if(e.target===$('lineupModal'))$('lineupModal').classList.remove('show');});
@@ -660,7 +676,7 @@ $('luHomeBtn').onclick=()=>{lineupTeam='home';renderLineup();};
 $('luAwayBtn').onclick=()=>{lineupTeam='away';renderLineup();};
 $('luAdd').onclick=addLuPlayer;
 $('luDir').onclick=luSwitchDir;
-['luNo','luName','luPos'].forEach(id=>$(id).addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();addLuPlayer();}}));
+['luNo','luName'].forEach(id=>$(id).addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();addLuPlayer();}}));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('lineupModal').classList.contains('show')){e.preventDefault();$('lineupModal').classList.remove('show');}});
 // parse "mm:ss(.cc)" / "h:mm:ss" / plain seconds -> seconds
 function parseTime(s){
@@ -1464,11 +1480,11 @@ function teamStatsSheet(){
 }
 
 if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
-renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable();
+renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); renderFormationMain();
 
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups};
 </script>
-<script src="cloud-sync.js?v=14"></script>
+<script src="cloud-sync.js?v=15"></script>
 </body>
 </html>
