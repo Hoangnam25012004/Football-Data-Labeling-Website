@@ -178,6 +178,7 @@ const CONFIG = { url: '', anonKey: '' };
     if ($('cloudMatchId')) $('cloudMatchId').value = matchCode || matchId;
     setTeamInputs(row.home_name, row.away_name);   // load this match's team names
     if (row.config) PT().applyCloudDuration(row.config);   // load this match's duration mapping
+    if (row.lineups) PT().applyCloudLineups(row.lineups);  // load this match's player lists / formation
     lastVideoUrl = row.video_url || null;
     if (row.video_url) PT().loadVideoUrl(row.video_url);   // load the shared video for this match
     const { data, error } = await sb.from('events').select('*').eq('match_id', matchId).order('t_seconds');
@@ -204,6 +205,7 @@ const CONFIG = { url: '', anonKey: '' };
           if (!p.new) return;
           setTeamInputs(p.new.home_name, p.new.away_name);
           if (p.new.config) PT().applyCloudDuration(p.new.config);
+          if (p.new.lineups) PT().applyCloudLineups(p.new.lineups);
           if (p.new.video_url && p.new.video_url !== lastVideoUrl) {
             lastVideoUrl = p.new.video_url; PT().loadVideoUrl(p.new.video_url);
           }
@@ -236,6 +238,16 @@ const CONFIG = { url: '', anonKey: '' };
       if (error) console.warn('duration save:', error.message);
     }, 250);
   }
+  // called by the app when player lists / formation change -> save on the match (matches.lineups)
+  let luTimer = null;
+  function onLineupsChanged(l) {
+    if (!connected || !matchId) return;
+    clearTimeout(luTimer);
+    luTimer = setTimeout(async () => {
+      const { error } = await sb.from('matches').update({ lineups: l }).eq('id', matchId);
+      if (error) console.warn('lineups save:', error.message);
+    }, 300);
+  }
 
   const findIdx = (id) => PT().state.rows.findIndex((r) => r.id === id);
   function applyRemote(payload) {
@@ -267,7 +279,7 @@ const CONFIG = { url: '', anonKey: '' };
   window.Cloud = {
     get connected() { return connected; },
     get matchId() { return matchId; },
-    onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged, onDurationChanged
+    onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged, onDurationChanged, onLineupsChanged
   };
 
   /* ---------- UI wiring ---------- */

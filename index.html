@@ -155,6 +155,38 @@
   table.stats tbody tr:hover td{background:#1c233066}
   .stats-empty{padding:24px;text-align:center;color:var(--mut)}
   .stats-toggle button.act-gen{background:var(--accent);color:#06281a;border-color:var(--accent)}
+  /* Player lists / formation modal */
+  .lineup-modal{max-width:96vw;width:1180px;max-height:92vh}
+  .lineup-body{display:flex;gap:14px;overflow:hidden}
+  .lu-left{width:350px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+  .lu-add{display:flex;gap:6px}
+  .lu-add input{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 8px;font-size:12px;width:54px}
+  .lu-add input#luName{flex:1;width:auto}
+  .lu-add button{background:var(--accent);color:#06281a;border:none;border-radius:6px;padding:0 12px;font-weight:700;cursor:pointer}
+  .lu-roster{flex:1;overflow:auto;max-height:64vh;display:flex;flex-direction:column;gap:4px}
+  .lu-prow{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px}
+  .lu-prow .num{width:26px;height:22px;display:flex;align-items:center;justify-content:center;background:#000;border-radius:4px;color:var(--accent);font-weight:700;font-size:11px;flex-shrink:0}
+  .lu-prow .pname{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lu-prow .ppos{color:var(--mut);width:38px;text-align:right}
+  .lu-prow button{border:1px solid var(--line);background:var(--panel);color:var(--mut);border-radius:5px;padding:2px 7px;cursor:pointer;font-size:11px}
+  .lu-prow button.on{border-color:var(--accent);color:var(--accent);font-weight:700}
+  .lu-prow .rm{color:var(--danger);border:none;background:none;font-size:14px}
+  .lu-right{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .lu-pitchwrap{background:#142b18;border:1px solid var(--line);border-radius:8px;overflow:hidden;padding:6px}
+  .lu-pitch{position:relative;width:100%;aspect-ratio:105/68;touch-action:none}
+  .lu-pitch svg{position:absolute;inset:0;width:100%;height:100%}
+  .lu-dot{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;cursor:grab;border:2px solid #000;user-select:none;z-index:2;touch-action:none}
+  .lu-dot.away{background:var(--away)}
+  .lu-dot .lbl{position:absolute;top:31px;left:50%;transform:translateX(-50%);font-size:10px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600;pointer-events:none}
+  .lu-dir{display:flex;align-items:center;gap:12px}
+  .lu-dir button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px}
+  .lu-dir button:hover{border-color:var(--accent)}
+  .lu-dir #luCount{color:var(--mut);font-size:12px}
+  .lu-subs{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .lu-subs b{font-size:12px}
+  .lu-subs #luSubs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:20px}
+  .lu-chip{display:inline-flex;align-items:center;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:3px 9px;font-size:11px}
+  .lu-chip .num{color:var(--accent);font-weight:700}
   /* Pass distribution matrix */
   .pm-title{font-weight:700;margin:16px 0 6px;font-size:13px}
   .pm-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;max-height:60vh}
@@ -204,6 +236,7 @@
     <button class="ev-btn" id="popBtn" title="Pop the video into its own window so the event table fills the screen">⧉ Open window</button>
     <button class="ev-btn" id="durBtn" title="Map original video times to the real match timeline">⏱ Duration</button>
     <button class="ev-btn" id="cloudBtn" title="Real-time cloud sync — share a match with others">☁ Cloud</button>
+    <button class="ev-btn" id="lineupBtn" title="Player lists, starting XI, subs & formation">👥 Player lists</button>
     <input id="homeName" placeholder="Home team" value="Home">
     <span class="score" id="scoreBoard" title="Goals — auto-counted from tagged events"><b class="sc-h">0</b><span class="sc-dash">-</span><b class="sc-a">0</b></span>
     <input id="awayName" placeholder="Away team" value="Away">
@@ -404,6 +437,37 @@
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="lineupModal">
+  <div class="modal lineup-modal">
+    <div class="modal-head">
+      <b>Player lists &amp; formation</b>
+      <div class="stats-toggle">
+        <button id="luHomeBtn">Home</button>
+        <button id="luAwayBtn">Away</button>
+      </div>
+      <button class="modal-close" id="lineupClose" title="Close">×</button>
+    </div>
+    <div class="modal-body lineup-body">
+      <div class="lu-left">
+        <div class="lu-add">
+          <input id="luNo" placeholder="No" inputmode="numeric">
+          <input id="luName" placeholder="Player name">
+          <input id="luPos" placeholder="Pos">
+          <button id="luAdd" title="add player">+</button>
+        </div>
+        <div class="lu-roster" id="luRoster"></div>
+      </div>
+      <div class="lu-right">
+        <div class="lu-pitchwrap"><div class="lu-pitch" id="luPitch"></div></div>
+        <div class="lu-dir">
+          <button id="luDir">⇄ Switch Attacking Direction</button>
+          <span id="luCount"></span>
+        </div>
+        <div class="lu-subs"><b>Substitutes</b><div id="luSubs"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -459,6 +523,7 @@ const state = {
   events:loadEvents(),
   duration:loadDuration(),
   pendingDots:{p:null,r:null}, // dots placed on the pitch, attached to the next tagged event
+  lineups:loadLineups(),       // {home:{roster,xi,subs,dir}, away:{...}}
   rows:[], fps:25
 };
 let pvRedraw=null, pvTogglePitch=null, pvSyncEntry=null, pvRenderPitch=null; // set while the video window is open
@@ -472,6 +537,95 @@ function loadDuration(){
   return {enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0};
 }
 function saveDuration(){try{localStorage.setItem(DUR_STORE,JSON.stringify(state.duration));}catch(e){}}
+
+/* ===================== PLAYER LISTS / FORMATION ===================== */
+const LU_STORE='pitchtagger.lineups.v1';
+const blankTeamLU=dir=>({roster:[],xi:[],subs:[],dir:dir||'lr'});
+function loadLineups(){try{const s=localStorage.getItem(LU_STORE);if(s){const o=JSON.parse(s);if(o&&o.home&&o.away)return o;}}catch(e){}
+  return {home:blankTeamLU('lr'),away:blankTeamLU('rl')};}
+function saveLineups(){try{localStorage.setItem(LU_STORE,JSON.stringify(state.lineups));}catch(e){}
+  window.Cloud&&window.Cloud.onLineupsChanged&&window.Cloud.onLineupsChanged(state.lineups);}
+function applyCloudLineups(l){
+  if(!l||!l.home||!l.away)return;
+  state.lineups=l;
+  try{localStorage.setItem(LU_STORE,JSON.stringify(l));}catch(e){}
+  if($('lineupModal')&&$('lineupModal').classList.contains('show'))renderLineup();
+}
+const MAX_XI={football:11,football7:7,futsal:5,basketball:5};
+let lineupTeam='home';
+function teamLU(){return state.lineups[lineupTeam];}
+function maxXI(){return MAX_XI[state.sport]||11;}
+function rosterPlayer(t,no){return t.roster.find(p=>p.no===no);}
+function renderLineup(){
+  $('luHomeBtn').className=lineupTeam==='home'?'act-home':'';
+  $('luAwayBtn').className=lineupTeam==='away'?'act-away':'';
+  $('luHomeBtn').textContent=$('homeName').value||'Home';
+  $('luAwayBtn').textContent=$('awayName').value||'Away';
+  const t=teamLU(), ros=$('luRoster'); ros.innerHTML='';
+  t.roster.forEach(p=>{
+    const inXI=t.xi.some(x=>x.no===p.no), inSub=t.subs.includes(p.no);
+    const row=document.createElement('div'); row.className='lu-prow';
+    row.innerHTML=`<span class="num">${p.no}</span><span class="pname">${p.name||''}</span><span class="ppos">${p.pos||''}</span>`;
+    const xiB=document.createElement('button');xiB.textContent='XI';if(inXI)xiB.className='on';xiB.onclick=()=>toggleXI(p.no);
+    const sB=document.createElement('button');sB.textContent='Sub';if(inSub)sB.className='on';sB.onclick=()=>toggleSub(p.no);
+    const rm=document.createElement('button');rm.className='rm';rm.textContent='×';rm.title='remove';rm.onclick=()=>removeLuPlayer(p.no);
+    row.append(xiB,sB,rm); ros.appendChild(row);
+  });
+  const subs=$('luSubs'); subs.innerHTML='';
+  t.subs.forEach(no=>{const p=rosterPlayer(t,no);if(!p)return;const c=document.createElement('span');c.className='lu-chip';c.innerHTML=`<span class="num">${p.no}</span>${p.name||''}`;subs.appendChild(c);});
+  $('luCount').textContent='Starters '+t.xi.length+'/'+maxXI()+' · Subs '+t.subs.length;
+  renderLuPitch();
+}
+function renderLuPitch(){
+  const t=teamLU(), pit=$('luPitch');
+  pit.innerHTML=pitchSVG('football');   // football pitch backdrop for the formation editor
+  t.xi.forEach(x=>{
+    const p=rosterPlayer(t,x.no);
+    const dot=document.createElement('div');
+    dot.className='lu-dot'+(lineupTeam==='away'?' away':'');
+    dot.style.left=x.x+'%'; dot.style.top=x.y+'%';
+    dot.innerHTML=`${x.no}<span class="lbl">${p?(p.name||''):''}</span>`;
+    luDrag(dot,x); pit.appendChild(dot);
+  });
+}
+function luDrag(dot,x){
+  dot.onpointerdown=e=>{
+    e.preventDefault(); dot.setPointerCapture(e.pointerId); dot.style.cursor='grabbing';
+    const pit=$('luPitch');
+    const move=ev=>{const r=pit.getBoundingClientRect();
+      x.x=Math.max(0,Math.min(100,(ev.clientX-r.left)/r.width*100));
+      x.y=Math.max(0,Math.min(100,(ev.clientY-r.top)/r.height*100));
+      dot.style.left=x.x+'%'; dot.style.top=x.y+'%';};
+    const up=()=>{dot.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);saveLineups();};
+    document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
+  };
+}
+function toggleXI(no){const t=teamLU(), i=t.xi.findIndex(x=>x.no===no);
+  if(i>=0)t.xi.splice(i,1);
+  else{if(t.xi.length>=maxXI()){alert('Starting lineup is full ('+maxXI()+').');return;}
+    t.subs=t.subs.filter(n=>n!==no); t.xi.push({no,x:50,y:Math.min(90,12+t.xi.length*8)});}
+  saveLineups();renderLineup();}
+function toggleSub(no){const t=teamLU();
+  if(t.subs.includes(no))t.subs=t.subs.filter(n=>n!==no);
+  else{t.xi=t.xi.filter(x=>x.no!==no); t.subs.push(no);}
+  saveLineups();renderLineup();}
+function removeLuPlayer(no){const t=teamLU();
+  t.roster=t.roster.filter(p=>p.no!==no); t.xi=t.xi.filter(x=>x.no!==no); t.subs=t.subs.filter(n=>n!==no);
+  saveLineups();renderLineup();}
+function addLuPlayer(){const no=$('luNo').value.trim(); if(!no)return; const t=teamLU();
+  if(t.roster.some(p=>p.no===no)){alert('No. '+no+' already exists.');return;}
+  t.roster.push({no,name:$('luName').value.trim(),pos:$('luPos').value.trim()});
+  $('luNo').value='';$('luName').value='';$('luPos').value=''; saveLineups();renderLineup(); $('luNo').focus();}
+function luSwitchDir(){const t=teamLU(); t.dir=t.dir==='rl'?'lr':'rl'; t.xi.forEach(x=>x.x=100-x.x); saveLineups();renderLineup();}
+$('lineupBtn').onclick=()=>{$('lineupModal').classList.add('show');renderLineup();};
+$('lineupClose').onclick=()=>$('lineupModal').classList.remove('show');
+$('lineupModal').addEventListener('click',e=>{if(e.target===$('lineupModal'))$('lineupModal').classList.remove('show');});
+$('luHomeBtn').onclick=()=>{lineupTeam='home';renderLineup();};
+$('luAwayBtn').onclick=()=>{lineupTeam='away';renderLineup();};
+$('luAdd').onclick=addLuPlayer;
+$('luDir').onclick=luSwitchDir;
+['luNo','luName','luPos'].forEach(id=>$(id).addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();addLuPlayer();}}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('lineupModal').classList.contains('show')){e.preventDefault();$('lineupModal').classList.remove('show');}});
 // parse "mm:ss(.cc)" / "h:mm:ss" / plain seconds -> seconds
 function parseTime(s){
   s=(s||'').trim(); if(!s)return 0;
@@ -1277,8 +1431,8 @@ if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
 renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable();
 
 // bridge for the cloud-sync module (loaded next)
-window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration};
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups};
 </script>
-<script src="cloud-sync.js?v=11"></script>
+<script src="cloud-sync.js?v=12"></script>
 </body>
 </html>
