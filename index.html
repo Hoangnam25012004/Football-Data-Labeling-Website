@@ -112,9 +112,9 @@
   td.ed:hover{outline:1px dashed var(--accent);outline-offset:-1px}
   .cell-edit{width:58px;background:#000;border:1px solid var(--accent);color:var(--ink);border-radius:4px;padding:2px 4px;font-size:11px;text-align:center}
   .cell-edit:focus{outline:none}
-  /* video popped out to its own window: hide left column, table goes full width */
-  body.video-popped .layout{grid-template-columns:1fr}
-  body.video-popped .left{display:none}
+  /* video popped out to its own window: hide only the video + controls, keep the formation panel */
+  body.video-popped .video-wrap{display:none}
+  body.video-popped #controls{display:none!important}
   .tlink{color:var(--accent);cursor:pointer;font-variant-numeric:tabular-nums}
   .del{color:var(--danger);cursor:pointer;font-weight:700}
   .empty{padding:30px;text-align:center;color:var(--mut)}
@@ -1485,6 +1485,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups};
 </script>
-<script src="cloud-sync.js?v=15"></script>
+<script src="cloud-sync.js?v=16"></script>
 </body>
 </html>
