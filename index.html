@@ -528,6 +528,11 @@ const DEFAULT_EVENTS = {
   "basketball": []
 };
 const SPORTS=['football','football7','futsal','basketball'];
+/* lineups store — declared before `state` so loadLineups() has no temporal-dead-zone issue */
+const LU_STORE='pitchtagger.lineups.v1';
+const blankTeamLU=dir=>({roster:[],xi:[],subs:[],dir:dir||'lr'});
+function loadLineups(){try{const s=localStorage.getItem(LU_STORE);if(s){const o=JSON.parse(s);if(o&&o.home&&o.away)return o;}}catch(e){}
+  return {home:blankTeamLU('lr'),away:blankTeamLU('rl')};}
 const state = {
   sport:'football', team:'home', activeEvent:null,
   events:loadEvents(),
@@ -550,10 +555,6 @@ function loadDuration(){
 function saveDuration(){try{localStorage.setItem(DUR_STORE,JSON.stringify(state.duration));}catch(e){}}
 
 /* ===================== PLAYER LISTS / FORMATION ===================== */
-const LU_STORE='pitchtagger.lineups.v1';
-const blankTeamLU=dir=>({roster:[],xi:[],subs:[],dir:dir||'lr'});
-function loadLineups(){try{const s=localStorage.getItem(LU_STORE);if(s){const o=JSON.parse(s);if(o&&o.home&&o.away)return o;}}catch(e){}
-  return {home:blankTeamLU('lr'),away:blankTeamLU('rl')};}
 function saveLineups(){try{localStorage.setItem(LU_STORE,JSON.stringify(state.lineups));}catch(e){}
   window.Cloud&&window.Cloud.onLineupsChanged&&window.Cloud.onLineupsChanged(state.lineups); refreshFormation();}
 function applyCloudLineups(l){
@@ -1468,6 +1469,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups};
 </script>
-<script src="cloud-sync.js?v=13"></script>
+<script src="cloud-sync.js?v=14"></script>
 </body>
 </html>
