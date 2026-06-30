@@ -28,8 +28,16 @@
   /* video fills left column */
   .video-wrap{background:#000;position:relative;flex:none;height:36vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
   /* permanent formation panel under the (smaller) video — both teams, read-only */
-  #formationPanel{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:8px;border-top:1px solid var(--line)}
-  .fm-pitch{position:relative;aspect-ratio:105/68;height:100%;max-height:60vh;max-width:100%}
+  #formationPanel{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;background:var(--bg);padding:8px;border-top:1px solid var(--line)}
+  #fmSubs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:22px}
+  .fm-sub{font-size:11px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2)}
+  .fm-sub b{font-weight:800;margin-right:3px}
+  .fm-sub.home{border-color:var(--home);color:#9cc2ff} .fm-sub.home b{color:var(--home)}
+  .fm-sub.away{border-color:var(--away);color:#ffb38a} .fm-sub.away b{color:var(--away)}
+  .fm-sub-empty{color:var(--mut);font-size:11px}
+  .fm-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;container-type:size}
+  /* largest 105:68 box that fits the stage (works for any stage shape) */
+  .fm-pitch{position:relative;aspect-ratio:105/68;width:min(100%, calc(100cqh * 105 / 68))}
   .fm-pitch svg{position:absolute;inset:0;width:100%;height:100%}
   .fm-dot{position:absolute;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;border:2px solid #000;z-index:3}
   .fm-dot.away{background:var(--away)}
@@ -289,7 +297,10 @@
         <option value="2">2×</option>
       </select>
     </div>
-    <div id="formationPanel"><div class="fm-pitch" id="fmPitch"></div></div>
+    <div id="formationPanel">
+      <div id="fmSubs"></div>
+      <div class="fm-stage"><div class="fm-pitch" id="fmPitch"></div></div>
+    </div>
   </div>
 
   <div class="right">
@@ -667,6 +678,18 @@ function renderFormationMain(){
       pit.appendChild(dot);
     });
   });
+  renderFormationSubs();
+}
+// substitutes bar above the pitch (both teams)
+function renderFormationSubs(){
+  const el=$('fmSubs'); if(!el)return;
+  let h='';
+  ['home','away'].forEach(team=>{
+    const t=state.lineups[team];
+    t.subs.forEach(no=>{const p=t.roster.find(r=>r.no===no);
+      h+=`<span class="fm-sub ${team}"><b>${no}</b>${p&&p.name?p.name:''}</span>`;});
+  });
+  el.innerHTML=h||'<span class="fm-sub-empty">No substitutes</span>';
 }
 function refreshFormation(){ renderFormationMain(); }   // formation is always shown on the main tab
 $('lineupBtn').onclick=()=>{$('lineupModal').classList.add('show');renderLineup();};
@@ -1485,6 +1508,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups};
 </script>
-<script src="cloud-sync.js?v=17"></script>
+<script src="cloud-sync.js?v=18"></script>
 </body>
 </html>
