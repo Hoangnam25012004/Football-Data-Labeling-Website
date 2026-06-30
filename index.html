@@ -19,6 +19,8 @@
   header h1 span{color:var(--accent)}
   .meta-inputs{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
   .meta-inputs input{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 8px;font-size:12px;width:120px}
+  .score{display:inline-flex;align-items:center;gap:7px;background:#000;border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-variant-numeric:tabular-nums;font-size:15px;font-weight:800}
+  .score .sc-h{color:var(--home)} .score .sc-a{color:var(--away)} .score .sc-dash{color:var(--mut);font-weight:600}
   .layout{display:grid;grid-template-columns:1fr 360px;gap:0;height:calc(100vh - 53px)}
   .left{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--line)}
   .right{display:flex;flex-direction:column;overflow:hidden;background:var(--panel)}
@@ -203,6 +205,7 @@
     <button class="ev-btn" id="durBtn" title="Map original video times to the real match timeline">⏱ Duration</button>
     <button class="ev-btn" id="cloudBtn" title="Real-time cloud sync — share a match with others">☁ Cloud</button>
     <input id="homeName" placeholder="Home team" value="Home">
+    <span class="score" id="scoreBoard" title="Goals — auto-counted from tagged events"><b class="sc-h">0</b><span class="sc-dash">-</span><b class="sc-a">0</b></span>
     <input id="awayName" placeholder="Away team" value="Away">
     <select id="sportSel" class="txt" style="width:auto">
       <option value="football">⚽ Football (11)</option>
@@ -481,6 +484,17 @@ function parseTime(s){
 }
 // which half does a row belong to (based on the 2nd-half kick-off in Duration)
 function eventHalf(r){const h2=state.duration.h2Start; return (h2>0 && r.t>=h2)?2:1;}
+// scoreboard — auto-counted from tagged events
+const GOAL_SPORTS=['football','football7','futsal'];
+function computeScore(){
+  let home=0,away=0;
+  if(GOAL_SPORTS.includes(state.sport)){
+    state.rows.forEach(r=>{ if(r.event==='goal'){ r.team==='home'?home++:away++; } });
+  }
+  // basketball: scoring rules to be added later (2/3 points) — shows 0-0 for now
+  return {home,away};
+}
+function updateScore(){const s=computeScore(),el=$('scoreBoard');if(el)el.innerHTML='<b class="sc-h">'+s.home+'</b><span class="sc-dash">-</span><b class="sc-a">'+s.away+'</b>';}
 // map a raw video time to match-clock seconds
 function matchTime(vt){
   const d=state.duration; if(!d.enabled)return vt;
@@ -792,7 +806,7 @@ function renderEvents(){
 function nextFreeKey(){const used=new Set(curEvents().map(e=>e.key));return DEFAULT_KEYS.find(k=>!used.has(k))||''}
 $('addEvBtn').onclick=()=>{const n=$('newEvName').value.trim();if(!n)return;curEvents().push({name:n,key:nextFreeKey()});if(!state.activeEvent)state.activeEvent=n;$('newEvName').value='';saveEvents();renderEvents();updateBanner()};
 $('newEvName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('addEvBtn').click()}});
-$('sportSel').onchange=e=>{state.sport=e.target.value;state.activeEvent=curEvents()[0]?.name||null;renderEvents();updateBanner();if(pvRenderPitch)pvRenderPitch();};
+$('sportSel').onchange=e=>{state.sport=e.target.value;state.activeEvent=curEvents()[0]?.name||null;renderEvents();updateBanner();updateScore();if(pvRenderPitch)pvRenderPitch();};
 
 /* event modal (opened from the top bar button) */
 function openEvModal(){$('evModal').classList.add('show');renderEvents();updateStoreStatus();setTimeout(()=>$('newEvName').focus(),0);}
@@ -881,6 +895,7 @@ function renderTable(){
   });
   $('count').textContent=shown;
   $('emptyMsg').style.display=shown?'none':'block';
+  updateScore();
   if(targetTr){targetTr.scrollIntoView({block:'center'});targetTr.classList.add('just-added');setTimeout(()=>targetTr.classList.remove('just-added'),700);}
   scrollToRow=null;
 }
@@ -1264,6 +1279,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration};
 </script>
-<script src="cloud-sync.js?v=10"></script>
+<script src="cloud-sync.js?v=11"></script>
 </body>
 </html>
