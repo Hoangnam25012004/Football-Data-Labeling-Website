@@ -26,7 +26,15 @@
   .right{display:flex;flex-direction:column;overflow:hidden;background:var(--panel)}
 
   /* video fills left column */
-  .video-wrap{background:#000;position:relative;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .video-wrap{background:#000;position:relative;flex:1;max-height:52vh;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  /* Formation overlay on the (smaller) video frame */
+  #formationOverlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:6}
+  .fm-pitch{position:relative;aspect-ratio:105/68;height:100%;max-width:100%}
+  .fm-pitch svg{position:absolute;inset:0;width:100%;height:100%}
+  .fm-dot{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;border:2px solid #000;z-index:2}
+  .fm-dot.away{background:var(--away)}
+  .fm-dot .lbl{position:absolute;top:27px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600}
+  .ev-btn.on{border-color:var(--accent);color:var(--accent)}
   video{width:100%;height:100%;object-fit:contain;display:block}
   .drop{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--panel2);border:2px dashed var(--line);color:var(--mut);cursor:pointer;text-align:center;flex-direction:column;gap:8px}
   .drop.drag{border-color:var(--accent);color:var(--accent)}
@@ -237,6 +245,7 @@
     <button class="ev-btn" id="durBtn" title="Map original video times to the real match timeline">⏱ Duration</button>
     <button class="ev-btn" id="cloudBtn" title="Real-time cloud sync — share a match with others">☁ Cloud</button>
     <button class="ev-btn" id="lineupBtn" title="Player lists, starting XI, subs & formation">👥 Player lists</button>
+    <button class="ev-btn" id="formBtn" title="Show both teams' formation over the video">📋 Formation</button>
     <input id="homeName" placeholder="Home team" value="Home">
     <span class="score" id="scoreBoard" title="Goals — auto-counted from tagged events"><b class="sc-h">0</b><span class="sc-dash">-</span><b class="sc-a">0</b></span>
     <input id="awayName" placeholder="Away team" value="Away">
@@ -258,6 +267,7 @@
         <div style="font-size:11px">mp4 / webm / mov</div>
       </div>
       <video id="video" style="display:none" controls preload="auto" playsinline disablepictureinpicture></video>
+      <div id="formationOverlay"><div class="fm-pitch" id="fmPitch"></div></div>
     </div>
     <input type="file" id="fileInput" accept="video/*" style="display:none">
     <div class="controls" id="controls" style="display:none">
@@ -527,6 +537,7 @@ const state = {
   rows:[], fps:25
 };
 let pvRedraw=null, pvTogglePitch=null, pvSyncEntry=null, pvRenderPitch=null; // set while the video window is open
+let formationOn=false; // formation overlay shown on the main video frame
 const fmtXY=xy=>xy?Math.round(xy.x)+','+Math.round(xy.y):'—';
 const newId=()=>(crypto&&crypto.randomUUID)?crypto.randomUUID():('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16);}));
 
@@ -544,12 +555,13 @@ const blankTeamLU=dir=>({roster:[],xi:[],subs:[],dir:dir||'lr'});
 function loadLineups(){try{const s=localStorage.getItem(LU_STORE);if(s){const o=JSON.parse(s);if(o&&o.home&&o.away)return o;}}catch(e){}
   return {home:blankTeamLU('lr'),away:blankTeamLU('rl')};}
 function saveLineups(){try{localStorage.setItem(LU_STORE,JSON.stringify(state.lineups));}catch(e){}
-  window.Cloud&&window.Cloud.onLineupsChanged&&window.Cloud.onLineupsChanged(state.lineups);}
+  window.Cloud&&window.Cloud.onLineupsChanged&&window.Cloud.onLineupsChanged(state.lineups); refreshFormation();}
 function applyCloudLineups(l){
   if(!l||!l.home||!l.away)return;
   state.lineups=l;
   try{localStorage.setItem(LU_STORE,JSON.stringify(l));}catch(e){}
   if($('lineupModal')&&$('lineupModal').classList.contains('show'))renderLineup();
+  refreshFormation();
 }
 const MAX_XI={football:11,football7:7,futsal:5,basketball:5};
 let lineupTeam='home';
@@ -617,6 +629,29 @@ function addLuPlayer(){const no=$('luNo').value.trim(); if(!no)return; const t=t
   t.roster.push({no,name:$('luName').value.trim(),pos:$('luPos').value.trim()});
   $('luNo').value='';$('luName').value='';$('luPos').value=''; saveLineups();renderLineup(); $('luNo').focus();}
 function luSwitchDir(){const t=teamLU(); t.dir=t.dir==='rl'?'lr':'rl'; t.xi.forEach(x=>x.x=100-x.x); saveLineups();renderLineup();}
+/* formation overlay on the main video frame (read-only, both teams) */
+function renderFormationMain(){
+  const pit=$('fmPitch'); if(!pit)return;
+  pit.innerHTML=pitchSVG('football');
+  ['home','away'].forEach(team=>{
+    const t=state.lineups[team];
+    t.xi.forEach(x=>{
+      const p=t.roster.find(r=>r.no===x.no);
+      const dot=document.createElement('div'); dot.className='fm-dot'+(team==='away'?' away':'');
+      dot.style.left=x.x+'%'; dot.style.top=x.y+'%';
+      dot.innerHTML=`${x.no}<span class="lbl">${p?(p.name||''):''}</span>`;
+      pit.appendChild(dot);
+    });
+  });
+}
+function refreshFormation(){ if(formationOn)renderFormationMain(); }
+function toggleFormation(){
+  formationOn=!formationOn;
+  $('formationOverlay').style.display=formationOn?'flex':'none';
+  $('formBtn').classList.toggle('on',formationOn);
+  if(formationOn)renderFormationMain();
+}
+$('formBtn').onclick=toggleFormation;
 $('lineupBtn').onclick=()=>{$('lineupModal').classList.add('show');renderLineup();};
 $('lineupClose').onclick=()=>$('lineupModal').classList.remove('show');
 $('lineupModal').addEventListener('click',e=>{if(e.target===$('lineupModal'))$('lineupModal').classList.remove('show');});
@@ -1433,6 +1468,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups};
 </script>
-<script src="cloud-sync.js?v=12"></script>
+<script src="cloud-sync.js?v=13"></script>
 </body>
 </html>
