@@ -35,6 +35,13 @@ jobs:
           cp index.html _site/index.html
           cp cloud-sync.js _site/cloud-sync.js
           cp pitchtagger_events.json _site/pitchtagger_events.json || true
+          # shared assets used by the standalone sub-pages
+          cp shared.css _site/shared.css
+          cp shared.js _site/shared.js
+          # standalone Stats and Player-Lists pages
+          mkdir -p _site/Stats _site/Player-Lists
+          cp Stats/index.html _site/Stats/index.html
+          cp Player-Lists/index.html _site/Player-Lists/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
