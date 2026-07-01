@@ -116,8 +116,9 @@
   .evt{font-weight:700}
   .evt.home{color:var(--home)}
   .evt.away{color:var(--away)}
-  td.ed{cursor:pointer}
-  td.ed:hover{outline:1px dashed var(--accent);outline-offset:-1px}
+  .pnum{font-weight:700;color:var(--ink)}
+  td.ed,.ed,.ed-ev{cursor:pointer}
+  td.ed:hover,.ed:hover,.ed-ev:hover{outline:1px dashed var(--accent);outline-offset:1px;border-radius:3px}
   .cell-edit{width:58px;background:#000;border:1px solid var(--accent);color:var(--ink);border-radius:4px;padding:2px 4px;font-size:11px;text-align:center}
   .cell-edit:focus{outline:none}
   /* video popped out to its own window: hide only the video + controls, keep the formation panel */
@@ -315,23 +316,18 @@
     </div>
 
     <div class="tbl-head">
-      <div><b>Tagged events</b> <span class="count" id="count">0</span></div>
+      <div><b>Events</b> <span class="count" id="count">0</span></div>
       <select id="halfSel" class="txt" style="width:auto;margin-left:10px">
         <option value="1">1st Half</option>
         <option value="2">2nd Half</option>
       </select>
-      <div class="exports" style="margin-left:auto">
-        <button id="expXlsx">⬇ XLSX</button>
-        <button id="expCsv">⬇ CSV</button>
-      </div>
     </div>
     <div class="tbl-scroll">
       <table id="tbl">
         <thead><tr>
-          <th>#</th>
-          <th class="h-side">Home event</th><th class="h-side">Player</th><th class="h-side">Receiver</th>
+          <th class="h-side">Home</th>
           <th class="tl-col">Timeline</th>
-          <th class="a-side">Receiver</th><th class="a-side">Player</th><th class="a-side">Away event</th>
+          <th class="a-side">Away</th>
           <th></th>
         </tr></thead>
         <tbody id="tbody"></tbody>
@@ -1086,6 +1082,11 @@ function submitEntry(){
   let name = p.key ? eventForKey(p.key) : state.activeEvent;
   if(p.key && !name){alert('No event is bound to hotkey "'+p.key+'".');return}
   if(!name){alert('No event selected. Type a hotkey in the string (e.g. 1s2) or click an event name.');return}
+  // dots must match the players in the entry: 2 players (e.g. 1s2) -> 2 dots (from + to);
+  // 1 player (e.g. 1b, 1ddd) -> exactly 1 dot. Mismatch -> block and warn.
+  const need=(p.from?1:0)+(p.to?1:0);
+  const pd=state.pendingDots, have=(pd.p?1:0)+(pd.r?1:0);
+  if(need>=1 && have!==need){alert('Cần kiểm tra lại dots');return}
   const ev=curEvents().find(o=>o.name===name);
   pushRow({from:p.from,to:p.to,action:ev?ev.key:'',event:name,raw:$('playerInput').value.trim()});
   state.activeEvent=name; renderEvents(); updateBanner();
@@ -1121,16 +1122,17 @@ function renderTable(){
     const tr=document.createElement('tr');
     if(r===scrollToRow)targetTr=tr;
     const isHome=r.team==='home';
-    const from=r.playerFrom||'—', to=r.playerTo||'—';
-    const blank='<td class="blank"></td>', b3=blank+blank+blank;
-    // [x,y] coordinates are still stored/exported — just hidden from this table
-    const homeCells = isHome
-      ? `<td class="h-side ed ed-ev" title="Double-click: type a hotkey to change the event"><span class="evt home">${r.event}</span></td><td class="h-side ed" data-edit="from" title="Double-click to edit">${from}</td><td class="h-side ed" data-edit="to" title="Double-click to edit">${to}</td>`
-      : b3;
-    const awayCells = !isHome
-      ? `<td class="a-side ed" data-edit="to" title="Double-click to edit">${to}</td><td class="a-side ed" data-edit="from" title="Double-click to edit">${from}</td><td class="a-side ed ed-ev" title="Double-click: type a hotkey to change the event"><span class="evt away">${r.event}</span></td>`
-      : b3;
-    tr.innerHTML=`<td>${shown}</td>${homeCells}<td class="tl-col tlink">${fmt(matchTime(r.t))}</td>${awayCells}<td class="del">×</td>`;
+    // one combined cell: "<player_from> <event> <player_to>" (receiver number only when present).
+    // [x,y] coordinates and both player numbers are still stored/exported — just shown as one string here.
+    const evClass=isHome?'home':'away';
+    const pf=`<span class="pnum ed" data-edit="from" title="Double-click to edit">${r.playerFrom||'—'}</span>`;
+    const pt=r.playerTo?` <span class="pnum ed" data-edit="to" title="Double-click to edit">${r.playerTo}</span>`:'';
+    const evSpan=`<span class="evt ${evClass} ed-ev" title="Double-click: type a hotkey to change the event">${r.event}</span>`;
+    const combined=`${pf} ${evSpan}${pt}`;
+    const blank='<td class="blank"></td>';
+    const homeCell = isHome ? `<td class="h-side">${combined}</td>` : blank;
+    const awayCell = !isHome ? `<td class="a-side">${combined}</td>` : blank;
+    tr.innerHTML=`${homeCell}<td class="tl-col tlink">${fmt(matchTime(r.t))}</td>${awayCell}<td class="del">×</td>`;
     tr.querySelector('.tlink').onclick=()=>{if(video.src)video.currentTime=r.t};
     tr.querySelector('.del').onclick=()=>{const id=state.rows[i].id;state.rows.splice(i,1);renderTable();window.Cloud&&window.Cloud.onLocalDelete(id);};
     tr.querySelectorAll('[data-edit]').forEach(td=>{td.ondblclick=()=>editPlayerCell(td,i,td.dataset.edit)});
@@ -1222,19 +1224,9 @@ function buildSheets(){
           ['pass_home',passSheet('home')],['pass_away',passSheet('away')],
           ['team_stats',teamStatsSheet()]];
 }
-$('expXlsx').onclick=()=>{if(!state.rows.length){alert('No data yet.');return}
-  const wb=XLSX.utils.book_new();
-  buildSheets().forEach(([name,ws])=>XLSX.utils.book_append_sheet(wb,ws,name));
-  XLSX.writeFile(wb,meta()+'_events.xlsx')};
-// CSV can't hold multiple sheets -> download one .csv per sheet
-$('expCsv').onclick=()=>{if(!state.rows.length){alert('No data yet.');return}
-  buildSheets().forEach(([name,ws],i)=>{
-    const csv=XLSX.utils.sheet_to_csv(ws);
-    const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-    a.download=meta()+'_'+name+'.csv';
-    setTimeout(()=>{a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);},i*300);
-  });};
+// Exports moved to the Stats page (open the Stats tab to download XLSX / CSV).
+// buildSheets()/statsSheet()/passSheet()/eventsSheet() are still defined above and
+// used by the cloud module; the download buttons now live on the Stats page.
 
 /* TOAST */
 let toastT;function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),900)}

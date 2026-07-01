@@ -89,7 +89,43 @@ function renderGeneral(){
   $('statsHolder').innerHTML=html+'</div>';
 }
 
-/* ---- exports ---- */
+/* ---- exports (full workbook: events + stats + pass distribution) ---- */
+let dur=loadJSON(PT_KEYS.duration,{enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0});
+function fmt(t){const m=Math.floor(t/60),s=Math.floor(t%60),cs=Math.floor((t%1)*100);return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;}
+function matchTime(vt){const d=dur; if(!d.enabled)return vt; const off=(+d.halfLen||45)*60;
+  if(d.h2Start>0 && vt>=d.h2Start) return off+(vt-d.h2Start); return Math.max(0, vt-(d.h1Start||0));}
+function eventHalf(r){const h2=dur.h2Start; return (h2>0 && r.t>=h2)?2:1;}
+function buildData(half){
+  const rs=rows.filter(r=>r.t!=null).sort((a,b)=>a.t-b.t).filter(r=>!half||eventHalf(r)===half);
+  return rs.map((r,i)=>({no:i+1,timecode:fmt(matchTime(r.t)),match_seconds:+matchTime(r.t).toFixed(2),
+    video_seconds:+(+r.t).toFixed(2),team:r.team,team_name:r.teamName||(r.team==='home'?meta.home:meta.away),event:r.event,
+    player_from:r.playerFrom,player_x:r.pXY?+r.pXY.x.toFixed(1):'',player_y:r.pXY?+r.pXY.y.toFixed(1):'',
+    player_to:r.playerTo,receiver_x:r.rXY?+r.rXY.x.toFixed(1):'',receiver_y:r.rXY?+r.rXY.y.toFixed(1):'',
+    action_code:r.action,raw_input:r.raw}));
+}
+function eventsSheet(half){
+  const ws=XLSX.utils.json_to_sheet(buildData(half));
+  ws['!cols']=[{wch:5},{wch:10},{wch:13},{wch:13},{wch:7},{wch:14},{wch:14},{wch:11},{wch:8},{wch:8},{wch:9},{wch:9},{wch:9},{wch:9},{wch:16}];
+  return ws;
+}
+function passSheet(team){
+  const {players,mtx}=passMatrix(rows,team);
+  const aoa=[['From \\ To',...players,'Σ']]; const colSum={}; let grand=0;
+  players.forEach(f=>{let rowSum=0; const row=[f];
+    players.forEach(t=>{if(f===t){row.push('–');return;}
+      const v=(mtx[f]&&mtx[f][t])||0; rowSum+=v; colSum[t]=(colSum[t]||0)+v; grand+=v; row.push(v);});
+    row.push(rowSum); aoa.push(row);});
+  aoa.push(['Σ recv',...players.map(p=>colSum[p]||0),grand]);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=aoa[0].map((h,i)=>({wch:i===0?9:Math.max(4,String(h).length+1)}));
+  return ws;
+}
+function buildSheets(){
+  return [['events_1st_half',eventsSheet(1)],['events_2nd_half',eventsSheet(2)],
+          ['stats_home',statsSheet('home')],['stats_away',statsSheet('away')],
+          ['pass_home',passSheet('home')],['pass_away',passSheet('away')],
+          ['team_stats',teamStatsSheet()]];
+}
 function statsSheet(team){
   const P=computeStats(rows,team), players=sortedPlayers(P);
   const h1=new Array(STAT_HEADERS.length).fill(''); const merges=[];
@@ -113,19 +149,21 @@ function teamStatsSheet(){
 }
 const matchName=()=>(meta.home||'Home')+'_vs_'+(meta.away||'Away');
 $('expXlsx').onclick=()=>{
+  if(!rows.length){alert('No data yet.');return;}
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,statsSheet('home'),(meta.home||'Home').slice(0,25));
-  XLSX.utils.book_append_sheet(wb,statsSheet('away'),(meta.away||'Away').slice(0,25));
-  XLSX.utils.book_append_sheet(wb,teamStatsSheet(),'team_stats');
-  XLSX.writeFile(wb,matchName()+'_stats.xlsx');
+  buildSheets().forEach(([name,ws])=>XLSX.utils.book_append_sheet(wb,ws,name));
+  XLSX.writeFile(wb,matchName()+'_events.xlsx');
 };
+// CSV can't hold multiple sheets -> download one .csv per sheet
 $('expCsv').onclick=()=>{
-  const team=statTeam==='general'?'home':statTeam;
-  const P=computeStats(rows,team), players=sortedPlayers(P);
-  const lines=[STAT_HEADERS.join(','),...players.map(no=>statRow(no,P[no]).join(','))];
-  const blob=new Blob([lines.join('\n')],{type:'text/csv'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download=matchName()+'_'+team+'_stats.csv'; a.click();
+  if(!rows.length){alert('No data yet.');return;}
+  buildSheets().forEach(([name,ws],i)=>{
+    const csv=XLSX.utils.sheet_to_csv(ws);
+    const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=matchName()+'_'+name+'.csv';
+    setTimeout(()=>{a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);},i*300);
+  });
 };
 
 $('statHomeBtn').onclick=()=>{statTeam='home';renderStats();};
@@ -136,6 +174,7 @@ $('statGenBtn').onclick=()=>{statTeam='general';renderStats();};
 window.addEventListener('storage',e=>{
   if(e.key===PT_KEYS.rows){rows=loadRows();renderStats();}
   else if(e.key===PT_KEYS.meta){meta=loadMeta();renderStats();}
+  else if(e.key===PT_KEYS.duration){dur=loadJSON(PT_KEYS.duration,dur);}
 });
 
 renderStats();
