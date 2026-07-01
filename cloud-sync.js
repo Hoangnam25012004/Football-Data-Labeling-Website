@@ -9,7 +9,13 @@
 =========================================================================== */
 // Paste your project's PUBLIC values here so everyone can use the site without entering keys.
 // Leave as '' to make users type their own. (Used only as a fallback — typed/saved values win.)
-const CONFIG = { url: '', anonKey: '' };
+const CONFIG = {
+  url: '', anonKey: '',
+  // Optional: direct-to-R2 video upload. Deploy worker/r2-presign.js (see worker/README.md),
+  // then paste its URL + your bucket's public base here. Leave workerUrl '' to hide the R2 button
+  // (pasting a video URL manually still works without any of this).
+  R2: { workerUrl: '', publicBase: '' }
+};
 
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -213,9 +219,41 @@ const CONFIG = { url: '', anonKey: '' };
       .subscribe();
   }
 
-  // NOTE: video upload removed — see the long-term storage plan (Cloudflare R2 / Stream).
-  // The app can still PLAY a shared video by reading matches.video_url, so once an external
-  // store is wired in (presigned upload -> set matches.video_url), playback works unchanged.
+  /* ---------- video source (matches.video_url) ---------- */
+  // Save a hosted video URL onto the current match so everyone plays it and it persists.
+  // Returns false when not in a shared match (the app then just plays it locally).
+  async function setVideoUrl(url) {
+    if (!connected || !matchId) return false;
+    const { error } = await sb.from('matches').update({ video_url: url }).eq('id', matchId);
+    if (error) { console.warn('video_url save:', error.message); return false; }
+    lastVideoUrl = url;
+    return true;
+  }
+  // Upload a file straight to Cloudflare R2 via a presigned PUT URL from the Worker.
+  // onProgress(fraction 0..1). Returns the public URL to store in matches.video_url.
+  async function uploadToR2(file, onProgress) {
+    const R2 = CONFIG.R2 || {};
+    if (!R2.workerUrl) throw new Error('R2 not configured (set CONFIG.R2.workerUrl).');
+    // 1) ask the Worker to sign an upload URL for this match
+    const resp = await fetch(R2.workerUrl, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ matchId, filename: file.name, contentType: file.type || 'video/mp4' })
+    });
+    if (!resp.ok) throw new Error('sign failed (' + resp.status + ')');
+    const { uploadUrl, publicUrl } = await resp.json();
+    if (!uploadUrl || !publicUrl) throw new Error('bad sign response');
+    // 2) PUT the bytes directly to R2 (XHR so we get upload progress)
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', uploadUrl, true);
+      if (file.type) xhr.setRequestHeader('Content-Type', file.type);
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error('R2 PUT ' + xhr.status));
+      xhr.onerror = () => reject(new Error('network error during upload'));
+      xhr.send(file);
+    });
+    return publicUrl;
+  }
 
   // set the Home/Away name boxes without re-triggering a cloud write
   function setTeamInputs(home, away) {
@@ -279,7 +317,9 @@ const CONFIG = { url: '', anonKey: '' };
   window.Cloud = {
     get connected() { return connected; },
     get matchId() { return matchId; },
-    onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged, onDurationChanged, onLineupsChanged
+    get r2Enabled() { return !!(CONFIG.R2 && CONFIG.R2.workerUrl); },
+    onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged, onDurationChanged, onLineupsChanged,
+    setVideoUrl, uploadToR2
   };
 
   /* ---------- UI wiring ---------- */

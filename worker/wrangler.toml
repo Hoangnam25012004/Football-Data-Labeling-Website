@@ -1,0 +1,16 @@
+name = "r2-presign"
+main = "r2-presign.js"
+compatibility_date = "2024-09-01"
+
+# Non-secret config. Fill these in with your own values.
+[vars]
+R2_ACCOUNT_ID  = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+R2_BUCKET      = "YOUR_BUCKET_NAME"
+# Public base URL of the bucket: either the r2.dev dev URL or your custom domain.
+R2_PUBLIC_BASE = "https://pub-XXXXXXXX.r2.dev"
+# Lock the presign endpoint to your site's origin ("*" allows any origin — fine for testing).
+ALLOW_ORIGIN   = "https://hoangnam25012004.github.io"
+
+# Secrets are NOT stored here — set them once with:
+#   wrangler secret put R2_ACCESS_KEY_ID
+#   wrangler secret put R2_SECRET_ACCESS_KEY

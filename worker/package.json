@@ -1,0 +1,16 @@
+{
+  "name": "r2-presign",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker that presigns direct-to-R2 video upload URLs for the Football Data Labeling app.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20"
+  },
+  "devDependencies": {
+    "wrangler": "^3.80.0"
+  }
+}

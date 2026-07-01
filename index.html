@@ -256,6 +256,7 @@
   <h1>Hoang<span>Nam</span></h1>
   <div class="meta-inputs">
     <button class="ev-btn" id="eventBtn" title="Manage events + hotkeys">⚙ Event</button>
+    <button class="ev-btn" id="videoBtn" title="Video source — local file or a shared URL (Cloudflare R2)">🎞 Video</button>
     <button class="ev-btn" id="statsBtn" title="Player statistics">📊 Stats</button>
     <button class="ev-btn" id="popBtn" title="Pop the video into its own window so the event table fills the screen">⧉ Open window</button>
     <button class="ev-btn" id="durBtn" title="Map original video times to the real match timeline">⏱ Duration</button>
@@ -456,6 +457,47 @@
       <div class="syntax-hint" style="margin-top:12px">
         One person clicks <b>New shared match</b> and shares the link (or match ID). Everyone who opens it
         sees each other's tags live. Tagged events save to your Supabase database (video stays local).
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="videoModal">
+  <div class="modal">
+    <div class="modal-head">
+      <b>Video source</b>
+      <span class="mini" id="videoSrcStatus">No video</span>
+      <button class="modal-close" id="videoClose" title="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <!-- 1) URL (shared / persists on the match) -->
+      <label class="fld"><span>Video URL <span class="mini">(plays from a hosted link — e.g. Cloudflare R2)</span></span></label>
+      <div class="addrow">
+        <input class="txt" id="vidUrlInput" placeholder="https://…/video.mp4">
+        <button id="vidUrlSave" title="Load and save to this match">Use</button>
+      </div>
+      <div class="syntax-hint">
+        Paste a public direct link to an <b>.mp4/.webm</b>. If you're in a shared match (Cloud), the URL is
+        saved to the match so everyone plays the same video and it persists on reload.
+      </div>
+
+      <!-- 2) Upload to R2 (only when a Worker endpoint is configured) -->
+      <div id="r2Box" style="display:none;border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+        <label class="fld"><span>Upload a file to Cloudflare R2</span></label>
+        <div class="ev-backup">
+          <button id="r2Pick">⬆ Choose a video &amp; upload to R2</button>
+        </div>
+        <input type="file" id="r2File" accept="video/*" style="display:none">
+        <div id="r2Progress" class="syntax-hint" style="display:none">Uploading… <b id="r2Pct">0%</b></div>
+        <div class="syntax-hint">Uploads straight to your R2 bucket, then saves the public link to the match.</div>
+      </div>
+
+      <!-- 3) Local file (this browser only) -->
+      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+        <label class="fld"><span>Local file <span class="mini">(this browser only — not shared)</span></span></label>
+        <div class="ev-backup">
+          <button id="vidLocalPick">📂 Choose a local video file…</button>
+        </div>
+        <div class="syntax-hint">Use this for matches you keep on your own machine. Tagged events still sync to the cloud; only the video stays local.</div>
       </div>
     </div>
   </div>
@@ -785,23 +827,69 @@ function updateStoreStatus(){
 
 /* VIDEO */
 const video=$('video'), drop=$('drop'), fileInput=$('fileInput');
+let videoSrcLabel='No video';
+function setVideoSrcStatus(txt){videoSrcLabel=txt; if($('videoSrcStatus'))$('videoSrcStatus').textContent=txt;}
 function loadFile(f){
   if(!f||!f.type.startsWith('video')) return;
   video.src=URL.createObjectURL(f);
   video.style.display='block'; drop.style.display='none';
   $('controls').style.display='flex';
+  setVideoSrcStatus('Local: '+(f.name||'file'));
 }
-// load a video from a URL (shared match video from Supabase Storage)
+// load a video from a URL (shared match video — e.g. Cloudflare R2)
 function loadVideoUrl(url){
   if(!url||video.src===url) return;
   video.src=url; video.style.display='block'; drop.style.display='none';
   $('controls').style.display='flex';
+  setVideoSrcStatus('URL: '+url);
 }
 drop.onclick=()=>fileInput.click();
 fileInput.onchange=e=>loadFile(e.target.files[0]);
 ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
 drop.addEventListener('drop',e=>loadFile(e.dataTransfer.files[0]));
+
+/* ---- Video source modal: URL (shared) · R2 upload · local file ---- */
+function openVideoModal(){
+  $('videoSrcStatus').textContent=videoSrcLabel;
+  // reveal the R2 upload box only when a Worker endpoint is configured
+  $('r2Box').style.display=(window.Cloud&&window.Cloud.r2Enabled)?'block':'none';
+  $('videoModal').classList.add('show');
+  setTimeout(()=>$('vidUrlInput').focus(),0);
+}
+function closeVideoModal(){$('videoModal').classList.remove('show');$('playerInput').focus();}
+// load a URL and, when in a shared match, save it to matches.video_url so it persists & shares
+async function useVideoUrl(url){
+  url=(url||'').trim();
+  if(!/^https?:\/\//i.test(url)){alert('Enter a valid http(s) video URL.');return;}
+  loadVideoUrl(url);
+  if(window.Cloud&&window.Cloud.connected){
+    const ok=await window.Cloud.setVideoUrl(url);
+    toast(ok?'Saved to match ✓':'Loaded (open a shared match to save it)');
+  }else{
+    toast('Playing (connect + open a match to share/persist)');
+  }
+}
+$('videoBtn').onclick=openVideoModal;
+$('videoClose').onclick=closeVideoModal;
+$('videoModal').addEventListener('click',e=>{if(e.target===$('videoModal'))closeVideoModal();});
+$('vidUrlSave').onclick=()=>useVideoUrl($('vidUrlInput').value);
+$('vidUrlInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();useVideoUrl($('vidUrlInput').value);}});
+$('vidLocalPick').onclick=()=>fileInput.click();
+// R2 direct upload (needs a configured Worker endpoint)
+$('r2Pick').onclick=()=>$('r2File').click();
+$('r2File').onchange=async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  if(!(window.Cloud&&window.Cloud.connected&&window.Cloud.matchId)){alert('Open a shared match first (Cloud) so the uploaded video can be saved to it.');return;}
+  $('r2Progress').style.display='block'; $('r2Pct').textContent='0%';
+  try{
+    const url=await window.Cloud.uploadToR2(f,p=>{$('r2Pct').textContent=Math.round(p*100)+'%';});
+    loadVideoUrl(url); await window.Cloud.setVideoUrl(url);
+    toast('Uploaded to R2 ✓'); $('r2Progress').style.display='none';
+  }catch(err){$('r2Progress').style.display='none'; alert('Upload failed: '+(err&&err.message||err));}
+  e.target.value='';
+};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('videoModal').classList.contains('show')){e.preventDefault();closeVideoModal();}});
 
 const seek=$('seek');
 function fmt(t){const m=Math.floor(t/60),s=Math.floor(t%60),cs=Math.floor((t%1)*100);return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`}
