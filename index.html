@@ -479,6 +479,9 @@
         Paste a public direct link to an <b>.mp4/.webm</b>. If you're in a shared match (Cloud), the URL is
         saved to the match so everyone plays the same video and it persists on reload.
       </div>
+      <div class="ev-backup" style="margin-top:8px">
+        <button id="vidRemove" title="Clear the shared video URL from this match and unload the player">✖ Remove shared video</button>
+      </div>
 
       <!-- 2) Upload to R2 (only when a Worker endpoint is configured) -->
       <div id="r2Box" style="display:none;border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
@@ -876,6 +879,20 @@ $('videoModal').addEventListener('click',e=>{if(e.target===$('videoModal'))close
 $('vidUrlSave').onclick=()=>useVideoUrl($('vidUrlInput').value);
 $('vidUrlInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();useVideoUrl($('vidUrlInput').value);}});
 $('vidLocalPick').onclick=()=>fileInput.click();
+// unload the current video and (when in a shared match) clear matches.video_url
+function unloadVideo(){
+  video.pause(); video.removeAttribute('src'); video.load();
+  video.style.display='none'; drop.style.display=''; $('controls').style.display='none';
+  setVideoSrcStatus('No video');
+}
+$('vidRemove').onclick=async()=>{
+  let msg='Video unloaded';
+  if(window.Cloud&&window.Cloud.connected&&window.Cloud.matchId){
+    const ok=await window.Cloud.setVideoUrl(null);   // clear the shared link on the match
+    msg=ok?'Shared video removed ✓':'Video unloaded';
+  }
+  unloadVideo(); toast(msg);
+};
 // R2 direct upload (needs a configured Worker endpoint)
 $('r2Pick').onclick=()=>$('r2File').click();
 $('r2File').onchange=async e=>{
