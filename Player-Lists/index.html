@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player lists — Pitch Tagger</title>
+<link rel="stylesheet" href="../shared.css">
+</head>
+<body>
+<header>
+  <h1>Hoang<span>Nam</span> · Player lists &amp; formation</h1>
+  <div class="stats-toggle" style="margin-left:14px">
+    <button id="luHomeBtn"></button>
+    <button id="luAwayBtn"></button>
+  </div>
+  <div class="spacer"></div>
+  <a class="back-link" href="../">← Tagging</a>
+</header>
+<div class="page">
+  <div class="lineup-body">
+    <div class="lu-left">
+      <div class="lu-add">
+        <input id="luNo" placeholder="No" inputmode="numeric">
+        <input id="luName" placeholder="Player name">
+        <button id="luAdd" title="add player">+</button>
+      </div>
+      <div class="lu-roster" id="luRoster"></div>
+    </div>
+    <div class="lu-right">
+      <div class="lu-pitchwrap"><div class="lu-pitch" id="luPitch"></div></div>
+      <div class="lu-dir">
+        <button id="luDir">⇄ Switch Attacking Direction</button>
+        <span id="luCount"></span>
+      </div>
+      <div class="lu-subs"><b>Substitutes</b><div id="luSubs"></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="../shared.js"></script>
+<script>
+let lineups=loadLineups(), meta=loadMeta(), lineupTeam='home';
+function teamLU(){return lineups[lineupTeam];}
+function maxXI(){return MAX_XI[meta.sport]||11;}
+function rosterPlayer(t,no){return t.roster.find(p=>p.no===no);}
+function save(){saveLineupsLS(lineups);}   // main tab picks this up via `storage` and refreshes its formation
+
+function renderLineup(){
+  $('luHomeBtn').className=lineupTeam==='home'?'act-home':'';
+  $('luAwayBtn').className=lineupTeam==='away'?'act-away':'';
+  $('luHomeBtn').textContent=meta.home;
+  $('luAwayBtn').textContent=meta.away;
+  const t=teamLU(), ros=$('luRoster'); ros.innerHTML='';
+  t.roster.forEach(p=>{
+    const xiE=t.xi.find(x=>x.no===p.no), inXI=!!xiE, inSub=t.subs.includes(p.no);
+    const row=document.createElement('div'); row.className='lu-prow';
+    row.innerHTML=`<span class="num">${p.no}</span><span class="pname">${p.name||''}</span><span class="ppos">${xiE?(xiE.pos||''):''}</span>`;
+    const xiB=document.createElement('button');xiB.textContent='XI';if(inXI)xiB.className='on';xiB.onclick=()=>toggleXI(p.no);
+    const sB=document.createElement('button');sB.textContent='Sub';if(inSub)sB.className='on';sB.onclick=()=>toggleSub(p.no);
+    const rm=document.createElement('button');rm.className='rm';rm.textContent='×';rm.title='remove';rm.onclick=()=>removeLuPlayer(p.no);
+    row.append(xiB,sB,rm); ros.appendChild(row);
+  });
+  const subs=$('luSubs'); subs.innerHTML='';
+  t.subs.forEach(no=>{const p=rosterPlayer(t,no);if(!p)return;const c=document.createElement('span');c.className='lu-chip';c.innerHTML=`<span class="num">${p.no}</span>${p.name||''}`;subs.appendChild(c);});
+  $('luCount').textContent='Starters '+t.xi.length+'/'+maxXI()+' · Subs '+t.subs.length;
+  renderLuPitch();
+}
+function renderLuPitch(){
+  const t=teamLU(), pit=$('luPitch');
+  pit.innerHTML=pitchSVG('football')+gridHTML(t.dir);
+  t.xi.forEach(x=>{
+    const p=rosterPlayer(t,x.no);
+    const dot=document.createElement('div');
+    dot.className='lu-dot'+(lineupTeam==='away'?' away':'');
+    dot.style.left=x.x+'%'; dot.style.top=x.y+'%';
+    dot.innerHTML=`${x.no}<span class="lbl">${p?(p.name||''):''}</span>`;
+    luDrag(dot,x); pit.appendChild(dot);
+  });
+}
+function luDrag(dot,x){
+  dot.onpointerdown=e=>{
+    e.preventDefault(); dot.setPointerCapture(e.pointerId); dot.style.cursor='grabbing';
+    const pit=$('luPitch'), dir=teamLU().dir;
+    const move=ev=>{const r=pit.getBoundingClientRect();
+      x.x=Math.max(0,Math.min(100,(ev.clientX-r.left)/r.width*100));
+      x.y=Math.max(0,Math.min(100,(ev.clientY-r.top)/r.height*100));
+      x.pos=zoneAt(x.x,x.y,dir);
+      dot.style.left=x.x+'%'; dot.style.top=x.y+'%';};
+    const up=()=>{dot.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);save();renderLineup();};
+    document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
+  };
+}
+function toggleXI(no){const t=teamLU(), i=t.xi.findIndex(x=>x.no===no);
+  if(i>=0)t.xi.splice(i,1);
+  else{if(t.xi.length>=maxXI()){alert('Starting lineup is full ('+maxXI()+').');return;}
+    t.subs=t.subs.filter(n=>n!==no); const nx=50,ny=Math.min(90,12+t.xi.length*8); t.xi.push({no,x:nx,y:ny,pos:zoneAt(nx,ny,t.dir)});}
+  save();renderLineup();}
+function toggleSub(no){const t=teamLU();
+  if(t.subs.includes(no))t.subs=t.subs.filter(n=>n!==no);
+  else{t.xi=t.xi.filter(x=>x.no!==no); t.subs.push(no);}
+  save();renderLineup();}
+function removeLuPlayer(no){const t=teamLU();
+  t.roster=t.roster.filter(p=>p.no!==no); t.xi=t.xi.filter(x=>x.no!==no); t.subs=t.subs.filter(n=>n!==no);
+  save();renderLineup();}
+function addLuPlayer(){const no=$('luNo').value.trim(); if(!no)return; const t=teamLU();
+  if(t.roster.some(p=>p.no===no)){alert('No. '+no+' already exists.');return;}
+  t.roster.push({no,name:$('luName').value.trim()});
+  $('luNo').value='';$('luName').value=''; save();renderLineup(); $('luNo').focus();}
+function luSwitchDir(){const t=teamLU(); t.dir=t.dir==='rl'?'lr':'rl';
+  t.xi.forEach(x=>{x.x=100-x.x; x.pos=zoneAt(x.x,x.y,t.dir);}); save();renderLineup();}
+
+$('luHomeBtn').onclick=()=>{lineupTeam='home';renderLineup();};
+$('luAwayBtn').onclick=()=>{lineupTeam='away';renderLineup();};
+$('luAdd').onclick=addLuPlayer;
+$('luName').addEventListener('keydown',e=>{if(e.key==='Enter')addLuPlayer();});
+$('luNo').addEventListener('keydown',e=>{if(e.key==='Enter')$('luName').focus();});
+$('luDir').onclick=luSwitchDir;
+
+/* live sync with the main tagging tab (team names / sport / cloud edits) */
+window.addEventListener('storage',e=>{
+  if(e.key===PT_KEYS.meta){meta=loadMeta();renderLineup();}
+  else if(e.key===PT_KEYS.lineups){lineups=loadLineups();renderLineup();}
+});
+
+renderLineup();
+</script>
+</body>
+</html>

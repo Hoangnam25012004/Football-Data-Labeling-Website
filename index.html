@@ -565,6 +565,20 @@ function loadDuration(){
 }
 function saveDuration(){try{localStorage.setItem(DUR_STORE,JSON.stringify(state.duration));}catch(e){}}
 
+/* ---- shared stores read by the standalone Stats/ and Player-Lists/ pages ---- */
+const ROWS_STORE='pitchtagger.rows.v1';   // tagged events (so the Stats page can read them)
+const META_STORE='pitchtagger.meta.v1';   // team names + sport (labels on the sub-pages)
+function saveRows(){try{localStorage.setItem(ROWS_STORE,JSON.stringify(state.rows));}catch(e){}}
+function saveMeta(){try{localStorage.setItem(META_STORE,JSON.stringify(
+  {home:$('homeName').value||'Home',away:$('awayName').value||'Away',sport:state.sport}));}catch(e){}}
+// live sync FROM the sub-pages: Player-Lists edits lineups -> refresh the main-tab formation
+window.addEventListener('storage',e=>{
+  if(e.key===LU_STORE){try{const o=JSON.parse(e.newValue);if(o&&o.home&&o.away){
+    state.lineups=o; refreshFormation();
+    window.Cloud&&window.Cloud.onLineupsChanged&&window.Cloud.onLineupsChanged(o);
+  }}catch(_){}}
+});
+
 /* ===================== PLAYER LISTS / FORMATION ===================== */
 function saveLineups(){try{localStorage.setItem(LU_STORE,JSON.stringify(state.lineups));}catch(e){}
   window.Cloud&&window.Cloud.onLineupsChanged&&window.Cloud.onLineupsChanged(state.lineups); refreshFormation();}
@@ -692,7 +706,7 @@ function renderFormationSubs(){
   el.innerHTML=h||'<span class="fm-sub-empty">No substitutes</span>';
 }
 function refreshFormation(){ renderFormationMain(); }   // formation is always shown on the main tab
-$('lineupBtn').onclick=()=>{$('lineupModal').classList.add('show');renderLineup();};
+$('lineupBtn').onclick=()=>{saveMeta();saveLineups();window.open('Player-Lists/','pt-players');};
 $('lineupClose').onclick=()=>$('lineupModal').classList.remove('show');
 $('lineupModal').addEventListener('click',e=>{if(e.target===$('lineupModal'))$('lineupModal').classList.remove('show');});
 $('luHomeBtn').onclick=()=>{lineupTeam='home';renderLineup();};
@@ -984,6 +998,7 @@ $('segHome').onclick=()=>setTeam('home');
 $('segAway').onclick=()=>setTeam('away');
 // team names: push to the cloud match (matches.home_name / away_name) when changed
 ['homeName','awayName'].forEach(id=>$(id).addEventListener('change',()=>{
+  saveMeta();
   window.Cloud&&window.Cloud.onTeamNamesChanged&&window.Cloud.onTeamNamesChanged($('homeName').value,$('awayName').value);
 }));
 
@@ -1035,7 +1050,7 @@ function renderEvents(){
 function nextFreeKey(){const used=new Set(curEvents().map(e=>e.key));return DEFAULT_KEYS.find(k=>!used.has(k))||''}
 $('addEvBtn').onclick=()=>{const n=$('newEvName').value.trim();if(!n)return;curEvents().push({name:n,key:nextFreeKey()});if(!state.activeEvent)state.activeEvent=n;$('newEvName').value='';saveEvents();renderEvents();updateBanner()};
 $('newEvName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('addEvBtn').click()}});
-$('sportSel').onchange=e=>{state.sport=e.target.value;state.activeEvent=curEvents()[0]?.name||null;renderEvents();updateBanner();updateScore();if(pvRenderPitch)pvRenderPitch();};
+$('sportSel').onchange=e=>{state.sport=e.target.value;state.activeEvent=curEvents()[0]?.name||null;renderEvents();updateBanner();updateScore();saveMeta();if(pvRenderPitch)pvRenderPitch();};
 
 /* event modal (opened from the top bar button) */
 function openEvModal(){$('evModal').classList.add('show');renderEvents();updateStoreStatus();setTimeout(()=>$('newEvName').focus(),0);}
@@ -1124,7 +1139,7 @@ function renderTable(){
   });
   $('count').textContent=shown;
   $('emptyMsg').style.display=shown?'none':'block';
-  updateScore();
+  updateScore(); saveRows();   // keep the Stats page in sync
   if(targetTr){targetTr.scrollIntoView({block:'center'});targetTr.classList.add('just-added');setTimeout(()=>targetTr.classList.remove('just-added'),700);}
   scrollToRow=null;
 }
@@ -1418,7 +1433,7 @@ document.querySelectorAll('.dur-now').forEach(b=>{b.onclick=()=>{
   $(b.dataset.now).value=fmt(video.src?video.currentTime:0); $('durEnabled').checked=true; applyDur();};});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('durModal').classList.contains('show')){e.preventDefault();closeDurModal();}});
 
-$('statsBtn').onclick=openStatsModal;
+$('statsBtn').onclick=()=>{saveMeta();saveRows();window.open('Stats/','pt-stats');};
 $('statsModalClose').onclick=closeStatsModal;
 $('statHomeBtn').onclick=()=>{statTeam='home';renderStats();};
 $('statAwayBtn').onclick=()=>{statTeam='away';renderStats();};

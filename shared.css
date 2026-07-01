@@ -1,0 +1,112 @@
+/* shared.css — theme + pitch/stats/roster styles for the Stats/ and
+   Player-Lists/ standalone pages (lifted from the main app). */
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3240;
+  --ink:#e6edf3; --mut:#8b97a7; --accent:#39d98a; --accent2:#2f81f7;
+  --home:#2f81f7; --away:#f7682f; --danger:#f7506b; --warn:#f7b32f; --radius:10px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50}
+header h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.3px}
+header h1 span{color:var(--accent)}
+.back-link{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none}
+.back-link:hover{border-color:var(--accent);color:var(--accent)}
+.spacer{margin-left:auto}
+.page{padding:16px}
+
+/* team toggle (Home / Away / General) */
+.stats-toggle{display:flex;gap:6px}
+.stats-toggle button{background:var(--panel2);border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:5px 16px;cursor:pointer;font-weight:600;font-size:12px}
+.stats-toggle button.act-home{background:var(--home);color:#fff;border-color:var(--home)}
+.stats-toggle button.act-away{background:var(--away);color:#fff;border-color:var(--away)}
+.stats-toggle button.act-gen{background:var(--accent);color:#06281a;border-color:var(--accent)}
+
+.exports{display:flex;gap:6px}
+.exports button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:600}
+.exports button:hover{border-color:var(--accent);color:var(--accent)}
+
+/* stats tables */
+.stats-wrap{overflow:auto;max-height:calc(100vh - 120px);border:1px solid var(--line);border-radius:8px}
+table.stats{border-collapse:collapse;font-size:11px;white-space:nowrap;width:100%}
+table.stats th,table.stats td{border:1px solid var(--line);padding:4px 8px;text-align:center}
+table.stats thead th{position:sticky;background:var(--panel2);color:var(--ink)}
+table.stats thead tr:first-child th{top:0;z-index:2}
+table.stats thead tr:nth-child(2) th{top:25px;z-index:1;color:var(--mut);font-weight:600}
+table.stats .grp{font-weight:700}
+table.stats .grp.g0{background:#22364f;color:#cfe2ff}
+table.stats .grp.g1{background:#1f4031;color:#bff0d6}
+table.stats .grp.g2{background:#43321f;color:#f3dcc0}
+table.stats .grp.g3{background:#3a2440;color:#e8c9f0}
+table.stats .grp.g4{background:#3a3a1f;color:#eeeec0}
+table.stats .grp.g5{background:#402427;color:#f0c9cf}
+table.stats td.no,table.stats th.no{font-weight:700;color:var(--accent);background:var(--panel2);position:sticky;left:0;z-index:1}
+table.stats tbody tr:hover td{background:#1c233066}
+.stats-empty{padding:24px;text-align:center;color:var(--mut)}
+
+/* pass distribution matrix */
+.pm-title{font-weight:700;margin:16px 0 6px;font-size:13px}
+.pm-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;max-height:60vh}
+table.pmtx{border-collapse:collapse;font-size:11px;white-space:nowrap}
+table.pmtx th,table.pmtx td{border:1px solid var(--line);padding:4px 8px;text-align:center;min-width:30px}
+table.pmtx .pm-h{position:sticky;top:0;z-index:2;background:#1b2740;color:#cfe2ff;font-weight:700}
+table.pmtx .pm-rh{position:sticky;left:0;z-index:1;background:#2f5fa8;color:#fff;font-weight:700}
+table.pmtx thead .pm-h:first-child{left:0;z-index:3}
+table.pmtx .pm-diag{background:var(--panel2);color:var(--mut)}
+table.pmtx .pm-sum{background:var(--panel2);font-weight:700;color:var(--ink)}
+table.pmtx .pm-z{color:var(--mut)}
+table.pmtx tbody tr:last-child td,table.pmtx tbody tr:last-child th{background:var(--panel2);font-weight:700}
+.pm-away table.pmtx .pm-h{background:#3a2417;color:#f3dcc0}
+.pm-away table.pmtx .pm-rh{background:#a85a2e}
+
+/* General (team comparison) view */
+.gen-wrap{display:flex;flex-direction:column;gap:2px;padding:6px;max-width:900px}
+.gen-top{display:flex;align-items:center;justify-content:space-between;padding:6px 4px;font-weight:700}
+.gen-top .gh{color:#fff;background:var(--home);padding:3px 12px;border-radius:6px}
+.gen-top .ga{color:#fff;background:var(--away);padding:3px 12px;border-radius:6px}
+.gen-sec{background:var(--panel2);color:var(--accent);font-weight:700;padding:6px 10px;border-radius:6px;margin-top:8px;font-size:12px}
+.gen-row{display:grid;grid-template-columns:60px 1fr 150px 1fr 60px;align-items:center;gap:8px;padding:3px 4px;font-size:12px}
+.gen-row .vh{text-align:right;font-weight:700;color:var(--home)}
+.gen-row .va{text-align:left;font-weight:700;color:var(--away)}
+.gen-row .lbl{text-align:center;color:var(--mut);font-weight:600}
+.gen-bar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--line)}
+.gen-bar.lbar{justify-content:flex-end}
+.gen-bar .bh{background:var(--home);height:100%}
+.gen-bar .ba{background:var(--away);height:100%}
+
+/* ---- Player lists / formation ---- */
+.lineup-body{display:flex;gap:14px}
+.lu-left{width:350px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+.lu-add{display:flex;gap:6px}
+.lu-add input{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 8px;font-size:12px;width:54px}
+.lu-add input#luName{flex:1;width:auto}
+.lu-add button{background:var(--accent);color:#06281a;border:none;border-radius:6px;padding:0 12px;font-weight:700;cursor:pointer}
+.lu-roster{flex:1;overflow:auto;max-height:calc(100vh - 190px);display:flex;flex-direction:column;gap:4px}
+.lu-prow{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px}
+.lu-prow .num{width:26px;height:22px;display:flex;align-items:center;justify-content:center;background:#000;border-radius:4px;color:var(--accent);font-weight:700;font-size:11px;flex-shrink:0}
+.lu-prow .pname{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lu-prow .ppos{color:var(--mut);width:38px;text-align:right}
+.lu-prow button{border:1px solid var(--line);background:var(--panel);color:var(--mut);border-radius:5px;padding:2px 7px;cursor:pointer;font-size:11px}
+.lu-prow button.on{border-color:var(--accent);color:var(--accent);font-weight:700}
+.lu-prow .rm{color:var(--danger);border:none;background:none;font-size:14px}
+.lu-right{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.lu-pitchwrap{background:#142b18;border:1px solid var(--line);border-radius:8px;overflow:hidden;padding:6px}
+.lu-pitch{position:relative;width:100%;aspect-ratio:105/68;touch-action:none}
+.lu-pitch svg{position:absolute;inset:0;width:100%;height:100%}
+.lu-dot{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;cursor:grab;border:2px solid #000;user-select:none;z-index:2;touch-action:none}
+.lu-dot.away{background:var(--away)}
+.lu-dot .lbl{position:absolute;top:31px;left:50%;transform:translateX(-50%);font-size:10px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600;pointer-events:none}
+.lu-dir{display:flex;align-items:center;gap:12px}
+.lu-dir button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px}
+.lu-dir button:hover{border-color:var(--accent)}
+.lu-dir #luCount{color:var(--mut);font-size:12px}
+.lu-subs{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.lu-subs b{font-size:12px}
+.lu-subs #luSubs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:20px}
+.lu-chip{display:inline-flex;align-items:center;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:3px 9px;font-size:11px}
+.lu-chip .num{color:var(--accent);font-weight:700}
+
+/* position-zone grid */
+.pz{position:absolute;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:rgba(255,255,255,.55);box-sizing:border-box;border:1px solid rgba(255,255,255,.10);z-index:1;pointer-events:none}
+.pz.red{background:rgba(150,40,40,.30)} .pz.green{background:rgba(40,95,52,.30)} .pz.blue{background:rgba(45,55,115,.32)} .pz.gold{background:rgba(120,100,40,.30)} .pz.none{background:transparent;border-color:transparent}
+.pz-arrow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:26px;color:rgba(255,255,255,.45);z-index:2;pointer-events:none}

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stats — Pitch Tagger</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="../shared.css">
+</head>
+<body>
+<header>
+  <h1>Hoang<span>Nam</span> · Stats</h1>
+  <div class="stats-toggle" style="margin-left:14px">
+    <button id="statHomeBtn"></button>
+    <button id="statAwayBtn"></button>
+    <button id="statGenBtn">General</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="exports">
+    <button id="expXlsx">⭳ XLSX</button>
+    <button id="expCsv">⭳ CSV</button>
+  </div>
+  <a class="back-link" href="../">← Tagging</a>
+</header>
+<div class="page">
+  <div class="stats-wrap"><div id="statsHolder"></div></div>
+</div>
+
+<script src="../shared.js"></script>
+<script>
+let rows=loadRows(), meta=loadMeta(), statTeam='home';
+
+function renderStats(){
+  $('statHomeBtn').className=statTeam==='home'?'act-home':'';
+  $('statAwayBtn').className=statTeam==='away'?'act-away':'';
+  $('statGenBtn').className=statTeam==='general'?'act-gen':'';
+  $('statHomeBtn').textContent=meta.home;
+  $('statAwayBtn').textContent=meta.away;
+  const holder=$('statsHolder');
+  if(statTeam==='general'){renderGeneral();return;}
+  const P=computeStats(rows,statTeam), players=sortedPlayers(P);
+  if(!players.length){holder.innerHTML='<div class="stats-empty">No events for this team yet.</div>';return;}
+  let grp=''; STAT_GROUPS.forEach((g,i)=>{grp+=`<th colspan="${g[1]}" class="grp g${i?i-1:0}">${g[0]}</th>`;});
+  let head=STAT_HEADERS.map((h,i)=>`<th class="${i===0?'no':''}">${h}</th>`).join('');
+  let body='';
+  players.forEach(no=>{const row=statRow(no,P[no]);
+    body+='<tr>'+row.map((v,i)=>`<td class="${i===0?'no':''}">${v}</td>`).join('')+'</tr>';});
+  holder.innerHTML=`<table class="stats"><thead><tr>${grp}</tr><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
+    +passMatrixHTML(statTeam);
+}
+function passMatrixHTML(team){
+  const {players,mtx}=passMatrix(rows,team);
+  const name=team==='home'?meta.home:meta.away;
+  if(!players.length)return `<div class="pm-title" style="color:${team==='home'?'var(--home)':'var(--away)'}">${name} — Pass Distribution</div><div class="stats-empty">No completed passes for this team yet.</div>`;
+  let max=0; players.forEach(f=>players.forEach(t=>{if(f!==t)max=Math.max(max,(mtx[f]&&mtx[f][t])||0);}));
+  const rgb=team==='home'?'47,129,247':'247,104,47';
+  const bg=v=>v?`style="background:rgba(${rgb},${(0.12+0.6*v/(max||1)).toFixed(3)})"`:'';
+  let head='<th class="pm-h">From \\ To</th>'+players.map(p=>`<th class="pm-h">${p}</th>`).join('')+'<th class="pm-h">Σ</th>';
+  const colSum={}; let grand=0, body='';
+  players.forEach(f=>{
+    let rowSum=0, cells='';
+    players.forEach(t=>{
+      if(f===t){cells+='<td class="pm-diag">–</td>';return;}
+      const v=(mtx[f]&&mtx[f][t])||0; rowSum+=v; colSum[t]=(colSum[t]||0)+v; grand+=v;
+      cells+=`<td ${bg(v)}>${v||'<span class="pm-z">0</span>'}</td>`;
+    });
+    body+=`<tr><th class="pm-rh">${f}</th>${cells}<td class="pm-sum">${rowSum}</td></tr>`;
+  });
+  const foot='<th class="pm-rh">Σ recv</th>'+players.map(p=>`<td class="pm-sum">${colSum[p]||0}</td>`).join('')+`<td class="pm-sum">${grand}</td>`;
+  return `<div class="pm-title" style="color:${team==='home'?'var(--home)':'var(--away)'}">${name} — Pass Distribution</div>`
+    +`<div class="pm-wrap pm-${team}"><table class="pmtx"><thead><tr>${head}</tr></thead><tbody>${body}<tr>${foot}</tr></tbody></table></div>`;
+}
+function renderGeneral(){
+  const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
+  let html=`<div class="gen-wrap"><div class="gen-top"><span class="gh">${meta.home}</span><span>Team Comparison</span><span class="ga">${meta.away}</span></div>`;
+  TEAM_SECTIONS.forEach(sec=>{
+    html+=`<div class="gen-sec">${sec[0]}</div>`;
+    sec[1].forEach(([label,fn])=>{
+      const hv=fn(h,a), av=fn(a,h);
+      const hnum=numOf(hv), anum=numOf(av), tot=hnum+anum;
+      const hp=tot?Math.round(hnum/tot*100):50;
+      html+=`<div class="gen-row"><span class="vh">${hv}</span>`+
+            `<div class="gen-bar lbar"><div class="bh" style="width:${hp}%"></div></div>`+
+            `<span class="lbl">${label}</span>`+
+            `<div class="gen-bar rbar"><div class="ba" style="width:${100-hp}%"></div></div>`+
+            `<span class="va">${av}</span></div>`;
+    });
+  });
+  $('statsHolder').innerHTML=html+'</div>';
+}
+
+/* ---- exports ---- */
+function statsSheet(team){
+  const P=computeStats(rows,team), players=sortedPlayers(P);
+  const h1=new Array(STAT_HEADERS.length).fill(''); const merges=[];
+  let c=0; STAT_GROUPS.forEach(g=>{if(g[0]){h1[c]=g[0]; if(g[1]>1)merges.push({s:{r:0,c},e:{r:0,c:c+g[1]-1}});} c+=g[1];});
+  merges.push({s:{r:0,c:0},e:{r:1,c:0}});
+  const aoa=[h1,STAT_HEADERS,...players.map(no=>statRow(no,P[no]))];
+  const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!merges']=merges;
+  ws['!cols']=STAT_HEADERS.map((h,i)=>({wch:i===0?5:Math.max(7,h.length)}));
+  return ws;
+}
+function teamStatsSheet(){
+  const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
+  const aoa=[[meta.home,'Team Comparison',meta.away]];
+  TEAM_SECTIONS.forEach(sec=>{
+    aoa.push([sec[0],'','']);
+    sec[1].forEach(([label,fn])=>aoa.push([fn(h,a),label,fn(a,h)]));
+    aoa.push(['','','']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:14},{wch:20},{wch:14}];
+  return ws;
+}
+const matchName=()=>(meta.home||'Home')+'_vs_'+(meta.away||'Away');
+$('expXlsx').onclick=()=>{
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,statsSheet('home'),(meta.home||'Home').slice(0,25));
+  XLSX.utils.book_append_sheet(wb,statsSheet('away'),(meta.away||'Away').slice(0,25));
+  XLSX.utils.book_append_sheet(wb,teamStatsSheet(),'team_stats');
+  XLSX.writeFile(wb,matchName()+'_stats.xlsx');
+};
+$('expCsv').onclick=()=>{
+  const team=statTeam==='general'?'home':statTeam;
+  const P=computeStats(rows,team), players=sortedPlayers(P);
+  const lines=[STAT_HEADERS.join(','),...players.map(no=>statRow(no,P[no]).join(','))];
+  const blob=new Blob([lines.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=matchName()+'_'+team+'_stats.csv'; a.click();
+};
+
+$('statHomeBtn').onclick=()=>{statTeam='home';renderStats();};
+$('statAwayBtn').onclick=()=>{statTeam='away';renderStats();};
+$('statGenBtn').onclick=()=>{statTeam='general';renderStats();};
+
+/* live sync with the main tagging tab */
+window.addEventListener('storage',e=>{
+  if(e.key===PT_KEYS.rows){rows=loadRows();renderStats();}
+  else if(e.key===PT_KEYS.meta){meta=loadMeta();renderStats();}
+});
+
+renderStats();
+</script>
+</body>
+</html>
