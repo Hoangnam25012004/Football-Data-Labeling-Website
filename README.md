@@ -30,8 +30,10 @@ viewing the same match (video stays local — only event metadata is stored).
 
 **One-time Supabase setup:**
 1. Create a free project at [supabase.com](https://supabase.com).
-2. Run the schema: paste [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql)
-   into the SQL Editor (or `supabase db push`).
+2. Run the schema: paste each file in [`supabase/migrations/`](supabase/migrations/) into the
+   SQL Editor **in order** (`0001` → `0008`), or run `supabase db push`. They add, in turn:
+   matches + events, match codes, the shared `event_types` dictionary, realtime, lineups,
+   the `event_types.name` → `event_name` rename, and the `teams` / `players` tables.
 3. Auth → Providers → enable **Allow anonymous sign-ins**.
 4. (Optional, for zero-friction sharing) put your project **URL** and **anon key** into
    `CONFIG` at the top of [`cloud-sync.js`](cloud-sync.js). The anon key is public and safe

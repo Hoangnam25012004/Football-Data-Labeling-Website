@@ -97,7 +97,7 @@ const CONFIG = { url: '', anonKey: '' };
   }
   function applyToApp(rows) {
     const ev = {};   // applyEventTypes() fills in any missing sports with empty arrays
-    rows.forEach(r => { (ev[r.sport] = ev[r.sport] || []).push({ name: r.name, key: r.key || '' }); });
+    rows.forEach(r => { (ev[r.sport] = ev[r.sport] || []).push({ name: r.event_name, key: r.key || '' }); });
     applyingET = true;
     PT().applyEventTypes(ev);     // app sets state.events + localStorage + re-renders
     applyingET = false;
@@ -109,15 +109,15 @@ const CONFIG = { url: '', anonKey: '' };
   async function pushEventTypes(events) {
     const rows = [];
     Object.keys(events).forEach(sport =>
-      (events[sport] || []).forEach((e, i) => rows.push({ sport, name: e.name, key: e.key || null, ord: i })));
+      (events[sport] || []).forEach((e, i) => rows.push({ sport, event_name: e.name, key: e.key || null, ord: i })));
     if (rows.length) {
-      const { error } = await sb.from('event_types').upsert(rows, { onConflict: 'sport,name' });
+      const { error } = await sb.from('event_types').upsert(rows, { onConflict: 'sport,event_name' });
       if (error) { console.warn('event_types upsert:', error.message); return; }
     }
     // delete rows that no longer exist locally
-    const { data: existing } = await sb.from('event_types').select('id,sport,name');
-    const keep = new Set(rows.map(r => r.sport + '|' + r.name));
-    const del = (existing || []).filter(r => !keep.has(r.sport + '|' + r.name)).map(r => r.id);
+    const { data: existing } = await sb.from('event_types').select('id,sport,event_name');
+    const keep = new Set(rows.map(r => r.sport + '|' + r.event_name));
+    const del = (existing || []).filter(r => !keep.has(r.sport + '|' + r.event_name)).map(r => r.id);
     if (del.length) await sb.from('event_types').delete().in('id', del);
   }
   function subscribeEventTypes() {
