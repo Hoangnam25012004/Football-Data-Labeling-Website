@@ -3,6 +3,9 @@
 --  A team has many players; a player belongs to exactly one team.
 --  Mirrors the RLS / realtime / updated_at conventions of the
 --  matches, events and event_types tables.
+--
+--  Non-destructive: only CREATE ... IF NOT EXISTS and guarded
+--  creates — no DROP / TRUNCATE / DELETE, safe to run (and re-run).
 -- ============================================================
 
 -- shared "touch updated_at on UPDATE" helper (safe to re-create)
@@ -26,10 +29,6 @@ create table if not exists public.teams (
 
 create index if not exists teams_name_idx on public.teams (name);
 
-drop trigger if exists teams_touch on public.teams;
-create trigger teams_touch before update on public.teams
-for each row execute function public.touch_updated_at();
-
 -- ---------- PLAYERS ----------
 create table if not exists public.players (
   id          uuid primary key default gen_random_uuid(),
@@ -45,21 +44,35 @@ create table if not exists public.players (
 
 create index if not exists players_team_idx on public.players (team_id);
 
-drop trigger if exists players_touch on public.players;
-create trigger players_touch before update on public.players
-for each row execute function public.touch_updated_at();
+-- ---------- updated_at triggers (create only if missing — no DROP) ----------
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'teams_touch') then
+    create trigger teams_touch before update on public.teams
+    for each row execute function public.touch_updated_at();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'players_touch') then
+    create trigger players_touch before update on public.players
+    for each row execute function public.touch_updated_at();
+  end if;
+end $$;
 
 -- ---------- ROW-LEVEL SECURITY (same shareable model as the rest) ----------
 alter table public.teams   enable row level security;
 alter table public.players enable row level security;
 
-drop policy if exists teams_rw on public.teams;
-create policy teams_rw on public.teams
-  for all to authenticated using (true) with check (true);
-
-drop policy if exists players_rw on public.players;
-create policy players_rw on public.players
-  for all to authenticated using (true) with check (true);
+-- create policies only if missing (no DROP)
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='teams' and policyname='teams_rw') then
+    create policy teams_rw on public.teams
+      for all to authenticated using (true) with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='players' and policyname='players_rw') then
+    create policy players_rw on public.players
+      for all to authenticated using (true) with check (true);
+  end if;
+end $$;
 
 -- ---------- REALTIME ----------
 alter table public.teams   replica identity full;
