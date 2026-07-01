@@ -125,7 +125,11 @@
   body.video-popped .video-wrap{display:none}
   body.video-popped #controls{display:none!important}
   .tlink{color:var(--accent);cursor:pointer;font-variant-numeric:tabular-nums}
-  .del{color:var(--danger);cursor:pointer;font-weight:700}
+  .rowbtns{white-space:nowrap;text-align:right}
+  .rowbtns .edit,.rowbtns .del{cursor:pointer;font-weight:700;padding:0 5px}
+  .edit{color:var(--accent2)} .edit:hover{filter:brightness(1.25)}
+  .del{color:var(--danger)}
+  tr.editing td{background:#2f81f733;box-shadow:inset 3px 0 0 var(--accent2)}
   .empty{padding:30px;text-align:center;color:var(--mut)}
   .kbd{background:#000;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:10px;color:var(--mut)}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--accent);color:#06281a;padding:8px 16px;border-radius:8px;font-weight:700;opacity:0;transition:.2s;pointer-events:none;z-index:99}
@@ -546,6 +550,7 @@ const state = {
   events:loadEvents(),
   duration:loadDuration(),
   pendingDots:{p:null,r:null}, // dots placed on the pitch, attached to the next tagged event
+  editingId:null,              // id of the row being re-edited (submit updates it in place)
   lineups:loadLineups(),       // {home:{roster,xi,subs,dir}, away:{...}}
   rows:[], fps:25
 };
@@ -1076,7 +1081,10 @@ $('playerInput').addEventListener('keydown',e=>{
   if(e.code==='ArrowLeft'){e.preventDefault();$('back2').click();return}
   if(e.code==='ArrowRight'){e.preventDefault();$('fwd2').click();return}
   if(e.key==='Enter'){e.preventDefault();submitEntry();return}
+  if(e.key==='Escape'&&state.editingId){e.preventDefault();$('playerInput').value='';cancelEdit();if(pvSyncEntry)pvSyncEntry();return}
 });
+// clearing the box exits edit mode, so the next entry is a fresh event (not an update)
+$('playerInput').addEventListener('input',()=>{if(state.editingId&&!$('playerInput').value.trim())cancelEdit();});
 function submitEntry(){
   const p=parseEntry($('playerInput').value);
   let name = p.key ? eventForKey(p.key) : state.activeEvent;
@@ -1096,14 +1104,19 @@ function submitEntry(){
 }
 function pushRow({from,to,action,event,raw}){
   const pd=state.pendingDots;
-  // Timeline = the moment the Player dot was placed (fall back to current video time)
-  const t = pd.p ? pd.p.t : (video.src?video.currentTime:0);
-  const row={id:newId(), t, rt: pd.r?pd.r.t:null, team:state.team,
+  // when editing an existing event, keep its original timeline if no new dots were placed
+  const existing = state.editingId ? state.rows.find(r=>r.id===state.editingId) : null;
+  // Timeline = the moment the Player dot was placed (fall back to the original, then current video time)
+  const t = pd.p ? pd.p.t : (existing ? existing.t : (video.src?video.currentTime:0));
+  const data={ t, rt: pd.r?pd.r.t:(pd.p?null:(existing?existing.rt:null)), team:state.team,
     teamName:state.team==='home'?$('homeName').value:$('awayName').value,
     event,playerFrom:from,playerTo:to,action,raw,
     pXY: pd.p?{x:pd.p.x,y:pd.p.y}:null, rXY: pd.r?{x:pd.r.x,y:pd.r.y}:null};
-  state.rows.push(row);
-  window.Cloud&&window.Cloud.onLocalUpsert(row); // sync new event to the cloud (if connected)
+  let row;
+  if(existing){ Object.assign(existing,data); row=existing; }   // edit in place — keep the same id
+  else { row=Object.assign({id:newId()},data); state.rows.push(row); }
+  state.editingId=null;
+  window.Cloud&&window.Cloud.onLocalUpsert(row); // sync new/updated event to the cloud (if connected)
   state.pendingDots={p:null,r:null}; // consume the dots
   if(pvRedraw)pvRedraw();             // clear them from the pitch overlay
   $('halfSel').value=eventHalf(row); // jump the view to the half the new event lands in
@@ -1111,6 +1124,33 @@ function pushRow({from,to,action,event,raw}){
   renderTable(); toast(event+' ✓');
 }
 let scrollToRow=null;
+/* pull an existing event back into the editor: restore its syntax + dots so it can be re-tagged.
+   Submitting (Enter) then updates that same event in place (keeps its id). */
+function startEdit(idx){
+  const row=state.rows[idx]; if(!row)return;
+  state.editingId=row.id;
+  setTeam(row.team);
+  state.activeEvent=row.event; renderEvents(); updateBanner();  // keyless re-submit keeps this event
+  // reconstruct the syntax (e.g. "1s2"); fall back to the stored raw input
+  const syntax=((row.playerFrom||'')+(row.action||'')+(row.playerTo||''))||row.raw||'';
+  $('playerInput').value=syntax;
+  // restore the dots (keep their original timeline)
+  state.pendingDots={
+    p: row.pXY?{x:row.pXY.x,y:row.pXY.y,t:row.t}:null,
+    r: row.rXY?{x:row.rXY.x,y:row.rXY.y,t:(row.rt!=null?row.rt:row.t)}:null
+  };
+  if(pvRedraw)pvRedraw();
+  if(pvTogglePitch)pvTogglePitch(true);   // reveal the pitch overlay so the restored dots show
+  if(pvSyncEntry)pvSyncEntry();
+  renderTable();                          // highlight the row being edited
+  if(document.hasFocus())$('playerInput').focus();
+  toast('Editing — adjust & press Enter');
+}
+function cancelEdit(){                     // leave edit mode without changing the row
+  if(!state.editingId)return;
+  state.editingId=null; state.pendingDots={p:null,r:null};
+  if(pvRedraw)pvRedraw(); renderTable();
+}
 function renderTable(){
   const tb=$('tbody'); tb.innerHTML='';
   // always sorted by timeline: earliest -> latest, regardless of input order
@@ -1121,6 +1161,7 @@ function renderTable(){
     shown++;
     const tr=document.createElement('tr');
     if(r===scrollToRow)targetTr=tr;
+    if(r.id===state.editingId)tr.classList.add('editing');
     const isHome=r.team==='home';
     // one combined cell: "<player_from> <event> <player_to>" (receiver number only when present).
     // [x,y] coordinates and both player numbers are still stored/exported — just shown as one string here.
@@ -1132,9 +1173,11 @@ function renderTable(){
     const blank='<td class="blank"></td>';
     const homeCell = isHome ? `<td class="h-side">${combined}</td>` : blank;
     const awayCell = !isHome ? `<td class="a-side">${combined}</td>` : blank;
-    tr.innerHTML=`${homeCell}<td class="tl-col tlink">${fmt(matchTime(r.t))}</td>${awayCell}<td class="del">×</td>`;
+    tr.innerHTML=`${homeCell}<td class="tl-col tlink">${fmt(matchTime(r.t))}</td>${awayCell}`
+      +`<td class="rowbtns"><span class="edit" title="Edit — reload the syntax and dots">✎</span><span class="del" title="Remove">×</span></td>`;
     tr.querySelector('.tlink').onclick=()=>{if(video.src)video.currentTime=r.t};
-    tr.querySelector('.del').onclick=()=>{const id=state.rows[i].id;state.rows.splice(i,1);renderTable();window.Cloud&&window.Cloud.onLocalDelete(id);};
+    tr.querySelector('.edit').onclick=()=>startEdit(i);
+    tr.querySelector('.del').onclick=()=>{const id=state.rows[i].id;if(state.editingId===id)state.editingId=null;state.rows.splice(i,1);renderTable();window.Cloud&&window.Cloud.onLocalDelete(id);};
     tr.querySelectorAll('[data-edit]').forEach(td=>{td.ondblclick=()=>editPlayerCell(td,i,td.dataset.edit)});
     tr.querySelectorAll('.ed-ev').forEach(td=>{td.ondblclick=()=>editEventCell(td,i)});
     tb.appendChild(tr);
