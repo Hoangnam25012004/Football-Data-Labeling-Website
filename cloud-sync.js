@@ -91,35 +91,27 @@ const CONFIG = {
   }
 
   /* ---------- teams database (public.teams) ---------- */
-  // Creating a match requires BOTH teams to already exist in the database:
-  // pick them here, or create them first with the ＋ buttons.
+  // Creating a match requires BOTH teams to already exist in the database.
+  // The teams cache feeds the autocomplete in the create-match dialog.
+  let teamsCache = [];
   async function loadTeams() {
-    if (!connected) return;
+    if (!connected) return teamsCache;
     const { data, error } = await sb.from('teams').select('id,name').order('name');
-    if (error) { console.warn('list teams:', error.message); return; }
-    ['cloudHomeTeam', 'cloudAwayTeam'].forEach((id, i) => {
-      const sel = $(id); if (!sel) return;
-      const cur = sel.value;
-      sel.innerHTML = `<option value="">— select ${i ? 'away' : 'home'} team —</option>` +
-        (data || []).map(t => `<option value="${t.id}">${t.name}</option>`).join('');
-      if (cur && (data || []).some(t => t.id === cur)) sel.value = cur;
-    });
+    if (error) { console.warn('list teams:', error.message); return teamsCache; }
+    teamsCache = data || [];
+    return teamsCache;
   }
-  // create a team in the database, then select it in the given picker
-  async function addTeam(selId) {
-    if (!connected && !(await connect())) return;
-    const name = (prompt('Tên team mới (lưu vào database):') || '').trim();
-    if (!name) return;
-    // reuse an existing team with the same name instead of duplicating it
+  // create (or reuse by name) a team in the database; returns {id,name} or null
+  async function createTeam(name) {
+    name = (name || '').trim();
+    if (!name) return null;
+    if (!connected && !(await connect())) return null;
     const { data: existing } = await sb.from('teams').select('id,name').ilike('name', name).maybeSingle();
-    let team = existing;
-    if (!team) {
-      const { data, error } = await sb.from('teams').insert({ name }).select().single();
-      if (error) { alert('Không tạo được team: ' + error.message); return; }
-      team = data;
-    }
+    if (existing) { await loadTeams(); return existing; }
+    const { data, error } = await sb.from('teams').insert({ name }).select().single();
+    if (error) { alert('Không tạo được team: ' + error.message); return null; }
     await loadTeams();
-    if ($(selId)) $(selId).value = team.id;
+    return data;
   }
 
   /* ---------- shared event dictionary (event_types) ---------- */
@@ -189,29 +181,43 @@ const CONFIG = {
   }
 
   /* ---------- match create / join / load ---------- */
-  async function createMatch() {
-    if (!connected && !(await connect())) return;
-    // a match may only be created for teams that already exist in public.teams
-    const hId = $('cloudHomeTeam') ? $('cloudHomeTeam').value : '';
-    const aId = $('cloudAwayTeam') ? $('cloudAwayTeam').value : '';
-    if (!hId || !aId) { alert('Chọn team Home và Away từ database trước khi tạo match.\n(Chưa có team? Bấm ＋ để tạo và lưu vào database.)'); return; }
-    if (hId === aId) { alert('Home và Away phải là hai team khác nhau.'); return; }
-    // verify both ids really exist in the database right before creating the match
+  // create the match for two DB team ids (verified on the DB right before insert)
+  async function createMatchWithTeams(hId, aId, matchDate) {
+    if (!connected && !(await connect())) return false;
+    if (!hId || !aId) { alert('Chọn đội Home và Away từ database trước.'); return false; }
+    if (hId === aId) { alert('Home và Away phải là hai đội khác nhau.'); return false; }
     const { data: teams, error: tErr } = await sb.from('teams').select('id,name').in('id', [hId, aId]);
     if (tErr || !teams || teams.length < 2) {
-      alert('Không xác thực được 2 teams trên database' + (tErr ? ': ' + tErr.message : '.') + '\nDanh sách teams sẽ được tải lại — chọn lại rồi thử tiếp.');
-      await loadTeams(); return;
+      alert('Không xác thực được 2 teams trên database' + (tErr ? ': ' + tErr.message : '.'));
+      await loadTeams(); return false;
     }
     const home = teams.find(t => t.id === hId), away = teams.find(t => t.id === aId);
-    const { data, error } = await sb.from('matches').insert({
-      home_name: home.name,
-      away_name: away.name,
-      home_team_id: hId,
-      away_team_id: aId,
+    const ins = {
+      home_name: home.name, away_name: away.name,
+      home_team_id: hId, away_team_id: aId,
       sport: PT().state.sport
-    }).select().single();
-    if (error) { alert('Create match failed: ' + error.message); return; }
+    };
+    if (matchDate) ins.match_date = matchDate;
+    const { data, error } = await sb.from('matches').insert(ins).select().single();
+    if (error) { alert('Create match failed: ' + error.message); return false; }
     await openMatchRow(data);                       // data includes the generated 5-digit code
+    await loadRecentMatches();
+    return true;
+  }
+  // look a match up by 5-digit code (or uuid) and compute its goal score
+  // -> {row, score:[h,a]} | null (not found / not connected)
+  async function findMatchByCode(input) {
+    if (!connected) return null;
+    input = (input || '').trim();
+    if (!input) return null;
+    const col = /^\d{5}$/.test(input) ? 'code' : 'id';
+    const { data, error } = await sb.from('matches').select('*').eq(col, input).maybeSingle();
+    if (error || !data) return null;
+    let h = 0, a = 0;
+    const { data: goals } = await sb.from('events').select('team')
+      .eq('match_id', data.id).eq('event_name', 'goal');
+    (goals || []).forEach(g => (g.team === 'home' ? h++ : a++));
+    return { row: data, score: [h, a] };
   }
   async function joinMatch() {
     await openByInput($('cloudMatchId').value);
@@ -367,6 +373,9 @@ const CONFIG = {
     get connected() { return connected; },
     get matchId() { return matchId; },
     get r2Enabled() { return !!(CONFIG.R2 && CONFIG.R2.workerUrl); },
+    get teams() { return teamsCache; },
+    loadTeams, createTeam, createMatchWithTeams, findMatchByCode,
+    openMatch: openByInput,
     onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged, onDurationChanged, onLineupsChanged,
     setVideoUrl, uploadToR2
   };
@@ -380,12 +389,26 @@ const CONFIG = {
     $('cloudClose').onclick = () => $('cloudModal').classList.remove('show');
     $('cloudModal').addEventListener('click', (e) => { if (e.target === $('cloudModal')) $('cloudModal').classList.remove('show'); });
     $('cloudConnect').onclick = () => connect();
-    $('cloudCreate').onclick = createMatch;
+    // "Tạo trận đấu mới" opens the create-match dialog (teams from the database)
+    $('cloudCreate').onclick = async () => {
+      if (!connected && !(await connect())) return;
+      await loadTeams();
+      if (PT().openMatchModal) PT().openMatchModal();
+    };
     $('cloudJoin').onclick = joinMatch;
     if ($('cloudMatchList')) $('cloudMatchList').onchange = (e) => { if (e.target.value) openByInput(e.target.value); };
     if ($('cloudRefresh')) $('cloudRefresh').onclick = () => { loadTeams(); loadRecentMatches(); };
-    if ($('cloudHomeTeamAdd')) $('cloudHomeTeamAdd').onclick = () => addTeam('cloudHomeTeam');
-    if ($('cloudAwayTeamAdd')) $('cloudAwayTeamAdd').onclick = () => addTeam('cloudAwayTeam');
+    // typing a 5-digit code shows the match info card (home / away / score / date) — click it to open
+    let findTimer = null;
+    if ($('cloudMatchId')) $('cloudMatchId').addEventListener('input', () => {
+      clearTimeout(findTimer);
+      const v = $('cloudMatchId').value.trim();
+      if (!/^\d{5}$/.test(v)) { if (PT().renderMatchPreview) PT().renderMatchPreview(null); return; }
+      findTimer = setTimeout(async () => {
+        const res = await findMatchByCode(v);
+        if (PT().renderMatchPreview) PT().renderMatchPreview(res || { notFound: true });
+      }, 350);
+    });
     $('cloudCopy').onclick = () => { $('cloudShare').select(); document.execCommand('copy'); };
     // auto-connect on load when credentials are saved/configured, so the shared event
     // dictionary syncs without clicking Connect; also auto-join a #match=<code> link.

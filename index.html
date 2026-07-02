@@ -225,6 +225,26 @@
   table.pmtx tbody tr:last-child td,table.pmtx tbody tr:last-child th{background:var(--panel2);font-weight:700}
   .pm-away table.pmtx .pm-h{background:#3a2417;color:#f3dcc0}
   .pm-away table.pmtx .pm-rh{background:#a85a2e}
+  /* New-match modal: team autocomplete from the teams database */
+  .nm-teams{display:flex;gap:10px;align-items:flex-start}
+  .nm-side{flex:1;min-width:0}
+  .nm-vs{color:var(--mut);font-weight:700;padding-top:34px}
+  .nm-box{position:relative}
+  .nm-sug{position:absolute;top:100%;left:0;right:0;background:var(--panel2);border:1px solid var(--line);border-radius:0 0 8px 8px;max-height:180px;overflow:auto;z-index:10;display:none}
+  .nm-sug div{padding:6px 9px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--line)}
+  .nm-sug div:last-child{border-bottom:none}
+  .nm-sug div:hover{background:#16302466;color:var(--accent)}
+  .nm-new{width:100%;margin-top:6px;background:var(--panel2);border:1px dashed var(--warn);color:var(--warn);border-radius:6px;padding:6px;cursor:pointer;font-weight:600;font-size:12px}
+  .nm-new:hover{filter:brightness(1.15)}
+  input.txt.nm-ok{border-color:var(--accent)}
+  /* match preview card (shown while typing a match code) */
+  .mp-card{margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer}
+  .mp-card:hover{border-color:var(--accent)}
+  .mp-top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:700;font-size:13px}
+  .mp-top .mp-h{color:var(--home)} .mp-top .mp-a{color:var(--away);text-align:right}
+  .mp-score{color:var(--warn);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:14px}
+  .mp-sub{display:flex;justify-content:space-between;color:var(--mut);font-size:11px;margin-top:6px}
+  .mp-none{margin-top:10px;color:var(--mut);font-size:11px}
   /* Duration modal */
   .dur-grid{display:flex;flex-direction:column;gap:9px}
   .dur-row{display:grid;grid-template-columns:130px 1fr auto;gap:8px;align-items:center}
@@ -435,29 +455,20 @@
 
       <div id="cloudConnected" style="display:none;margin-top:14px">
         <div style="border-top:1px solid var(--line);padding-top:12px">
-          <label class="fld"><span>Home team <span class="mini">(from the teams database)</span></span></label>
-          <div class="addrow">
-            <select class="txt" id="cloudHomeTeam"><option value="">— select home team —</option></select>
-            <button id="cloudHomeTeamAdd" title="Create a new team in the database">＋</button>
-          </div>
-          <label class="fld" style="margin-top:8px"><span>Away team <span class="mini">(from the teams database)</span></span></label>
-          <div class="addrow">
-            <select class="txt" id="cloudAwayTeam"><option value="">— select away team —</option></select>
-            <button id="cloudAwayTeamAdd" title="Create a new team in the database">＋</button>
-          </div>
-          <div class="ev-backup" style="margin-top:10px">
-            <button id="cloudCreate" title="Both teams must exist in the database before the match can be created">＋ New shared match</button>
+          <div class="ev-backup">
+            <button id="cloudCreate" title="Tạo trận đấu mới — chọn 2 đội từ database">＋ Tạo trận đấu mới</button>
           </div>
           <label class="fld" style="margin-top:10px"><span>Open a recent match</span></label>
           <div class="addrow">
             <select class="txt" id="cloudMatchList"><option value="">— select a match —</option></select>
             <button id="cloudRefresh" title="refresh list">⟳</button>
           </div>
-          <label class="fld" style="margin-top:10px"><span>…or join by 5-digit code</span></label>
+          <label class="fld" style="margin-top:10px"><span>Match ID <span class="mini">— nhập code 5 số để xem thông tin trận</span></span></label>
           <div class="addrow">
-            <input class="txt" id="cloudMatchId" placeholder="e.g. 12345" inputmode="numeric">
+            <input class="txt" id="cloudMatchId" placeholder="e.g. 12345" inputmode="numeric" autocomplete="off">
             <button id="cloudJoin" title="join">↪</button>
           </div>
+          <div id="matchPreview" style="display:none"></div>
           <div class="file-link" id="cloudShareRow" style="display:none">
             <input class="txt" id="cloudShare" readonly style="flex:1">
             <button id="cloudCopy">Copy link</button>
@@ -465,8 +476,44 @@
         </div>
       </div>
       <div class="syntax-hint" style="margin-top:12px">
-        One person clicks <b>New shared match</b> and shares the link (or match ID). Everyone who opens it
-        sees each other's tags live. Tagged events save to your Supabase database (video stays local).
+        Một người bấm <b>Tạo trận đấu mới</b> rồi chia sẻ link (hoặc Match ID). Ai mở link sẽ thấy
+        tag của nhau theo thời gian thực. Sự kiện lưu vào Supabase (video giữ ở máy).
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="matchModal">
+  <div class="modal">
+    <div class="modal-head">
+      <b>Tạo trận đấu mới</b>
+      <button class="modal-close" id="matchModalClose" title="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="nm-teams">
+        <div class="nm-side">
+          <label class="fld"><span>Home</span></label>
+          <div class="nm-box">
+            <input class="txt" id="nmHome" placeholder="Nhập tên đội" autocomplete="off">
+            <div class="nm-sug" id="nmHomeSug"></div>
+          </div>
+          <button class="nm-new" id="nmHomeNew" style="display:none">＋ New team</button>
+        </div>
+        <div class="nm-vs">vs</div>
+        <div class="nm-side">
+          <label class="fld"><span>Away</span></label>
+          <div class="nm-box">
+            <input class="txt" id="nmAway" placeholder="Nhập tên đội" autocomplete="off">
+            <div class="nm-sug" id="nmAwaySug"></div>
+          </div>
+          <button class="nm-new" id="nmAwayNew" style="display:none">＋ New team</button>
+        </div>
+      </div>
+      <label class="fld" style="margin-top:10px"><span>Ngày diễn ra trận đấu</span></label>
+      <input class="txt" type="date" id="nmDate">
+      <button class="addbtn" id="nmCreate">Register</button>
+      <div class="syntax-hint" style="margin-top:10px">
+        Gõ tên đội để tìm trong database — chọn đội từ danh sách gợi ý. Nếu <b>không có gợi ý</b>,
+        đội chưa tồn tại trong database: bấm <b>＋ New team</b> để lưu đội mới rồi mới tạo được trận.
       </div>
     </div>
   </div>
@@ -1702,12 +1749,86 @@ function teamStatsSheet(){
   return ws;
 }
 
+/* ===================== TẠO TRẬN ĐẤU MỚI (teams từ database) =====================
+   Home/Away là ô nhập text có gợi ý từ bảng teams. Không có gợi ý = đội chưa tồn tại
+   trong database -> phải bấm ＋ New team để lưu đội trước, rồi mới tạo được trận. */
+const nmSel={home:null,away:null};        // team đã chọn {id,name} cho từng bên
+function nmTeams(){return (window.Cloud&&window.Cloud.teams)||[];}
+function nmBind(side){
+  const cap=side==='home'?'Home':'Away';
+  const inp=$('nm'+cap), sug=$('nm'+cap+'Sug'), nb=$('nm'+cap+'New');
+  const render=()=>{
+    const q=inp.value.trim().toLowerCase();
+    nmSel[side]=null; inp.classList.remove('nm-ok');
+    sug.innerHTML=''; sug.style.display='none'; nb.style.display='none';
+    if(!q)return;
+    const hits=nmTeams().filter(t=>t.name.toLowerCase().includes(q)).slice(0,8);
+    if(hits.length){
+      hits.forEach(t=>{const d=document.createElement('div');d.textContent=t.name;
+        d.onclick=()=>{nmSel[side]=t;inp.value=t.name;inp.classList.add('nm-ok');
+          sug.style.display='none';nb.style.display='none';};
+        sug.appendChild(d);});
+      sug.style.display='block';
+    }else nb.style.display='block';   // đội chưa có trong database
+  };
+  inp.addEventListener('input',render);
+  inp.addEventListener('focus',render);
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();
+      const first=sug.querySelector('div');
+      if(first&&sug.style.display==='block')first.click();}
+    if(e.key==='Escape'&&sug.style.display==='block'){e.stopPropagation();sug.style.display='none';}
+  });
+  nb.onclick=async()=>{
+    const name=inp.value.trim(); if(!name||!window.Cloud)return;
+    nb.disabled=true;
+    const t=await window.Cloud.createTeam(name);
+    nb.disabled=false;
+    if(t){nmSel[side]=t;inp.value=t.name;inp.classList.add('nm-ok');nb.style.display='none';
+      toast('Đã lưu team "'+t.name+'" vào database ✓');}
+  };
+}
+function openMatchModal(){
+  nmSel.home=nmSel.away=null;
+  ['nmHome','nmAway'].forEach(id=>{$(id).value='';$(id).classList.remove('nm-ok');});
+  ['nmHomeSug','nmAwaySug','nmHomeNew','nmAwayNew'].forEach(id=>$(id).style.display='none');
+  $('nmDate').value=new Date().toISOString().slice(0,10);
+  $('matchModal').classList.add('show');
+  setTimeout(()=>$('nmHome').focus(),0);
+}
+function closeMatchModal(){$('matchModal').classList.remove('show');}
+nmBind('home'); nmBind('away');
+$('matchModalClose').onclick=closeMatchModal;
+$('matchModal').addEventListener('click',e=>{if(e.target===$('matchModal'))closeMatchModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('matchModal').classList.contains('show')){e.preventDefault();closeMatchModal();}});
+$('nmCreate').onclick=async()=>{
+  if(!nmSel.home||!nmSel.away){alert('Chọn đội Home và Away từ danh sách gợi ý.\n(Không có gợi ý? Bấm ＋ New team để lưu đội vào database trước.)');return;}
+  if(nmSel.home.id===nmSel.away.id){alert('Home và Away phải là hai đội khác nhau.');return;}
+  $('nmCreate').disabled=true;
+  const ok=await window.Cloud.createMatchWithTeams(nmSel.home.id,nmSel.away.id,$('nmDate').value||null);
+  $('nmCreate').disabled=false;
+  if(ok){closeMatchModal();toast('Đã tạo trận đấu ✓');}
+};
+/* card xem trước trận đấu khi nhập Match ID — click để mở trận */
+function renderMatchPreview(res){
+  const box=$('matchPreview'); if(!box)return;
+  if(!res){box.style.display='none';box.innerHTML='';return;}
+  if(res.notFound){box.innerHTML='<div class="mp-none">Không tìm thấy trận đấu với Match ID này.</div>';box.style.display='block';return;}
+  const m=res.row, d=m.match_date||((m.created_at||'').slice(0,10));
+  const disp=d?d.split('-').reverse().join('/'):'—';
+  box.innerHTML=`<div class="mp-card" title="Click để mở trận đấu này">
+    <div class="mp-top"><span class="mp-h">${m.home_name}</span><span class="mp-score">${res.score[0]} : ${res.score[1]}</span><span class="mp-a">${m.away_name}</span></div>
+    <div class="mp-sub"><span>🕐 ${disp}</span><span>Match ID: <b style="color:var(--accent)">${m.code||m.id.slice(0,8)}</b></span></div></div>`;
+  box.style.display='block';
+  box.querySelector('.mp-card').onclick=()=>{box.style.display='none';window.Cloud.openMatch(m.code||m.id);};
+}
+
 if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
 renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); renderFormationMain();
 
 // bridge for the cloud-sync module (loaded next)
-window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams};
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=20"></script>
+<script src="cloud-sync.js?v=21"></script>
 </body>
 </html>
