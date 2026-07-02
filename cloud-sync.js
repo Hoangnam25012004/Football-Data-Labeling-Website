@@ -207,7 +207,7 @@ const CONFIG = {
   // look a match up by 5-digit code (or uuid) and compute its goal score
   // -> {row, score:[h,a]} | null (not found / not connected)
   async function findMatchByCode(input) {
-    if (!connected) return null;
+    if (!connected && !(await connect(true))) return null;   // silent connect so the preview works right after load
     input = (input || '').trim();
     if (!input) return null;
     const col = /^\d{5}$/.test(input) ? 'code' : 'id';
@@ -398,17 +398,23 @@ const CONFIG = {
     $('cloudJoin').onclick = joinMatch;
     if ($('cloudMatchList')) $('cloudMatchList').onchange = (e) => { if (e.target.value) openByInput(e.target.value); };
     if ($('cloudRefresh')) $('cloudRefresh').onclick = () => { loadTeams(); loadRecentMatches(); };
-    // typing a 5-digit code shows the match info card (home / away / score / date) — click it to open
+    // a 5-digit code in the Match ID box shows the match info card (home / away /
+    // score / date) — click it to open. Runs on typing, on focus, and when the
+    // modal opens with a code already in the box (e.g. auto-filled by a join).
     let findTimer = null;
-    if ($('cloudMatchId')) $('cloudMatchId').addEventListener('input', () => {
+    const previewMatchId = () => {
+      if (!$('cloudMatchId')) return;
       clearTimeout(findTimer);
       const v = $('cloudMatchId').value.trim();
       if (!/^\d{5}$/.test(v)) { if (PT().renderMatchPreview) PT().renderMatchPreview(null); return; }
       findTimer = setTimeout(async () => {
         const res = await findMatchByCode(v);
         if (PT().renderMatchPreview) PT().renderMatchPreview(res || { notFound: true });
-      }, 350);
-    });
+      }, 300);
+    };
+    if ($('cloudMatchId')) ['input', 'focus', 'keyup'].forEach(ev =>
+      $('cloudMatchId').addEventListener(ev, previewMatchId));
+    $('cloudBtn').onclick = () => { $('cloudModal').classList.add('show'); previewMatchId(); };
     $('cloudCopy').onclick = () => { $('cloudShare').select(); document.execCommand('copy'); };
     // auto-connect on load when credentials are saved/configured, so the shared event
     // dictionary syncs without clicking Connect; also auto-join a #match=<code> link.
