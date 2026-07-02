@@ -435,8 +435,18 @@
 
       <div id="cloudConnected" style="display:none;margin-top:14px">
         <div style="border-top:1px solid var(--line);padding-top:12px">
-          <div class="ev-backup">
-            <button id="cloudCreate" title="Create a new shared match">＋ New shared match</button>
+          <label class="fld"><span>Home team <span class="mini">(from the teams database)</span></span></label>
+          <div class="addrow">
+            <select class="txt" id="cloudHomeTeam"><option value="">— select home team —</option></select>
+            <button id="cloudHomeTeamAdd" title="Create a new team in the database">＋</button>
+          </div>
+          <label class="fld" style="margin-top:8px"><span>Away team <span class="mini">(from the teams database)</span></span></label>
+          <div class="addrow">
+            <select class="txt" id="cloudAwayTeam"><option value="">— select away team —</option></select>
+            <button id="cloudAwayTeamAdd" title="Create a new team in the database">＋</button>
+          </div>
+          <div class="ev-backup" style="margin-top:10px">
+            <button id="cloudCreate" title="Both teams must exist in the database before the match can be created">＋ New shared match</button>
           </div>
           <label class="fld" style="margin-top:10px"><span>Open a recent match</span></label>
           <div class="addrow">
@@ -590,6 +600,9 @@ const LU_STORE='pitchtagger.lineups.v1';
 const blankTeamLU=dir=>({roster:[],xi:[],subs:[],dir:dir||'lr'});
 function loadLineups(){try{const s=localStorage.getItem(LU_STORE);if(s){const o=JSON.parse(s);if(o&&o.home&&o.away)return o;}}catch(e){}
   return {home:blankTeamLU('lr'),away:blankTeamLU('rl')};}
+// team ids (public.teams) of the currently open match — restored across reloads via the meta store
+function loadTeamIds(){try{const m=JSON.parse(localStorage.getItem('pitchtagger.meta.v1'))||{};
+  return {home:m.homeTeamId||null,away:m.awayTeamId||null};}catch(e){return {home:null,away:null};}}
 const state = {
   sport:'football', team:'home', activeEvent:null,
   events:loadEvents(),
@@ -597,6 +610,7 @@ const state = {
   pendingDots:{p:null,r:null}, // dots placed on the pitch, attached to the next tagged event
   editingId:null,              // id of the row being re-edited (submit updates it in place)
   lineups:loadLineups(),       // {home:{roster,xi,subs,dir}, away:{...}}
+  teamIds:loadTeamIds(),       // {home:uuid|null, away:uuid|null} — teams table ids of the open match
   rows:[], fps:25
 };
 let pvRedraw=null, pvTogglePitch=null, pvSyncEntry=null, pvRenderPitch=null; // set while the video window is open
@@ -616,7 +630,13 @@ const ROWS_STORE='pitchtagger.rows.v1';   // tagged events (so the Stats page ca
 const META_STORE='pitchtagger.meta.v1';   // team names + sport (labels on the sub-pages)
 function saveRows(){try{localStorage.setItem(ROWS_STORE,JSON.stringify(state.rows));}catch(e){}}
 function saveMeta(){try{localStorage.setItem(META_STORE,JSON.stringify(
-  {home:$('homeName').value||'Home',away:$('awayName').value||'Away',sport:state.sport}));}catch(e){}}
+  {home:$('homeName').value||'Home',away:$('awayName').value||'Away',sport:state.sport,
+   homeTeamId:state.teamIds.home,awayTeamId:state.teamIds.away}));}catch(e){}}
+// called by cloud-sync when a match is created/opened — links this session to the teams table
+function setMatchTeams(homeId,awayId){
+  state.teamIds={home:homeId||null,away:awayId||null};
+  saveMeta();   // Player-Lists reads the ids from the meta store to load the DB roster
+}
 // live sync FROM the sub-pages: Player-Lists edits lineups -> refresh the main-tab formation
 window.addEventListener('storage',e=>{
   if(e.key===LU_STORE){try{const o=JSON.parse(e.newValue);if(o&&o.home&&o.away){
@@ -1201,7 +1221,10 @@ function submitEntry(){
   const pd=state.pendingDots, have=(pd.p?1:0)+(pd.r?1:0);
   if(need>=1 && have!==need){alert('Cần kiểm tra lại dots');return}
   const ev=curEvents().find(o=>o.name===name);
-  pushRow({from:p.from,to:p.to,action:ev?ev.key:'',event:name,raw:$('playerInput').value.trim()});
+  const wasEditing=!!state.editingId;   // re-editing a sub row must not re-apply the swap
+  const row=pushRow({from:p.from,to:p.to,action:ev?ev.key:'',event:name,raw:$('playerInput').value.trim()});
+  // "15sub3" = 15 out, 3 in -> auto-update the lineup and open the formation editor
+  if(!wasEditing && name==='substitution' && p.from && p.to) applySubstitution(state.team,p.from,p.to,row.t);
   state.activeEvent=name; renderEvents(); updateBanner();
   $('playerInput').value='';
   if(document.hasFocus())$('playerInput').focus(); // don't yank focus when typing from the video window
@@ -1227,6 +1250,28 @@ function pushRow({from,to,action,event,raw}){
   $('halfSel').value=eventHalf(row); // jump the view to the half the new event lands in
   scrollToRow=row;                   // scroll the list to this exact row (not the bottom)
   renderTable(); toast(event+' ✓');
+  return row;
+}
+/* substitution "OUTsubIN" (e.g. 15sub3): OUT leaves the XI for the bench, IN takes OUT's
+   spot on the pitch, and the formation editor opens so the new shape can be arranged.
+   The moment of the swap (row.t) is kept on the lineup for per-player minutes. */
+function applySubstitution(team,outNo,inNo,t){
+  const lu=state.lineups[team], eq=(a,b)=>String(a)===String(b);
+  const inP=lu.roster.find(p=>eq(p.no,inNo));
+  if(!inP) toast('⚠ Số '+inNo+' chưa có trong danh sách trận — thêm ở Player lists');
+  const xiIdx=lu.xi.findIndex(x=>eq(x.no,outNo));
+  if(xiIdx<0 && !lu.roster.some(p=>eq(p.no,outNo)))
+    toast('⚠ Số '+outNo+' không có trong đội hình xuất phát');
+  const spot=xiIdx>=0?lu.xi[xiIdx]:{x:50,y:50,pos:''};   // IN inherits OUT's position first
+  if(xiIdx>=0)lu.xi.splice(xiIdx,1);
+  if(!lu.subs.some(n=>eq(n,outNo)))lu.subs.push(String(outNo));   // OUT -> bench
+  lu.subs=lu.subs.filter(n=>!eq(n,inNo));                         // IN -> off the bench
+  if(!lu.xi.some(x=>eq(x.no,inNo)))
+    lu.xi.push({no:inP?inP.no:String(inNo),x:spot.x,y:spot.y,pos:spot.pos});
+  (lu.subHistory=lu.subHistory||[]).push({out:String(outNo),in:String(inNo),t});
+  saveLineups();
+  window.open('Player-Lists/','pt-players');   // re-arrange the formation at this moment
+  toast('Thay người: '+outNo+' ▼  '+inNo+' ▲ — sắp xếp lại formation');
 }
 let scrollToRow=null;
 /* pull an existing event back into the editor: restore its syntax + dots so it can be re-tagged.
@@ -1661,8 +1706,8 @@ if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
 renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); renderFormationMain();
 
 // bridge for the cloud-sync module (loaded next)
-window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups};
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams};
 </script>
-<script src="cloud-sync.js?v=18"></script>
+<script src="cloud-sync.js?v=19"></script>
 </body>
 </html>

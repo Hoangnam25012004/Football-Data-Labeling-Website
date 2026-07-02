@@ -77,7 +77,10 @@ table.pmtx tbody tr:last-child td,table.pmtx tbody tr:last-child th{background:v
 /* ---- Player lists / formation ---- */
 .lineup-body{display:flex;gap:14px}
 .lu-left{width:350px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+.lu-sec{font-size:12px;display:flex;gap:6px;align-items:baseline;margin-top:2px}
+.lu-sec .mini{color:var(--mut);font-size:11px;font-weight:400}
 .lu-add{display:flex;gap:6px}
+.lu-add input#dbName{flex:1;width:auto}
 .lu-add input{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 8px;font-size:12px;width:54px}
 .lu-add input#luName{flex:1;width:auto}
 .lu-add button{background:var(--accent);color:#06281a;border:none;border-radius:6px;padding:0 12px;font-weight:700;cursor:pointer}

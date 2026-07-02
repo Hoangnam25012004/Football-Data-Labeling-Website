@@ -85,8 +85,41 @@ const CONFIG = {
     connected = true; status('Connected', true);
     if ($('cloudConnected')) $('cloudConnected').style.display = 'block';
     await initEventTypes();      // shared event dictionary (live)
+    await loadTeams();           // teams database -> home/away pickers
     await loadRecentMatches();
     return true;
+  }
+
+  /* ---------- teams database (public.teams) ---------- */
+  // Creating a match requires BOTH teams to already exist in the database:
+  // pick them here, or create them first with the ＋ buttons.
+  async function loadTeams() {
+    if (!connected) return;
+    const { data, error } = await sb.from('teams').select('id,name').order('name');
+    if (error) { console.warn('list teams:', error.message); return; }
+    ['cloudHomeTeam', 'cloudAwayTeam'].forEach((id, i) => {
+      const sel = $(id); if (!sel) return;
+      const cur = sel.value;
+      sel.innerHTML = `<option value="">— select ${i ? 'away' : 'home'} team —</option>` +
+        (data || []).map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+      if (cur && (data || []).some(t => t.id === cur)) sel.value = cur;
+    });
+  }
+  // create a team in the database, then select it in the given picker
+  async function addTeam(selId) {
+    if (!connected && !(await connect())) return;
+    const name = (prompt('Tên team mới (lưu vào database):') || '').trim();
+    if (!name) return;
+    // reuse an existing team with the same name instead of duplicating it
+    const { data: existing } = await sb.from('teams').select('id,name').ilike('name', name).maybeSingle();
+    let team = existing;
+    if (!team) {
+      const { data, error } = await sb.from('teams').insert({ name }).select().single();
+      if (error) { alert('Không tạo được team: ' + error.message); return; }
+      team = data;
+    }
+    await loadTeams();
+    if ($(selId)) $(selId).value = team.id;
   }
 
   /* ---------- shared event dictionary (event_types) ---------- */
@@ -158,9 +191,23 @@ const CONFIG = {
   /* ---------- match create / join / load ---------- */
   async function createMatch() {
     if (!connected && !(await connect())) return;
+    // a match may only be created for teams that already exist in public.teams
+    const hId = $('cloudHomeTeam') ? $('cloudHomeTeam').value : '';
+    const aId = $('cloudAwayTeam') ? $('cloudAwayTeam').value : '';
+    if (!hId || !aId) { alert('Chọn team Home và Away từ database trước khi tạo match.\n(Chưa có team? Bấm ＋ để tạo và lưu vào database.)'); return; }
+    if (hId === aId) { alert('Home và Away phải là hai team khác nhau.'); return; }
+    // verify both ids really exist in the database right before creating the match
+    const { data: teams, error: tErr } = await sb.from('teams').select('id,name').in('id', [hId, aId]);
+    if (tErr || !teams || teams.length < 2) {
+      alert('Không xác thực được 2 teams trên database' + (tErr ? ': ' + tErr.message : '.') + '\nDanh sách teams sẽ được tải lại — chọn lại rồi thử tiếp.');
+      await loadTeams(); return;
+    }
+    const home = teams.find(t => t.id === hId), away = teams.find(t => t.id === aId);
     const { data, error } = await sb.from('matches').insert({
-      home_name: $('homeName').value || 'Home',
-      away_name: $('awayName').value || 'Away',
+      home_name: home.name,
+      away_name: away.name,
+      home_team_id: hId,
+      away_team_id: aId,
       sport: PT().state.sport
     }).select().single();
     if (error) { alert('Create match failed: ' + error.message); return; }
@@ -183,6 +230,8 @@ const CONFIG = {
     matchId = row.id; matchCode = row.code || '';
     if ($('cloudMatchId')) $('cloudMatchId').value = matchCode || matchId;
     setTeamInputs(row.home_name, row.away_name);   // load this match's team names
+    // link this session to the match's teams so Player-Lists loads the DB roster
+    if (PT().setMatchTeams) PT().setMatchTeams(row.home_team_id || null, row.away_team_id || null);
     if (row.config) PT().applyCloudDuration(row.config);   // load this match's duration mapping
     if (row.lineups) PT().applyCloudLineups(row.lineups);  // load this match's player lists / formation
     lastVideoUrl = row.video_url || null;
@@ -334,7 +383,9 @@ const CONFIG = {
     $('cloudCreate').onclick = createMatch;
     $('cloudJoin').onclick = joinMatch;
     if ($('cloudMatchList')) $('cloudMatchList').onchange = (e) => { if (e.target.value) openByInput(e.target.value); };
-    if ($('cloudRefresh')) $('cloudRefresh').onclick = loadRecentMatches;
+    if ($('cloudRefresh')) $('cloudRefresh').onclick = () => { loadTeams(); loadRecentMatches(); };
+    if ($('cloudHomeTeamAdd')) $('cloudHomeTeamAdd').onclick = () => addTeam('cloudHomeTeam');
+    if ($('cloudAwayTeamAdd')) $('cloudAwayTeamAdd').onclick = () => addTeam('cloudAwayTeam');
     $('cloudCopy').onclick = () => { $('cloudShare').select(); document.execCommand('copy'); };
     // auto-connect on load when credentials are saved/configured, so the shared event
     // dictionary syncs without clicking Connect; also auto-join a #match=<code> link.

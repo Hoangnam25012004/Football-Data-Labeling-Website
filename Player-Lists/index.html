@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Player lists — Pitch Tagger</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="../shared.css">
 </head>
 <body>
@@ -19,7 +20,17 @@
 <div class="page">
   <div class="lineup-body">
     <div class="lu-left">
-      <div class="lu-add">
+      <!-- players stored on the team in the database (no shirt numbers — those are per match) -->
+      <div class="lu-sec"><b>Team players — database</b> <span class="mini" id="dbStatus">…</span></div>
+      <div class="lu-add" id="dbAddRow" style="display:none">
+        <input id="dbName" placeholder="New player name" style="flex:1;width:auto">
+        <input id="dbPos" placeholder="Pos" title="position, e.g. GK / CB / CM (optional)">
+        <button id="dbAdd" title="Save the player to the team in the database">+</button>
+      </div>
+      <div class="lu-roster" id="dbRoster" style="flex:none;max-height:32vh"></div>
+      <!-- this match's squad: DB players with the shirt number they wear TODAY -->
+      <div class="lu-sec"><b>Match squad</b> <span class="mini">shirt numbers for this match</span></div>
+      <div class="lu-add" id="luAddRow">
         <input id="luNo" placeholder="No" inputmode="numeric">
         <input id="luName" placeholder="Player name">
         <button id="luAdd" title="add player">+</button>
@@ -45,6 +56,86 @@ function maxXI(){return MAX_XI[meta.sport]||11;}
 function rosterPlayer(t,no){return t.roster.find(p=>p.no===no);}
 function save(){saveLineupsLS(lineups);}   // main tab picks this up via `storage` and refreshes its formation
 
+/* ===== team players from the DATABASE (public.players) =====
+   Players must be stored on the team in the database BEFORE they can join the
+   match squad. DB players carry no shirt number — the number is assigned here,
+   per match, when the player is added to the squad. */
+const CLOUD_CFG='pitchtagger.cloud.cfg';
+let sb=null, dbPlayers={home:[],away:[]}, dbErr='';
+function teamIdFor(team){return team==='home'?meta.homeTeamId:meta.awayTeamId;}
+async function initDB(){
+  let c={}; try{c=JSON.parse(localStorage.getItem(CLOUD_CFG))||{};}catch(e){}
+  if(!c.url||!c.key||!window.supabase){dbErr='chưa cấu hình Cloud (kết nối ở tab chính)';renderDbRoster();return;}
+  try{
+    sb=window.supabase.createClient(c.url,c.key);
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session){const {error}=await sb.auth.signInAnonymously(); if(error)throw error;}
+  }catch(e){sb=null;dbErr='không kết nối được database';renderDbRoster();return;}
+  await loadDbPlayers();
+}
+async function loadDbPlayers(){
+  if(!sb)return renderDbRoster();
+  for(const team of ['home','away']){
+    const tid=teamIdFor(team);
+    if(!tid){dbPlayers[team]=[];continue;}
+    const {data,error}=await sb.from('players').select('id,name,position').eq('team_id',tid).order('name');
+    if(error){dbErr=error.message;dbPlayers[team]=[];}
+    else dbPlayers[team]=data||[];
+  }
+  renderDbRoster();
+}
+function renderDbRoster(){
+  const box=$('dbRoster'), st=$('dbStatus'), t=teamLU();
+  const tid=teamIdFor(lineupTeam), dbOn=!!(sb&&tid);
+  // enforce the DB flow: manual (offline) add is only available without a database link
+  $('dbAddRow').style.display=dbOn?'flex':'none';
+  $('luAddRow').style.display=dbOn?'none':'flex';
+  box.innerHTML='';
+  if(!dbOn){
+    st.textContent=sb?'⚠ match chưa gắn team — tạo match từ Cloud (chọn team database)':'⚠ '+(dbErr||'offline');
+    return;
+  }
+  st.textContent='✓ '+dbPlayers[lineupTeam].length+' cầu thủ';
+  dbPlayers[lineupTeam].forEach(p=>{
+    const inSquad=t.roster.find(r=>r.pid===p.id);
+    const row=document.createElement('div'); row.className='lu-prow';
+    row.innerHTML=`<span class="pname">${p.name}</span><span class="ppos">${p.position||''}</span>`;
+    const b=document.createElement('button');
+    if(inSquad){b.textContent='#'+inSquad.no;b.className='on';b.title='đã trong danh sách trận';b.disabled=true;}
+    else{b.textContent='→ squad';b.title='thêm vào danh sách trận (nhập số áo)';b.onclick=()=>addToSquad(p);}
+    row.appendChild(b); box.appendChild(row);
+  });
+  if(!dbPlayers[lineupTeam].length){
+    const e=document.createElement('div');
+    e.style.cssText='color:var(--mut);font-size:11px;padding:8px;text-align:center';
+    e.textContent='Team chưa có cầu thủ nào trong database — thêm bằng ô bên trên.';
+    box.appendChild(e);
+  }
+}
+// save a NEW player on the team in the database (no shirt number)
+async function addDbPlayer(){
+  const name=$('dbName').value.trim(); if(!name)return;
+  const tid=teamIdFor(lineupTeam);
+  if(!sb||!tid){alert('Chưa kết nối database hoặc match chưa gắn team.');return;}
+  if(dbPlayers[lineupTeam].some(p=>p.name.toLowerCase()===name.toLowerCase())
+     && !confirm('"'+name+'" đã có trong database. Vẫn tạo bản ghi mới?'))return;
+  const pos=$('dbPos').value.trim()||null;
+  const {error}=await sb.from('players').insert({team_id:tid,name,position:pos});
+  if(error){alert('Không lưu được cầu thủ: '+error.message);return;}
+  $('dbName').value='';$('dbPos').value='';$('dbName').focus();
+  await loadDbPlayers();
+}
+// DB player -> match squad: assign the shirt number worn in THIS match
+function addToSquad(p){
+  const t=teamLU();
+  let no=prompt('Số áo của '+p.name+' trong trận này:'); if(no==null)return;
+  no=String(no).trim();
+  if(!no){alert('Cần nhập số áo.');return;}
+  if(t.roster.some(r=>String(r.no)===no)){alert('Số '+no+' đã được dùng trong danh sách trận.');return;}
+  t.roster.push({no,name:p.name,pid:p.id});
+  save();renderLineup();
+}
+
 function renderLineup(){
   $('luHomeBtn').className=lineupTeam==='home'?'act-home':'';
   $('luAwayBtn').className=lineupTeam==='away'?'act-away':'';
@@ -63,6 +154,7 @@ function renderLineup(){
   const subs=$('luSubs'); subs.innerHTML='';
   t.subs.forEach(no=>{const p=rosterPlayer(t,no);if(!p)return;const c=document.createElement('span');c.className='lu-chip';c.innerHTML=`<span class="num">${p.no}</span>${p.name||''}`;subs.appendChild(c);});
   $('luCount').textContent='Starters '+t.xi.length+'/'+maxXI()+' · Subs '+t.subs.length;
+  renderDbRoster();
   renderLuPitch();
 }
 function renderLuPitch(){
@@ -114,15 +206,19 @@ $('luAwayBtn').onclick=()=>{lineupTeam='away';renderLineup();};
 $('luAdd').onclick=addLuPlayer;
 $('luName').addEventListener('keydown',e=>{if(e.key==='Enter')addLuPlayer();});
 $('luNo').addEventListener('keydown',e=>{if(e.key==='Enter')$('luName').focus();});
+$('dbAdd').onclick=addDbPlayer;
+$('dbName').addEventListener('keydown',e=>{if(e.key==='Enter')$('dbPos').focus();});
+$('dbPos').addEventListener('keydown',e=>{if(e.key==='Enter')addDbPlayer();});
 $('luDir').onclick=luSwitchDir;
 
-/* live sync with the main tagging tab (team names / sport / cloud edits) */
+/* live sync with the main tagging tab (team names / sport / team ids / cloud edits) */
 window.addEventListener('storage',e=>{
-  if(e.key===PT_KEYS.meta){meta=loadMeta();renderLineup();}
+  if(e.key===PT_KEYS.meta){meta=loadMeta();renderLineup();loadDbPlayers();}
   else if(e.key===PT_KEYS.lineups){lineups=loadLineups();renderLineup();}
 });
 
 renderLineup();
+initDB();
 </script>
 </body>
 </html>
