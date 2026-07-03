@@ -654,6 +654,12 @@ const state = {
 };
 let pvRedraw=null, pvTogglePitch=null, pvSyncEntry=null, pvRenderPitch=null; // set while the video window is open
 const fmtXY=xy=>xy?Math.round(xy.x)+','+Math.round(xy.y):'—';
+// remove the most-recently-placed pitch dot (Receiver first, then Player) — Esc undoes one at a time
+function undoLastDot(){
+  const pd=state.pendingDots;
+  if(pd.r)pd.r=null; else if(pd.p)pd.p=null;
+  if(pvRedraw)pvRedraw();
+}
 const newId=()=>(crypto&&crypto.randomUUID)?crypto.randomUUID():('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16);}));
 
 /* ---- match duration mapping (original video time -> match timeline) ---- */
@@ -1104,32 +1110,62 @@ function openVideoWindow(){
   overlay.style.cssText='position:absolute;inset:0;display:none;z-index:5;cursor:crosshair';
   const statusHTML='<div id="pv-pstatus" style="position:absolute;top:8px;left:8px;display:flex;gap:8px;align-items:center;'+
     'background:rgba(0,0,0,.6);color:#e6edf3;padding:5px 10px;border-radius:6px;font-size:12px">'+
-    '<span id="pv-ptext"></span><button id="pv-pclear" style="background:#1c2330;border:1px solid #2a3240;color:#e6edf3;border-radius:5px;padding:2px 8px;cursor:pointer">Clear (Esc)</button></div>';
+    '<span id="pv-ptext"></span><button id="pv-pclear" title="Removes the last-placed dot; press again to remove the first" style="background:#1c2330;border:1px solid #2a3240;color:#e6edf3;border-radius:5px;padding:2px 8px;cursor:pointer">Undo (Esc)</button></div>';
   stage.appendChild(overlay);
   let dims=PITCH_DIMS[state.sport]||PITCH_DIMS.football;
+  const SVGNS='http://www.w3.org/2000/svg';
+  // convert a pointer event's screen position to pitch %, using the given <svg>'s CTM
+  function svgPct(svg,e){
+    const m=svg.getScreenCTM(); if(!m)return null;
+    const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
+    const loc=pt.matrixTransform(m.inverse());
+    if(loc.x<0||loc.x>dims.w||loc.y<0||loc.y>dims.h)return null; // outside the field
+    return {x:loc.x/dims.w*100, y:loc.y/dims.h*100};
+  }
+  // drag an already-placed dot to reposition it (keeps its original timestamp)
+  function makeDotDraggable(g,dot){
+    g.style.cursor='grab';
+    g.addEventListener('pointerdown',e=>{
+      e.preventDefault(); e.stopPropagation();
+      g.setPointerCapture(e.pointerId); g.style.cursor='grabbing';
+      const svg=overlay.querySelector('svg');
+      const move=ev=>{const p=svgPct(svg,ev); if(!p)return; dot.x=p.x; dot.y=p.y; redraw();};
+      const up=ev=>{g.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);};
+      document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
+    });
+    g.addEventListener('click',e=>e.stopPropagation());   // don't let the click bubble into onPitchClick
+  }
   function redraw(){
     const svg=overlay.querySelector('svg'); if(!svg)return;
     const g=svg.querySelector('#pv-dots'); const pd=state.pendingDots;
-    const mk=(dot,color,label)=>{if(!dot)return'';const vx=dot.x/100*dims.w,vy=dot.y/100*dims.h;
-      return '<circle cx="'+vx+'" cy="'+vy+'" r="14" fill="'+color+'" stroke="#000" stroke-width="2"/>'+
-        '<text x="'+vx+'" y="'+(vy+5)+'" text-anchor="middle" font-size="15" font-weight="700" fill="#06281a">'+label+'</text>';};
-    g.innerHTML=mk(pd.p,'#39d98a','P')+mk(pd.r,'#f7b32f','R');
+    g.innerHTML='';
+    const mk=(dot,color,label)=>{if(!dot)return;const vx=dot.x/100*dims.w,vy=dot.y/100*dims.h;
+      const grp=document.createElementNS(SVGNS,'g');
+      const c=document.createElementNS(SVGNS,'circle');
+      c.setAttribute('cx',vx);c.setAttribute('cy',vy);c.setAttribute('r',14);
+      c.setAttribute('fill',color);c.setAttribute('stroke','#000');c.setAttribute('stroke-width',2);
+      const t=document.createElementNS(SVGNS,'text');
+      t.setAttribute('x',vx);t.setAttribute('y',vy+5);t.setAttribute('text-anchor','middle');
+      t.setAttribute('font-size',15);t.setAttribute('font-weight',700);t.setAttribute('fill','#06281a');
+      t.textContent=label;
+      grp.appendChild(c);grp.appendChild(t);
+      makeDotDraggable(grp,dot);
+      g.appendChild(grp);};
+    mk(pd.p,'#39d98a','P'); mk(pd.r,'#f7b32f','R');
     const pt=overlay.querySelector('#pv-ptext');
-    if(pt)pt.textContent=!pd.p?'Click the pitch: Player dot':(!pd.r?'Click the pitch: Receiver dot (skip for shots)':'Both placed — next click restarts');
+    if(pt)pt.textContent=!pd.p?'Click the pitch: Player dot':(!pd.r?'Click the pitch: Receiver dot (skip for shots) — drag a dot to reposition':'Both placed — drag to reposition, click empty pitch to restart');
   }
   function onPitchClick(e){
-    const svg=overlay.querySelector('svg'); const m=svg.getScreenCTM(); if(!m)return;
-    const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
-    const loc=pt.matrixTransform(m.inverse());
-    if(loc.x<0||loc.x>dims.w||loc.y<0||loc.y>dims.h)return; // ignore clicks outside the field
-    const nx=loc.x/dims.w*100, ny=loc.y/dims.h*100, t=video.src?video.currentTime:0, pd=state.pendingDots;
-    if(!pd.p)pd.p={x:nx,y:ny,t}; else if(!pd.r)pd.r={x:nx,y:ny,t}; else {pd.p={x:nx,y:ny,t};pd.r=null;}
+    const svg=overlay.querySelector('svg');
+    const loc=svgPct(svg,e); if(!loc)return; // ignore clicks outside the field (or on a dot — stopped above)
+    const t=video.src?video.currentTime:0, pd=state.pendingDots;
+    if(!pd.p)pd.p={x:loc.x,y:loc.y,t}; else if(!pd.r)pd.r={x:loc.x,y:loc.y,t}; else {pd.p={x:loc.x,y:loc.y,t};pd.r=null;}
     redraw();
   }
   function renderPitch(){
     dims=PITCH_DIMS[state.sport]||PITCH_DIMS.football;
     overlay.innerHTML=pitchSVG(state.sport)+statusHTML;
-    overlay.querySelector('#pv-pclear').onclick=()=>{state.pendingDots={p:null,r:null};redraw();};
+    overlay.querySelector('#pv-pclear').onclick=undoLastDot;
     overlay.querySelector('svg').addEventListener('click',onPitchClick);
     redraw();
   }
@@ -1140,7 +1176,7 @@ function openVideoWindow(){
   // keyboard shortcuts INSIDE the video window (capture phase to beat native video keys)
   d.addEventListener('keydown',e=>{
     if(e.key==='Shift'){if(!e.repeat){e.preventDefault();togglePitch(true);}return;}   // hold to show pitch
-    if(e.key==='Escape'){e.preventDefault();state.pendingDots={p:null,r:null};redraw();return;} // clear unsaved dots
+    if(e.key==='Escape'){e.preventDefault();undoLastDot();return;} // undo the last-placed dot
     if(e.key==='.'){e.preventDefault();seekBy(-0.2);return;}
     if(e.key==='/'){e.preventDefault();seekBy(0.2);return;}
     if(e.code==='ArrowLeft'){e.preventDefault();seekBy(-2);return;}
@@ -1514,11 +1550,11 @@ document.addEventListener('keydown',e=>{
     if(pvSyncEntry)pvSyncEntry();   // programmatic .value change fires no 'input' event
   }
 });
-// Esc clears unsaved pitch dots from the main tab too (when the video window is open and no modal is up)
+// Esc undoes the last-placed dot from the main tab too (when the video window is open and no modal is up)
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape'||!pvRedraw)return;
   if(document.querySelector('.modal-overlay.show'))return; // let modals handle their own Esc
-  state.pendingDots={p:null,r:null}; pvRedraw();
+  undoLastDot();
 });
 // hold Shift in the MAIN tab to also show the pitch in the (open) video window
 document.addEventListener('keydown',e=>{if(e.key==='Shift'&&!e.repeat&&pvTogglePitch)pvTogglePitch(true);});
@@ -1867,6 +1903,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=28"></script>
+<script src="cloud-sync.js?v=29"></script>
 </body>
 </html>
