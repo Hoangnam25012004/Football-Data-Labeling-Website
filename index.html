@@ -1122,16 +1122,28 @@ function openVideoWindow(){
     if(loc.x<0||loc.x>dims.w||loc.y<0||loc.y>dims.h)return null; // outside the field
     return {x:loc.x/dims.w*100, y:loc.y/dims.h*100};
   }
-  // drag an already-placed dot to reposition it (keeps its original timestamp)
-  function makeDotDraggable(g,dot){
+  // drag an already-placed dot to reposition it (keeps its original timestamp).
+  // Updates the circle/text attributes directly instead of calling redraw() on every
+  // move — redraw() rebuilds #pv-dots from scratch, which would destroy the very <g>
+  // holding the pointer capture mid-drag and kill the drag after one tick.
+  // Listeners go on `g` itself (not `document`) — this overlay lives in the popup
+  // video window's own document, and setPointerCapture already routes every
+  // subsequent pointer event for this pointerId straight to the captor (g).
+  function makeDotDraggable(g,c,t,dot){
     g.style.cursor='grab';
     g.addEventListener('pointerdown',e=>{
       e.preventDefault(); e.stopPropagation();
       g.setPointerCapture(e.pointerId); g.style.cursor='grabbing';
       const svg=overlay.querySelector('svg');
-      const move=ev=>{const p=svgPct(svg,ev); if(!p)return; dot.x=p.x; dot.y=p.y; redraw();};
-      const up=ev=>{g.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);};
-      document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
+      const move=ev=>{
+        const p=svgPct(svg,ev); if(!p)return;
+        dot.x=p.x; dot.y=p.y;
+        const vx=p.x/100*dims.w, vy=p.y/100*dims.h;
+        c.setAttribute('cx',vx); c.setAttribute('cy',vy);
+        t.setAttribute('x',vx); t.setAttribute('y',vy+5);
+      };
+      const up=()=>{g.style.cursor='grab';g.removeEventListener('pointermove',move);g.removeEventListener('pointerup',up);};
+      g.addEventListener('pointermove',move); g.addEventListener('pointerup',up);
     });
     g.addEventListener('click',e=>e.stopPropagation());   // don't let the click bubble into onPitchClick
   }
@@ -1140,16 +1152,16 @@ function openVideoWindow(){
     const g=svg.querySelector('#pv-dots'); const pd=state.pendingDots;
     g.innerHTML='';
     const mk=(dot,color,label)=>{if(!dot)return;const vx=dot.x/100*dims.w,vy=dot.y/100*dims.h;
-      const grp=document.createElementNS(SVGNS,'g');
-      const c=document.createElementNS(SVGNS,'circle');
+      const grp=d.createElementNS(SVGNS,'g');
+      const c=d.createElementNS(SVGNS,'circle');
       c.setAttribute('cx',vx);c.setAttribute('cy',vy);c.setAttribute('r',14);
       c.setAttribute('fill',color);c.setAttribute('stroke','#000');c.setAttribute('stroke-width',2);
-      const t=document.createElementNS(SVGNS,'text');
+      const t=d.createElementNS(SVGNS,'text');
       t.setAttribute('x',vx);t.setAttribute('y',vy+5);t.setAttribute('text-anchor','middle');
       t.setAttribute('font-size',15);t.setAttribute('font-weight',700);t.setAttribute('fill','#06281a');
       t.textContent=label;
       grp.appendChild(c);grp.appendChild(t);
-      makeDotDraggable(grp,dot);
+      makeDotDraggable(grp,c,t,dot);
       g.appendChild(grp);};
     mk(pd.p,'#39d98a','P'); mk(pd.r,'#f7b32f','R');
     const pt=overlay.querySelector('#pv-ptext');
@@ -1903,6 +1915,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=29"></script>
+<script src="cloud-sync.js?v=30"></script>
 </body>
 </html>
