@@ -219,10 +219,12 @@ const CONFIG = {
     matchId = row.id; matchCode = row.code || '';
     if ($('cloudMatchId')) $('cloudMatchId').value = matchCode || matchId;
     setTeamInputs(row.home_name, row.away_name);   // load this match's team names
-    // link this session to the match's teams so Player-Lists loads the DB roster
-    if (PT().setMatchTeams) PT().setMatchTeams(row.home_team_id || null, row.away_team_id || null);
+    // link this session to the match (+ its teams) so Player-Lists loads the DB roster
+    if (PT().setMatchTeams) PT().setMatchTeams(row.home_team_id || null, row.away_team_id || null, row.id);
     if (row.config) PT().applyCloudDuration(row.config);   // load this match's duration mapping
-    if (row.lineups) PT().applyCloudLineups(row.lineups);  // load this match's player lists / formation
+    // lineups belong to THIS match: load them, or start blank when the match has none yet
+    if (row.lineups) PT().applyCloudLineups(row.lineups);
+    else if (PT().resetLineups) PT().resetLineups();
     lastVideoUrl = row.video_url || null;
     if (row.video_url) PT().loadVideoUrl(row.video_url);   // load the shared video for this match
     const { data, error } = await sb.from('events').select('*').eq('match_id', matchId).order('t_seconds');

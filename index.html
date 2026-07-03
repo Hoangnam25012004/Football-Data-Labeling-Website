@@ -638,9 +638,10 @@ const LU_STORE='pitchtagger.lineups.v1';
 const blankTeamLU=dir=>({roster:[],xi:[],subs:[],dir:dir||'lr'});
 function loadLineups(){try{const s=localStorage.getItem(LU_STORE);if(s){const o=JSON.parse(s);if(o&&o.home&&o.away)return o;}}catch(e){}
   return {home:blankTeamLU('lr'),away:blankTeamLU('rl')};}
-// team ids (public.teams) of the currently open match — restored across reloads via the meta store
+// team ids (public.teams) + match id of the currently open match — restored via the meta store
 function loadTeamIds(){try{const m=JSON.parse(localStorage.getItem('pitchtagger.meta.v1'))||{};
-  return {home:m.homeTeamId||null,away:m.awayTeamId||null};}catch(e){return {home:null,away:null};}}
+  return {home:m.homeTeamId||null,away:m.awayTeamId||null,matchId:m.matchId||null};}
+  catch(e){return {home:null,away:null,matchId:null};}}
 const state = {
   sport:'football', team:'home', activeEvent:null,
   events:loadEvents(),
@@ -669,11 +670,19 @@ const META_STORE='pitchtagger.meta.v1';   // team names + sport (labels on the s
 function saveRows(){try{localStorage.setItem(ROWS_STORE,JSON.stringify(state.rows));}catch(e){}}
 function saveMeta(){try{localStorage.setItem(META_STORE,JSON.stringify(
   {home:$('homeName').value||'Home',away:$('awayName').value||'Away',sport:state.sport,
-   homeTeamId:state.teamIds.home,awayTeamId:state.teamIds.away}));}catch(e){}}
+   homeTeamId:state.teamIds.home,awayTeamId:state.teamIds.away,matchId:state.teamIds.matchId}));}catch(e){}}
 // called by cloud-sync when a match is created/opened — links this session to the teams table
-function setMatchTeams(homeId,awayId){
-  state.teamIds={home:homeId||null,away:awayId||null};
+function setMatchTeams(homeId,awayId,matchId){
+  state.teamIds={home:homeId||null,away:awayId||null,matchId:matchId||null};
   saveMeta();   // Player-Lists reads the ids from the meta store to load the DB roster
+  refreshFormation();
+}
+// blank both lineups (a lineup belongs to ONE match — used when no match is open,
+// or when the opened match has no lineups saved yet)
+function resetLineups(){
+  state.lineups={home:blankTeamLU('lr'),away:blankTeamLU('rl')};
+  try{localStorage.setItem(LU_STORE,JSON.stringify(state.lineups));}catch(e){}
+  refreshFormation();
 }
 // live sync FROM the sub-pages: Player-Lists edits lineups -> refresh the main-tab formation
 window.addEventListener('storage',e=>{
@@ -782,10 +791,16 @@ function addLuPlayer(){const no=$('luNo').value.trim(); if(!no)return; const t=t
   $('luNo').value='';$('luName').value=''; saveLineups();renderLineup(); $('luNo').focus();}
 function luSwitchDir(){const t=teamLU(); t.dir=t.dir==='rl'?'lr':'rl';
   t.xi.forEach(x=>{x.x=100-x.x; x.pos=zoneAt(x.x,x.y,t.dir);}); saveLineups();renderLineup();}
-/* formation overlay on the main video frame (read-only, both teams) */
+/* formation overlay on the main video frame (read-only, both teams).
+   A lineup belongs to one match — without an open match the pitch stays empty. */
 function renderFormationMain(){
   const pit=$('fmPitch'); if(!pit)return;
   pit.innerHTML=pitchSVG('football');
+  if(!state.teamIds.matchId){
+    const el=$('fmSubs');
+    if(el)el.innerHTML='<span class="fm-sub-empty">Chưa mở trận đấu — vào ☁ Cloud để tạo hoặc join một match, đội hình sẽ hiện ở đây.</span>';
+    return;
+  }
   ['home','away'].forEach(team=>{
     const t=state.lineups[team];
     t.xi.forEach(x=>{
@@ -1823,12 +1838,22 @@ function renderMatchPreview(res){
   };
 }
 
+// opening the site WITHOUT a #match= link means no match is open -> drop any
+// leftover match link + lineups from the previous session (lineups are per-match;
+// re-opening a match reloads its own lineups from the matches table)
+if(!/match=/i.test(location.hash)){
+  state.teamIds={home:null,away:null,matchId:null};
+  state.lineups={home:blankTeamLU('lr'),away:blankTeamLU('rl')};
+  try{localStorage.setItem(LU_STORE,JSON.stringify(state.lineups));}catch(e){}
+  saveMeta();
+}
+
 if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
 renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); renderFormationMain();
 
 // bridge for the cloud-sync module (loaded next)
-window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, openMatchModal, renderMatchPreview};
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=26"></script>
+<script src="cloud-sync.js?v=27"></script>
 </body>
 </html>

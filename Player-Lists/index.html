@@ -18,6 +18,13 @@
   <a class="back-link" href="../">← Tagging</a>
 </header>
 <div class="page">
+  <!-- lineups belong to one match — without an open match there is nothing to edit -->
+  <div id="noMatchMsg" style="display:none;padding:48px 20px;text-align:center;color:var(--mut);font-size:13px;line-height:1.8">
+    <div style="font-size:28px">⚽</div>
+    <b style="color:var(--ink)">Chưa mở trận đấu nào</b><br>
+    Đội hình &amp; formation thuộc về từng trận. Quay lại tab chính, vào <b>☁ Cloud</b>
+    để tạo hoặc join một match rồi mở lại trang này.
+  </div>
   <div class="lineup-body">
     <div class="lu-left">
       <!-- players stored on the team in the database (no shirt numbers — those are per match) -->
@@ -137,6 +144,11 @@ function addToSquad(p){
 }
 
 function renderLineup(){
+  // no open match -> show the notice instead of the editor
+  const open=!!meta.matchId;
+  $('noMatchMsg').style.display=open?'none':'block';
+  document.querySelector('.lineup-body').style.display=open?'':'none';
+  if(!open)return;
   $('luHomeBtn').className=lineupTeam==='home'?'act-home':'';
   $('luAwayBtn').className=lineupTeam==='away'?'act-away':'';
   $('luHomeBtn').textContent=meta.home;
