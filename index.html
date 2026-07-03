@@ -638,10 +638,10 @@ const LU_STORE='pitchtagger.lineups.v1';
 const blankTeamLU=dir=>({roster:[],xi:[],subs:[],dir:dir||'lr'});
 function loadLineups(){try{const s=localStorage.getItem(LU_STORE);if(s){const o=JSON.parse(s);if(o&&o.home&&o.away)return o;}}catch(e){}
   return {home:blankTeamLU('lr'),away:blankTeamLU('rl')};}
-// team ids (public.teams) + match id of the currently open match — restored via the meta store
+// team ids (public.teams) + match id/code of the currently open match — restored via the meta store
 function loadTeamIds(){try{const m=JSON.parse(localStorage.getItem('pitchtagger.meta.v1'))||{};
-  return {home:m.homeTeamId||null,away:m.awayTeamId||null,matchId:m.matchId||null};}
-  catch(e){return {home:null,away:null,matchId:null};}}
+  return {home:m.homeTeamId||null,away:m.awayTeamId||null,matchId:m.matchId||null,code:m.matchCode||null};}
+  catch(e){return {home:null,away:null,matchId:null,code:null};}}
 const state = {
   sport:'football', team:'home', activeEvent:null,
   events:loadEvents(),
@@ -670,12 +670,19 @@ const META_STORE='pitchtagger.meta.v1';   // team names + sport (labels on the s
 function saveRows(){try{localStorage.setItem(ROWS_STORE,JSON.stringify(state.rows));}catch(e){}}
 function saveMeta(){try{localStorage.setItem(META_STORE,JSON.stringify(
   {home:$('homeName').value||'Home',away:$('awayName').value||'Away',sport:state.sport,
-   homeTeamId:state.teamIds.home,awayTeamId:state.teamIds.away,matchId:state.teamIds.matchId}));}catch(e){}}
+   homeTeamId:state.teamIds.home,awayTeamId:state.teamIds.away,matchId:state.teamIds.matchId,
+   matchCode:state.teamIds.code}));}catch(e){}}
 // called by cloud-sync when a match is created/opened — links this session to the teams table
-function setMatchTeams(homeId,awayId,matchId){
-  state.teamIds={home:homeId||null,away:awayId||null,matchId:matchId||null};
+function setMatchTeams(homeId,awayId,matchId,code){
+  state.teamIds={home:homeId||null,away:awayId||null,matchId:matchId||null,code:code||null};
   saveMeta();   // Player-Lists reads the ids from the meta store to load the DB roster
   refreshFormation();
+}
+// sub-pages (Player-Lists / Stats) carry the open match in their URL, and their
+// "← Tagging" link brings it back — so navigating never drops the match context
+function subPageUrl(page){
+  const c=state.teamIds.code||state.teamIds.matchId;
+  return page+'/'+(state.teamIds.matchId&&c?'#match='+c:'');
 }
 // blank both lineups (a lineup belongs to ONE match — used when no match is open,
 // or when the opened match has no lineups saved yet)
@@ -825,7 +832,7 @@ function renderFormationSubs(){
   el.innerHTML=h||'<span class="fm-sub-empty">No substitutes</span>';
 }
 function refreshFormation(){ renderFormationMain(); }   // formation is always shown on the main tab
-$('lineupBtn').onclick=()=>{saveMeta();saveLineups();window.open('Player-Lists/','pt-players');};
+$('lineupBtn').onclick=()=>{saveMeta();saveLineups();window.open(subPageUrl('Player-Lists'),'pt-players');};
 $('lineupClose').onclick=()=>$('lineupModal').classList.remove('show');
 $('lineupModal').addEventListener('click',e=>{if(e.target===$('lineupModal'))$('lineupModal').classList.remove('show');});
 $('luHomeBtn').onclick=()=>{lineupTeam='home';renderLineup();};
@@ -1325,7 +1332,7 @@ function applySubstitution(team,outNo,inNo,t){
     lu.xi.push({no:inP?inP.no:String(inNo),x:spot.x,y:spot.y,pos:spot.pos});
   (lu.subHistory=lu.subHistory||[]).push({out:String(outNo),in:String(inNo),t});
   saveLineups();
-  window.open('Player-Lists/','pt-players');   // re-arrange the formation at this moment
+  window.open(subPageUrl('Player-Lists'),'pt-players');   // re-arrange the formation at this moment
   toast('Thay người: '+outNo+' ▼  '+inNo+' ▲ — sắp xếp lại formation');
 }
 let scrollToRow=null;
@@ -1673,7 +1680,7 @@ document.querySelectorAll('.dur-now').forEach(b=>{b.onclick=()=>{
   $(b.dataset.now).value=fmt(video.src?video.currentTime:0); $('durEnabled').checked=true; applyDur();};});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('durModal').classList.contains('show')){e.preventDefault();closeDurModal();}});
 
-$('statsBtn').onclick=()=>{saveMeta();saveRows();window.open('Stats/','pt-stats');};
+$('statsBtn').onclick=()=>{saveMeta();saveRows();window.open(subPageUrl('Stats'),'pt-stats');};
 $('statsModalClose').onclick=closeStatsModal;
 $('statHomeBtn').onclick=()=>{statTeam='home';renderStats();};
 $('statAwayBtn').onclick=()=>{statTeam='away';renderStats();};
@@ -1854,6 +1861,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=27"></script>
+<script src="cloud-sync.js?v=28"></script>
 </body>
 </html>

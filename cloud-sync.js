@@ -220,7 +220,7 @@ const CONFIG = {
     if ($('cloudMatchId')) $('cloudMatchId').value = matchCode || matchId;
     setTeamInputs(row.home_name, row.away_name);   // load this match's team names
     // link this session to the match (+ its teams) so Player-Lists loads the DB roster
-    if (PT().setMatchTeams) PT().setMatchTeams(row.home_team_id || null, row.away_team_id || null, row.id);
+    if (PT().setMatchTeams) PT().setMatchTeams(row.home_team_id || null, row.away_team_id || null, row.id, row.code || null);
     if (row.config) PT().applyCloudDuration(row.config);   // load this match's duration mapping
     // lineups belong to THIS match: load them, or start blank when the match has none yet
     if (row.lineups) PT().applyCloudLineups(row.lineups);

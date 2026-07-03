@@ -160,6 +160,7 @@ function addToSquad(p){
 }
 
 function renderLineup(){
+  syncBackLink(meta);   // "← Tagging" returns to ../#match=<code>, keeping the match open
   // no open match -> show the notice instead of the editor
   const open=!!meta.matchId;
   $('noMatchMsg').style.display=open?'none':'block';

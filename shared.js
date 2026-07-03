@@ -21,7 +21,14 @@ const blankTeamLU=dir=>({roster:[],xi:[],subs:[],dir:dir||'lr'});
 function loadLineups(){const o=loadJSON(PT_KEYS.lineups,null);return (o&&o.home&&o.away)?o:{home:blankTeamLU('lr'),away:blankTeamLU('rl')};}
 function saveLineupsLS(l){try{localStorage.setItem(PT_KEYS.lineups,JSON.stringify(l));}catch(e){}}
 function loadMeta(){const m=loadJSON(PT_KEYS.meta,null)||{};return {home:m.home||'Home',away:m.away||'Away',sport:m.sport||'football',
-  homeTeamId:m.homeTeamId||null,awayTeamId:m.awayTeamId||null,matchId:m.matchId||null};}
+  homeTeamId:m.homeTeamId||null,awayTeamId:m.awayTeamId||null,matchId:m.matchId||null,matchCode:m.matchCode||null};}
+/* "← Tagging" must return WITH the match (…/#match=<code>) or the main tab treats the
+   bare URL as "no match open" and clears the session. Called on load + meta changes. */
+function syncBackLink(meta){
+  const a=document.querySelector('.back-link'); if(!a)return;
+  const c=(location.hash.match(/match=([0-9a-z-]{5,36})/i)||[])[1]||meta.matchCode||meta.matchId;
+  a.href='../'+(c?'#match='+c:'');
+}
 
 /* ---- sport-accurate pitches/courts (copied from the main app) ---- */
 const PITCH_DIMS={

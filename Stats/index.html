@@ -173,10 +173,11 @@ $('statGenBtn').onclick=()=>{statTeam='general';renderStats();};
 /* live sync with the main tagging tab */
 window.addEventListener('storage',e=>{
   if(e.key===PT_KEYS.rows){rows=loadRows();renderStats();}
-  else if(e.key===PT_KEYS.meta){meta=loadMeta();renderStats();}
+  else if(e.key===PT_KEYS.meta){meta=loadMeta();syncBackLink(meta);renderStats();}
   else if(e.key===PT_KEYS.duration){dur=loadJSON(PT_KEYS.duration,dur);}
 });
 
+syncBackLink(meta);   // "← Tagging" returns to ../#match=<code>, keeping the match open
 renderStats();
 </script>
 </body>
