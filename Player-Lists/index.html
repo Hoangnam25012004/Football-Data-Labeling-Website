@@ -14,6 +14,7 @@
     <button id="luHomeBtn"></button>
     <button id="luAwayBtn"></button>
   </div>
+  <span id="saveStatus" style="margin-left:12px;font-size:11px;color:var(--mut)"></span>
   <div class="spacer"></div>
   <a class="back-link" href="../">← Tagging</a>
 </header>
@@ -61,7 +62,22 @@ let lineups=loadLineups(), meta=loadMeta(), lineupTeam='home';
 function teamLU(){return lineups[lineupTeam];}
 function maxXI(){return MAX_XI[meta.sport]||11;}
 function rosterPlayer(t,no){return t.roster.find(p=>p.no===no);}
-function save(){saveLineupsLS(lineups);}   // main tab picks this up via `storage` and refreshes its formation
+// save = localStorage (main tab mirrors it live via `storage`) + push straight to the
+// match row in Supabase, so saving never depends on the main tab being open to relay —
+// before this, edits made here could be overwritten by the stale cloud copy on reload.
+let pushTimer=null;
+function save(){
+  saveLineupsLS(lineups);
+  if(sb&&meta.matchId){
+    clearTimeout(pushTimer);
+    pushTimer=setTimeout(async()=>{
+      const {error}=await sb.from('matches').update({lineups}).eq('id',meta.matchId);
+      const st=$('saveStatus');
+      if(st){st.textContent=error?'⚠ lưu cloud lỗi: '+error.message:'☁ đã lưu vào trận';st.style.color=error?'var(--warn)':'var(--accent)';}
+      if(error)console.warn('lineups save:',error.message);
+    },300);
+  }
+}
 
 /* ===== team players from the DATABASE (public.players) =====
    Players must be stored on the team in the database BEFORE they can join the
