@@ -235,6 +235,8 @@ const CONFIG = {
     status('Live · #' + (matchCode || matchId.slice(0, 8)) + ' (' + PT().state.rows.length + ')', true);
     const link = location.origin + location.pathname + '#match=' + (matchCode || matchId);
     if ($('cloudShare')) { $('cloudShare').value = link; $('cloudShareRow').style.display = 'flex'; }
+    // reflect the open match in the address bar (…/#match=53830) — same URL as the share link
+    try { history.replaceState(null, '', '#match=' + (matchCode || matchId)); } catch (e) {}
   }
 
   function subscribe() {
