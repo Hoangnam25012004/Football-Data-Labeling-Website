@@ -1255,9 +1255,11 @@ function submitEntry(){
   if(!name){alert('No event selected. Type a hotkey in the string (e.g. 1s2) or click an event name.');return}
   // dots must match the players in the entry: 2 players (e.g. 1s2) -> 2 dots (from + to);
   // 1 player (e.g. 1b, 1ddd) -> exactly 1 dot. Mismatch -> block and warn.
+  // Substitution is exempt: OUT/IN are bench numbers, not passer/receiver pitch positions,
+  // so dots are never required for it (still saved if the user happened to place them).
   const need=(p.from?1:0)+(p.to?1:0);
   const pd=state.pendingDots, have=(pd.p?1:0)+(pd.r?1:0);
-  if(need>=1 && have!==need){alert('Cần kiểm tra lại dots');return}
+  if(name!=='substitution' && need>=1 && have!==need){alert('Cần kiểm tra lại dots');return}
   const ev=curEvents().find(o=>o.name===name);
   const wasEditing=!!state.editingId;   // re-editing a sub row must not re-apply the swap
   const row=pushRow({from:p.from,to:p.to,action:ev?ev.key:'',event:name,raw:$('playerInput').value.trim()});
@@ -1827,6 +1829,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=25"></script>
+<script src="cloud-sync.js?v=26"></script>
 </body>
 </html>
