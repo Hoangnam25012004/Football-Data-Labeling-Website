@@ -233,9 +233,7 @@ const CONFIG = {
     applying = false;
     subscribe();
     status('Live · #' + (matchCode || matchId.slice(0, 8)) + ' (' + PT().state.rows.length + ')', true);
-    const link = location.origin + location.pathname + '#match=' + (matchCode || matchId);
-    if ($('cloudShare')) { $('cloudShare').value = link; $('cloudShareRow').style.display = 'flex'; }
-    // reflect the open match in the address bar (…/#match=53830) — same URL as the share link
+    // reflect the open match in the address bar (…/#match=53830) so the URL itself is shareable
     try { history.replaceState(null, '', '#match=' + (matchCode || matchId)); } catch (e) {}
   }
 
@@ -398,7 +396,6 @@ const CONFIG = {
     if ($('cloudMatchId')) ['input', 'focus', 'keyup'].forEach(ev =>
       $('cloudMatchId').addEventListener(ev, previewMatchId));
     $('cloudBtn').onclick = () => { $('cloudModal').classList.add('show'); previewMatchId(); };
-    $('cloudCopy').onclick = () => { $('cloudShare').select(); document.execCommand('copy'); };
     // auto-connect on load when credentials are saved/configured, so the shared event
     // dictionary syncs without clicking Connect; also auto-join a #match=<code> link.
     if (c.url || CONFIG.url) (async () => {
