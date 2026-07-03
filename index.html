@@ -458,11 +458,6 @@
           <div class="ev-backup">
             <button id="cloudCreate" title="Tạo trận đấu mới — chọn 2 đội từ database">＋ Tạo trận đấu mới</button>
           </div>
-          <label class="fld" style="margin-top:10px"><span>Open a recent match</span></label>
-          <div class="addrow">
-            <select class="txt" id="cloudMatchList"><option value="">— select a match —</option></select>
-            <button id="cloudRefresh" title="refresh list">⟳</button>
-          </div>
           <label class="fld" style="margin-top:10px"><span>Match ID <span class="mini">— nhập code 5 số để xem thông tin trận</span></span></label>
           <div class="addrow">
             <input class="txt" id="cloudMatchId" placeholder="e.g. 12345" inputmode="numeric" autocomplete="off">
@@ -1820,7 +1815,14 @@ function renderMatchPreview(res){
     <div class="mp-top"><span class="mp-h">${m.home_name}</span><span class="mp-score">${res.score[0]} : ${res.score[1]}</span><span class="mp-a">${m.away_name}</span></div>
     <div class="mp-sub"><span>🕐 ${disp}</span><span>Match ID: <b style="color:var(--accent)">${m.code||m.id.slice(0,8)}</b></span></div></div>`;
   box.style.display='block';
-  box.querySelector('.mp-card').onclick=()=>{box.style.display='none';window.Cloud.openMatch(m.code||m.id);};
+  // click the card -> close the modal and jump straight into the match
+  box.querySelector('.mp-card').onclick=()=>{
+    box.style.display='none';
+    $('cloudModal').classList.remove('show');
+    toast('Đang mở trận #'+(m.code||m.id.slice(0,8))+'…');
+    window.Cloud.openMatch(m.code||m.id);
+    $('playerInput').focus();
+  };
 }
 
 if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
@@ -1829,6 +1831,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=22"></script>
+<script src="cloud-sync.js?v=23"></script>
 </body>
 </html>

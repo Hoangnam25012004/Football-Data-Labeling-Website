@@ -85,8 +85,7 @@ const CONFIG = {
     connected = true; status('Connected', true);
     if ($('cloudConnected')) $('cloudConnected').style.display = 'block';
     await initEventTypes();      // shared event dictionary (live)
-    await loadTeams();           // teams database -> home/away pickers
-    await loadRecentMatches();
+    await loadTeams();           // teams database -> create-match autocomplete
     return true;
   }
 
@@ -165,21 +164,6 @@ const CONFIG = {
     etTimer = setTimeout(() => pushEventTypes(PT().state.events), 250);
   }
 
-  /* ---------- list recent matches into the dropdown ---------- */
-  async function loadRecentMatches() {
-    if (!connected) return;
-    const sel = $('cloudMatchList'); if (!sel) return;
-    const { data, error } = await sb.from('matches')
-      .select('*')
-      .order('created_at', { ascending: false }).limit(50);
-    if (error) { console.warn('list matches:', error.message); return; }
-    sel.innerHTML = '<option value="">— select a match —</option>' +
-      (data || []).map(m => {
-        const d = (m.created_at || '').slice(0, 16).replace('T', ' ');
-        return `<option value="${m.code || m.id}">#${m.code || '?'} · ${m.home_name} vs ${m.away_name} · ${d}</option>`;
-      }).join('');
-  }
-
   /* ---------- match create / join / load ---------- */
   // create the match for two DB team ids (verified on the DB right before insert)
   async function createMatchWithTeams(hId, aId, matchDate) {
@@ -201,7 +185,6 @@ const CONFIG = {
     const { data, error } = await sb.from('matches').insert(ins).select().single();
     if (error) { alert('Create match failed: ' + error.message); return false; }
     await openMatchRow(data);                       // data includes the generated 5-digit code
-    await loadRecentMatches();
     return true;
   }
   // look a match up by 5-digit code (or uuid) and compute its goal score
@@ -396,8 +379,6 @@ const CONFIG = {
       if (PT().openMatchModal) PT().openMatchModal();
     };
     $('cloudJoin').onclick = joinMatch;
-    if ($('cloudMatchList')) $('cloudMatchList').onchange = (e) => { if (e.target.value) openByInput(e.target.value); };
-    if ($('cloudRefresh')) $('cloudRefresh').onclick = () => { loadTeams(); loadRecentMatches(); };
     // a 5-digit code in the Match ID box shows the match info card (home / away /
     // score / date) — click it to open. Runs on typing, on focus, and when the
     // modal opens with a code already in the box (e.g. auto-filled by a join).
