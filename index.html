@@ -19,6 +19,7 @@
   header h1 span{color:var(--accent)}
   .meta-inputs{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
   .meta-inputs input{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 8px;font-size:12px;width:120px}
+  .meta-inputs input[readonly]{opacity:.75;cursor:default;pointer-events:none}
   .score{display:inline-flex;align-items:center;gap:7px;background:#000;border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-variant-numeric:tabular-nums;font-size:15px;font-weight:800}
   .score .sc-h{color:var(--home)} .score .sc-a{color:var(--away)} .score .sc-dash{color:var(--mut);font-weight:600}
   .layout{display:grid;grid-template-columns:1fr 520px;gap:0;height:calc(100vh - 53px)}
@@ -282,9 +283,9 @@
     <button class="ev-btn" id="durBtn" title="Map original video times to the real match timeline">⏱ Duration</button>
     <button class="ev-btn" id="cloudBtn" title="Real-time cloud sync — share a match with others">☁ Cloud</button>
     <button class="ev-btn" id="lineupBtn" title="Player lists, starting XI, subs & formation">👥 Player lists</button>
-    <input id="homeName" placeholder="Home team" value="Home">
+    <input id="homeName" placeholder="Home team" value="Home" readonly tabindex="-1" title="Tên đội lấy từ database (bảng teams) — tạo/chọn đội khi tạo trận, không sửa tại đây">
     <span class="score" id="scoreBoard" title="Goals — auto-counted from tagged events"><b class="sc-h">0</b><span class="sc-dash">-</span><b class="sc-a">0</b></span>
-    <input id="awayName" placeholder="Away team" value="Away">
+    <input id="awayName" placeholder="Away team" value="Away" readonly tabindex="-1" title="Tên đội lấy từ database (bảng teams) — tạo/chọn đội khi tạo trận, không sửa tại đây">
     <select id="sportSel" class="txt" style="width:auto">
       <option value="football">⚽ Football (11)</option>
       <option value="football7">⚽ Football (7)</option>
@@ -1580,7 +1581,7 @@ const EVENT_INC={
   'key pass':['keyPasses'],
   'shot on target':['totalShots','shotsOn'],
   'shot off target':['totalShots','shotsOff'],
-  'blocked shot':['totalShots'],
+  'blocked shot':['totalShots','shotsBlocked'],
   'pass success':['passes','passesComp'],
   'pass fail':['passes'],
   'cross success':['crosses','crossesComp'],
@@ -1608,14 +1609,14 @@ const EVENT_INC={
   'save':['saves']
 };
 // column groups (label,span) matching the reference xlsx
-const STAT_GROUPS=[['',1],['Shooting',6],['Distribution',10],['Defensive',7],['Duels',4],['Set Pieces',2],['Discipline',4]];
-const STAT_HEADERS=['No','Goals','Assists','Total Shots','Shots On Target','Shots Off Target','Shooting Accuracy',
+const STAT_GROUPS=[['',1],['Shooting',7],['Distribution',10],['Defensive',7],['Duels',4],['Set Pieces',2],['Discipline',4]];
+const STAT_HEADERS=['No','Goals','Assists','Total Shots','Shots On Target','Shots Off Target','Blocked Shots','Shooting Accuracy',
   'Passes','Passes Completed','Pass Accuracy','Crosses','Crosses Completed','Cross Accuracy',
   'Take-ons','Take-ons Won','Take-on Success','Step-ins',
   'Tackles','Tackles Won','Tackle Success','Interceptions','Clearances','Blocks','Recoveries',
   'Ground Duels','Ground Duels Won','Aerial Duels','Aerial Duels Won',
   'Corners','Free-kicks','Fouls','Offsides','Mistakes','Saves'];
-function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,shotsOff:0,passes:0,passesComp:0,
+function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,shotsOff:0,shotsBlocked:0,passes:0,passesComp:0,
   crosses:0,crossesComp:0,takeOns:0,takeOnsWon:0,stepIns:0,tackles:0,tacklesWon:0,interceptions:0,
   clearances:0,blocks:0,recoveries:0,groundDuels:0,groundDuelsWon:0,aerialDuels:0,aerialDuelsWon:0,
   corners:0,freeKicks:0,penalties:0,fouls:0,offsides:0,mistakes:0,saves:0};}
@@ -1628,7 +1629,7 @@ function computeStats(team){
   });
   return P;
 }
-function statRow(no,s){return[no,s.goals,s.assists,s.totalShots,s.shotsOn,s.shotsOff,pct(s.shotsOn,s.totalShots),
+function statRow(no,s){return[no,s.goals,s.assists,s.totalShots,s.shotsOn,s.shotsOff,s.shotsBlocked,pct(s.shotsOn,s.totalShots),
   s.passes,s.passesComp,pct(s.passesComp,s.passes),s.crosses,s.crossesComp,pct(s.crossesComp,s.crosses),
   s.takeOns,s.takeOnsWon,pct(s.takeOnsWon,s.takeOns),s.stepIns,
   s.tackles,s.tacklesWon,pct(s.tacklesWon,s.tackles),s.interceptions,s.clearances,s.blocks,s.recoveries,
@@ -1765,6 +1766,7 @@ const TEAM_SECTIONS=[
   ['Attacking Stats',[
     ['Goals',(s,o)=>s.goals],['Assists',(s,o)=>s.assists],['Key Passes',(s,o)=>s.keyPasses],['Total Shots',(s,o)=>s.totalShots],
     ['Shots On Target',(s,o)=>s.shotsOn],['Shots Off Target',(s,o)=>s.shotsOff],
+    ['Blocked Shots',(s,o)=>s.shotsBlocked],
     ['Shooting Accuracy',(s,o)=>pct(s.shotsOn,s.totalShots)]]],
   ['Distribution Stats',[
     ['Possession %',(s,o)=>pct(s.passes,s.passes+o.passes)],['Passes',(s,o)=>s.passes],
@@ -1915,6 +1917,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=30"></script>
+<script src="cloud-sync.js?v=31"></script>
 </body>
 </html>

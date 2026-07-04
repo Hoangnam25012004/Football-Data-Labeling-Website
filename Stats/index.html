@@ -33,7 +33,7 @@
   <div class="stats-wrap"><div id="statsHolder"></div></div>
 </div>
 
-<script src="../shared.js"></script>
+<script src="../shared.js?v=2"></script>
 <script>
 let rows=loadRows(), meta=loadMeta(), statTeam='general', statCat='shooting';
 
@@ -43,6 +43,7 @@ const STAT_CATS={
   shooting:[
     ['Goals',s=>s.goals],['Assists',s=>s.assists],['Key Passes',s=>s.keyPasses],
     ['Total Shots',s=>s.totalShots],['Shots On Target',s=>s.shotsOn],['Shots Off Target',s=>s.shotsOff],
+    ['Blocked Shots',s=>s.shotsBlocked],
     ['Shooting Accuracy',s=>pct(s.shotsOn,s.totalShots)]],
   distribution:[
     ['Passes',s=>s.passes],['Passes Completed',s=>s.passesComp],['Pass Accuracy',s=>pct(s.passesComp,s.passes)],
