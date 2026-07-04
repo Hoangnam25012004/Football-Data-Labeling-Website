@@ -11,9 +11,16 @@
 <header>
   <h1>Hoang<span>Nam</span> · Stats</h1>
   <div class="stats-toggle" style="margin-left:14px">
+    <button id="statGenBtn">General</button>
     <button id="statHomeBtn"></button>
     <button id="statAwayBtn"></button>
-    <button id="statGenBtn">General</button>
+  </div>
+  <!-- category tabs (only for Home / Away): the 34-column table split into 4 views -->
+  <div class="stats-toggle" id="catToggle" style="margin-left:10px;display:none">
+    <button data-cat="shooting">Shooting</button>
+    <button data-cat="distribution">Distribution</button>
+    <button data-cat="defensive">Defensive</button>
+    <button data-cat="other">Other</button>
   </div>
   <div class="spacer"></div>
   <div class="exports">
@@ -28,25 +35,48 @@
 
 <script src="../shared.js"></script>
 <script>
-let rows=loadRows(), meta=loadMeta(), statTeam='home';
+let rows=loadRows(), meta=loadMeta(), statTeam='general', statCat='shooting';
+
+/* per-category column sets — the wide table split into 4 tabs.
+   Defensive = Defensive + Duels; Other = Set Pieces + Discipline. */
+const STAT_CATS={
+  shooting:[
+    ['Goals',s=>s.goals],['Assists',s=>s.assists],['Key Passes',s=>s.keyPasses],
+    ['Total Shots',s=>s.totalShots],['Shots On Target',s=>s.shotsOn],['Shots Off Target',s=>s.shotsOff],
+    ['Shooting Accuracy',s=>pct(s.shotsOn,s.totalShots)]],
+  distribution:[
+    ['Passes',s=>s.passes],['Passes Completed',s=>s.passesComp],['Pass Accuracy',s=>pct(s.passesComp,s.passes)],
+    ['Crosses',s=>s.crosses],['Crosses Completed',s=>s.crossesComp],['Cross Accuracy',s=>pct(s.crossesComp,s.crosses)],
+    ['Take-ons',s=>s.takeOns],['Take-ons Won',s=>s.takeOnsWon],['Take-on Success',s=>pct(s.takeOnsWon,s.takeOns)],
+    ['Step-ins',s=>s.stepIns]],
+  defensive:[
+    ['Tackles',s=>s.tackles],['Tackles Won',s=>s.tacklesWon],['Tackle Success',s=>pct(s.tacklesWon,s.tackles)],
+    ['Interceptions',s=>s.interceptions],['Clearances',s=>s.clearances],['Blocks',s=>s.blocks],['Recoveries',s=>s.recoveries],
+    ['Ground Duels',s=>s.groundDuels],['Ground Duels Won',s=>s.groundDuelsWon],
+    ['Aerial Duels',s=>s.aerialDuels],['Aerial Duels Won',s=>s.aerialDuelsWon]],
+  other:[
+    ['Corners',s=>s.corners],['Free-kicks',s=>s.freeKicks],['Penalty Kicks',s=>s.penalties],
+    ['Fouls',s=>s.fouls],['Offsides',s=>s.offsides],['Mistakes',s=>s.mistakes],['Saves',s=>s.saves]]
+};
 
 function renderStats(){
+  $('statGenBtn').className=statTeam==='general'?'act-gen':'';
   $('statHomeBtn').className=statTeam==='home'?'act-home':'';
   $('statAwayBtn').className=statTeam==='away'?'act-away':'';
-  $('statGenBtn').className=statTeam==='general'?'act-gen':'';
   $('statHomeBtn').textContent=meta.home;
   $('statAwayBtn').textContent=meta.away;
+  $('catToggle').style.display=statTeam==='general'?'none':'flex';
+  document.querySelectorAll('#catToggle button').forEach(b=>b.className=b.dataset.cat===statCat?'act-gen':'');
   const holder=$('statsHolder');
   if(statTeam==='general'){renderGeneral();return;}
   const P=computeStats(rows,statTeam), players=sortedPlayers(P);
   if(!players.length){holder.innerHTML='<div class="stats-empty">No events for this team yet.</div>';return;}
-  let grp=''; STAT_GROUPS.forEach((g,i)=>{grp+=`<th colspan="${g[1]}" class="grp g${i?i-1:0}">${g[0]}</th>`;});
-  let head=STAT_HEADERS.map((h,i)=>`<th class="${i===0?'no':''}">${h}</th>`).join('');
-  let body='';
-  players.forEach(no=>{const row=statRow(no,P[no]);
-    body+='<tr>'+row.map((v,i)=>`<td class="${i===0?'no':''}">${v}</td>`).join('')+'</tr>';});
-  holder.innerHTML=`<table class="stats"><thead><tr>${grp}</tr><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
-    +passMatrixHTML(statTeam);
+  const cols=STAT_CATS[statCat];
+  const head='<th class="no">No</th>'+cols.map(c=>`<th>${c[0]}</th>`).join('');
+  const body=players.map(no=>'<tr><td class="no">'+no+'</td>'
+    +cols.map(c=>`<td>${c[1](P[no])}</td>`).join('')+'</tr>').join('');
+  holder.innerHTML=`<table class="stats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
+    +(statCat==='distribution'?passMatrixHTML(statTeam):'');   // pass matrix lives in Distribution
 }
 function passMatrixHTML(team){
   const {players,mtx}=passMatrix(rows,team);
@@ -166,9 +196,10 @@ $('expCsv').onclick=()=>{
   });
 };
 
+$('statGenBtn').onclick=()=>{statTeam='general';renderStats();};
 $('statHomeBtn').onclick=()=>{statTeam='home';renderStats();};
 $('statAwayBtn').onclick=()=>{statTeam='away';renderStats();};
-$('statGenBtn').onclick=()=>{statTeam='general';renderStats();};
+document.querySelectorAll('#catToggle button').forEach(b=>b.onclick=()=>{statCat=b.dataset.cat;renderStats();});
 
 /* live sync with the main tagging tab */
 window.addEventListener('storage',e=>{
