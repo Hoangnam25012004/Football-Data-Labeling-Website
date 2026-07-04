@@ -36,6 +36,9 @@
   .fm-sub.home{border-color:var(--home);color:#9cc2ff} .fm-sub.home b{color:var(--home)}
   .fm-sub.away{border-color:var(--away);color:#ffb38a} .fm-sub.away b{color:var(--away)}
   .fm-sub-empty{color:var(--mut);font-size:11px}
+  .fm-dirlbl{position:absolute;top:6px;font-size:11px;font-weight:800;z-index:4;pointer-events:none;text-shadow:0 1px 2px #000,0 0 3px #000}
+  .fm-dirlbl.home{left:10px;color:var(--home)}
+  .fm-dirlbl.away{right:10px;color:var(--away)}
   .fm-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;container-type:size}
   /* largest 105:68 box that fits the stage (works for any stage shape) */
   .fm-pitch{position:relative;aspect-ratio:105/68;width:min(100%, calc(100cqh * 105 / 68))}
@@ -806,7 +809,9 @@ function addLuPlayer(){const no=$('luNo').value.trim(); if(!no)return; const t=t
 function luSwitchDir(){const t=teamLU(); t.dir=t.dir==='rl'?'lr':'rl';
   t.xi.forEach(x=>{x.x=100-x.x; x.pos=zoneAt(x.x,x.y,t.dir);}); saveLineups();renderLineup();}
 /* formation overlay on the main video frame (read-only, both teams).
-   A lineup belongs to one match — without an open match the pitch stays empty. */
+   A lineup belongs to one match — without an open match the pitch stays empty.
+   Attacking direction: half 1 uses the direction set in Player lists; half 2
+   (per the Half selector) mirrors both direction and player positions. */
 function renderFormationMain(){
   const pit=$('fmPitch'); if(!pit)return;
   pit.innerHTML=pitchSVG('football');
@@ -815,12 +820,20 @@ function renderFormationMain(){
     if(el)el.innerHTML='<span class="fm-sub-empty">Chưa mở trận đấu — vào ☁ Cloud để tạo hoặc join một match, đội hình sẽ hiện ở đây.</span>';
     return;
   }
+  const flip=+($('halfSel')&&$('halfSel').value||1)===2;   // teams swap ends at half-time
   ['home','away'].forEach(team=>{
     const t=state.lineups[team];
+    const dir=flip?(t.dir==='lr'?'rl':'lr'):(t.dir||'lr');
+    // attacking-direction label for this team (arrow follows the current half)
+    const name=team==='home'?($('homeName').value||'Home'):($('awayName').value||'Away');
+    const lab=document.createElement('div');
+    lab.className='fm-dirlbl '+team;
+    lab.textContent=dir==='lr'?(name+' ⟶'):('⟵ '+name);
+    pit.appendChild(lab);
     t.xi.forEach(x=>{
       const p=t.roster.find(r=>r.no===x.no);
       const dot=document.createElement('div'); dot.className='fm-dot'+(team==='away'?' away':'');
-      dot.style.left=x.x+'%'; dot.style.top=x.y+'%';
+      dot.style.left=(flip?100-x.x:x.x)+'%'; dot.style.top=x.y+'%';
       dot.innerHTML=`${x.no}<span class="lbl">${p?(p.name||''):''}</span>`;
       pit.appendChild(dot);
     });
@@ -1454,7 +1467,7 @@ function renderTable(){
   if(targetTr){targetTr.scrollIntoView({block:'center'});targetTr.classList.add('just-added');setTimeout(()=>targetTr.classList.remove('just-added'),700);}
   scrollToRow=null;
 }
-$('halfSel').onchange=renderTable;
+$('halfSel').onchange=()=>{renderTable();refreshFormation();};   // half decides the attacking direction shown
 
 /* inline-edit a player number cell (double-click) */
 function editPlayerCell(td,idx,field){
@@ -1917,6 +1930,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=31"></script>
+<script src="cloud-sync.js?v=32"></script>
 </body>
 </html>
