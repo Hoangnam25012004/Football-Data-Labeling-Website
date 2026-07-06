@@ -348,7 +348,7 @@
       </div>
 
       <label class="fld" style="margin-top:10px"><span>Enter event</span></label>
-      <input class="txt" id="playerInput" placeholder="e.g. 1s2  ·  1d  ·  9  ·  aa" autofocus>
+      <input class="txt" id="playerInput" placeholder="e.g. 1s2  ·  1s2s3s4  ·  1k*c2  ·  1xx*aa" autofocus>
     </div>
 
     <div class="tbl-head">
@@ -657,7 +657,7 @@ const state = {
   sport:'football', team:'home', activeEvent:null,
   events:loadEvents(),
   duration:loadDuration(),
-  pendingDots:{p:null,r:null}, // dots placed on the pitch, attached to the next tagged event
+  pendingDots:[],              // ordered pitch dots — one per ball touch, attached to the next entry
   editingId:null,              // id of the row being re-edited (submit updates it in place)
   lineups:loadLineups(),       // {home:{roster,xi,subs,dir}, away:{...}}
   teamIds:loadTeamIds(),       // {home:uuid|null, away:uuid|null} — teams table ids of the open match
@@ -665,10 +665,9 @@ const state = {
 };
 let pvRedraw=null, pvTogglePitch=null, pvSyncEntry=null, pvRenderPitch=null; // set while the video window is open
 const fmtXY=xy=>xy?Math.round(xy.x)+','+Math.round(xy.y):'—';
-// remove the most-recently-placed pitch dot (Receiver first, then Player) — Esc undoes one at a time
+// remove the most-recently-placed pitch dot — Esc undoes one at a time
 function undoLastDot(){
-  const pd=state.pendingDots;
-  if(pd.r)pd.r=null; else if(pd.p)pd.p=null;
+  if(state.pendingDots.length)state.pendingDots.pop();
   if(pvRedraw)pvRedraw();
 }
 const newId=()=>(crypto&&crypto.randomUUID)?crypto.randomUUID():('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16);}));
@@ -1172,27 +1171,31 @@ function openVideoWindow(){
     const svg=overlay.querySelector('svg'); if(!svg)return;
     const g=svg.querySelector('#pv-dots'); const pd=state.pendingDots;
     g.innerHTML='';
-    const mk=(dot,color,label)=>{if(!dot)return;const vx=dot.x/100*dims.w,vy=dot.y/100*dims.h;
+    pd.forEach((dot,i)=>{
+      const vx=dot.x/100*dims.w,vy=dot.y/100*dims.h;
       const grp=d.createElementNS(SVGNS,'g');
       const c=d.createElementNS(SVGNS,'circle');
       c.setAttribute('cx',vx);c.setAttribute('cy',vy);c.setAttribute('r',14);
-      c.setAttribute('fill',color);c.setAttribute('stroke','#000');c.setAttribute('stroke-width',2);
+      c.setAttribute('fill',i===pd.length-1?'#f7b32f':'#39d98a');  // newest dot highlighted
+      c.setAttribute('stroke','#000');c.setAttribute('stroke-width',2);
       const t=d.createElementNS(SVGNS,'text');
       t.setAttribute('x',vx);t.setAttribute('y',vy+5);t.setAttribute('text-anchor','middle');
       t.setAttribute('font-size',15);t.setAttribute('font-weight',700);t.setAttribute('fill','#06281a');
-      t.textContent=label;
+      t.textContent=String(i+1);
       grp.appendChild(c);grp.appendChild(t);
       makeDotDraggable(grp,c,t,dot);
-      g.appendChild(grp);};
-    mk(pd.p,'#39d98a','P'); mk(pd.r,'#f7b32f','R');
+      g.appendChild(grp);
+    });
     const pt=overlay.querySelector('#pv-ptext');
-    if(pt)pt.textContent=!pd.p?'Click the pitch: Player dot':(!pd.r?'Click the pitch: Receiver dot (skip for shots) — drag a dot to reposition':'Both placed — drag to reposition, click empty pitch to restart');
+    if(pt)pt.textContent=pd.length
+      ?pd.length+' dots — 1 dot / lần chạm bóng, theo thứ tự (kéo để chỉnh, Esc xoá dot cuối)'
+      :'Click: chấm dot theo thứ tự chạm bóng (1 dot / lần chạm)';
   }
   function onPitchClick(e){
     const svg=overlay.querySelector('svg');
     const loc=svgPct(svg,e); if(!loc)return; // ignore clicks outside the field (or on a dot — stopped above)
-    const t=video.src?video.currentTime:0, pd=state.pendingDots;
-    if(!pd.p)pd.p={x:loc.x,y:loc.y,t}; else if(!pd.r)pd.r={x:loc.x,y:loc.y,t}; else {pd.p={x:loc.x,y:loc.y,t};pd.r=null;}
+    if(state.pendingDots.length>=20)return;  // sanity cap
+    state.pendingDots.push({x:loc.x,y:loc.y,t:video.src?video.currentTime:0});
     redraw();
   }
   function renderPitch(){
@@ -1219,7 +1222,7 @@ function openVideoWindow(){
     // forward tagging keystrokes to the main "Enter event" box without leaving the video window
     if(e.key==='Enter'){e.preventDefault();submitEntry();pvSyncEntry();return;}
     if(e.key==='Backspace'){e.preventDefault();PI.value=PI.value.slice(0,-1);pvSyncEntry();return;}
-    if(e.key.length===1 && /[a-z0-9]/i.test(e.key)){e.preventDefault();PI.value+=e.key;pvSyncEntry();}
+    if(e.key.length===1 && /[a-z0-9*]/i.test(e.key)){e.preventDefault();PI.value+=e.key;pvSyncEntry();}
   },true);
   d.addEventListener('keyup',e=>{if(e.key==='Shift')togglePitch(false);},true); // release to hide pitch
   document.body.classList.add('video-popped');
@@ -1319,12 +1322,56 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('evModal').classL
 /* event lookup by hotkey (supports multi-char like 'aa') */
 function eventForKey(k){const ev=curEvents().find(o=>o.key&&o.key===k);return ev?ev.name:null}
 
-/* SYNTAX — "1s2" from1 key s to2 | "1aa2" multi-char | "1 2" numbers only -> active event */
-function parseEntry(raw){
+/* ===== SYNTAX — chains of events in one entry =====
+   "1s2"        one pass 1->2 (classic)
+   "1s2s3s4"    one-touch chain: pass 1->2, 2->3, 3->4 (consecutive dots shared)
+   "1s2s1ss"    ... last pass fails: extra dot = where the opponent took the ball
+   "1xx*aa"     '*' = several events for the same player (duel fail + tackle fail by 1)
+   "1k*c2"      free-kick by 1, then cross 1->2 — the TRANSFER event in a '*' group
+                (pass/cross success/fail) takes the next number as receiver
+   "1k*s2ss3xx" free-kick 1, pass 1->2, pass fail 2->3, ground duel fail 3
+   One dot per number (ball touch), in order; +1 trailing dot required when the
+   entry ENDS with a failed pass/cross (opponent-recovery position). */
+const TRANSFER_EVENTS=new Set(['pass success','pass fail','cross success','cross fail','substitution']);
+const TRAILING_EXTRA_DOT=new Set(['pass fail','cross fail']);
+function parseChain(raw){
   raw=(raw||'').trim().toLowerCase();
-  const key=(raw.match(/[a-z]+/)||[''])[0];
-  const nums=raw.match(/\d+/g)||[];
-  return {from:nums[0]||'',to:nums[1]||'',key};
+  const tokens=raw.match(/\d+|[a-z*]+/g)||[];
+  if(!tokens.length)return {evs:[],touches:0,badKey:null};
+  const evs=[]; let curNum='', curIdx=null, touches=0, group=null, badKey=null;
+  // resolve a pending key group once the next number (or the end of input) is known
+  const flush=(nextNum,nextIdx)=>{
+    if(!group)return;
+    const named=group.map(k=>({key:k,name:eventForKey(k)}));
+    named.forEach(o=>{if(!o.name&&!badKey)badKey=o.key;});
+    if(curIdx==null&&nextNum!=null){
+      // keys BEFORE the first number belong to that player (e.g. "aa2" = 2 does aa)
+      named.forEach(o=>evs.push({key:o.key,name:o.name,from:nextNum,fromIdx:nextIdx,to:'',toIdx:null}));
+    }else{
+      // exactly one event in the group carries the ball to the next number:
+      // the last transfer-type key, or (compat) the last key when none is transfer-type
+      let ti=-1;
+      if(nextNum!=null){
+        for(let i=named.length-1;i>=0;i--)if(TRANSFER_EVENTS.has(named[i].name)){ti=i;break;}
+        if(ti<0)ti=named.length-1;
+      }
+      named.forEach((o,i)=>evs.push(i===ti
+        ?{key:o.key,name:o.name,from:curNum,fromIdx:curIdx,to:nextNum,toIdx:nextIdx}
+        :{key:o.key,name:o.name,from:curNum,fromIdx:curIdx,to:'',toIdx:null}));
+    }
+    group=null;
+  };
+  tokens.forEach(tok=>{
+    if(/^\d+$/.test(tok)){
+      const idx=touches++;
+      flush(tok,idx);
+      curNum=tok; curIdx=idx;
+    }else{
+      group=(group||[]).concat(tok.split('*').filter(Boolean));
+    }
+  });
+  flush(null,null);   // trailing keys = solo events of the last player
+  return {evs,touches,badKey};
 }
 
 /* ADD ROW */
@@ -1346,48 +1393,62 @@ $('playerInput').addEventListener('input',()=>{
   if(pvSyncEntry)pvSyncEntry();
 });
 function submitEntry(){
-  const p=parseEntry($('playerInput').value);
-  let name = p.key ? eventForKey(p.key) : state.activeEvent;
-  if(p.key && !name){alert('No event is bound to hotkey "'+p.key+'".');return}
-  if(!name){alert('No event selected. Type a hotkey in the string (e.g. 1s2) or click an event name.');return}
-  // dots must match the players in the entry: 2 players (e.g. 1s2) -> 2 dots (from + to);
-  // 1 player (e.g. 1b, 1ddd) -> exactly 1 dot. Mismatch -> block and warn.
-  // Substitution is exempt: OUT/IN are bench numbers, not passer/receiver pitch positions,
-  // so dots are never required for it (still saved if the user happened to place them).
-  const need=(p.from?1:0)+(p.to?1:0);
-  const pd=state.pendingDots, have=(pd.p?1:0)+(pd.r?1:0);
-  if(name!=='substitution' && need>=1 && have!==need){alert('Cần kiểm tra lại dots');return}
-  const ev=curEvents().find(o=>o.name===name);
-  const wasEditing=!!state.editingId;   // re-editing a sub row must not re-apply the swap
-  const row=pushRow({from:p.from,to:p.to,action:ev?ev.key:'',event:name,raw:$('playerInput').value.trim()});
+  const raw=$('playerInput').value.trim();
+  if(!raw)return;
+  const chain=parseChain(raw);
+  if(chain.badKey){alert('No event is bound to hotkey "'+chain.badKey+'".');return}
+  let evs=chain.evs, touches=chain.touches;
+  if(!evs.length){
+    // numbers only (e.g. "9" / "1 2") -> the active event, like before
+    if(!state.activeEvent){alert('No event selected. Type a hotkey in the string (e.g. 1s2) or click an event name.');return}
+    const nums=raw.match(/\d+/g)||[];
+    evs=[{key:'',name:state.activeEvent,from:nums[0]||'',fromIdx:nums[0]?0:null,to:nums[1]||'',toIdx:nums[1]?1:null}];
+    touches=Math.min(nums.length,2);
+  }
+  const dots=state.pendingDots;
+  const isSub=evs.length===1&&evs[0].name==='substitution';
+  // dots: one per ball touch (number), in order. A FINAL failed pass/cross needs one
+  // extra dot — where the opponent took the ball. Substitution needs no dots.
+  const last=evs[evs.length-1];
+  const needExtra=(!isSub&&last&&!last.to&&TRAILING_EXTRA_DOT.has(last.name))?1:0;
+  const need=touches+needExtra;
+  if(!isSub&&touches>0&&dots.length!==need){
+    alert('Cần kiểm tra lại dots — cần '+need+' dots: '+touches+' lần chạm bóng'
+      +(needExtra?' + 1 dot tại thời điểm đối phương đoạt bóng':'')+'.');return}
+  // editing updates ONE row in place — chains can't map onto a single row
+  if(state.editingId&&evs.length>1){alert('Đang sửa 1 event — chỉ nhập 1 event (không dùng chuỗi).');return}
+  const wasEditing=!!state.editingId;
+  let lastRow=null;
+  evs.forEach(ev=>{
+    const pD=ev.fromIdx!=null?dots[ev.fromIdx]:(touches===0?dots[0]:null);
+    const rIdx=ev.toIdx!=null?ev.toIdx:((ev===last&&needExtra)?touches:null);
+    const rD=rIdx!=null?dots[rIdx]:null;
+    const existing=state.editingId?state.rows.find(r=>r.id===state.editingId):null;
+    // timeline = the moment that touch's dot was placed (else the edited row's / current time)
+    const t=pD?pD.t:(existing?existing.t:(video.src?video.currentTime:0));
+    const data={t, rt:rD?rD.t:(pD?null:(existing?existing.rt:null)), team:state.team,
+      teamName:state.team==='home'?$('homeName').value:$('awayName').value,
+      event:ev.name,playerFrom:ev.from,playerTo:ev.to||'',action:ev.key,raw,
+      pXY:pD?{x:pD.x,y:pD.y}:null, rXY:rD?{x:rD.x,y:rD.y}:null};
+    let row;
+    if(existing){Object.assign(existing,data);row=existing;}   // edit in place — keep the same id
+    else{row=Object.assign({id:newId()},data);state.rows.push(row);}
+    window.Cloud&&window.Cloud.onLocalUpsert(row);             // each event syncs to the cloud
+    lastRow=row;
+  });
+  state.editingId=null;
+  state.pendingDots=[];              // consume the dots
+  if(pvRedraw)pvRedraw();
+  $('halfSel').value=eventHalf(lastRow);
+  scrollToRow=lastRow;
+  renderTable();
+  toast(evs.length>1?(evs.length+' events ✓'):(evs[0].name+' ✓'));
   // "15sub3" = 15 out, 3 in -> auto-update the lineup and open the formation editor
-  if(!wasEditing && name==='substitution' && p.from && p.to) applySubstitution(state.team,p.from,p.to,row.t);
-  state.activeEvent=name; renderEvents(); updateBanner();
+  if(!wasEditing&&isSub&&evs[0].from&&evs[0].to)applySubstitution(state.team,evs[0].from,evs[0].to,lastRow.t);
+  state.activeEvent=evs[evs.length-1].name; renderEvents(); updateBanner();
   $('playerInput').value='';
   if(document.hasFocus())$('playerInput').focus(); // don't yank focus when typing from the video window
   if(pvSyncEntry)pvSyncEntry();
-}
-function pushRow({from,to,action,event,raw}){
-  const pd=state.pendingDots;
-  // when editing an existing event, keep its original timeline if no new dots were placed
-  const existing = state.editingId ? state.rows.find(r=>r.id===state.editingId) : null;
-  // Timeline = the moment the Player dot was placed (fall back to the original, then current video time)
-  const t = pd.p ? pd.p.t : (existing ? existing.t : (video.src?video.currentTime:0));
-  const data={ t, rt: pd.r?pd.r.t:(pd.p?null:(existing?existing.rt:null)), team:state.team,
-    teamName:state.team==='home'?$('homeName').value:$('awayName').value,
-    event,playerFrom:from,playerTo:to,action,raw,
-    pXY: pd.p?{x:pd.p.x,y:pd.p.y}:null, rXY: pd.r?{x:pd.r.x,y:pd.r.y}:null};
-  let row;
-  if(existing){ Object.assign(existing,data); row=existing; }   // edit in place — keep the same id
-  else { row=Object.assign({id:newId()},data); state.rows.push(row); }
-  state.editingId=null;
-  window.Cloud&&window.Cloud.onLocalUpsert(row); // sync new/updated event to the cloud (if connected)
-  state.pendingDots={p:null,r:null}; // consume the dots
-  if(pvRedraw)pvRedraw();             // clear them from the pitch overlay
-  $('halfSel').value=eventHalf(row); // jump the view to the half the new event lands in
-  scrollToRow=row;                   // scroll the list to this exact row (not the bottom)
-  renderTable(); toast(event+' ✓');
-  return row;
 }
 /* substitution "OUTsubIN" (e.g. 15sub3): OUT leaves the XI for the bench, IN takes OUT's
    spot on the pitch, and the formation editor opens so the new shape can be arranged.
@@ -1422,10 +1483,10 @@ function startEdit(idx){
   const syntax=((row.playerFrom||'')+(row.action||'')+(row.playerTo||''))||row.raw||'';
   $('playerInput').value=syntax;
   // restore the dots (keep their original timeline)
-  state.pendingDots={
-    p: row.pXY?{x:row.pXY.x,y:row.pXY.y,t:row.t}:null,
-    r: row.rXY?{x:row.rXY.x,y:row.rXY.y,t:(row.rt!=null?row.rt:row.t)}:null
-  };
+  state.pendingDots=[
+    ...(row.pXY?[{x:row.pXY.x,y:row.pXY.y,t:row.t}]:[]),
+    ...(row.rXY?[{x:row.rXY.x,y:row.rXY.y,t:(row.rt!=null?row.rt:row.t)}]:[])
+  ];
   if(pvRedraw)pvRedraw();
   if(pvTogglePitch)pvTogglePitch(true);   // reveal the pitch overlay so the restored dots show
   if(pvSyncEntry)pvSyncEntry();
@@ -1435,7 +1496,7 @@ function startEdit(idx){
 }
 function cancelEdit(){                     // leave edit mode without changing the row
   if(!state.editingId)return;
-  state.editingId=null; state.pendingDots={p:null,r:null};
+  state.editingId=null; state.pendingDots=[];
   if(pvRedraw)pvRedraw(); renderTable();
 }
 function renderTable(){
@@ -1579,7 +1640,7 @@ document.addEventListener('keydown',e=>{
   if(e.code==='ArrowLeft'){e.preventDefault();$('back2').click();return}
   if(e.code==='ArrowRight'){e.preventDefault();$('fwd2').click();return}
   // any printable character -> jump into the player box and type it there (Space is reserved for play/pause)
-  if(e.key.length===1 && /[a-z0-9]/i.test(e.key)){
+  if(e.key.length===1 && /[a-z0-9*]/i.test(e.key)){
     PI.focus(); PI.value+=e.key; e.preventDefault();
     if(pvSyncEntry)pvSyncEntry();   // programmatic .value change fires no 'input' event
   }
