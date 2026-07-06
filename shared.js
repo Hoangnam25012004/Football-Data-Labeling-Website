@@ -88,15 +88,17 @@ const FORMATION_GRID=[
 ];
 const PZ_COLORS=['red','green','green','blue','blue','gold'];
 const effCol=(col,dir)=>dir==='lr'?5-col:col;
+/* row heights: top 25% / middle (GK..CF) 50% / bottom 25% */
+const PZ_ROW_TOP=[0,25,75], PZ_ROW_H=[25,50,25];
 function zoneAt(x,y,dir){
-  const col=Math.max(0,Math.min(5,Math.floor(x/100*6))), row=Math.max(0,Math.min(2,Math.floor(y/100*3)));
+  const col=Math.max(0,Math.min(5,Math.floor(x/100*6))), row=y<25?0:(y<75?1:2);
   return FORMATION_GRID[row][effCol(col,dir)]||'';
 }
 function gridHTML(dir){
   let h='';
   for(let row=0;row<3;row++)for(let col=0;col<6;col++){
     const ec=effCol(col,dir), lbl=FORMATION_GRID[row][ec], color=lbl?PZ_COLORS[ec]:'none';
-    h+=`<div class="pz ${color}" style="left:${col*100/6}%;top:${row*100/3}%;width:${100/6}%;height:${100/3}%">${lbl}</div>`;
+    h+=`<div class="pz ${color}" style="left:${col*100/6}%;top:${PZ_ROW_TOP[row]}%;width:${100/6}%;height:${PZ_ROW_H[row]}%">${lbl}</div>`;
   }
   h+=`<div class="pz-arrow">${dir==='lr'?'▶':'◀'}</div>`;
   return h;

@@ -104,6 +104,13 @@
   .exports button:hover{border-color:var(--accent);color:var(--accent)}
   .tbl-scroll{flex:1;overflow:auto}
   table{width:100%;border-collapse:collapse;font-size:11.5px}
+  /* fixed columns: Home and Away share the width evenly around a narrow timeline;
+     long content wraps onto extra lines instead of stretching the column */
+  #tbl{table-layout:fixed}
+  #tbl th.h-side,#tbl th.a-side{width:auto}
+  #tbl th.tl-col{width:86px}
+  #tbl th:last-child{width:52px}
+  #tbl td{white-space:normal;overflow-wrap:break-word;word-break:break-word}
   th{position:sticky;top:0;background:var(--panel2);color:var(--mut);text-align:left;padding:6px 8px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap}
   td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
   tr:hover td{background:var(--panel2)}
@@ -727,15 +734,17 @@ const FORMATION_GRID=[
 ];
 const PZ_COLORS=['red','green','green','blue','blue','gold']; // by canonical column
 const effCol=(col,dir)=>dir==='lr'?5-col:col;
+/* row heights: top 25% / middle (GK..CF) 50% / bottom 25% */
+const PZ_ROW_TOP=[0,25,75], PZ_ROW_H=[25,50,25];
 function zoneAt(x,y,dir){
-  const col=Math.max(0,Math.min(5,Math.floor(x/100*6))), row=Math.max(0,Math.min(2,Math.floor(y/100*3)));
+  const col=Math.max(0,Math.min(5,Math.floor(x/100*6))), row=y<25?0:(y<75?1:2);
   return FORMATION_GRID[row][effCol(col,dir)]||'';
 }
 function gridHTML(dir){
   let h='';
   for(let row=0;row<3;row++)for(let col=0;col<6;col++){
     const ec=effCol(col,dir), lbl=FORMATION_GRID[row][ec], color=lbl?PZ_COLORS[ec]:'none';
-    h+=`<div class="pz ${color}" style="left:${col*100/6}%;top:${row*100/3}%;width:${100/6}%;height:${100/3}%">${lbl}</div>`;
+    h+=`<div class="pz ${color}" style="left:${col*100/6}%;top:${PZ_ROW_TOP[row]}%;width:${100/6}%;height:${PZ_ROW_H[row]}%">${lbl}</div>`;
   }
   h+=`<div class="pz-arrow">${dir==='lr'?'▶':'◀'}</div>`;
   return h;
@@ -821,34 +830,32 @@ function renderFormationMain(){
     return;
   }
   const flip=+($('halfSel')&&$('halfSel').value||1)===2;   // teams swap ends at half-time
-  ['home','away'].forEach(team=>{
-    const t=state.lineups[team];
-    const dir=flip?(t.dir==='lr'?'rl':'lr'):(t.dir||'lr');
-    // attacking-direction label for this team (arrow follows the current half)
-    const name=team==='home'?($('homeName').value||'Home'):($('awayName').value||'Away');
-    const lab=document.createElement('div');
-    lab.className='fm-dirlbl '+team;
-    lab.textContent=dir==='lr'?(name+' ⟶'):('⟵ '+name);
-    pit.appendChild(lab);
-    t.xi.forEach(x=>{
-      const p=t.roster.find(r=>r.no===x.no);
-      const dot=document.createElement('div'); dot.className='fm-dot'+(team==='away'?' away':'');
-      dot.style.left=(flip?100-x.x:x.x)+'%'; dot.style.top=x.y+'%';
-      dot.innerHTML=`${x.no}<span class="lbl">${p?(p.name||''):''}</span>`;
-      pit.appendChild(dot);
-    });
+  // only the SELECTED team's formation is shown (Home / Away segment above the entry box)
+  const team=state.team, t=state.lineups[team];
+  const dir=flip?(t.dir==='lr'?'rl':'lr'):(t.dir||'lr');
+  // attacking-direction label (arrow follows the current half)
+  const name=team==='home'?($('homeName').value||'Home'):($('awayName').value||'Away');
+  const lab=document.createElement('div');
+  lab.className='fm-dirlbl '+team;
+  lab.style[dir==='lr'?'left':'right']='10px'; lab.style[dir==='lr'?'right':'left']='auto';
+  lab.textContent=dir==='lr'?(name+' ⟶'):('⟵ '+name);
+  pit.appendChild(lab);
+  t.xi.forEach(x=>{
+    const p=t.roster.find(r=>r.no===x.no);
+    const dot=document.createElement('div'); dot.className='fm-dot'+(team==='away'?' away':'');
+    dot.style.left=(flip?100-x.x:x.x)+'%'; dot.style.top=x.y+'%';
+    dot.innerHTML=`${x.no}<span class="lbl">${p?(p.name||''):''}</span>`;
+    pit.appendChild(dot);
   });
   renderFormationSubs();
 }
-// substitutes bar above the pitch (both teams)
+// substitutes bar above the pitch (selected team only, matching the formation)
 function renderFormationSubs(){
   const el=$('fmSubs'); if(!el)return;
   let h='';
-  ['home','away'].forEach(team=>{
-    const t=state.lineups[team];
-    t.subs.forEach(no=>{const p=t.roster.find(r=>r.no===no);
-      h+=`<span class="fm-sub ${team}"><b>${no}</b>${p&&p.name?p.name:''}</span>`;});
-  });
+  const team=state.team, t=state.lineups[team];
+  t.subs.forEach(no=>{const p=t.roster.find(r=>r.no===no);
+    h+=`<span class="fm-sub ${team}"><b>${no}</b>${p&&p.name?p.name:''}</span>`;});
   el.innerHTML=h||'<span class="fm-sub-empty">No substitutes</span>';
 }
 function refreshFormation(){ renderFormationMain(); }   // formation is always shown on the main tab
@@ -1241,7 +1248,8 @@ video.addEventListener('click',focusEntryIfDocked);
 video.addEventListener('play',focusEntryIfDocked);
 
 /* TEAM */
-function setTeam(t){state.team=t;$('segHome').className=t==='home'?'act-home':'';$('segAway').className=t==='away'?'act-away':''}
+function setTeam(t){state.team=t;$('segHome').className=t==='home'?'act-home':'';$('segAway').className=t==='away'?'act-away':'';
+  refreshFormation();}   // the formation panel shows the selected team
 $('segHome').onclick=()=>setTeam('home');
 $('segAway').onclick=()=>setTeam('away');
 // team names: push to the cloud match (matches.home_name / away_name) when changed
