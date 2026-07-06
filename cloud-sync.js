@@ -14,7 +14,7 @@ const CONFIG = {
   // Optional: direct-to-R2 video upload. Deploy worker/r2-presign.js (see worker/README.md),
   // then paste its URL + your bucket's public base here. Leave workerUrl '' to hide the R2 button
   // (pasting a video URL manually still works without any of this).
-  R2: { workerUrl: '', publicBase: '' }
+  R2: { workerUrl: 'https://r2-presign.hoangnam25012004.workers.dev', publicBase: 'https://pub-9cdd291bf181425b9738328ada297691.r2.dev' }
 };
 
 (function () {
