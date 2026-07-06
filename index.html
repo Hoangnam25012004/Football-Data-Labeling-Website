@@ -659,6 +659,7 @@ const state = {
   duration:loadDuration(),
   pendingDots:[],              // ordered pitch dots — one per ball touch, attached to the next entry
   editingId:null,              // id of the row being re-edited (submit updates it in place)
+  editingGroup:null,           // grp id of the CHAIN being re-edited (submit replaces the whole chain)
   lineups:loadLineups(),       // {home:{roster,xi,subs,dir}, away:{...}}
   teamIds:loadTeamIds(),       // {home:uuid|null, away:uuid|null} — teams table ids of the open match
   rows:[], fps:25
@@ -1383,7 +1384,7 @@ $('playerInput').addEventListener('keydown',e=>{
   if(e.code==='ArrowLeft'){e.preventDefault();$('back2').click();return}
   if(e.code==='ArrowRight'){e.preventDefault();$('fwd2').click();return}
   if(e.key==='Enter'){e.preventDefault();submitEntry();return}
-  if(e.key==='Escape'&&state.editingId){e.preventDefault();$('playerInput').value='';cancelEdit();if(pvSyncEntry)pvSyncEntry();return}
+  if(e.key==='Escape'&&(state.editingId||state.editingGroup)){e.preventDefault();$('playerInput').value='';cancelEdit();if(pvSyncEntry)pvSyncEntry();return}
 });
 // clearing the box exits edit mode, so the next entry is a fresh event (not an update).
 // Also mirror every change into the video window's Entry display, so typing in the
@@ -1417,7 +1418,17 @@ function submitEntry(){
       +(needExtra?' + 1 dot tại thời điểm đối phương đoạt bóng':'')+'.');return}
   // editing updates ONE row in place — chains can't map onto a single row
   if(state.editingId&&evs.length>1){alert('Đang sửa 1 event — chỉ nhập 1 event (không dùng chuỗi).');return}
-  const wasEditing=!!state.editingId;
+  const wasEditing=!!state.editingId||!!state.editingGroup;
+  // re-editing a chain: replace the whole old group with the new batch
+  if(state.editingGroup){
+    const old=state.rows.filter(r=>r.grp===state.editingGroup);
+    state.rows=state.rows.filter(r=>r.grp!==state.editingGroup);
+    old.forEach(r=>window.Cloud&&window.Cloud.onLocalDelete(r.id));
+    state.editingGroup=null;
+  }
+  // events born from ONE entry share a group id -> shown as ONE line in the table
+  // (each still stored as its own row/event in Supabase)
+  const grpId=evs.length>1?newId():null;
   let lastRow=null;
   evs.forEach(ev=>{
     const pD=ev.fromIdx!=null?dots[ev.fromIdx]:(touches===0?dots[0]:null);
@@ -1429,6 +1440,7 @@ function submitEntry(){
     const data={t, rt:rD?rD.t:(pD?null:(existing?existing.rt:null)), team:state.team,
       teamName:state.team==='home'?$('homeName').value:$('awayName').value,
       event:ev.name,playerFrom:ev.from,playerTo:ev.to||'',action:ev.key,raw,
+      grp:grpId,
       pXY:pD?{x:pD.x,y:pD.y}:null, rXY:rD?{x:rD.x,y:rD.y}:null};
     let row;
     if(existing){Object.assign(existing,data);row=existing;}   // edit in place — keep the same id
@@ -1494,42 +1506,101 @@ function startEdit(idx){
   if(document.hasFocus())$('playerInput').focus();
   toast('Editing — adjust & press Enter');
 }
-function cancelEdit(){                     // leave edit mode without changing the row
-  if(!state.editingId)return;
-  state.editingId=null; state.pendingDots=[];
+/* pull a whole CHAIN back into the editor: raw syntax + every touch dot.
+   Submitting replaces all the old rows of the chain with the new batch. */
+function startEditGroup(grpRows){
+  if(!grpRows.length)return;
+  state.editingId=null; state.editingGroup=grpRows[0].grp;
+  setTeam(grpRows[0].team);
+  $('playerInput').value=grpRows[0].raw||'';
+  // rebuild the ordered touch dots — consecutive rows share dots (row N's receiver
+  // dot IS row N+1's player dot), so skip a dot identical to the last one pushed
+  const dots=[];
+  const push=(pt,t)=>{if(!pt)return;
+    const last=dots[dots.length-1];
+    if(last&&last.x===pt.x&&last.y===pt.y&&last.t===t)return;
+    dots.push({x:pt.x,y:pt.y,t});};
+  grpRows.forEach(r=>{push(r.pXY,r.t); if(r.rXY)push(r.rXY,r.rt!=null?r.rt:r.t);});
+  state.pendingDots=dots;
+  if(pvRedraw)pvRedraw();
+  if(pvTogglePitch)pvTogglePitch(true);
+  if(pvSyncEntry)pvSyncEntry();
+  renderTable();
+  if(document.hasFocus())$('playerInput').focus();
+  toast('Editing chuỗi — chỉnh & Enter (chuỗi cũ sẽ được thay bằng chuỗi mới)');
+}
+function cancelEdit(){                     // leave edit mode without changing the row(s)
+  if(!state.editingId&&!state.editingGroup)return;
+  state.editingId=null; state.editingGroup=null; state.pendingDots=[];
   if(pvRedraw)pvRedraw(); renderTable();
+}
+/* one chain entry -> one display line: "17 #pass fail 7 #ground duel fail"
+   (numbers are not repeated when consecutive events share a player) */
+function chainHTML(grpRows,evClass){
+  let html='',cur=null;
+  grpRows.forEach(r=>{
+    const f=r.playerFrom||'';
+    if(f&&f!==cur){html+=(html?' ':'')+`<span class="pnum">${f}</span>`;cur=f;}
+    html+=` <span class="evt ${evClass}">#${r.event}</span>`;
+    if(r.playerTo){html+=` <span class="pnum">${r.playerTo}</span>`;cur=r.playerTo;}
+  });
+  return html;
+}
+// delete one or several rows (a whole chain) locally + in the cloud
+function deleteRows(rs){
+  rs.forEach(r=>{
+    if(state.editingId===r.id)state.editingId=null;
+    if(state.editingGroup&&r.grp===state.editingGroup)state.editingGroup=null;
+    const i=state.rows.indexOf(r); if(i>=0)state.rows.splice(i,1);
+    window.Cloud&&window.Cloud.onLocalDelete(r.id);
+  });
+  renderTable();
 }
 function renderTable(){
   const tb=$('tbody'); tb.innerHTML='';
   // always sorted by timeline: earliest -> latest, regardless of input order
   state.rows.sort((a,b)=>a.t-b.t);
   const half=+($('halfSel').value||1); let shown=0, targetTr=null;
-  state.rows.forEach((r,i)=>{
-    if(eventHalf(r)!==half)return; // only show the selected half
-    shown++;
+  const visible=state.rows.filter(r=>eventHalf(r)===half); // only the selected half
+  let i=0;
+  while(i<visible.length){
+    const r=visible[i];
+    // rows born from one chain entry share grp -> collapse consecutive ones into ONE line
+    const grpRows=[r];
+    if(r.grp){let j=i+1;while(j<visible.length&&visible[j].grp===r.grp){grpRows.push(visible[j]);j++;}}
+    i+=grpRows.length; shown++;
     const tr=document.createElement('tr');
-    if(r===scrollToRow)targetTr=tr;
-    if(r.id===state.editingId)tr.classList.add('editing');
-    const isHome=r.team==='home';
-    // one combined cell: "<player_from> <event> <player_to>" (receiver number only when present).
-    // [x,y] coordinates and both player numbers are still stored/exported — just shown as one string here.
-    const evClass=isHome?'home':'away';
-    const pf=`<span class="pnum ed" data-edit="from" title="Double-click to edit">${r.playerFrom||'—'}</span>`;
-    const pt=r.playerTo?` <span class="pnum ed" data-edit="to" title="Double-click to edit">${r.playerTo}</span>`:'';
-    const evSpan=`<span class="evt ${evClass} ed-ev" title="Double-click: type a hotkey to change the event">${r.event}</span>`;
-    const combined=`${pf} ${evSpan}${pt}`;
+    if(grpRows.includes(scrollToRow))targetTr=tr;
+    if(grpRows.some(x=>x.id===state.editingId)||(r.grp&&r.grp===state.editingGroup))tr.classList.add('editing');
+    const isHome=r.team==='home', evClass=isHome?'home':'away';
+    let combined;
+    if(grpRows.length>1){
+      combined=chainHTML(grpRows,evClass);
+    }else{
+      // single event: "<player_from> <event> <player_to>", numbers/event editable by double-click
+      const pf=`<span class="pnum ed" data-edit="from" title="Double-click to edit">${r.playerFrom||'—'}</span>`;
+      const pt=r.playerTo?` <span class="pnum ed" data-edit="to" title="Double-click to edit">${r.playerTo}</span>`:'';
+      const evSpan=`<span class="evt ${evClass} ed-ev" title="Double-click: type a hotkey to change the event">${r.event}</span>`;
+      combined=`${pf} ${evSpan}${pt}`;
+    }
     const blank='<td class="blank"></td>';
     const homeCell = isHome ? `<td class="h-side">${combined}</td>` : blank;
     const awayCell = !isHome ? `<td class="a-side">${combined}</td>` : blank;
     tr.innerHTML=`${homeCell}<td class="tl-col tlink">${fmt(matchTime(r.t))}</td>${awayCell}`
       +`<td class="rowbtns"><span class="edit" title="Edit — reload the syntax and dots">✎</span><span class="del" title="Remove">×</span></td>`;
     tr.querySelector('.tlink').onclick=()=>{if(video.src)video.currentTime=r.t};
-    tr.querySelector('.edit').onclick=()=>startEdit(i);
-    tr.querySelector('.del').onclick=()=>{const id=state.rows[i].id;if(state.editingId===id)state.editingId=null;state.rows.splice(i,1);renderTable();window.Cloud&&window.Cloud.onLocalDelete(id);};
-    tr.querySelectorAll('[data-edit]').forEach(td=>{td.ondblclick=()=>editPlayerCell(td,i,td.dataset.edit)});
-    tr.querySelectorAll('.ed-ev').forEach(td=>{td.ondblclick=()=>editEventCell(td,i)});
+    if(grpRows.length>1){
+      tr.querySelector('.edit').onclick=()=>startEditGroup(grpRows);
+      tr.querySelector('.del').onclick=()=>deleteRows(grpRows);
+    }else{
+      const idx=state.rows.indexOf(r);
+      tr.querySelector('.edit').onclick=()=>startEdit(idx);
+      tr.querySelector('.del').onclick=()=>deleteRows([r]);
+      tr.querySelectorAll('[data-edit]').forEach(td=>{td.ondblclick=()=>editPlayerCell(td,idx,td.dataset.edit)});
+      tr.querySelectorAll('.ed-ev').forEach(td=>{td.ondblclick=()=>editEventCell(td,idx)});
+    }
     tb.appendChild(tr);
-  });
+  }
   $('count').textContent=shown;
   $('emptyMsg').style.display=shown?'none':'block';
   updateScore(); saveRows();   // keep the Stats page in sync
@@ -1999,6 +2070,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=33"></script>
+<script src="cloud-sync.js?v=34"></script>
 </body>
 </html>

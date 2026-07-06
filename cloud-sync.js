@@ -36,7 +36,7 @@ const CONFIG = {
       x: r.pXY ? r.pXY.x : null, y: r.pXY ? r.pXY.y : null,
       rx: r.rXY ? r.rXY.x : null, ry: r.rXY ? r.rXY.y : null,
       t_seconds: r.t, half: PT().eventHalf(r),
-      attributes: { raw: r.raw || '', team_name: r.teamName || '', rt: r.rt ?? null }
+      attributes: { raw: r.raw || '', team_name: r.teamName || '', rt: r.rt ?? null, grp: r.grp || null }
     };
   }
   function dbToRow(d) {
@@ -46,7 +46,7 @@ const CONFIG = {
       teamName: a.team_name || d.team, event: d.event_name,
       playerFrom: d.player_from != null ? String(d.player_from) : '',
       playerTo: d.player_to != null ? String(d.player_to) : '',
-      action: d.action_code || '', raw: a.raw || '',
+      action: d.action_code || '', raw: a.raw || '', grp: a.grp || null,
       pXY: d.x != null ? { x: d.x, y: d.y } : null,
       rXY: d.rx != null ? { x: d.rx, y: d.ry } : null
     };
