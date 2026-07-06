@@ -19,7 +19,10 @@
   header h1 span{color:var(--accent)}
   .meta-inputs{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
   .meta-inputs input{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 8px;font-size:12px;width:120px}
-  .meta-inputs input[readonly]{opacity:.75;cursor:default;pointer-events:none}
+  /* team names are read-only DIVs (inputs can't wrap) — long names wrap onto extra lines */
+  .meta-inputs .team-name{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;
+    padding:5px 8px;font-size:12px;min-width:70px;max-width:150px;text-align:center;
+    white-space:normal;overflow-wrap:break-word;word-break:break-word;line-height:1.25;opacity:.85;cursor:default}
   .score{display:inline-flex;align-items:center;gap:7px;background:#000;border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-variant-numeric:tabular-nums;font-size:15px;font-weight:800}
   .score .sc-h{color:var(--home)} .score .sc-a{color:var(--away)} .score .sc-dash{color:var(--mut);font-weight:600}
   .layout{display:grid;grid-template-columns:1fr 520px;gap:0;height:calc(100vh - 53px)}
@@ -293,9 +296,9 @@
     <button class="ev-btn" id="durBtn" title="Map original video times to the real match timeline">⏱ Duration</button>
     <button class="ev-btn" id="cloudBtn" title="Real-time cloud sync — share a match with others">☁ Cloud</button>
     <button class="ev-btn" id="lineupBtn" title="Player lists, starting XI, subs & formation">👥 Player lists</button>
-    <input id="homeName" placeholder="Home team" value="Home" readonly tabindex="-1" title="Tên đội lấy từ database (bảng teams) — tạo/chọn đội khi tạo trận, không sửa tại đây">
+    <div id="homeName" class="team-name" title="Tên đội lấy từ database (bảng teams) — tạo/chọn đội khi tạo trận, không sửa tại đây">Home</div>
     <span class="score" id="scoreBoard" title="Goals — auto-counted from tagged events"><b class="sc-h">0</b><span class="sc-dash">-</span><b class="sc-a">0</b></span>
-    <input id="awayName" placeholder="Away team" value="Away" readonly tabindex="-1" title="Tên đội lấy từ database (bảng teams) — tạo/chọn đội khi tạo trận, không sửa tại đây">
+    <div id="awayName" class="team-name" title="Tên đội lấy từ database (bảng teams) — tạo/chọn đội khi tạo trận, không sửa tại đây">Away</div>
     <select id="sportSel" class="txt" style="width:auto">
       <option value="football">⚽ Football (11)</option>
       <option value="football7">⚽ Football (7)</option>
@@ -598,6 +601,10 @@
 
 <script>
 const $ = id => document.getElementById(id);
+// team-name boxes are DIVs (an <input> can't wrap a long name) — give them the same
+// .value API as inputs so every existing $('homeName').value read/write keeps working
+['homeName','awayName'].forEach(id=>{const el=$(id);
+  Object.defineProperty(el,'value',{get(){return el.textContent;},set(v){el.textContent=v==null?'':String(v);}});});
 const DEFAULT_KEYS=['a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m'];
 
 /* ---- events bundled with this file (loads automatically on first open) ---- */
@@ -1580,7 +1587,7 @@ function renderTable(){
       // single event: "<player_from> <event> <player_to>", numbers/event editable by double-click
       const pf=`<span class="pnum ed" data-edit="from" title="Double-click to edit">${r.playerFrom||'—'}</span>`;
       const pt=r.playerTo?` <span class="pnum ed" data-edit="to" title="Double-click to edit">${r.playerTo}</span>`:'';
-      const evSpan=`<span class="evt ${evClass} ed-ev" title="Double-click: type a hotkey to change the event">${r.event}</span>`;
+      const evSpan=`<span class="evt ${evClass} ed-ev" title="Double-click: type a hotkey to change the event">#${r.event}</span>`;
       combined=`${pf} ${evSpan}${pt}`;
     }
     const blank='<td class="blank"></td>';
