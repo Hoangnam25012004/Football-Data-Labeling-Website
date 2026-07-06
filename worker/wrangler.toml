@@ -4,9 +4,10 @@ compatibility_date = "2024-09-01"
 
 # Non-secret config. Fill these in with your own values.
 [vars]
-R2_ACCOUNT_ID  = "YOUR_CLOUDFLARE_ACCOUNT_ID"
-R2_BUCKET      = "YOUR_BUCKET_NAME"
+R2_ACCOUNT_ID  = "3e1025b807b311195e822c7f2d21f7d4"
+R2_BUCKET      = "football-videos"
 # Public base URL of the bucket: either the r2.dev dev URL or your custom domain.
+# TODO: paste the URL you got from "Public Development URL -> Enable" here (https://pub-XXXX.r2.dev)
 R2_PUBLIC_BASE = "https://pub-XXXXXXXX.r2.dev"
 # Lock the presign endpoint to your site's origin ("*" allows any origin — fine for testing).
 ALLOW_ORIGIN   = "https://hoangnam25012004.github.io"
