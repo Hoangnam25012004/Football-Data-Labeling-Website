@@ -1713,16 +1713,20 @@ function cancelEdit(){                     // leave edit mode without changing t
   state.editingId=null; state.editingGroup=null; state.pendingDots=[];
   if(pvRedraw)pvRedraw(); renderTable();
 }
-/* one chain entry -> one display line: "17 #pass fail 7 #ground duel fail"
-   (numbers are not repeated when consecutive events share a player) */
+/* one chain entry -> one display line: "17 #corner-kick #cross success #key pass 14 #shot on target".
+   Rows are grouped by touch (same player_from): the player number prints once,
+   then ALL of that touch's events, and only then the receiver number — so solo
+   events sitting next to a transfer don't re-print the passer's number. */
 function chainHTML(grpRows,evClass){
-  let html='',cur=null;
-  grpRows.forEach(r=>{
-    const f=r.playerFrom||'';
-    if(f&&f!==cur){html+=(html?' ':'')+`<span class="pnum">${f}</span>`;cur=f;}
-    html+=` <span class="evt ${evClass}">#${r.event}</span>`;
-    if(r.playerTo){html+=` <span class="pnum">${r.playerTo}</span>`;cur=r.playerTo;}
-  });
+  let html='', printed=null, i=0;
+  while(i<grpRows.length){
+    const from=grpRows[i].playerFrom||'';
+    const run=[]; while(i<grpRows.length&&(grpRows[i].playerFrom||'')===from){run.push(grpRows[i]);i++;}
+    if(from&&from!==printed){html+=(html?' ':'')+`<span class="pnum">${from}</span>`;printed=from;}
+    let to=null;
+    run.forEach(r=>{html+=` <span class="evt ${evClass}">#${r.event}</span>`; if(r.playerTo)to=r.playerTo;});
+    if(to){html+=` <span class="pnum">${to}</span>`;printed=to;}
+  }
   return html;
 }
 // delete one or several rows (a whole chain) locally + in the cloud
@@ -2249,6 +2253,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=35"></script>
+<script src="cloud-sync.js?v=36"></script>
 </body>
 </html>
