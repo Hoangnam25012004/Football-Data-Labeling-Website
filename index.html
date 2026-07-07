@@ -356,10 +356,13 @@
 
     <div class="tbl-head">
       <div><b>Events</b> <span class="count" id="count">0</span></div>
-      <select id="halfSel" class="txt" style="width:auto;margin-left:10px">
-        <option value="1">1st Half</option>
-        <option value="2">2nd Half</option>
-      </select>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="ev-btn" id="fmBtn" title="Formation theo từng thời điểm của cả 2 đội">⛨ Formation</button>
+        <select id="halfSel" class="txt" style="width:auto">
+          <option value="1">1st Half</option>
+          <option value="2">2nd Half</option>
+        </select>
+      </div>
     </div>
     <div class="tbl-scroll">
       <table id="tbl">
@@ -597,6 +600,29 @@
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="fmModal">
+  <div class="modal lineup-modal">
+    <div class="modal-head">
+      <b>Formation theo thời điểm</b>
+      <div class="stats-toggle">
+        <button id="fmHomeBtn">Home</button>
+        <button id="fmAwayBtn">Away</button>
+      </div>
+      <button class="modal-close" id="fmModalClose" title="Close">×</button>
+    </div>
+    <div class="modal-body lineup-body">
+      <div class="lu-left">
+        <label class="fld"><span>Các giai đoạn formation <span class="mini">— click để xem/chỉnh</span></span></label>
+        <div class="lu-roster" id="fmPeriods"></div>
+        <button class="addbtn" id="fmSnapBtn" title="Chụp formation đang hiệu lực tại thời điểm video hiện tại thành một giai đoạn mới">＋ Lưu formation tại thời điểm video</button>
+      </div>
+      <div class="lu-right">
+        <div class="lu-pitchwrap"><div class="lu-pitch" id="fmEditPitch"></div></div>
+        <div class="lu-subs"><b>Substitutes</b><div id="fmModalSubs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:20px"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -731,6 +757,7 @@ function applyCloudLineups(l){
   state.lineups=l;
   try{localStorage.setItem(LU_STORE,JSON.stringify(l));}catch(e){}
   if($('lineupModal')&&$('lineupModal').classList.contains('show'))renderLineup();
+  if($('fmModal')&&$('fmModal').classList.contains('show'))renderFmModal();
   refreshFormation();
 }
 /* position-zone grid (6 cols x 3 rows). Canonical: attacking LEFT, GK on the right. */
@@ -837,8 +864,11 @@ function renderFormationMain(){
     return;
   }
   const flip=+($('halfSel')&&$('halfSel').value||1)===2;   // teams swap ends at half-time
-  // only the SELECTED team's formation is shown (Home / Away segment above the entry box)
-  const team=state.team, t=state.lineups[team];
+  // only the SELECTED team's formation is shown (Home / Away segment above the entry box),
+  // as effective at the current video time (substitution snapshots switch it live)
+  const team=state.team;
+  const now=video&&video.src?video.currentTime:Number.MAX_SAFE_INTEGER;
+  const t=effectiveLU(team,now);
   const dir=flip?(t.dir==='lr'?'rl':'lr'):(t.dir||'lr');
   // attacking-direction label (arrow follows the current half)
   const name=team==='home'?($('homeName').value||'Home'):($('awayName').value||'Away');
@@ -856,12 +886,14 @@ function renderFormationMain(){
   });
   renderFormationSubs();
 }
-// substitutes bar above the pitch (selected team only, matching the formation)
+// substitutes bar above the pitch (selected team only, matching the effective formation)
 function renderFormationSubs(){
   const el=$('fmSubs'); if(!el)return;
   let h='';
-  const team=state.team, t=state.lineups[team];
-  t.subs.forEach(no=>{const p=t.roster.find(r=>r.no===no);
+  const team=state.team;
+  const now=video&&video.src?video.currentTime:Number.MAX_SAFE_INTEGER;
+  const t=effectiveLU(team,now);
+  t.subs.forEach(no=>{const p=t.roster.find(r=>String(r.no)===String(no));
     h+=`<span class="fm-sub ${team}"><b>${no}</b>${p&&p.name?p.name:''}</span>`;});
   el.innerHTML=h||'<span class="fm-sub-empty">No substitutes</span>';
 }
@@ -1027,6 +1059,13 @@ function fmt(t){const m=Math.floor(t/60),s=Math.floor(t%60),cs=Math.floor((t%1)*
 video.addEventListener('loadedmetadata',()=>{seek.max=video.duration});
 video.addEventListener('timeupdate',()=>{seek.value=video.currentTime;
   $('tcode').textContent=state.duration.enabled?'⚽ '+fmt(matchTime(video.currentTime)):fmt(video.currentTime)});
+// re-render the formation panel only when the video crosses a substitution snapshot boundary
+let fmSig='';
+video.addEventListener('timeupdate',()=>{
+  const t=video.currentTime;
+  const sig=((state.lineups.history||[]).filter(h=>h.team===state.team&&h.t<=t).length)+'';
+  if(sig!==fmSig){fmSig=sig;refreshFormation();}
+});
 seek.addEventListener('input',()=>{video.currentTime=+seek.value});
 $('playBtn').onclick=()=>{video.paused?video.play():video.pause()};
 video.addEventListener('play',()=>$('playBtn').textContent='⏸');
@@ -1414,13 +1453,19 @@ function submitEntry(){
     touches=Math.min(nums.length,2);
   }
   const dots=state.pendingDots;
-  const isSub=evs.length===1&&evs[0].name==='substitution';
-  // dots: one per ball touch (number), in order. A FINAL failed pass/cross needs one
-  // extra dot — where the opponent took the ball. Substitution needs no dots.
+  // substitutions: "38sub6*27sub43" = several pairs in one entry. They may not be
+  // mixed with other events; dots are optional, but if placed there must be ONE
+  // per pair — at the position of the player COMING OFF (gives time + spot).
+  const allSubs=evs.length>0&&evs.every(e=>e.name==='substitution');
+  if(!allSubs&&evs.some(e=>e.name==='substitution')){
+    alert('Không trộn substitution với event khác trong một lần nhập.');return}
   const last=evs[evs.length-1];
-  const needExtra=(!isSub&&last&&!last.to&&TRAILING_EXTRA_DOT.has(last.name))?1:0;
+  const needExtra=(!allSubs&&last&&!last.to&&TRAILING_EXTRA_DOT.has(last.name))?1:0;
   const need=touches+needExtra;
-  if(!isSub&&touches>0&&dots.length!==need){
+  if(allSubs){
+    if(dots.length!==0&&dots.length!==evs.length){
+      alert('Thay người: chấm '+evs.length+' dots tại vị trí cầu thủ bị thay RA (hoặc không chấm dot).');return}
+  }else if(touches>0&&dots.length!==need){
     alert('Cần kiểm tra lại dots — cần '+need+' dots: '+touches+' lần chạm bóng'
       +(needExtra?' + 1 dot tại thời điểm đối phương đoạt bóng':'')+'.');return}
   // editing updates ONE row in place — chains can't map onto a single row
@@ -1437,9 +1482,10 @@ function submitEntry(){
   // (each still stored as its own row/event in Supabase)
   const grpId=evs.length>1?newId():null;
   let lastRow=null;
-  evs.forEach(ev=>{
-    const pD=ev.fromIdx!=null?dots[ev.fromIdx]:(touches===0?dots[0]:null);
-    const rIdx=ev.toIdx!=null?ev.toIdx:((ev===last&&needExtra)?touches:null);
+  evs.forEach((ev,k)=>{
+    // substitutions map dot k -> pair k (position of the outgoing player); no receiver dot
+    const pD=allSubs?(dots[k]||null):(ev.fromIdx!=null?dots[ev.fromIdx]:(touches===0?dots[0]:null));
+    const rIdx=allSubs?null:(ev.toIdx!=null?ev.toIdx:((ev===last&&needExtra)?touches:null));
     const rD=rIdx!=null?dots[rIdx]:null;
     const existing=state.editingId?state.rows.find(r=>r.id===state.editingId):null;
     // timeline = the moment that touch's dot was placed (else the edited row's / current time)
@@ -1462,34 +1508,160 @@ function submitEntry(){
   scrollToRow=lastRow;
   renderTable();
   toast(evs.length>1?(evs.length+' events ✓'):(evs[0].name+' ✓'));
-  // "15sub3" = 15 out, 3 in -> auto-update the lineup and open the formation editor
-  if(!wasEditing&&isSub&&evs[0].from&&evs[0].to)applySubstitution(state.team,evs[0].from,evs[0].to,lastRow.t);
+  // substitutions -> new formation snapshot from this moment (the starting lineup
+  // in Player lists stays untouched). Dot = where the OUT player stood; stored in
+  // half-1 orientation, so a 2nd-half dot is mirrored back to canonical coords.
+  if(!wasEditing&&allSubs&&evs.every(e=>e.from&&e.to)){
+    const subsArr=evs.map((ev,k)=>{
+      const dk=dots[k]||null, t=dk?dk.t:lastRow.t;
+      const pos=dk?(eventHalf({t})===2?{x:100-dk.x,y:dk.y}:{x:dk.x,y:dk.y}):null;
+      return {out:ev.from,in:ev.to,t,pos};
+    });
+    applySubGroup(state.team,subsArr);
+  }
   state.activeEvent=evs[evs.length-1].name; renderEvents(); updateBanner();
   $('playerInput').value='';
   if(document.hasFocus())$('playerInput').focus(); // don't yank focus when typing from the video window
   if(pvSyncEntry)pvSyncEntry();
 }
-/* substitution "OUTsubIN" (e.g. 15sub3): OUT leaves the XI for the bench, IN takes OUT's
-   spot on the pitch, and the formation editor opens so the new shape can be arranged.
-   The moment of the swap (row.t) is kept on the lineup for per-player minutes. */
-function applySubstitution(team,outNo,inNo,t){
-  const lu=state.lineups[team], eq=(a,b)=>String(a)===String(b);
-  const inP=lu.roster.find(p=>eq(p.no,inNo));
-  if(!inP) toast('⚠ Số '+inNo+' chưa có trong danh sách trận — thêm ở Player lists');
-  const xiIdx=lu.xi.findIndex(x=>eq(x.no,outNo));
-  if(xiIdx<0 && !lu.roster.some(p=>eq(p.no,outNo)))
-    toast('⚠ Số '+outNo+' không có trong đội hình xuất phát');
-  const spot=xiIdx>=0?lu.xi[xiIdx]:{x:50,y:50,pos:''};   // IN inherits OUT's position first
-  if(xiIdx>=0)lu.xi.splice(xiIdx,1);
-  if(!lu.subs.some(n=>eq(n,outNo)))lu.subs.push(String(outNo));   // OUT -> bench
-  lu.subs=lu.subs.filter(n=>!eq(n,inNo));                         // IN -> off the bench
-  if(!lu.xi.some(x=>eq(x.no,inNo)))
-    lu.xi.push({no:inP?inP.no:String(inNo),x:spot.x,y:spot.y,pos:spot.pos});
-  (lu.subHistory=lu.subHistory||[]).push({out:String(outNo),in:String(inNo),t});
-  saveLineups();
-  window.open(subPageUrl('Player-Lists'),'pt-players');   // re-arrange the formation at this moment
-  toast('Thay người: '+outNo+' ▼  '+inNo+' ▲ — sắp xếp lại formation');
+/* ===== FORMATION HISTORY =====
+   lineups.home/away keep the STARTING formation (what Player lists edits).
+   Every substitution moment appends a snapshot to lineups.history:
+   {t, team, xi, subs, label} — the formation valid FROM that time on.
+   The main-tab pitch always shows the formation effective at the video time. */
+function effectiveLU(team,t){
+  const lu=state.lineups[team];
+  const hist=(state.lineups.history||[]).filter(h=>h.team===team&&h.t<=t).sort((a,b)=>a.t-b.t);
+  const last=hist[hist.length-1];
+  return last?{xi:last.xi,subs:last.subs,dir:lu.dir,roster:lu.roster}
+             :{xi:lu.xi,subs:lu.subs,dir:lu.dir,roster:lu.roster};
 }
+/* apply one entry's substitutions ("38sub6*27sub43") as ONE new snapshot:
+   OUT -> bench, IN takes the dot position (or OUT's old spot). The starting
+   lineup stays untouched — Player lists keeps showing the original XI. */
+function applySubGroup(team,subsArr){
+  const lu=state.lineups[team], eq=(a,b)=>String(a)===String(b);
+  const t0=Math.min(...subsArr.map(s=>s.t));
+  const eff=effectiveLU(team,t0);
+  const xi=eff.xi.map(x=>({...x})), bench=eff.subs.slice();
+  subsArr.forEach(s=>{
+    if(!lu.roster.some(p=>eq(p.no,s.in)))toast('⚠ Số '+s.in+' chưa có trong danh sách trận — thêm ở Player lists');
+    const i=xi.findIndex(x=>eq(x.no,s.out));
+    if(i<0)toast('⚠ Số '+s.out+' không có trên sân tại thời điểm này');
+    const spot=s.pos||(i>=0?{x:xi[i].x,y:xi[i].y}:{x:50,y:50});
+    if(i>=0)xi.splice(i,1);
+    if(!bench.some(n=>eq(n,s.out)))bench.push(String(s.out));       // OUT -> bench
+    const bi=bench.findIndex(n=>eq(n,s.in)); if(bi>=0)bench.splice(bi,1); // IN -> off the bench
+    if(!xi.some(x=>eq(x.no,s.in)))
+      xi.push({no:String(s.in),x:spot.x,y:spot.y,pos:zoneAt(spot.x,spot.y,lu.dir||'lr')});
+    (lu.subHistory=lu.subHistory||[]).push({out:String(s.out),in:String(s.in),t:s.t}); // minutes played
+  });
+  (state.lineups.history=state.lineups.history||[]).push({
+    t:t0, team, xi, subs:bench,
+    label:'Thay người: '+subsArr.map(s=>s.out+'▼ '+s.in+'▲').join(', ')});
+  state.lineups.history.sort((a,b)=>a.t-b.t);
+  saveLineups();
+  openFmModal(team);   // fine-tune the NEW period here (Player lists keeps the original)
+  toast('Thay người '+subsArr.map(s=>s.out+'▼'+s.in+'▲').join(' ')+' — chỉnh formation mới nếu cần');
+}
+
+/* ===== FORMATION MODAL — view/adjust each period's formation, both teams ===== */
+let fmTeam='home', fmSel=-1;   // fmSel: -1 = starting formation, >=0 = index into this team's history
+function fmTeamHistory(){return (state.lineups.history||[]).filter(h=>h.team===fmTeam);}
+function fmSelected(){          // -> {xi,subs,label,t,editableHere}
+  const lu=state.lineups[fmTeam], hist=fmTeamHistory();
+  if(fmSel>=0&&hist[fmSel])return hist[fmSel];
+  return {t:0,xi:lu.xi,subs:lu.subs,label:'Đội hình xuất phát'};
+}
+function openFmModal(team){
+  if(team)fmTeam=team;
+  fmSel=fmTeamHistory().length-1;              // land on the latest period
+  $('fmModal').classList.add('show');
+  renderFmModal();
+}
+function renderFmModal(){
+  $('fmHomeBtn').className=fmTeam==='home'?'act-home':'';
+  $('fmAwayBtn').className=fmTeam==='away'?'act-away':'';
+  $('fmHomeBtn').textContent=$('homeName').value||'Home';
+  $('fmAwayBtn').textContent=$('awayName').value||'Away';
+  const hist=fmTeamHistory(), box=$('fmPeriods'); box.innerHTML='';
+  if(fmSel>=hist.length)fmSel=hist.length-1;
+  // period rows: start – end, label; the starting formation first
+  const periods=[{t:0,label:'Đội hình xuất phát',hIdx:-1},...hist.map((h,i)=>({t:h.t,label:h.label||'Snapshot',hIdx:i}))];
+  periods.forEach((p,i)=>{
+    const end=i+1<periods.length?fmt(matchTime(periods[i+1].t)):'hết trận';
+    const row=document.createElement('div'); row.className='lu-prow';
+    row.style.cursor='pointer';
+    if(p.hIdx===fmSel)row.style.borderColor='var(--accent)';
+    row.innerHTML=`<span class="num">${fmt(matchTime(p.t)).slice(0,5)}</span>
+      <span class="pname">${p.label}<br><span style="color:var(--mut);font-size:10px">${fmt(matchTime(p.t))} → ${end}</span></span>`;
+    row.onclick=()=>{fmSel=p.hIdx;renderFmModal();};
+    if(p.hIdx>=0){
+      const rm=document.createElement('button'); rm.className='rm'; rm.textContent='×';
+      rm.title='Xoá giai đoạn này';
+      rm.onclick=e=>{e.stopPropagation();
+        const gi=(state.lineups.history||[]).indexOf(hist[p.hIdx]);
+        if(gi>=0)state.lineups.history.splice(gi,1);
+        if(fmSel>=p.hIdx)fmSel--;
+        saveLineups(); renderFmModal();};
+      row.appendChild(rm);
+    }
+    box.appendChild(row);
+  });
+  // editable pitch for the selected period
+  const sel=fmSelected(), lu=state.lineups[fmTeam], pit=$('fmEditPitch');
+  pit.innerHTML=pitchSVG('football')+gridHTML(lu.dir||'lr');
+  sel.xi.forEach(x=>{
+    const p=lu.roster.find(r=>String(r.no)===String(x.no));
+    const dot=document.createElement('div');
+    dot.className='lu-dot'+(fmTeam==='away'?' away':'');
+    dot.style.left=x.x+'%'; dot.style.top=x.y+'%';
+    dot.innerHTML=`${x.no}<span class="lbl">${p?(p.name||''):''}</span>`;
+    fmDrag(dot,x,lu.dir||'lr'); pit.appendChild(dot);
+  });
+  const subsEl=$('fmModalSubs'); subsEl.innerHTML='';
+  sel.subs.forEach(no=>{const p=lu.roster.find(r=>String(r.no)===String(no));
+    const c=document.createElement('span'); c.className='lu-chip';
+    c.innerHTML=`<span class="num">${no}</span>${p?(p.name||''):''}`; subsEl.appendChild(c);});
+}
+// drag a formation dot inside the modal — mutates the snapshot (or the starting XI)
+function fmDrag(dot,x,dir){
+  dot.onpointerdown=e=>{
+    e.preventDefault(); dot.setPointerCapture(e.pointerId); dot.style.cursor='grabbing';
+    const pit=$('fmEditPitch');
+    const move=ev=>{const r=pit.getBoundingClientRect();
+      x.x=Math.max(0,Math.min(100,(ev.clientX-r.left)/r.width*100));
+      x.y=Math.max(0,Math.min(100,(ev.clientY-r.top)/r.height*100));
+      x.pos=zoneAt(x.x,x.y,dir);
+      dot.style.left=x.x+'%'; dot.style.top=x.y+'%';};
+    const up=()=>{dot.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);
+      saveLineups(); renderFmModal();};
+    document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
+  };
+}
+$('fmBtn').onclick=()=>{
+  if(!state.teamIds.matchId){alert('Mở một trận đấu trước (☁ Cloud).');return}
+  openFmModal(state.team);
+};
+$('fmHomeBtn').onclick=()=>{fmTeam='home';fmSel=fmTeamHistory().length-1;renderFmModal();};
+$('fmAwayBtn').onclick=()=>{fmTeam='away';fmSel=fmTeamHistory().length-1;renderFmModal();};
+$('fmModalClose').onclick=()=>$('fmModal').classList.remove('show');
+$('fmModal').addEventListener('click',e=>{if(e.target===$('fmModal'))$('fmModal').classList.remove('show');});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('fmModal').classList.contains('show')){e.preventDefault();$('fmModal').classList.remove('show');}});
+// snapshot the formation effective at the current video time as a new period
+$('fmSnapBtn').onclick=()=>{
+  const t=video.src?video.currentTime:0;
+  const eff=effectiveLU(fmTeam,t);
+  (state.lineups.history=state.lineups.history||[]).push({
+    t, team:fmTeam,
+    xi:eff.xi.map(x=>({...x})), subs:eff.subs.slice(),
+    label:'Lưu tay @ '+fmt(matchTime(t))});
+  state.lineups.history.sort((a,b)=>a.t-b.t);
+  saveLineups();
+  fmSel=fmTeamHistory().findIndex(h=>h.t===t&&h.label.startsWith('Lưu tay'));
+  renderFmModal();
+  toast('Đã lưu formation tại '+fmt(matchTime(t))+' ✓');
+};
 let scrollToRow=null;
 /* pull an existing event back into the editor: restore its syntax + dots so it can be re-tagged.
    Submitting (Enter) then updates that same event in place (keeps its id). */
@@ -2077,6 +2249,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=34"></script>
+<script src="cloud-sync.js?v=35"></script>
 </body>
 </html>
