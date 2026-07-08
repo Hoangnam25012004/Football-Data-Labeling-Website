@@ -44,6 +44,19 @@ table.stats td.no,table.stats th.no{font-weight:700;color:var(--accent);backgrou
 table.stats tbody tr:hover td{background:#1c233066}
 .stats-empty{padding:24px;text-align:center;color:var(--mut)}
 
+/* stats charts (Shooting donut + Distribution scatter) */
+.chart-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.chart-title{font-weight:700;font-size:13px;margin-bottom:10px}
+.donut-wrap{display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.donut-svg{flex:none}
+.donut-legend{display:flex;flex-direction:column;gap:9px;min-width:240px;flex:1}
+.leg-row{display:flex;align-items:center;gap:9px;font-size:13px}
+.leg-dot{width:11px;height:11px;border-radius:50%;flex:none}
+.leg-lbl{color:var(--mut)}
+.leg-val{margin-left:auto;font-weight:700;color:var(--ink);display:flex;gap:10px;align-items:baseline}
+.leg-sub{color:var(--mut);font-weight:600;font-size:12px}
+.scatter-wrap{overflow-x:auto}
+
 /* pass distribution matrix */
 .pm-title{font-weight:700;margin:16px 0 6px;font-size:13px}
 .pm-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;max-height:60vh}

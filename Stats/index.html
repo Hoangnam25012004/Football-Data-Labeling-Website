@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stats — Pitch Tagger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="../shared.css">
+<link rel="stylesheet" href="../shared.css?v=2">
 </head>
 <body>
 <header>
@@ -76,8 +76,68 @@ function renderStats(){
   const head='<th class="no">No</th>'+cols.map(c=>`<th>${c[0]}</th>`).join('');
   const body=players.map(no=>'<tr><td class="no">'+no+'</td>'
     +cols.map(c=>`<td>${c[1](P[no])}</td>`).join('')+'</tr>').join('');
-  holder.innerHTML=`<table class="stats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
+  // per-category chart on top: Shooting -> donut, Distribution -> pass scatter
+  const chart = statCat==='shooting' ? shootingChartHTML(statTeam)
+              : statCat==='distribution' ? passScatterHTML(statTeam) : '';
+  holder.innerHTML=chart
+    +`<table class="stats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
     +(statCat==='distribution'?passMatrixHTML(statTeam):'');   // pass matrix lives in Distribution
+}
+/* ---- Shooting: donut of Goals / On-target / Off-target+Blocked (image 1) ---- */
+function arcPath(cx,cy,rr,a0,a1){
+  const p=a=>[cx+rr*Math.cos(a),cy+rr*Math.sin(a)];
+  const [x0,y0]=p(a0),[x1,y1]=p(a1), large=(a1-a0)>Math.PI?1:0;
+  return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${rr} ${rr} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+function shootingChartHTML(team){
+  const s=sumTeam(rows,team), total=s.totalShots;
+  const name=team==='home'?meta.home:meta.away, teamColor=team==='home'?'var(--home)':'var(--away)';
+  if(!total)return `<div class="chart-card"><div class="chart-title" style="color:${teamColor}">${name} — Shooting</div><div class="stats-empty">No shots yet.</div></div>`;
+  const goals=s.goals, onNon=Math.max(0,s.shotsOn-s.goals), off=s.shotsOff+s.shotsBlocked;
+  const segs=[['Goals',goals,'#f7b32f'],['On Target',onNon,'#39d98a'],['Off Target / Blocked',off,'#8b97a7']];
+  const cx=90,cy=90,rr=62,thick=26; let a=-Math.PI/2, ring='';
+  segs.forEach(([lbl,val,col])=>{
+    if(val<=0)return;
+    const frac=val/total, a1=a+frac*2*Math.PI;
+    ring += frac>=0.9999
+      ? `<circle cx="${cx}" cy="${cy}" r="${rr}" fill="none" stroke="${col}" stroke-width="${thick}"/>`
+      : `<path d="${arcPath(cx,cy,rr,a,a1)}" fill="none" stroke="${col}" stroke-width="${thick}"/>`;
+    a=a1;
+  });
+  const svg=`<svg viewBox="0 0 180 180" width="170" height="170">${ring}`
+    +`<text x="${cx}" y="${cy-6}" text-anchor="middle" font-size="13" fill="var(--mut)">Goals</text>`
+    +`<text x="${cx}" y="${cy+26}" text-anchor="middle" font-size="36" font-weight="800" fill="var(--ink)">${goals}</text></svg>`;
+  const legend=
+     `<div class="leg-row"><span class="leg-lbl">Total Shots</span><span class="leg-val">${total}</span></div>`
+    +`<div class="leg-row"><span class="leg-dot" style="background:#f7b32f"></span><span class="leg-lbl">Goals</span><span class="leg-val">${goals}</span></div>`
+    +`<div class="leg-row"><span class="leg-dot" style="background:#39d98a"></span><span class="leg-lbl">On Target</span><span class="leg-val">${pct(s.shotsOn,total)}<span class="leg-sub">${s.shotsOn}/${total}</span></span></div>`
+    +`<div class="leg-row"><span class="leg-dot" style="background:#8b97a7"></span><span class="leg-lbl">Off Target / Blocked</span><span class="leg-val"><span class="leg-sub">${off}/${total}</span></span></div>`;
+  return `<div class="chart-card"><div class="chart-title" style="color:${teamColor}">${name} — Shooting</div>`
+    +`<div class="donut-wrap"><div class="donut-svg">${svg}</div><div class="donut-legend">${legend}</div></div></div>`;
+}
+/* ---- Distribution: each player a bubble at (pass accuracy %, pass volume) (image 2) ---- */
+function passScatterHTML(team){
+  const P=computeStats(rows,team), name=team==='home'?meta.home:meta.away;
+  const teamColor=team==='home'?'var(--home)':'var(--away)', fill=team==='home'?'#2f81f7':'#f7682f';
+  const players=sortedPlayers(P).filter(no=>P[no].passes>0);
+  if(!players.length)return `<div class="chart-card"><div class="chart-title" style="color:${teamColor}">${name} · Passes by Volume &amp; Accuracy</div><div class="stats-empty">No passes yet.</div></div>`;
+  const W=680,H=300,mL=44,mR=22,mT=18,mB=36, maxVol=Math.max(...players.map(no=>P[no].passes));
+  const X=acc=>mL+(acc/100)*(W-mL-mR), Y=vol=>H-mB-(maxVol?vol/maxVol:0)*(H-mT-mB);
+  let g=`<rect x="${mL}" y="${mT}" width="${W-mL-mR}" height="${H-mT-mB}" fill="none" stroke="var(--line)"/>`;
+  g+=`<line x1="${X(50)}" y1="${mT}" x2="${X(50)}" y2="${H-mB}" stroke="var(--line)" stroke-dasharray="4 4"/>`;
+  g+=`<line x1="${mL}" y1="${Y(maxVol/2)}" x2="${W-mR}" y2="${Y(maxVol/2)}" stroke="var(--line)" stroke-dasharray="4 4"/>`;
+  g+=`<text x="${mL}" y="${H-10}" font-size="11" fill="var(--mut)">0%</text>`;
+  g+=`<text x="${X(50)}" y="${H-10}" text-anchor="middle" font-size="11" fill="var(--mut)">Pass Accuracy →</text>`;
+  g+=`<text x="${W-mR}" y="${H-10}" text-anchor="end" font-size="11" fill="var(--mut)">100%</text>`;
+  g+=`<text x="10" y="${mT+10}" font-size="11" fill="var(--mut)">↑ Volume</text>`;
+  const bubbles=players.map(no=>{
+    const s=P[no], acc=s.passes?s.passesComp/s.passes*100:0, rr=9+(s.passes/maxVol)*11;
+    const cx=X(acc), cy=Y(s.passes);
+    return `<g><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${rr.toFixed(1)}" fill="${fill}" fill-opacity="0.92" stroke="#0d1117" stroke-width="1.5"/>`
+      +`<text x="${cx.toFixed(1)}" y="${(cy+3.5).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${no}</text></g>`;
+  }).join('');
+  return `<div class="chart-card"><div class="chart-title" style="color:${teamColor}">${name} · Passes by Volume &amp; Accuracy</div>`
+    +`<div class="scatter-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:${W}px">${g}${bubbles}</svg></div></div>`;
 }
 function passMatrixHTML(team){
   const {players,mtx}=passMatrix(rows,team);
