@@ -1498,15 +1498,19 @@ function submitEntry(){
   }else if(touches>0&&dots.length!==need){
     alert('Cần kiểm tra lại dots — cần '+need+' dots: '+touches+' lần chạm bóng'
       +(needExtra?' + 1 dot tại thời điểm đối phương đoạt bóng':'')+'.');return}
-  // editing updates ONE row in place — chains can't map onto a single row
-  if(state.editingId&&evs.length>1){alert('Đang sửa 1 event — chỉ nhập 1 event (không dùng chuỗi).');return}
   const wasEditing=!!state.editingId||!!state.editingGroup;
-  // re-editing a chain: replace the whole old group with the new batch
-  if(state.editingGroup){
-    const old=state.rows.filter(r=>r.grp===state.editingGroup);
-    state.rows=state.rows.filter(r=>r.grp!==state.editingGroup);
-    old.forEach(r=>window.Cloud&&window.Cloud.onLocalDelete(r.id));
-    state.editingGroup=null;
+  // A single-event edit that STAYS a single event updates the row in place (keeps its id).
+  // Anything else while editing — a single event that becomes a chain (e.g. 1s2 -> 1s2m /
+  // 1s2s3), or re-editing an existing chain — deletes the old row(s) and creates the new
+  // batch fresh (a chain can't map onto one row / keep a single id).
+  const editInPlace=state.editingId&&evs.length===1;
+  if(state.editingGroup||(state.editingId&&!editInPlace)){
+    const ids=state.editingGroup
+      ? state.rows.filter(r=>r.grp===state.editingGroup).map(r=>r.id)
+      : [state.editingId];
+    state.rows=state.rows.filter(r=>!ids.includes(r.id));
+    ids.forEach(id=>window.Cloud&&window.Cloud.onLocalDelete(id));
+    state.editingId=null; state.editingGroup=null;
   }
   // events born from ONE entry share a group id -> shown as ONE line in the table
   // (each still stored as its own row/event in Supabase)
