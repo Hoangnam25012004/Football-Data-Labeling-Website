@@ -1452,13 +1452,13 @@ $('playerInput').addEventListener('keydown',e=>{
   if(e.code==='ArrowLeft'){e.preventDefault();$('back2').click();return}
   if(e.code==='ArrowRight'){e.preventDefault();$('fwd2').click();return}
   if(e.key==='Enter'){e.preventDefault();submitEntry();return}
-  // while editing: Esc removes ONE dot at a time (so you can re-place them); once no
-  // dots remain, the next Esc exits edit mode. stopPropagation so the document-level
-  // Esc handler doesn't also pop a dot (which would remove two per press).
+  // while editing: Esc ALWAYS just removes one dot (never clears the entry text or exits
+  // edit mode) — same behaviour whether Esc is pressed here or in the video window.
+  // To leave edit mode, clear the box instead. stopPropagation so the document-level Esc
+  // handler doesn't also pop a dot (which would remove two per press).
   if(e.key==='Escape'&&(state.editingId||state.editingGroup)){
     e.preventDefault(); e.stopPropagation();
-    if(state.pendingDots.length){undoLastDot();}
-    else{$('playerInput').value='';cancelEdit();}
+    undoLastDot();
     if(pvSyncEntry)pvSyncEntry(); return;
   }
 });
