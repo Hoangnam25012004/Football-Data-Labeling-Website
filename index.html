@@ -1296,12 +1296,26 @@ window.addEventListener('beforeunload',()=>{if(vidWin&&!vidWin.closed)vidWin.clo
 const focusEntryIfDocked=()=>{if(video.ownerDocument===document)setTimeout(()=>$('playerInput').focus(),0);};
 video.addEventListener('click',focusEntryIfDocked);
 video.addEventListener('play',focusEntryIfDocked);
-// right-click (or any non-left button) on the video must NOT pause/resume it or open
-// the media menu — Space is the pause key. The same node moves into the popup window,
-// so these listeners cover both the docked and the popped-out video.
+// clicks on the video must NOT pause/resume it — Space is the pause key. The same
+// node moves into the popup window, so these listeners cover docked AND popped-out.
+// Right-click / middle-click: fully blocked (no toggle, no media menu).
 ['contextmenu','auxclick'].forEach(ev=>video.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();}));
 video.addEventListener('pointerdown',e=>{if(e.button!==0){e.preventDefault();e.stopPropagation();}});
 video.addEventListener('mousedown',e=>{if(e.button!==0){e.preventDefault();e.stopPropagation();}});
+// Left-click on the video SURFACE: cancel Chrome's play/pause toggle, and if the
+// browser toggled anyway, restore the pre-click state. Clicks on the native control
+// bar (bottom strip ~60px) are left untouched so seeking/volume/fullscreen still work.
+let surfacePausedBefore=null;
+const onControlBar=e=>{const r=video.getBoundingClientRect();return e.clientY>r.bottom-60;};
+video.addEventListener('pointerdown',e=>{
+  if(e.button===0&&!onControlBar(e))surfacePausedBefore=video.paused;
+});
+video.addEventListener('click',e=>{
+  if(onControlBar(e)){surfacePausedBefore=null;return;}
+  e.preventDefault();
+  const want=surfacePausedBefore; surfacePausedBefore=null;
+  if(want!==null)setTimeout(()=>{if(video.paused!==want){want?video.pause():video.play();}},0);
+});
 
 /* TEAM */
 function setTeam(t){state.team=t;$('segHome').className=t==='home'?'act-home':'';$('segAway').className=t==='away'?'act-away':'';
@@ -2259,6 +2273,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=37"></script>
+<script src="cloud-sync.js?v=38"></script>
 </body>
 </html>
