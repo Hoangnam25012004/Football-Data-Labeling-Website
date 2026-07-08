@@ -1714,13 +1714,18 @@ function startEditGroup(grpRows){
   state.editingId=null; state.editingGroup=grpRows[0].grp;
   setTeam(grpRows[0].team);
   $('playerInput').value=grpRows[0].raw||'';
-  // rebuild the ordered touch dots — consecutive rows share dots (row N's receiver
-  // dot IS row N+1's player dot), so skip a dot identical to the last one pushed
-  const dots=[];
+  // rebuild the ordered touch dots. Multiple rows can point at the SAME physical
+  // touch dot — consecutive chain rows (row N's receiver IS row N+1's player), and
+  // also several solo '*' events sharing one player's dot with a transfer row's
+  // dot interleaved in between (e.g. "12k*c*9*aa 5aa*ddd"). So de-dup by an
+  // (x,y,t) key across ALL dots seen so far, not just the last one pushed —
+  // comparing only to the last dot missed re-occurrences of an earlier touch's
+  // dot once another touch's dot had been pushed in between, inflating the count.
+  const dots=[], seen=new Set();
   const push=(pt,t)=>{if(!pt)return;
-    const last=dots[dots.length-1];
-    if(last&&last.x===pt.x&&last.y===pt.y&&last.t===t)return;
-    dots.push({x:pt.x,y:pt.y,t});};
+    const k=pt.x+','+pt.y+','+t;
+    if(seen.has(k))return;
+    seen.add(k); dots.push({x:pt.x,y:pt.y,t});};
   grpRows.forEach(r=>{push(r.pXY,r.t); if(r.rXY)push(r.rXY,r.rt!=null?r.rt:r.t);});
   state.pendingDots=dots;
   if(pvRedraw)pvRedraw();
