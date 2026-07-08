@@ -10,7 +10,8 @@
 // Paste your project's PUBLIC values here so everyone can use the site without entering keys.
 // Leave as '' to make users type their own. (Used only as a fallback — typed/saved values win.)
 const CONFIG = {
-  url: '', anonKey: '',
+  url: 'https://xtzmtdcohoixoxqusyyz.supabase.co',
+  anonKey: 'sb_publishable_ZcIbdPmEdfW0POArBW_eNg_aZbc-lFa',
   // Optional: direct-to-R2 video upload. Deploy worker/r2-presign.js (see worker/README.md),
   // then paste its URL + your bucket's public base here. Leave workerUrl '' to hide the R2 button
   // (pasting a video URL manually still works without any of this).
