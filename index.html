@@ -898,7 +898,9 @@ function renderFormationSubs(){
   el.innerHTML=h||'<span class="fm-sub-empty">No substitutes</span>';
 }
 function refreshFormation(){ renderFormationMain(); }   // formation is always shown on the main tab
-$('lineupBtn').onclick=()=>{saveMeta();saveLineups();window.open(subPageUrl('Player-Lists'),'pt-players');};
+// '_blank' (not a fixed window name) so this always opens a fresh new tab instead of
+// re-navigating a previously-opened one (which some browsers surface as "replacing" the tab)
+$('lineupBtn').onclick=()=>{saveMeta();saveLineups();window.open(subPageUrl('Player-Lists'),'_blank');};
 $('lineupClose').onclick=()=>$('lineupModal').classList.remove('show');
 $('lineupModal').addEventListener('click',e=>{if(e.target===$('lineupModal'))$('lineupModal').classList.remove('show');});
 $('luHomeBtn').onclick=()=>{lineupTeam='home';renderLineup();};
