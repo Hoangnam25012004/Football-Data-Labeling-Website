@@ -1527,7 +1527,7 @@ function submitEntry(){
     const data={t, rt:rD?rD.t:(pD?null:(existing?existing.rt:null)), team:state.team,
       teamName:state.team==='home'?$('homeName').value:$('awayName').value,
       event:ev.name,playerFrom:ev.from,playerTo:ev.to||'',action:ev.key,raw,
-      grp:grpId,
+      grp:grpId, ord:k,   // ord = position within the chain, so a group's rows keep their order
       pXY:pD?{x:pD.x,y:pD.y}:null, rXY:rD?{x:rD.x,y:rD.y}:null};
     let row;
     if(existing){Object.assign(existing,data);row=existing;}   // edit in place — keep the same id
@@ -1780,8 +1780,19 @@ function deleteRows(rs){
 }
 function renderTable(){
   const tb=$('tbody'); tb.innerHTML='';
-  // always sorted by timeline: earliest -> latest, regardless of input order
-  state.rows.sort((a,b)=>a.t-b.t);
+  // Sort by timeline, but keep every chain (rows sharing a grp) together as one block:
+  // a chain sorts by its EARLIEST touch time, and its rows stay in chain order (ord).
+  // Without this, the chain's rows have different dot-times and an unrelated event can
+  // land between them, splitting what must render as ONE cell.
+  const gmin={};
+  state.rows.forEach(r=>{if(r.grp!=null)gmin[r.grp]=Math.min(r.t, gmin[r.grp]==null?Infinity:gmin[r.grp]);});
+  const keyT=r=>(r.grp!=null?gmin[r.grp]:r.t);
+  state.rows.sort((a,b)=>{
+    const ka=keyT(a), kb=keyT(b); if(ka!==kb)return ka-kb;
+    const ga=a.grp==null?'':String(a.grp), gb=b.grp==null?'':String(b.grp);
+    if(ga!==gb)return ga<gb?-1:1;                 // cluster rows of the same chain together
+    return (a.ord||0)-(b.ord||0);                 // and keep them in chain order
+  });
   const half=+($('halfSel').value||1); let shown=0, targetTr=null;
   const visible=state.rows.filter(r=>eventHalf(r)===half); // only the selected half
   let i=0;
@@ -2292,6 +2303,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=39"></script>
+<script src="cloud-sync.js?v=40"></script>
 </body>
 </html>
