@@ -880,7 +880,9 @@ function renderFormationMain(){
   t.xi.forEach(x=>{
     const p=t.roster.find(r=>r.no===x.no);
     const dot=document.createElement('div'); dot.className='fm-dot'+(team==='away'?' away':'');
-    dot.style.left=(flip?100-x.x:x.x)+'%'; dot.style.top=x.y+'%';
+    // swapping ends at half-time rotates the whole team 180° (flip BOTH axes), not just
+    // left<->right — otherwise a left-back would show up on the right side in the 2nd half.
+    dot.style.left=(flip?100-x.x:x.x)+'%'; dot.style.top=(flip?100-x.y:x.y)+'%';
     dot.innerHTML=`${x.no}<span class="lbl">${p?(p.name||''):''}</span>`;
     pit.appendChild(dot);
   });
@@ -1548,7 +1550,7 @@ function submitEntry(){
   if(!wasEditing&&allSubs&&evs.every(e=>e.from&&e.to)){
     const subsArr=evs.map((ev,k)=>{
       const dk=dots[k]||null, t=dk?dk.t:lastRow.t;
-      const pos=dk?(eventHalf({t})===2?{x:100-dk.x,y:dk.y}:{x:dk.x,y:dk.y}):null;
+      const pos=dk?(eventHalf({t})===2?{x:100-dk.x,y:100-dk.y}:{x:dk.x,y:dk.y}):null;
       return {out:ev.from,in:ev.to,t,pos};
     });
     applySubGroup(state.team,subsArr);
