@@ -767,17 +767,20 @@ const FORMATION_GRID=[
   ['LF','LW','LM','LWB','LB','']
 ];
 const PZ_COLORS=['red','green','green','blue','blue','gold']; // by canonical column
+// switching attacking direction rotates the map 180° -> flip BOTH columns and rows
+// (rows decide which flank is Right), else L/R roles invert for one direction.
 const effCol=(col,dir)=>dir==='lr'?5-col:col;
+const effRow=(row,dir)=>dir==='lr'?2-row:row;
 /* row heights: top 25% / middle (GK..CF) 50% / bottom 25% */
 const PZ_ROW_TOP=[0,25,75], PZ_ROW_H=[25,50,25];
 function zoneAt(x,y,dir){
   const col=Math.max(0,Math.min(5,Math.floor(x/100*6))), row=y<25?0:(y<75?1:2);
-  return FORMATION_GRID[row][effCol(col,dir)]||'';
+  return FORMATION_GRID[effRow(row,dir)][effCol(col,dir)]||'';
 }
 function gridHTML(dir){
   let h='';
   for(let row=0;row<3;row++)for(let col=0;col<6;col++){
-    const ec=effCol(col,dir), lbl=FORMATION_GRID[row][ec], color=lbl?PZ_COLORS[ec]:'none';
+    const ec=effCol(col,dir), lbl=FORMATION_GRID[effRow(row,dir)][ec], color=lbl?PZ_COLORS[ec]:'none';
     h+=`<div class="pz ${color}" style="left:${col*100/6}%;top:${PZ_ROW_TOP[row]}%;width:${100/6}%;height:${PZ_ROW_H[row]}%">${lbl}</div>`;
   }
   h+=`<div class="pz-arrow">${dir==='lr'?'▶':'◀'}</div>`;

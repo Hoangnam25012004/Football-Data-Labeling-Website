@@ -56,7 +56,7 @@
   </div>
 </div>
 
-<script src="../shared.js?v=3"></script>
+<script src="../shared.js?v=4"></script>
 <script>
 let lineups=loadLineups(), meta=loadMeta(), lineupTeam='home';
 function teamLU(){return lineups[lineupTeam];}
@@ -174,7 +174,7 @@ function renderLineup(){
   t.roster.forEach(p=>{
     const xiE=t.xi.find(x=>x.no===p.no), inXI=!!xiE, inSub=t.subs.includes(p.no);
     const row=document.createElement('div'); row.className='lu-prow';
-    row.innerHTML=`<span class="num">${p.no}</span><span class="pname">${p.name||''}</span><span class="ppos">${xiE?(xiE.pos||''):''}</span>`;
+    row.innerHTML=`<span class="num">${p.no}</span><span class="pname">${p.name||''}</span><span class="ppos">${xiE?zoneAt(xiE.x,xiE.y,t.dir):''}</span>`;
     const xiB=document.createElement('button');xiB.textContent='XI';if(inXI)xiB.className='on';xiB.onclick=()=>toggleXI(p.no);
     const sB=document.createElement('button');sB.textContent='Sub';if(inSub)sB.className='on';sB.onclick=()=>toggleSub(p.no);
     const rm=document.createElement('button');rm.className='rm';rm.textContent='×';rm.title='remove';rm.onclick=()=>removeLuPlayer(p.no);
