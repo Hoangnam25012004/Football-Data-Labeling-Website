@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stats — Pitch Tagger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="../shared.css?v=3">
+<link rel="stylesheet" href="../shared.css?v=4">
 </head>
 <body>
 <header>
@@ -35,7 +35,7 @@
 
 <script src="../shared.js?v=3"></script>
 <script>
-let rows=loadRows(), meta=loadMeta(), statTeam='general', statCat='shooting';
+let rows=loadRows(), meta=loadMeta(), statTeam='general', statCat='shooting', shotHalf=1;
 
 /* per-category column sets — the wide table split into 4 tabs.
    Defensive = Defensive + Duels; Other = Set Pieces + Discipline. */
@@ -123,8 +123,12 @@ function shootingChartHTML(team){
 function shotMapHTML(team){
   const name=team==='home'?meta.home:meta.away, teamColor=team==='home'?'var(--home)':'var(--away)';
   const kinds={'goal':'#f7b32f','shot on target':'#39d98a','shot off target':'#8b97a7','blocked shot':'#8b97a7'};
-  const shots=rows.filter(r=>r.team===team && kinds[r.event] && r.pXY);
-  if(!shots.length)return `<div class="chart-card map-card"><div class="chart-title" style="color:${teamColor}">${name} · Shot locations</div><div class="stats-empty">No shot positions yet.</div></div>`;
+  // split by half — attacking direction flips between halves, so 1st/2nd are shown separately
+  const head=`<div class="chart-head"><div class="chart-title" style="color:${teamColor}">${name} · Shot locations</div>`
+    +`<div class="half-toggle"><button class="${shotHalf===1?'on':''}" onclick="setShotHalf(1)">1st</button>`
+    +`<button class="${shotHalf===2?'on':''}" onclick="setShotHalf(2)">2nd</button></div></div>`;
+  const shots=rows.filter(r=>r.team===team && kinds[r.event] && r.pXY && eventHalf(r)===shotHalf);
+  if(!shots.length)return `<div class="chart-card map-card">${head}<div class="stats-empty">No shots in the ${shotHalf===1?'1st':'2nd'} half.</div></div>`;
   const d=PITCH_DIMS.football, W=d.w, H=d.h;
   const dots=shots.map(r=>{
     const cx=(r.pXY.x/100*W).toFixed(1), cy=(r.pXY.y/100*H).toFixed(1), col=kinds[r.event];
@@ -135,9 +139,10 @@ function shotMapHTML(team){
   const legend=`<span class="sm-leg"><span class="leg-dot" style="background:#f7b32f"></span>Goal</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:#39d98a"></span>On target</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:#8b97a7"></span>Off / Blocked</span>`;
-  return `<div class="chart-card map-card"><div class="chart-title" style="color:${teamColor}">${name} · Shot locations</div>`
+  return `<div class="chart-card map-card">${head}`
     +`<div class="shotmap-pitch">${pitch}</div><div class="shotmap-legend">${legend}</div></div>`;
 }
+function setShotHalf(h){shotHalf=h;renderStats();}
 /* ---- Distribution: each player a bubble at (pass accuracy %, pass volume) (image 2) ---- */
 function passScatterHTML(team){
   const P=computeStats(rows,team), name=team==='home'?meta.home:meta.away;
