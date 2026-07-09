@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stats — Pitch Tagger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="../shared.css?v=4">
+<link rel="stylesheet" href="../shared.css?v=5">
 </head>
 <body>
 <header>
@@ -35,7 +35,7 @@
 
 <script src="../shared.js?v=3"></script>
 <script>
-let rows=loadRows(), meta=loadMeta(), statTeam='general', statCat='shooting', shotHalf=1;
+let rows=loadRows(), meta=loadMeta(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles';
 
 /* per-category column sets — the wide table split into 4 tabs.
    Defensive = Defensive + Duels; Other = Set Pieces + Discipline. */
@@ -84,9 +84,61 @@ function renderStats(){
     extra=`<div class="chart-row">${shootingChartHTML(statTeam)}${shotMapHTML(statTeam)}</div>`;
   }else if(statCat==='distribution'){
     extra=`<div class="chart-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}</div>`;
+  }else if(statCat==='defensive'){
+    extra=`<div class="chart-row">${defMapHTML(statTeam)}</div>`;
   }
   holder.innerHTML=table+extra;
 }
+/* attacking direction for a half — inferred from where this team's shots land
+   ('right' if their shots average past midfield, else 'left'); if a half has no
+   shots, use the opposite of the other half; sensible default otherwise. */
+function attackDir(team,half){
+  const shotKinds=new Set(['goal','shot on target','shot off target','blocked shot']);
+  const meanX=h=>{const xs=rows.filter(r=>r.team===team&&shotKinds.has(r.event)&&r.pXY&&eventHalf(r)===h).map(r=>r.pXY.x);
+    return xs.length?xs.reduce((s,v)=>s+v,0)/xs.length:null;};
+  let m=meanX(half); if(m==null){const o=meanX(half===1?2:1); if(o!=null)m=100-o;}
+  if(m==null)return half===1?'right':'left';
+  return m>=50?'right':'left';
+}
+// attacking-direction arrow drawn near the top of the pitch (viewBox coords)
+function dirArrowSVG(dir){
+  const W=1050,y=42,off=140,cx=W/2, x0=cx-off, x1=cx+off;
+  const sx=dir==='right'?x0:x1, ex=dir==='right'?x1:x0, hd=dir==='right'?-22:22;
+  return `<g opacity="0.72"><line x1="${sx}" y1="${y}" x2="${ex}" y2="${y}" stroke="#fff" stroke-width="5"/>`
+    +`<polyline points="${ex+hd},${y-12} ${ex},${y} ${ex+hd},${y+12}" fill="none" stroke="#fff" stroke-width="5"/>`
+    +`<text x="${cx}" y="${y-16}" text-anchor="middle" font-size="21" fill="#fff">Attacking</text></g>`;
+}
+/* Defensive-action location map: dropdown picks the action; won/lost split by colour. */
+const DEF_CATS={
+  tackles:{label:'Tackles',parts:[['tackle success','Won','#39d98a'],['tackle fail','Lost','#f7506b']]},
+  interceptions:{label:'Interceptions',parts:[['interception','Interception','#2f81f7']]},
+  clearances:{label:'Clearances',parts:[['clearance','Clearance','#2f81f7']]},
+  blocks:{label:'Blocks',parts:[['block','Block','#2f81f7']]},
+  recoveries:{label:'Recoveries',parts:[['recovery','Recovery','#2f81f7']]},
+  ground:{label:'Ground Duels',parts:[['ground duel success','Won','#39d98a'],['ground duel fail','Lost','#f7506b']]},
+  aerial:{label:'Aerial Duels',parts:[['aerial duel success','Won','#39d98a'],['aerial duel fail','Lost','#f7506b']]}
+};
+function defMapHTML(team){
+  const name=team==='home'?meta.home:meta.away, teamColor=team==='home'?'var(--home)':'var(--away)';
+  const cat=DEF_CATS[defCat]||DEF_CATS.tackles;
+  const opts=Object.entries(DEF_CATS).map(([k,c])=>`<option value="${k}"${k===defCat?' selected':''}>${c.label}</option>`).join('');
+  const head=`<div class="chart-head"><div class="chart-title" style="color:${teamColor}">${name} · Defensive locations</div>`
+    +`<div class="head-ctrls"><select class="def-sel" onchange="setDefCat(this.value)">${opts}</select>`
+    +`<div class="half-toggle"><button class="${defHalf===1?'on':''}" onclick="setDefHalf(1)">1st</button>`
+    +`<button class="${defHalf===2?'on':''}" onclick="setDefHalf(2)">2nd</button></div></div></div>`;
+  const col={}; cat.parts.forEach(([ev,,c])=>col[ev]=c);
+  const acts=rows.filter(r=>r.team===team && col[r.event] && r.pXY && eventHalf(r)===defHalf);
+  if(!acts.length)return `<div class="chart-card map-card">${head}<div class="stats-empty">No ${cat.label.toLowerCase()} in the ${defHalf===1?'1st':'2nd'} half.</div></div>`;
+  const d=PITCH_DIMS.football, W=d.w, H=d.h;
+  const dots=acts.map(r=>{const cx=(r.pXY.x/100*W).toFixed(1), cy=(r.pXY.y/100*H).toFixed(1);
+    return `<g><circle cx="${cx}" cy="${cy}" r="13" fill="${col[r.event]}" fill-opacity="0.9" stroke="#0d1117" stroke-width="2"/>`
+      +`<text x="${cx}" y="${(+cy+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#06281a">${r.playerFrom||''}</text></g>`;}).join('');
+  const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG(attackDir(team,defHalf))+dots+'</svg>');
+  const legend=cat.parts.map(([,lbl,c])=>`<span class="sm-leg"><span class="leg-dot" style="background:${c}"></span>${lbl}</span>`).join('');
+  return `<div class="chart-card map-card">${head}<div class="shotmap-pitch">${pitch}</div><div class="shotmap-legend">${legend}</div></div>`;
+}
+function setDefCat(v){defCat=v;renderStats();}
+function setDefHalf(h){defHalf=h;renderStats();}
 /* ---- Shooting: donut of Goals / On-target / Off-target+Blocked (image 1) ---- */
 function arcPath(cx,cy,rr,a0,a1){
   const p=a=>[cx+rr*Math.cos(a),cy+rr*Math.sin(a)];
@@ -135,7 +187,7 @@ function shotMapHTML(team){
     return `<g><circle cx="${cx}" cy="${cy}" r="13" fill="${col}" fill-opacity="0.9" stroke="#0d1117" stroke-width="2"/>`
       +`<text x="${cx}" y="${(+cy+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#06281a">${r.playerFrom||''}</text></g>`;
   }).join('');
-  const pitch=pitchSVG('football').replace('</svg>', dots+'</svg>');
+  const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG(attackDir(team,shotHalf))+dots+'</svg>');
   const legend=`<span class="sm-leg"><span class="leg-dot" style="background:#f7b32f"></span>Goal</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:#39d98a"></span>On target</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:#8b97a7"></span>Off / Blocked</span>`;
