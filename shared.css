@@ -56,6 +56,16 @@ table.stats tbody tr:hover td{background:#1c233066}
 .leg-val{margin-left:auto;font-weight:700;color:var(--ink);display:flex;gap:10px;align-items:baseline}
 .leg-sub{color:var(--mut);font-weight:600;font-size:12px}
 .scatter-wrap{overflow-x:auto}
+/* charts row under the table: matrix/donut on the left, scatter/map on the right */
+.chart-row{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-top:14px}
+.chart-row .chart-card{margin-bottom:0}
+.pm-col{flex:none;max-width:100%}
+.pm-col .pm-title{margin-top:0}
+.donut-card{flex:none}
+.scatter-card,.map-card{flex:1;min-width:360px}
+.shotmap-pitch{position:relative;width:100%;max-width:560px;aspect-ratio:105/68;margin:2px auto 0}
+.shotmap-legend{display:flex;gap:16px;justify-content:center;margin-top:8px;font-size:12px;color:var(--mut)}
+.sm-leg{display:inline-flex;align-items:center;gap:6px}
 
 /* pass distribution matrix */
 .pm-title{font-weight:700;margin:16px 0 6px;font-size:13px}

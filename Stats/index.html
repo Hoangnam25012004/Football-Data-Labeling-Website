@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stats — Pitch Tagger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="../shared.css?v=2">
+<link rel="stylesheet" href="../shared.css?v=3">
 </head>
 <body>
 <header>
@@ -76,12 +76,16 @@ function renderStats(){
   const head='<th class="no">No</th>'+cols.map(c=>`<th>${c[0]}</th>`).join('');
   const body=players.map(no=>'<tr><td class="no">'+no+'</td>'
     +cols.map(c=>`<td>${c[1](P[no])}</td>`).join('')+'</tr>').join('');
-  // per-category chart on top: Shooting -> donut, Distribution -> pass scatter
-  const chart = statCat==='shooting' ? shootingChartHTML(statTeam)
-              : statCat==='distribution' ? passScatterHTML(statTeam) : '';
-  holder.innerHTML=chart
-    +`<table class="stats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
-    +(statCat==='distribution'?passMatrixHTML(statTeam):'');   // pass matrix lives in Distribution
+  const table=`<table class="stats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  // charts sit BELOW the table. Shooting: donut + shot-location map side by side.
+  // Distribution: pass matrix on the left, volume/accuracy scatter on its right.
+  let extra='';
+  if(statCat==='shooting'){
+    extra=`<div class="chart-row">${shootingChartHTML(statTeam)}${shotMapHTML(statTeam)}</div>`;
+  }else if(statCat==='distribution'){
+    extra=`<div class="chart-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}</div>`;
+  }
+  holder.innerHTML=table+extra;
 }
 /* ---- Shooting: donut of Goals / On-target / Off-target+Blocked (image 1) ---- */
 function arcPath(cx,cy,rr,a0,a1){
@@ -112,8 +116,27 @@ function shootingChartHTML(team){
     +`<div class="leg-row"><span class="leg-dot" style="background:#f7b32f"></span><span class="leg-lbl">Goals</span><span class="leg-val">${goals}</span></div>`
     +`<div class="leg-row"><span class="leg-dot" style="background:#39d98a"></span><span class="leg-lbl">On Target</span><span class="leg-val">${pct(s.shotsOn,total)}<span class="leg-sub">${s.shotsOn}/${total}</span></span></div>`
     +`<div class="leg-row"><span class="leg-dot" style="background:#8b97a7"></span><span class="leg-lbl">Off Target / Blocked</span><span class="leg-val"><span class="leg-sub">${off}/${total}</span></span></div>`;
-  return `<div class="chart-card"><div class="chart-title" style="color:${teamColor}">${name} — Shooting</div>`
+  return `<div class="chart-card donut-card"><div class="chart-title" style="color:${teamColor}">${name} — Shooting</div>`
     +`<div class="donut-wrap"><div class="donut-svg">${svg}</div><div class="donut-legend">${legend}</div></div></div>`;
+}
+/* ---- Shooting: pitch map of where each shot was taken (uses the Player dot) ---- */
+function shotMapHTML(team){
+  const name=team==='home'?meta.home:meta.away, teamColor=team==='home'?'var(--home)':'var(--away)';
+  const kinds={'goal':'#f7b32f','shot on target':'#39d98a','shot off target':'#8b97a7','blocked shot':'#8b97a7'};
+  const shots=rows.filter(r=>r.team===team && kinds[r.event] && r.pXY);
+  if(!shots.length)return `<div class="chart-card map-card"><div class="chart-title" style="color:${teamColor}">${name} · Shot locations</div><div class="stats-empty">No shot positions yet.</div></div>`;
+  const d=PITCH_DIMS.football, W=d.w, H=d.h;
+  const dots=shots.map(r=>{
+    const cx=(r.pXY.x/100*W).toFixed(1), cy=(r.pXY.y/100*H).toFixed(1), col=kinds[r.event];
+    return `<g><circle cx="${cx}" cy="${cy}" r="13" fill="${col}" fill-opacity="0.9" stroke="#0d1117" stroke-width="2"/>`
+      +`<text x="${cx}" y="${(+cy+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#06281a">${r.playerFrom||''}</text></g>`;
+  }).join('');
+  const pitch=pitchSVG('football').replace('</svg>', dots+'</svg>');
+  const legend=`<span class="sm-leg"><span class="leg-dot" style="background:#f7b32f"></span>Goal</span>`
+    +`<span class="sm-leg"><span class="leg-dot" style="background:#39d98a"></span>On target</span>`
+    +`<span class="sm-leg"><span class="leg-dot" style="background:#8b97a7"></span>Off / Blocked</span>`;
+  return `<div class="chart-card map-card"><div class="chart-title" style="color:${teamColor}">${name} · Shot locations</div>`
+    +`<div class="shotmap-pitch">${pitch}</div><div class="shotmap-legend">${legend}</div></div>`;
 }
 /* ---- Distribution: each player a bubble at (pass accuracy %, pass volume) (image 2) ---- */
 function passScatterHTML(team){
@@ -136,7 +159,7 @@ function passScatterHTML(team){
     return `<g><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${rr.toFixed(1)}" fill="${fill}" fill-opacity="0.92" stroke="#0d1117" stroke-width="1.5"/>`
       +`<text x="${cx.toFixed(1)}" y="${(cy+3.5).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${no}</text></g>`;
   }).join('');
-  return `<div class="chart-card"><div class="chart-title" style="color:${teamColor}">${name} · Passes by Volume &amp; Accuracy</div>`
+  return `<div class="chart-card scatter-card"><div class="chart-title" style="color:${teamColor}">${name} · Passes by Volume &amp; Accuracy</div>`
     +`<div class="scatter-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:${W}px">${g}${bubbles}</svg></div></div>`;
 }
 function passMatrixHTML(team){
