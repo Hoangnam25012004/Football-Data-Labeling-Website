@@ -228,10 +228,19 @@ const CONFIG = {
     else if (PT().resetLineups) PT().resetLineups();
     lastVideoUrl = row.video_url || null;
     if (row.video_url) PT().loadVideoUrl(row.video_url);   // load the shared video for this match
-    const { data, error } = await sb.from('events').select('*').eq('match_id', matchId).order('t_seconds');
-    if (error) { alert('Load failed: ' + error.message); return; }
+    // Load ALL events in pages — Supabase caps a single select at 1000 rows, so a
+    // busy match (1300+ events) silently truncated to the first ~63 minutes on reload.
+    const PAGE = 1000;
+    const all = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await sb.from('events').select('*')
+        .eq('match_id', matchId).order('t_seconds').range(from, from + PAGE - 1);
+      if (error) { alert('Load failed: ' + error.message); return; }
+      all.push(...(data || []));
+      if (!data || data.length < PAGE) break;
+    }
     applying = true;
-    PT().state.rows = (data || []).map(dbToRow);
+    PT().state.rows = all.map(dbToRow);
     PT().renderTable();
     applying = false;
     subscribe();
