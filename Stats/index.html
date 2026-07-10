@@ -28,6 +28,23 @@
 .hm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hm-cnt{margin-left:auto;color:var(--mut);font-weight:700;font-size:12px}
 .hm-cnt-foot{border-top:1px solid var(--line);margin-top:6px;padding:7px 6px 2px;font-size:11px;color:var(--mut)}
+/* General tab: match-summary timeline + starting formations flanking the comparison */
+.sum-card{margin:14px 14px 0}
+.sum-wrap{width:100%;overflow-x:auto}
+.gen-layout{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;padding:14px}
+.gen-center{flex:1;min-width:420px}
+.gen-center .gen-wrap{max-width:none;padding:0}
+.gen-form{flex:none;width:232px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+.gf-title{font-weight:700;font-size:13px;margin-bottom:8px}
+.gf-pitch{position:relative;width:100%;aspect-ratio:68/105;border-radius:6px;overflow:hidden}
+.gf-dot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;z-index:2;pointer-events:none}
+.gf-no{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:#fff;background:var(--home);border:2px solid rgba(255,255,255,0.85);
+  box-shadow:0 1px 3px rgba(0,0,0,0.6)}
+.gf-dot.away .gf-no{background:var(--away)}
+.gf-nm{margin-top:1px;font-size:9px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.9);
+  max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gf-arrow{position:absolute;top:6px;left:6px;font-size:10px;color:rgba(255,255,255,0.75);font-weight:700}
 </style>
 </head>
 <body>
@@ -58,7 +75,7 @@
 
 <script src="../shared.js?v=4"></script>
 <script>
-let rows=loadRows(), meta=loadMeta(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles';
+let rows=loadRows(), meta=loadMeta(), lineups=loadLineups(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
 
 /* per-category column sets — the wide table split into 4 tabs.
@@ -379,7 +396,72 @@ function renderGeneral(){
             `<span class="va">${av}</span></div>`;
     });
   });
-  $('statsHolder').innerHTML=html+'</div>';
+  html+='</div>';
+  $('statsHolder').innerHTML=matchSummaryHTML()
+    +`<div class="gen-layout">${formationSideHTML('home')}<div class="gen-center">${html}</div>${formationSideHTML('away')}</div>`;
+}
+/* ---- General: horizontal match-summary timeline (goals / own goals / cards only).
+   Home events sit above the axis, away events below; stacked when they collide. */
+const SUMMARY_EVENTS={'goal':'goal','own goal':'og','own-goal':'og','yellow card':'yc','red card':'rc'};
+function matchSummaryHTML(){
+  const head='<div class="chart-title" style="color:var(--accent)">Match Summary</div>';
+  const evs=rows.filter(r=>r.t!=null&&SUMMARY_EVENTS[r.event]).sort((x,y)=>x.t-y.t)
+    .map(r=>({kind:SUMMARY_EVENTS[r.event],team:r.team,no:(r.playerFrom||'').toString().trim(),sec:matchTime(r.t)}));
+  if(!evs.length)return `<div class="chart-card sum-card">${head}<div class="stats-empty">No goals or cards yet.</div></div>`;
+  const W=1000,H=230,mL=96,mR=30,axisY=H/2,hl=(+dur.halfLen||45)*60;
+  const total=Math.max(2*hl,...evs.map(e=>e.sec))+90;
+  const X=s=>mL+s/total*(W-mL-mR);
+  let g=`<line x1="${mL}" y1="${axisY}" x2="${W-mR}" y2="${axisY}" stroke="var(--line)" stroke-width="4" stroke-linecap="round"/>`;
+  [[0,"0'"],[hl,'HT'],[2*hl,'FT']].forEach(([s,lb])=>{
+    g+=`<line x1="${X(s)}" y1="${axisY-7}" x2="${X(s)}" y2="${axisY+7}" stroke="var(--mut)" stroke-width="2"/>`
+      +`<text x="${X(s)}" y="${axisY+22}" text-anchor="middle" font-size="12" fill="var(--mut)">${lb}</text>`;
+  });
+  const short=n=>n.length>13?n.slice(0,12)+'…':n;
+  g+=`<text x="8" y="${axisY-30}" font-size="12" font-weight="700" fill="var(--home)">${short(meta.home)}</text>`
+    +`<text x="8" y="${axisY+38}" font-size="12" font-weight="700" fill="var(--away)">${short(meta.away)}</text>`;
+  const icon=k=>k==='goal'?'<text text-anchor="middle" font-size="17" y="6">⚽</text>'
+    :k==='og'?'<circle r="10" fill="#f7506b"/><text text-anchor="middle" font-size="9" font-weight="800" fill="#fff" y="3.5">OG</text>'
+    :`<rect x="-5.5" y="-8" width="11" height="16" rx="2" fill="${k==='yc'?'#ffd23f':'#e5484d'}" stroke="#0d1117"/>`;
+  const lastX={home:-1e9,away:-1e9}, lastLv={home:0,away:0};
+  const marks=evs.map(e=>{
+    const x=X(e.sec), up=e.team==='home';
+    let lv=0; if(x-lastX[e.team]<24)lv=Math.min(2,lastLv[e.team]+1);
+    lastX[e.team]=x; lastLv[e.team]=lv;
+    const y=up?axisY-30-lv*46:axisY+38+lv*46, m=Math.floor(e.sec/60)+1;
+    return `<g transform="translate(${x.toFixed(1)} ${y})">${icon(e.kind)}`
+      +`<text text-anchor="middle" y="${up?-14:26}" font-size="10" font-weight="700" fill="var(--ink)">${e.no}</text>`
+      +`<text text-anchor="middle" y="${up?24:-14}" font-size="10" fill="var(--mut)">${m}'</text></g>`;
+  }).join('');
+  const legend='<span class="sm-leg">⚽ Goal</span>'
+    +'<span class="sm-leg"><span class="leg-dot" style="background:#f7506b"></span>Own goal</span>'
+    +'<span class="sm-leg"><span class="leg-dot" style="background:#ffd23f;border-radius:2px"></span>Yellow card</span>'
+    +'<span class="sm-leg"><span class="leg-dot" style="background:#e5484d;border-radius:2px"></span>Red card</span>';
+  return `<div class="chart-card sum-card">${head}<div class="sum-wrap">`
+    +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;min-width:720px">${g}${marks}</svg></div>`
+    +`<div class="shotmap-legend">${legend}</div></div>`;
+}
+/* ---- General: starting formation, vertical pitch, always attacking UP ---- */
+function pitchSVGV(){
+  const d=PITCH_DIMS.football;
+  return `<svg viewBox="0 0 ${d.h} ${d.w}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block">`
+    +`<rect width="${d.h}" height="${d.w}" fill="rgba(26,62,32,0.72)"/>`
+    +`<g transform="translate(0 ${d.w}) rotate(-90)"><g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(d.w,d.h,false)}</g></g></svg>`;
+}
+function formationSideHTML(team){
+  const name=team==='home'?meta.home:meta.away, color=team==='home'?'var(--home)':'var(--away)';
+  const lu=(lineups&&lineups[team])||blankTeamLU('lr');
+  const title=`<div class="gf-title" style="color:${color}">${name} — Starting XI</div>`;
+  if(!lu.xi||!lu.xi.length)
+    return `<div class="gen-form">${title}<div class="stats-empty">No starting lineup yet — set it in Player lists.</div></div>`;
+  const dots=lu.xi.map(p=>{
+    let x=p.x, y=p.y;
+    if((lu.dir||'lr')==='rl'){x=100-x;y=100-y;}          // normalise board coords to attacking RIGHT
+    const left=y, top=100-x;                             // then rotate 90° CCW → vertical, attacking UP
+    const pl=(lu.roster||[]).find(r=>String(r.no)===String(p.no));
+    return `<div class="gf-dot ${team}" style="left:${left.toFixed(1)}%;top:${top.toFixed(1)}%">`
+      +`<span class="gf-no">${p.no}</span><span class="gf-nm">${pl&&pl.name?pl.name:'P. '+p.no}</span></div>`;
+  }).join('');
+  return `<div class="gen-form">${title}<div class="gf-pitch">${pitchSVGV()}${dots}<div class="gf-arrow">▲ Attacking</div></div></div>`;
 }
 
 /* ---- exports (full workbook: events + stats + pass distribution) ---- */
@@ -468,7 +550,8 @@ document.querySelectorAll('#catToggle button').forEach(b=>b.onclick=()=>{statCat
 window.addEventListener('storage',e=>{
   if(e.key===PT_KEYS.rows){rows=loadRows();renderStats();}
   else if(e.key===PT_KEYS.meta){meta=loadMeta();syncBackLink(meta);renderStats();}
-  else if(e.key===PT_KEYS.duration){dur=loadJSON(PT_KEYS.duration,dur);}
+  else if(e.key===PT_KEYS.duration){dur=loadJSON(PT_KEYS.duration,dur);renderStats();}
+  else if(e.key===PT_KEYS.lineups){lineups=loadLineups();if(statTeam==='general')renderStats();}
 });
 
 syncBackLink(meta);   // "← Tagging" returns to ../#match=<code>, keeping the match open
