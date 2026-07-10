@@ -15,9 +15,16 @@ body{display:flex;flex-direction:column}
 body>header{flex:none}
 .page{flex:1;min-height:0;display:flex;flex-direction:column;box-sizing:border-box}
 .stats-wrap{flex:1;min-height:0;max-height:none}
-/* Distribution: matrix + scatter + cross map share one row */
+/* Distribution: matrix + scatter + cross map share one row with EQUAL heights —
+   the row stretches every card to the tallest one and centres each card's
+   content vertically; the svgs cap their height and letterbox (viewBox keeps
+   the aspect ratio), so nothing distorts. */
 .scatter-card{flex:1;min-width:320px;max-width:560px}
 .cross-card{flex:1.35;min-width:400px}
+.dist-row{align-items:stretch}
+.dist-row .pm-col,.dist-row .chart-card{display:flex;flex-direction:column;justify-content:center}
+.dist-row .cross-card svg{max-height:470px}
+.dist-row .scatter-card svg{max-height:470px}
 /* player heatmap card (Distribution tab) */
 .hm-flex{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
 .hm-flex>div:first-child{flex:1;min-width:340px}
@@ -143,7 +150,7 @@ function renderStats(){
   if(statCat==='shooting'){
     extra=`<div class="chart-row">${shootingChartHTML(statTeam)}${shotMapHTML(statTeam)}</div>`;
   }else if(statCat==='distribution'){
-    extra=`<div class="chart-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}${crossMapHTML(statTeam)}</div>`
+    extra=`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}${crossMapHTML(statTeam)}</div>`
       +`<div class="chart-row">${heatMapHTML(statTeam)}</div>`;
   }else if(statCat==='defensive'){
     extra=`<div class="chart-row">${defMapHTML(statTeam)}</div>`;
@@ -261,7 +268,7 @@ function passScatterHTML(team){
   const P=computeStats(rows,team), fill=team==='home'?'#2f81f7':'#f7682f';
   const players=sortedPlayers(P).filter(no=>P[no].passes>0);
   if(!players.length)return `<div class="chart-card"><div class="stats-empty">No passes yet.</div></div>`;
-  const W=460,H=300,mL=44,mR=22,mT=18,mB=36, maxVol=Math.max(...players.map(no=>P[no].passes));
+  const W=460,H=380,mL=44,mR=22,mT=18,mB=36, maxVol=Math.max(...players.map(no=>P[no].passes));
   const X=acc=>mL+(acc/100)*(W-mL-mR), Y=vol=>H-mB-(maxVol?vol/maxVol:0)*(H-mT-mB);
   let g=`<rect x="${mL}" y="${mT}" width="${W-mL-mR}" height="${H-mT-mB}" fill="none" stroke="var(--line)"/>`;
   g+=`<line x1="${X(50)}" y1="${mT}" x2="${X(50)}" y2="${H-mB}" stroke="var(--line)" stroke-dasharray="4 4"/>`;
