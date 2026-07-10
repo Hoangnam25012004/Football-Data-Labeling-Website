@@ -34,7 +34,15 @@
 .gen-layout{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;padding:14px}
 .gen-center{flex:1;min-width:420px}
 .gen-center .gen-wrap{max-width:none;padding:0}
-.gen-form{flex:none;width:232px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+.gen-form{flex:none;width:310px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;
+  position:sticky;top:14px}   /* sticky: stays in view while the long comparison scrolls, so the column never looks empty */
+.score-bar{display:flex;align-items:center;justify-content:center;gap:20px;padding:8px 6px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.sb-name{flex:1;font-size:19px;font-weight:800;line-height:1.25}
+.sb-name.home{text-align:right;color:var(--home)}
+.sb-name.away{text-align:left;color:var(--away)}
+.sb-score{flex:none;font-size:24px;font-weight:800;color:var(--ink);background:var(--panel);
+  border:1px solid var(--line);border-radius:10px;padding:5px 18px;letter-spacing:1px}
+.sb-score i{font-style:normal;color:var(--mut);margin:0 10px;font-size:20px}
 .gf-title{font-weight:700;font-size:13px;margin-bottom:8px}
 .gf-pitch{position:relative;width:100%;aspect-ratio:68/105;border-radius:6px;overflow:hidden}
 .gf-dot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;z-index:2;pointer-events:none}
@@ -43,7 +51,7 @@
   box-shadow:0 1px 3px rgba(0,0,0,0.6)}
 .gf-dot.away .gf-no{background:var(--away)}
 .gf-nm{margin-top:1px;font-size:9px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.9);
-  max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gf-arrow{position:absolute;top:6px;left:6px;font-size:10px;color:rgba(255,255,255,0.75);font-weight:700}
 </style>
 </head>
@@ -375,7 +383,7 @@ function drawHeat(pts){
 function setHeatHalf(h){heatHalf=h;renderStats();}
 function renderGeneral(){
   const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
-  let html=`<div class="gen-wrap"><div class="gen-top"><span class="gh">${meta.home}</span><span class="ga">${meta.away}</span></div>`;
+  let html=`<div class="gen-wrap">`;
   TEAM_SECTIONS.forEach(sec=>{
     html+=`<div class="gen-sec">${sec[0]}</div>`;
     sec[1].forEach(([label,fn])=>{
@@ -393,13 +401,24 @@ function renderGeneral(){
   $('statsHolder').innerHTML=matchSummaryHTML()
     +`<div class="gen-layout">${formationSideHTML('home')}<div class="gen-center">${html}</div>${formationSideHTML('away')}</div>`;
 }
+/* goals scored by a team = its own 'goal' events + opponent own goals */
+function teamGoals(team){
+  const opp=team==='home'?'away':'home';
+  return rows.filter(r=>r.team===team&&r.event==='goal').length
+       + rows.filter(r=>r.team===opp&&(r.event==='own goal'||r.event==='own-goal')).length;
+}
+function scoreBarHTML(){
+  return `<div class="score-bar"><span class="sb-name home">${meta.home}</span>`
+    +`<span class="sb-score">${teamGoals('home')}<i>:</i>${teamGoals('away')}</span>`
+    +`<span class="sb-name away">${meta.away}</span></div>`;
+}
 /* ---- General: horizontal match-summary timeline (goals / own goals / cards only).
    Home events sit above the axis, away events below; stacked when they collide. */
 const SUMMARY_EVENTS={'goal':'goal','own goal':'og','own-goal':'og','yellow card':'yc','red card':'rc'};
 function matchSummaryHTML(){
   const evs=rows.filter(r=>r.t!=null&&SUMMARY_EVENTS[r.event]).sort((x,y)=>x.t-y.t)
     .map(r=>({kind:SUMMARY_EVENTS[r.event],team:r.team,no:(r.playerFrom||'').toString().trim(),sec:matchTime(r.t)}));
-  if(!evs.length)return `<div class="chart-card sum-card"><div class="stats-empty">No goals or cards yet.</div></div>`;
+  if(!evs.length)return `<div class="chart-card sum-card">${scoreBarHTML()}<div class="stats-empty">No goals or cards yet.</div></div>`;
   // wide, flat viewBox keeps the card short when the SVG scales to full width
   const W=1500,H=138,mL=104,mR=30,axisY=66,hl=(+dur.halfLen||45)*60;
   const total=Math.max(2*hl,...evs.map(e=>e.sec))+90;
@@ -433,7 +452,7 @@ function matchSummaryHTML(){
     return `<g transform="translate(${x.toFixed(1)} ${y})">${icon(e.kind)}${noBadge}`
       +`<text text-anchor="middle" y="${up?20:-16}" font-size="10" fill="var(--mut)">${m}'</text></g>`;
   }).join('');
-  return `<div class="chart-card sum-card"><div class="sum-wrap">`
+  return `<div class="chart-card sum-card">${scoreBarHTML()}<div class="sum-wrap">`
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;min-width:900px">${g}${marks}</svg></div></div>`;
 }
 /* ---- General: starting formation, vertical pitch, always attacking UP ---- */
