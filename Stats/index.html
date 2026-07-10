@@ -6,6 +6,29 @@
 <title>Stats — Pitch Tagger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="../shared.css?v=5">
+<style>
+/* player heatmap card (Distribution tab) */
+.hm-flex{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.hm-flex>div:first-child{flex:1;min-width:340px}
+.hm-flex .shotmap-pitch{margin:2px 0 0;max-width:640px}
+#heatCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.hm-mark{position:absolute;width:26px;height:26px;border-radius:50%;transform:translate(-50%,-50%);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;
+  border:2px solid rgba(255,255,255,0.85);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.55);
+  transition:opacity .12s, transform .12s;z-index:2}
+.hm-mark.dim{opacity:0.3}
+.hm-mark.sel{transform:translate(-50%,-50%) scale(1.25);z-index:3}
+.hm-list{flex:none;width:220px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px}
+.hm-hint{font-size:11px;color:var(--mut);padding:2px 6px 8px;line-height:1.4}
+.hm-row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;font-size:13px;color:var(--ink);cursor:default}
+.hm-row:hover,.hm-row.sel{background:var(--panel2)}
+.hm-row.dim{opacity:0.45}
+.hm-no{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:11px;color:#fff}
+.hm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hm-cnt{margin-left:auto;color:var(--mut);font-weight:700;font-size:12px}
+.hm-cnt-foot{border-top:1px solid var(--line);margin-top:6px;padding:7px 6px 2px;font-size:11px;color:var(--mut)}
+</style>
 </head>
 <body>
 <header>
@@ -36,7 +59,7 @@
 <script src="../shared.js?v=4"></script>
 <script>
 let rows=loadRows(), meta=loadMeta(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles';
-let heatHalf=0, heatPlayer='';   // touch heatmap filters: 0 = both halves, '' = whole team
+let heatHalf=0;   // touch heatmap half filter: 0 = both halves
 
 /* per-category column sets — the wide table split into 4 tabs.
    Defensive = Defensive + Duels; Other = Set Pieces + Discipline. */
@@ -90,7 +113,7 @@ function renderStats(){
     extra=`<div class="chart-row">${defMapHTML(statTeam)}</div>`;
   }
   holder.innerHTML=table+extra;
-  if(statCat==='distribution')drawHeat();   // canvas must exist in the DOM first
+  if(statCat==='distribution')heatHover('');   // canvas must exist in the DOM first
 }
 /* attacking direction for a half — inferred from where this team's shots land
    ('right' if their shots average past midfield, else 'left'); if a half has no
@@ -260,42 +283,65 @@ function touchPoints(team){
   });
   return out;
 }
-let _heatPts=[];   // points selected by heatMapHTML, drawn by drawHeat() after the DOM update
+/* Per-player heatmap (like the reference video): the pitch shows the whole
+   team's heat plus a marker per player at his average position; hovering a
+   marker or a row in the player list isolates that player's heatmap. */
+let _heatBy={}, _heatOrder=[];   // points grouped by player, built in heatMapHTML
 function heatMapHTML(team){
   const name=team==='home'?meta.home:meta.away, teamColor=team==='home'?'var(--home)':'var(--away)';
-  const pts=touchPoints(team);
-  const players=[...new Set(pts.filter(t=>t.p).map(t=>t.p))]
-    .sort((a,b)=>{const na=+a,nb=+b;return(!isNaN(na)&&!isNaN(nb))?na-nb:a.localeCompare(b);});
-  if(heatPlayer && !players.includes(heatPlayer))heatPlayer='';   // e.g. after switching team
-  const opts='<option value="">All players</option>'
-    +players.map(p=>`<option value="${p}"${p===heatPlayer?' selected':''}>${p}</option>`).join('');
-  const head=`<div class="chart-head"><div class="chart-title" style="color:${teamColor}">${name} · Touch Heatmap</div>`
-    +`<div class="head-ctrls"><select class="def-sel" onchange="setHeatPlayer(this.value)">${opts}</select>`
+  const fill=team==='home'?'#2f81f7':'#f7682f';
+  const head=`<div class="chart-head"><div class="chart-title" style="color:${teamColor}">${name} · Player Heatmap</div>`
     +`<div class="half-toggle"><button class="${heatHalf===0?'on':''}" onclick="setHeatHalf(0)">All</button>`
     +`<button class="${heatHalf===1?'on':''}" onclick="setHeatHalf(1)">1st</button>`
-    +`<button class="${heatHalf===2?'on':''}" onclick="setHeatHalf(2)">2nd</button></div></div></div>`;
-  _heatPts=pts.filter(t=>(!heatHalf||t.half===heatHalf)&&(!heatPlayer||t.p===heatPlayer));
-  if(!_heatPts.length)
-    return `<div class="chart-card map-card">${head}<div class="stats-empty">No located events${heatPlayer?` for player ${heatPlayer}`:''}${heatHalf?` in the ${heatHalf===1?'1st':'2nd'} half`:''}.</div></div>`;
+    +`<button class="${heatHalf===2?'on':''}" onclick="setHeatHalf(2)">2nd</button></div></div>`;
+  const pts=touchPoints(team).filter(t=>!heatHalf||t.half===heatHalf);
+  if(!pts.length)
+    return `<div class="chart-card map-card">${head}<div class="stats-empty">No located events${heatHalf?` in the ${heatHalf===1?'1st':'2nd'} half`:''}.</div></div>`;
+  _heatBy={}; pts.forEach(t=>{const k=t.p; (_heatBy[k]=_heatBy[k]||[]).push(t);});
+  _heatOrder=Object.keys(_heatBy).filter(p=>p!=='')
+    .sort((a,b)=>{const na=+a,nb=+b;return(!isNaN(na)&&!isNaN(nb))?na-nb:a.localeCompare(b);});
+  const markers=_heatOrder.map(p=>{
+    const a=_heatBy[p];
+    const mx=a.reduce((s,t)=>s+t.x,0)/a.length, my=a.reduce((s,t)=>s+t.y,0)/a.length;
+    return `<div class="hm-mark" data-p="${p}" style="left:${mx.toFixed(1)}%;top:${my.toFixed(1)}%;background:${fill}"`
+      +` onmouseenter="heatHover('${p}')" onmouseleave="heatHover('')">${p}</div>`;
+  }).join('');
+  const list=_heatOrder.map(p=>
+    `<div class="hm-row" data-p="${p}" onmouseenter="heatHover('${p}')" onmouseleave="heatHover('')">`
+    +`<span class="hm-no" style="background:${fill}">${p}</span>`
+    +`<span class="hm-name">${isNaN(+p)?p:'Player '+p}</span>`
+    +`<span class="hm-cnt">${_heatBy[p].length}</span></div>`).join('');
   const d=PITCH_DIMS.football;
   const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG('right')+'</svg>');
   const legend=`<span class="sm-leg">Low</span>`
     +`<span style="display:inline-block;width:130px;height:10px;border-radius:5px;margin:0 4px;`
     +`background:linear-gradient(90deg,rgba(0,60,255,0.55),#00c8ff,#39ff54,#ffe12b,#ff2b1e)"></span>`
     +`<span class="sm-leg">High</span>`;
-  return `<div class="chart-card map-card">${head}<div class="shotmap-pitch">${pitch}`
-    +`<canvas id="heatCv" width="${d.w}" height="${d.h}" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></canvas></div>`
-    +`<div class="shotmap-legend">${legend}</div></div>`;
+  return `<div class="chart-card map-card">${head}<div class="hm-flex">`
+    +`<div><div class="shotmap-pitch" id="hmPitch">${pitch}`
+    +`<canvas id="heatCv" width="${d.w}" height="${d.h}"></canvas>${markers}</div>`
+    +`<div class="shotmap-legend">${legend}</div></div>`
+    +`<div class="hm-list"><div class="hm-hint">Markers = average position · hover a player to isolate his heatmap</div>${list}`
+    +`<div class="hm-cnt-foot">Located touches: ${pts.length}</div></div></div></div>`;
 }
-function drawHeat(){
+/* hover with '' restores the whole-team heatmap */
+function heatHover(p){
+  const pts=p?(_heatBy[p]||[]):[].concat(...Object.values(_heatBy));
+  drawHeat(pts);
+  document.querySelectorAll('.hm-mark,.hm-row').forEach(el=>{
+    el.classList.toggle('sel',!!p&&el.dataset.p===p);
+    el.classList.toggle('dim',!!p&&el.dataset.p!==p);
+  });
+}
+function drawHeat(pts){
   const cv=$('heatCv'); if(!cv)return;
   const W=cv.width, H=cv.height;
   // grayscale density buffer: one soft radial blob per touch, stacked alpha
   const off=document.createElement('canvas'); off.width=W; off.height=H;
   const c=off.getContext('2d'), R=54;
   // per-point weight shrinks with volume so a full-match team map doesn't saturate
-  const A=Math.max(0.10,Math.min(0.40,45/_heatPts.length)).toFixed(3);
-  _heatPts.forEach(t=>{
+  const A=Math.max(0.10,Math.min(0.40,45/(pts.length||1))).toFixed(3);
+  pts.forEach(t=>{
     const x=t.x/100*W, y=t.y/100*H;
     const g=c.createRadialGradient(x,y,0,x,y,R);
     g.addColorStop(0,`rgba(0,0,0,${A})`); g.addColorStop(1,'rgba(0,0,0,0)');
@@ -314,10 +360,9 @@ function drawHeat(){
     dta[i]=lut[a*4]; dta[i+1]=lut[a*4+1]; dta[i+2]=lut[a*4+2];
     dta[i+3]=Math.min(235,a*1.6);
   }
-  cv.getContext('2d').putImageData(img,0,0);
+  const g2=cv.getContext('2d'); g2.clearRect(0,0,W,H); g2.putImageData(img,0,0);
 }
 function setHeatHalf(h){heatHalf=h;renderStats();}
-function setHeatPlayer(p){heatPlayer=p;renderStats();}
 function renderGeneral(){
   const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
   let html=`<div class="gen-wrap"><div class="gen-top"><span class="gh">${meta.home}</span><span>Team Comparison</span><span class="ga">${meta.away}</span></div>`;
