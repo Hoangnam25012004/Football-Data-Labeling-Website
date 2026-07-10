@@ -36,6 +36,7 @@
 <script src="../shared.js?v=4"></script>
 <script>
 let rows=loadRows(), meta=loadMeta(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles';
+let heatHalf=0, heatPlayer='';   // touch heatmap filters: 0 = both halves, '' = whole team
 
 /* per-category column sets — the wide table split into 4 tabs.
    Defensive = Defensive + Duels; Other = Set Pieces + Discipline. */
@@ -83,11 +84,13 @@ function renderStats(){
   if(statCat==='shooting'){
     extra=`<div class="chart-row">${shootingChartHTML(statTeam)}${shotMapHTML(statTeam)}</div>`;
   }else if(statCat==='distribution'){
-    extra=`<div class="chart-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}</div>`;
+    extra=`<div class="chart-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}</div>`
+      +`<div class="chart-row">${heatMapHTML(statTeam)}</div>`;
   }else if(statCat==='defensive'){
     extra=`<div class="chart-row">${defMapHTML(statTeam)}</div>`;
   }
   holder.innerHTML=table+extra;
+  if(statCat==='distribution')drawHeat();   // canvas must exist in the DOM first
 }
 /* attacking direction for a half — inferred from where this team's shots land
    ('right' if their shots average past midfield, else 'left'); if a half has no
@@ -241,6 +244,80 @@ function passMatrixHTML(team){
   return `<div class="pm-title" style="color:${team==='home'?'var(--home)':'var(--away)'}">${name} — Pass Distribution</div>`
     +`<div class="pm-wrap pm-${team}"><table class="pmtx"><thead><tr>${head}</tr></thead><tbody>${body}<tr>${foot}</tr></tbody></table></div>`;
 }
+/* ---- Distribution: touch heatmap (every event that has a pitch location).
+   Both halves are normalised so the team always attacks RIGHT — events from a
+   half where the team attacked left are rotated 180° (x AND y flip) — so the
+   'All' view can safely mix the two halves on one pitch. */
+function touchPoints(team){
+  const dir={1:attackDir(team,1),2:attackDir(team,2)}, out=[];
+  rows.forEach(r=>{
+    if(r.team!==team)return;
+    const h=eventHalf(r), flip=dir[h]==='left';
+    const add=(xy,pl)=>{ if(!xy||xy.x==null)return;
+      out.push({x:flip?100-xy.x:xy.x, y:flip?100-xy.y:xy.y, half:h, p:(pl==null?'':String(pl).trim())});
+    };
+    add(r.pXY,r.playerFrom); add(r.rXY,r.playerTo);
+  });
+  return out;
+}
+let _heatPts=[];   // points selected by heatMapHTML, drawn by drawHeat() after the DOM update
+function heatMapHTML(team){
+  const name=team==='home'?meta.home:meta.away, teamColor=team==='home'?'var(--home)':'var(--away)';
+  const pts=touchPoints(team);
+  const players=[...new Set(pts.filter(t=>t.p).map(t=>t.p))]
+    .sort((a,b)=>{const na=+a,nb=+b;return(!isNaN(na)&&!isNaN(nb))?na-nb:a.localeCompare(b);});
+  if(heatPlayer && !players.includes(heatPlayer))heatPlayer='';   // e.g. after switching team
+  const opts='<option value="">All players</option>'
+    +players.map(p=>`<option value="${p}"${p===heatPlayer?' selected':''}>${p}</option>`).join('');
+  const head=`<div class="chart-head"><div class="chart-title" style="color:${teamColor}">${name} · Touch Heatmap</div>`
+    +`<div class="head-ctrls"><select class="def-sel" onchange="setHeatPlayer(this.value)">${opts}</select>`
+    +`<div class="half-toggle"><button class="${heatHalf===0?'on':''}" onclick="setHeatHalf(0)">All</button>`
+    +`<button class="${heatHalf===1?'on':''}" onclick="setHeatHalf(1)">1st</button>`
+    +`<button class="${heatHalf===2?'on':''}" onclick="setHeatHalf(2)">2nd</button></div></div></div>`;
+  _heatPts=pts.filter(t=>(!heatHalf||t.half===heatHalf)&&(!heatPlayer||t.p===heatPlayer));
+  if(!_heatPts.length)
+    return `<div class="chart-card map-card">${head}<div class="stats-empty">No located events${heatPlayer?` for player ${heatPlayer}`:''}${heatHalf?` in the ${heatHalf===1?'1st':'2nd'} half`:''}.</div></div>`;
+  const d=PITCH_DIMS.football;
+  const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG('right')+'</svg>');
+  const legend=`<span class="sm-leg">Low</span>`
+    +`<span style="display:inline-block;width:130px;height:10px;border-radius:5px;margin:0 4px;`
+    +`background:linear-gradient(90deg,rgba(0,60,255,0.55),#00c8ff,#39ff54,#ffe12b,#ff2b1e)"></span>`
+    +`<span class="sm-leg">High</span>`;
+  return `<div class="chart-card map-card">${head}<div class="shotmap-pitch">${pitch}`
+    +`<canvas id="heatCv" width="${d.w}" height="${d.h}" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></canvas></div>`
+    +`<div class="shotmap-legend">${legend}</div></div>`;
+}
+function drawHeat(){
+  const cv=$('heatCv'); if(!cv)return;
+  const W=cv.width, H=cv.height;
+  // grayscale density buffer: one soft radial blob per touch, stacked alpha
+  const off=document.createElement('canvas'); off.width=W; off.height=H;
+  const c=off.getContext('2d'), R=54;
+  // per-point weight shrinks with volume so a full-match team map doesn't saturate
+  const A=Math.max(0.10,Math.min(0.40,45/_heatPts.length)).toFixed(3);
+  _heatPts.forEach(t=>{
+    const x=t.x/100*W, y=t.y/100*H;
+    const g=c.createRadialGradient(x,y,0,x,y,R);
+    g.addColorStop(0,`rgba(0,0,0,${A})`); g.addColorStop(1,'rgba(0,0,0,0)');
+    c.fillStyle=g; c.fillRect(x-R,y-R,2*R,2*R);
+  });
+  // 256-entry colour LUT: blue → cyan → green → yellow → red
+  const pc=document.createElement('canvas'); pc.width=256; pc.height=1;
+  const pg=pc.getContext('2d'), lg=pg.createLinearGradient(0,0,256,0);
+  [[0.08,'#0028ff'],[0.35,'#00c8ff'],[0.55,'#39ff54'],[0.75,'#ffe12b'],[1,'#ff2b1e']]
+    .forEach(([s,col])=>lg.addColorStop(s,col));
+  pg.fillStyle=lg; pg.fillRect(0,0,256,1);
+  const lut=pg.getImageData(0,0,256,1).data;
+  const img=c.getImageData(0,0,W,H), dta=img.data;
+  for(let i=0;i<dta.length;i+=4){
+    const a=dta[i+3]; if(!a)continue;
+    dta[i]=lut[a*4]; dta[i+1]=lut[a*4+1]; dta[i+2]=lut[a*4+2];
+    dta[i+3]=Math.min(235,a*1.6);
+  }
+  cv.getContext('2d').putImageData(img,0,0);
+}
+function setHeatHalf(h){heatHalf=h;renderStats();}
+function setHeatPlayer(p){heatPlayer=p;renderStats();}
 function renderGeneral(){
   const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
   let html=`<div class="gen-wrap"><div class="gen-top"><span class="gh">${meta.home}</span><span>Team Comparison</span><span class="ga">${meta.away}</span></div>`;
