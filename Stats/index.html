@@ -146,6 +146,8 @@ function renderStats(){
       +`<div class="chart-row">${heatMapHTML(statTeam)}</div>`;
   }else if(statCat==='defensive'){
     extra=`<div class="chart-row">${defMapHTML(statTeam)}</div>`;
+  }else if(statCat==='other'){
+    extra=`<div class="chart-row">${foulMapHTML(statTeam)}</div>`;
   }
   holder.innerHTML=table+extra;
   if(statCat==='distribution')heatHover('');   // canvas must exist in the DOM first
@@ -332,6 +334,60 @@ function crossMapHTML(team){
     +`<span class="sm-leg"><span class="leg-dot" style="background:#f7506b"></span>Cross fail</span>`;
   return `<div class="chart-card cross-card">`
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block">${defs}${over}${pitch}</svg>`
+    +`<div class="shotmap-legend">${legend}</div></div>`;
+}
+/* ---- Other: foul map — every located foul, both halves normalised to attack
+   RIGHT. Marker shape = half (circle 1st, square 2nd); a yellow/red ring marks
+   fouls that led to a card (same player's card event within 90s). Hatched area
+   = dangerous zone (own defensive third); ratio bands like the cross map. */
+const FOUL_EVENTS=new Set(['foul','foul throw','handball foul']);
+function foulMapHTML(team){
+  const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
+  const teamColor=team==='home'?'var(--home)':'var(--away)', fill=team==='home'?'#2f81f7':'#f7682f';
+  const evs=rows.filter(r=>r.team===team&&FOUL_EVENTS.has(r.event)&&r.pXY);
+  if(!evs.length)return `<div class="chart-card cross-card"><div class="stats-empty">No located fouls yet.</div></div>`;
+  const cards=rows.filter(r=>r.team===team&&(r.event==='yellow card'||r.event==='red card')&&r.t!=null);
+  const cardFor=f=>{let best=null,bd=90;
+    cards.forEach(c=>{
+      if(String(c.playerFrom||'').trim()!==String(f.playerFrom||'').trim())return;
+      const dd=Math.abs(c.t-f.t); if(dd<=bd){bd=dd;best=c.event;}
+    });
+    return best;};
+  const dir={1:attackDir(team,1),2:attackDir(team,2)};
+  const fl=evs.map(r=>{
+    const h=eventHalf(r), flip=dir[h]==='left';
+    return {x:(flip?100-r.pXY.x:r.pXY.x)/100*PW, y:(flip?100-r.pXY.y:r.pXY.y)/100*PH,
+            half:h, no:(r.playerFrom||'').toString().trim(), card:cardFor(r)};
+  });
+  const oCnt=[0,0,0]; fl.forEach(f=>oCnt[Math.min(2,Math.floor(f.x/PW*3))]++);
+  const tCnt=[0,0,0]; fl.forEach(f=>tCnt[Math.min(2,Math.floor(f.y/PH*3))]++);
+  const pctL=n=>(Math.round(n/fl.length*1000)/10)+'%';
+  let over='';
+  for(let i=0;i<3;i++)
+    over+=`<text x="${((i+0.5)*PW/3).toFixed(0)}" y="40" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${pctL(oCnt[i])}</text>`;
+  [1,2].forEach(i=>over+=`<line x1="${i*PW/3}" y1="10" x2="${i*PW/3}" y2="${mT-16}" stroke="var(--line)" stroke-width="2"/>`);
+  for(let i=0;i<3;i++)
+    over+=`<text x="${PW+mR2/2}" y="${(mT+(i+0.5)*PH/3+10).toFixed(0)}" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${pctL(tCnt[i])}</text>`;
+  [1,2].forEach(i=>over+=`<line x1="${PW+18}" y1="${mT+i*PH/3}" x2="${W-18}" y2="${mT+i*PH/3}" stroke="var(--line)" stroke-width="2"/>`);
+  const defs='<defs><pattern id="dngPat" width="26" height="26" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">'
+    +'<rect width="26" height="26" fill="rgba(247,80,107,0.10)"/><rect width="13" height="26" fill="rgba(247,80,107,0.26)"/></pattern></defs>';
+  const dots=fl.map(f=>{
+    const ring=f.card?`stroke="${f.card==='red card'?'#e5484d':'#ffd23f'}" stroke-width="5"`:'stroke="#0d1117" stroke-width="1.5"';
+    const shape=f.half===1
+      ?`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${fill}" fill-opacity="0.92" ${ring}/>`
+      :`<rect x="${(f.x-11).toFixed(1)}" y="${(f.y-11).toFixed(1)}" width="22" height="22" rx="3" fill="${fill}" fill-opacity="0.92" ${ring}/>`;
+    return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${f.no}</text></g>`;
+  }).join('');
+  const pitch=`<g transform="translate(0 ${mT})"><rect width="${PW}" height="${PH}" fill="rgba(26,62,32,0.72)"/>`
+    +`<rect width="${PW/3}" height="${PH}" fill="url(#dngPat)"/>`
+    +`<g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG('right')}${dots}</g>`;
+  const legend=`<span class="sm-leg"><span class="leg-dot" style="background:${fill}"></span>1st half</span>`
+    +`<span class="sm-leg"><span class="leg-dot" style="background:${fill};border-radius:3px"></span>2nd half</span>`
+    +`<span class="sm-leg"><span class="leg-dot" style="background:repeating-linear-gradient(45deg,rgba(247,80,107,0.45) 0 4px,rgba(247,80,107,0.12) 4px 8px)"></span>Dangerous zone</span>`
+    +`<span class="sm-leg"><span class="leg-dot" style="background:${fill};box-shadow:0 0 0 3px #ffd23f"></span>Led to yellow card</span>`
+    +`<span class="sm-leg"><span class="leg-dot" style="background:${fill};box-shadow:0 0 0 3px #e5484d"></span>Led to red card</span>`;
+  return `<div class="chart-card cross-card">`
+    +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block;max-width:1000px;margin:0 auto">${defs}${over}${pitch}</svg>`
     +`<div class="shotmap-legend">${legend}</div></div>`;
 }
 function passMatrixHTML(team){
