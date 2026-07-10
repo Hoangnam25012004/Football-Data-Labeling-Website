@@ -14,6 +14,9 @@ body{display:flex;flex-direction:column}
 body>header{flex:none}
 .page{flex:1;min-height:0;display:flex;flex-direction:column;box-sizing:border-box}
 .stats-wrap{flex:1;min-height:0;max-height:none}
+/* Distribution: matrix + scatter + cross map share one row */
+.scatter-card{flex:1;min-width:320px;max-width:560px}
+.cross-card{flex:1.35;min-width:400px}
 /* player heatmap card (Distribution tab) */
 .hm-flex{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
 .hm-flex>div:first-child{flex:1;min-width:340px}
@@ -139,7 +142,7 @@ function renderStats(){
   if(statCat==='shooting'){
     extra=`<div class="chart-row">${shootingChartHTML(statTeam)}${shotMapHTML(statTeam)}</div>`;
   }else if(statCat==='distribution'){
-    extra=`<div class="chart-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}</div>`
+    extra=`<div class="chart-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}${crossMapHTML(statTeam)}</div>`
       +`<div class="chart-row">${heatMapHTML(statTeam)}</div>`;
   }else if(statCat==='defensive'){
     extra=`<div class="chart-row">${defMapHTML(statTeam)}</div>`;
@@ -255,7 +258,7 @@ function passScatterHTML(team){
   const P=computeStats(rows,team), fill=team==='home'?'#2f81f7':'#f7682f';
   const players=sortedPlayers(P).filter(no=>P[no].passes>0);
   if(!players.length)return `<div class="chart-card"><div class="stats-empty">No passes yet.</div></div>`;
-  const W=680,H=300,mL=44,mR=22,mT=18,mB=36, maxVol=Math.max(...players.map(no=>P[no].passes));
+  const W=460,H=300,mL=44,mR=22,mT=18,mB=36, maxVol=Math.max(...players.map(no=>P[no].passes));
   const X=acc=>mL+(acc/100)*(W-mL-mR), Y=vol=>H-mB-(maxVol?vol/maxVol:0)*(H-mT-mB);
   let g=`<rect x="${mL}" y="${mT}" width="${W-mL-mR}" height="${H-mT-mB}" fill="none" stroke="var(--line)"/>`;
   g+=`<line x1="${X(50)}" y1="${mT}" x2="${X(50)}" y2="${H-mB}" stroke="var(--line)" stroke-dasharray="4 4"/>`;
@@ -264,14 +267,72 @@ function passScatterHTML(team){
   g+=`<text x="${X(50)}" y="${H-10}" text-anchor="middle" font-size="11" fill="var(--mut)">Pass Accuracy →</text>`;
   g+=`<text x="${W-mR}" y="${H-10}" text-anchor="end" font-size="11" fill="var(--mut)">100%</text>`;
   g+=`<text x="10" y="${mT+10}" font-size="11" fill="var(--mut)">↑ Volume</text>`;
-  const bubbles=players.map(no=>{
-    const s=P[no], acc=s.passes?s.passesComp/s.passes*100:0, rr=9+(s.passes/maxVol)*11;
-    const cx=X(acc), cy=Y(s.passes);
-    return `<g><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${rr.toFixed(1)}" fill="${fill}" fill-opacity="0.92" stroke="#0d1117" stroke-width="1.5"/>`
-      +`<text x="${cx.toFixed(1)}" y="${(cy+3.5).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${no}</text></g>`;
-  }).join('');
+  // bubbles are pushed apart when they overlap so every shirt number stays readable
+  const pts=players.map(no=>{
+    const s=P[no], acc=s.passes?s.passesComp/s.passes*100:0;
+    return {no, rr:8+(s.passes/maxVol)*9, cx:X(acc), cy:Y(s.passes)};
+  });
+  for(let it=0;it<80;it++){
+    let moved=false;
+    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+      const p=pts[i], q=pts[j];
+      let dx=q.cx-p.cx, dy=q.cy-p.cy, dd=Math.hypot(dx,dy);
+      const min=p.rr+q.rr+2;
+      if(dd<min){ if(!dd){dx=1;dy=0;dd=1;}
+        const push=(min-dd)/2;
+        p.cx-=dx/dd*push; p.cy-=dy/dd*push; q.cx+=dx/dd*push; q.cy+=dy/dd*push; moved=true; }
+    }
+    pts.forEach(p=>{p.cx=Math.max(mL+p.rr,Math.min(W-mR-p.rr,p.cx));
+                    p.cy=Math.max(mT+p.rr,Math.min(H-mB-p.rr,p.cy));});
+    if(!moved)break;
+  }
+  const bubbles=pts.map(p=>
+    `<g><circle cx="${p.cx.toFixed(1)}" cy="${p.cy.toFixed(1)}" r="${p.rr.toFixed(1)}" fill="${fill}" fill-opacity="0.92" stroke="#0d1117" stroke-width="1.5"/>`
+    +`<text x="${p.cx.toFixed(1)}" y="${(p.cy+3.5).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${p.no}</text></g>`).join('');
   return `<div class="chart-card scatter-card">`
     +`<div class="scatter-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:${W}px">${g}${bubbles}</svg></div></div>`;
+}
+/* ---- Distribution: cross map — origin→target arrows with zone ratios.
+   Both halves are normalised so the team attacks RIGHT (same rule as the
+   heatmap). Top band: share of crosses by origin third of the pitch length;
+   right band: share of located cross targets by height third. */
+function crossMapHTML(team){
+  const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
+  const teamColor=team==='home'?'var(--home)':'var(--away)';
+  const evs=rows.filter(r=>r.team===team&&(r.event==='cross success'||r.event==='cross fail')&&r.pXY);
+  if(!evs.length)return `<div class="chart-card cross-card"><div class="stats-empty">No crosses yet.</div></div>`;
+  const dir={1:attackDir(team,1),2:attackDir(team,2)};
+  const cr=evs.map(r=>{
+    const flip=dir[eventHalf(r)]==='left', f=p=>({x:(flip?100-p.x:p.x)/100*PW, y:(flip?100-p.y:p.y)/100*PH});
+    return {a:f(r.pXY), b:r.rXY?f(r.rXY):null, ok:r.event==='cross success'};
+  });
+  const oCnt=[0,0,0]; cr.forEach(c=>oCnt[Math.min(2,Math.floor(c.a.x/PW*3))]++);
+  const tgt=cr.filter(c=>c.b), tCnt=[0,0,0]; tgt.forEach(c=>tCnt[Math.min(2,Math.floor(c.b.y/PH*3))]++);
+  const pctL=(n,dd)=>dd?(Math.round(n/dd*1000)/10)+'%':'–';
+  let over='';
+  for(let i=0;i<3;i++)
+    over+=`<text x="${((i+0.5)*PW/3).toFixed(0)}" y="40" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${pctL(oCnt[i],cr.length)}</text>`;
+  [1,2].forEach(i=>over+=`<line x1="${i*PW/3}" y1="10" x2="${i*PW/3}" y2="${mT-16}" stroke="var(--line)" stroke-width="2"/>`);
+  for(let i=0;i<3;i++)
+    over+=`<text x="${PW+mR2/2}" y="${(mT+(i+0.5)*PH/3+10).toFixed(0)}" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${pctL(tCnt[i],tgt.length)}</text>`;
+  [1,2].forEach(i=>over+=`<line x1="${PW+18}" y1="${mT+i*PH/3}" x2="${W-18}" y2="${mT+i*PH/3}" stroke="var(--line)" stroke-width="2"/>`);
+  const seg=cr.map(c=>{
+    const col=c.ok?'#39d98a':'#f7506b';
+    let s=`<circle cx="${c.a.x.toFixed(1)}" cy="${c.a.y.toFixed(1)}" r="8" fill="${col}" fill-opacity="0.9" stroke="#0d1117" stroke-width="1.5"/>`;
+    if(c.b)s+=`<line x1="${c.a.x.toFixed(1)}" y1="${c.a.y.toFixed(1)}" x2="${c.b.x.toFixed(1)}" y2="${c.b.y.toFixed(1)}"`
+      +` stroke="${col}" stroke-width="3.5" stroke-dasharray="9 8" marker-end="url(#${c.ok?'cmOk':'cmNo'})" opacity="0.9"/>`;
+    return s;
+  }).join('');
+  const defs='<defs>'
+    +'<marker id="cmOk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#39d98a"/></marker>'
+    +'<marker id="cmNo" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#f7506b"/></marker></defs>';
+  const pitch=`<g transform="translate(0 ${mT})"><rect width="${PW}" height="${PH}" fill="rgba(26,62,32,0.72)"/>`
+    +`<g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG('right')}${seg}</g>`;
+  const legend=`<span class="sm-leg"><span class="leg-dot" style="background:#39d98a"></span>Cross success</span>`
+    +`<span class="sm-leg"><span class="leg-dot" style="background:#f7506b"></span>Cross fail</span>`;
+  return `<div class="chart-card cross-card">`
+    +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block">${defs}${over}${pitch}</svg>`
+    +`<div class="shotmap-legend">${legend}</div></div>`;
 }
 function passMatrixHTML(team){
   const {players,mtx}=passMatrix(rows,team);
