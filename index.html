@@ -608,6 +608,10 @@
         <button id="fmHomeBtn">Home</button>
         <button id="fmAwayBtn">Away</button>
       </div>
+      <div class="stats-toggle" title="Hướng tấn công 2 hiệp ngược nhau — chọn hiệp để xem đúng chiều">
+        <button id="fmHalf1Btn">1st</button>
+        <button id="fmHalf2Btn">2nd</button>
+      </div>
       <button class="modal-close" id="fmModalClose" title="Close">×</button>
     </div>
     <div class="modal-body lineup-body">
@@ -1605,7 +1609,7 @@ function applySubGroup(team,subsArr){
 }
 
 /* ===== FORMATION MODAL — view/adjust each period's formation, both teams ===== */
-let fmTeam='home', fmSel=-1;   // fmSel: -1 = starting formation, >=0 = index into this team's history
+let fmTeam='home', fmSel=-1, fmHalf=1;   // fmSel: -1 = starting formation, >=0 = index into history; fmHalf: viewing 1st/2nd (attacking dir flips)
 function fmTeamHistory(){return (state.lineups.history||[]).filter(h=>h.team===fmTeam);}
 function fmSelected(){          // -> {xi,subs,label,t,editableHere}
   const lu=state.lineups[fmTeam], hist=fmTeamHistory();
@@ -1615,6 +1619,7 @@ function fmSelected(){          // -> {xi,subs,label,t,editableHere}
 function openFmModal(team){
   if(team)fmTeam=team;
   fmSel=fmTeamHistory().length-1;              // land on the latest period
+  fmHalf=eventHalf({t:fmSelected().t})===2?2:1; // default to that period's half
   $('fmModal').classList.add('show');
   renderFmModal();
 }
@@ -1623,6 +1628,8 @@ function renderFmModal(){
   $('fmAwayBtn').className=fmTeam==='away'?'act-away':'';
   $('fmHomeBtn').textContent=$('homeName').value||'Home';
   $('fmAwayBtn').textContent=$('awayName').value||'Away';
+  $('fmHalf1Btn').className=fmHalf===1?'act-gen':'';
+  $('fmHalf2Btn').className=fmHalf===2?'act-gen':'';
   const hist=fmTeamHistory(), box=$('fmPeriods'); box.innerHTML='';
   if(fmSel>=hist.length)fmSel=hist.length-1;
   // period rows: start – end, label; the starting formation first
@@ -1634,7 +1641,7 @@ function renderFmModal(){
     if(p.hIdx===fmSel)row.style.borderColor='var(--accent)';
     row.innerHTML=`<span class="num">${fmt(matchTime(p.t)).slice(0,5)}</span>
       <span class="pname">${p.label}<br><span style="color:var(--mut);font-size:10px">${fmt(matchTime(p.t))} → ${end}</span></span>`;
-    row.onclick=()=>{fmSel=p.hIdx;renderFmModal();};
+    row.onclick=()=>{fmSel=p.hIdx;fmHalf=eventHalf({t:p.t})===2?2:1;renderFmModal();};
     if(p.hIdx>=0){
       const rm=document.createElement('button'); rm.className='rm'; rm.textContent='×';
       rm.title='Xoá giai đoạn này';
@@ -1647,16 +1654,19 @@ function renderFmModal(){
     }
     box.appendChild(row);
   });
-  // editable pitch for the selected period
+  // editable pitch for the selected period. Positions are stored in half-1 orientation;
+  // viewing the 2nd half rotates the whole team 180° (flip both axes + attacking dir).
   const sel=fmSelected(), lu=state.lineups[fmTeam], pit=$('fmEditPitch');
-  pit.innerHTML=pitchSVG('football')+gridHTML(lu.dir||'lr');
+  const dir0=lu.dir||'lr', flip=fmHalf===2;
+  const gdir=flip?(dir0==='lr'?'rl':'lr'):dir0;
+  pit.innerHTML=pitchSVG('football')+gridHTML(gdir);
   sel.xi.forEach(x=>{
     const p=lu.roster.find(r=>String(r.no)===String(x.no));
     const dot=document.createElement('div');
     dot.className='lu-dot'+(fmTeam==='away'?' away':'');
-    dot.style.left=x.x+'%'; dot.style.top=x.y+'%';
+    dot.style.left=(flip?100-x.x:x.x)+'%'; dot.style.top=(flip?100-x.y:x.y)+'%';
     dot.innerHTML=`${x.no}<span class="lbl">${p?(p.name||''):''}</span>`;
-    fmDrag(dot,x,lu.dir||'lr'); pit.appendChild(dot);
+    fmDrag(dot,x,dir0,flip); pit.appendChild(dot);
   });
   const subsEl=$('fmModalSubs'); subsEl.innerHTML='';
   sel.subs.forEach(no=>{const p=lu.roster.find(r=>String(r.no)===String(no));
@@ -1664,15 +1674,17 @@ function renderFmModal(){
     c.innerHTML=`<span class="num">${no}</span>${p?(p.name||''):''}`; subsEl.appendChild(c);});
 }
 // drag a formation dot inside the modal — mutates the snapshot (or the starting XI)
-function fmDrag(dot,x,dir){
+function fmDrag(dot,x,dir,flip){
   dot.onpointerdown=e=>{
     e.preventDefault(); dot.setPointerCapture(e.pointerId); dot.style.cursor='grabbing';
     const pit=$('fmEditPitch');
     const move=ev=>{const r=pit.getBoundingClientRect();
-      x.x=Math.max(0,Math.min(100,(ev.clientX-r.left)/r.width*100));
-      x.y=Math.max(0,Math.min(100,(ev.clientY-r.top)/r.height*100));
+      const px=Math.max(0,Math.min(100,(ev.clientX-r.left)/r.width*100));
+      const py=Math.max(0,Math.min(100,(ev.clientY-r.top)/r.height*100));
+      // convert the on-screen (2nd-half-flipped) position back to half-1 canonical storage
+      x.x=flip?100-px:px; x.y=flip?100-py:py;
       x.pos=zoneAt(x.x,x.y,dir);
-      dot.style.left=x.x+'%'; dot.style.top=x.y+'%';};
+      dot.style.left=px+'%'; dot.style.top=py+'%';};
     const up=()=>{dot.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);
       saveLineups(); renderFmModal();};
     document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
@@ -1684,6 +1696,8 @@ $('fmBtn').onclick=()=>{
 };
 $('fmHomeBtn').onclick=()=>{fmTeam='home';fmSel=fmTeamHistory().length-1;renderFmModal();};
 $('fmAwayBtn').onclick=()=>{fmTeam='away';fmSel=fmTeamHistory().length-1;renderFmModal();};
+$('fmHalf1Btn').onclick=()=>{fmHalf=1;renderFmModal();};
+$('fmHalf2Btn').onclick=()=>{fmHalf=2;renderFmModal();};
 $('fmModalClose').onclick=()=>$('fmModal').classList.remove('show');
 $('fmModal').addEventListener('click',e=>{if(e.target===$('fmModal'))$('fmModal').classList.remove('show');});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('fmModal').classList.contains('show')){e.preventDefault();$('fmModal').classList.remove('show');}});
