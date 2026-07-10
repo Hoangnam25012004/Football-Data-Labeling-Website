@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stats — Pitch Tagger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="../shared.css?v=5">
 <style>
 /* fill the viewport exactly: header + page + stats-wrap as a flex column, so no
@@ -683,8 +684,9 @@ $('statHomeBtn').onclick=()=>{statTeam='home';renderStats();};
 $('statAwayBtn').onclick=()=>{statTeam='away';renderStats();};
 document.querySelectorAll('#catToggle button').forEach(b=>b.onclick=()=>{statCat=b.dataset.cat;renderStats();});
 
-/* live sync with the main tagging tab */
+/* live sync with the main tagging tab (ignored while cloud mode owns the data) */
 window.addEventListener('storage',e=>{
+  if(cloudMode)return;
   if(e.key===PT_KEYS.rows){rows=loadRows();renderStats();}
   else if(e.key===PT_KEYS.meta){meta=loadMeta();syncBackLink(meta);renderStats();}
   else if(e.key===PT_KEYS.duration){dur=loadJSON(PT_KEYS.duration,dur);renderStats();}
@@ -693,6 +695,81 @@ window.addEventListener('storage',e=>{
 
 syncBackLink(meta);   // "← Tagging" returns to ../#match=<code>, keeping the match open
 renderStats();
+
+/* ===== standalone cloud mode =====
+   Opening …/Stats/#match=<code> directly (without the main tagging tab) used to
+   show nothing: this page only read localStorage, which only the main tab fills.
+   With a #match code in the URL we now load the match read-only from Supabase
+   (source of truth) and subscribe to live changes. localStorage is never written,
+   so the main tab's session is untouched; if the cloud is unreachable the page
+   silently keeps the localStorage-driven view above. */
+const SB_CONFIG={   // public values — keep in sync with CONFIG in ../cloud-sync.js
+  url:'https://xtzmtdcohoixoxqusyyz.supabase.co',
+  anonKey:'sb_publishable_ZcIbdPmEdfW0POArBW_eNg_aZbc-lFa'
+};
+let cloudMode=false;
+function dbToRow(d){
+  const a=d.attributes||{};
+  return {id:d.id, t:d.t_seconds, rt:a.rt??null, team:d.team,
+    teamName:a.team_name||d.team, event:d.event_name,
+    playerFrom:d.player_from!=null?String(d.player_from):'',
+    playerTo:d.player_to!=null?String(d.player_to):'',
+    action:d.action_code||'', raw:a.raw||'', grp:a.grp||null, ord:a.ord??0,
+    pXY:d.x!=null?{x:d.x,y:d.y}:null, rXY:d.rx!=null?{x:d.rx,y:d.ry}:null};
+}
+(async function statsCloud(){
+  const m=location.hash.match(/match=([0-9a-z-]{5,36})/i);
+  if(!m||!window.supabase)return;
+  const saved=loadJSON('pitchtagger.cloud.cfg',{});
+  const url=saved.url||SB_CONFIG.url, key=saved.key||SB_CONFIG.anonKey;
+  if(!url||!key)return;
+  try{
+    const sb=window.supabase.createClient(url,key,{realtime:{params:{eventsPerSecond:20}}});
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session){const {error}=await sb.auth.signInAnonymously(); if(error)throw error;}
+    const code=m[1], col=/^\d{5}$/.test(code)?'code':'id';
+    const {data:match,error}=await sb.from('matches').select('*').eq(col,code).maybeSingle();
+    if(error||!match){if(error)console.warn('Stats cloud: match lookup failed —',error.message);return;}
+    const applyMatch=row=>{
+      meta={...meta, home:row.home_name||meta.home, away:row.away_name||meta.away,
+        homeTeamId:row.home_team_id||null, awayTeamId:row.away_team_id||null,
+        matchId:row.id, matchCode:row.code||null};
+      if(row.config&&Object.keys(row.config).length)
+        dur=Object.assign({enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0},row.config);
+      if(row.lineups&&row.lineups.home&&row.lineups.away)lineups=row.lineups;
+    };
+    applyMatch(match);
+    // page through ALL events — a single select caps at 1000 rows
+    const PAGE=1000, all=[];
+    for(let from=0;;from+=PAGE){
+      const {data,error:e2}=await sb.from('events').select('*')
+        .eq('match_id',match.id).order('t_seconds').range(from,from+PAGE-1);
+      if(e2){console.warn('Stats cloud: events load failed —',e2.message);break;}
+      all.push(...(data||[]));
+      if(!data||data.length<PAGE)break;
+    }
+    cloudMode=true;                 // from here on, ignore main-tab localStorage events
+    rows=all.map(dbToRow);
+    syncBackLink(meta);
+    renderStats();
+    // live updates: events stream + match row (names / duration / lineups)
+    let t=null; const rerender=()=>{clearTimeout(t);t=setTimeout(renderStats,120);};
+    sb.channel('stats:'+match.id)
+      .on('postgres_changes',{event:'*',schema:'public',table:'events',filter:'match_id=eq.'+match.id},p=>{
+        if(p.eventType==='INSERT'||p.eventType==='UPDATE'){
+          const r=dbToRow(p.new), i=rows.findIndex(x=>x.id===r.id);
+          if(i>=0)rows[i]=r; else rows.push(r);
+        }else if(p.eventType==='DELETE'){
+          const i=rows.findIndex(x=>x.id===p.old.id); if(i>=0)rows.splice(i,1);
+        }
+        rerender();
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'matches',filter:'id=eq.'+match.id},p=>{
+        if(p.new){applyMatch(p.new);rerender();}
+      })
+      .subscribe();
+  }catch(e){console.warn('Stats cloud load failed — using local data:',(e&&e.message)||e);}
+})();
 </script>
 </body>
 </html>
