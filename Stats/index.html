@@ -15,6 +15,9 @@ body{display:flex;flex-direction:column}
 body>header{flex:none}
 .page{flex:1;min-height:0;display:flex;flex-direction:column;box-sizing:border-box}
 .stats-wrap{flex:1;min-height:0;max-height:none}
+/* flat look: no grey panels behind the visualizations (charts sit straight on
+   the page background; only tables/lists keep their own styling) */
+.chart-card,.gen-form{background:transparent;border:none}
 /* Distribution: matrix + scatter + cross map share one row with EQUAL heights —
    the row stretches every card to the tallest one and centres each card's
    content vertically; the svgs cap their height and letterbox (viewBox keeps
@@ -52,7 +55,7 @@ body>header{flex:none}
 .gen-layout{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;padding:14px}
 .gen-center{flex:1;min-width:420px}
 .gen-center .gen-wrap{max-width:none;padding:0}
-.gen-form{flex:none;width:310px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;
+.gen-form{flex:none;width:310px;border-radius:10px;padding:10px;
   position:sticky;top:14px}   /* sticky: stays in view while the long comparison scrolls, so the column never looks empty */
 .score-bar{display:flex;align-items:center;justify-content:center;gap:20px;padding:8px 6px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
 .sb-name{flex:1;font-size:19px;font-weight:800;line-height:1.25}
