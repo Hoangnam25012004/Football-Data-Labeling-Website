@@ -18,6 +18,17 @@ body>header{flex:none}
 /* flat look: no grey panels behind the visualizations (charts sit straight on
    the page background; only tables/lists keep their own styling) */
 .chart-card,.gen-form{background:transparent;border:none}
+/* Distribution: pass-type breakdown table (below the heatmap) */
+.pt-card{flex:1;max-width:900px}
+.pt-head{display:flex;align-items:center;gap:26px;padding:4px 2px 12px}
+.pt-title{font-size:17px;font-weight:800;color:var(--ink);margin-right:auto}
+.pt-head span{color:var(--mut);font-size:12px}
+.pt-head span b{color:var(--ink);font-size:13px;margin-left:6px}
+.ptable{width:100%;border-collapse:collapse;font-size:13px}
+.ptable th,.ptable td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.ptable th:first-child,.ptable td:first-child{text-align:left}
+.ptable .pt-sec th{background:var(--panel2);color:var(--mut);font-size:12px;font-weight:700}
+.ptable .pt-lbl{font-weight:600}
 /* Distribution: matrix + scatter + cross map share one row with EQUAL heights —
    the row stretches every card to the tallest one and centres each card's
    content vertically; the svgs cap their height and letterbox (viewBox keeps
@@ -154,7 +165,8 @@ function renderStats(){
     extra=`<div class="chart-row">${shootingChartHTML(statTeam)}${shotMapHTML(statTeam)}</div>`;
   }else if(statCat==='distribution'){
     extra=`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}${crossMapHTML(statTeam)}</div>`
-      +`<div class="chart-row">${heatMapHTML(statTeam)}</div>`;
+      +`<div class="chart-row">${heatMapHTML(statTeam)}</div>`
+      +`<div class="chart-row">${passTypesHTML(statTeam)}</div>`;
   }else if(statCat==='defensive'){
     extra=`<div class="chart-row">${defMapHTML(statTeam)}</div>`;
   }else if(statCat==='other'){
@@ -400,6 +412,52 @@ function foulMapHTML(team){
   return `<div class="chart-card cross-card">`
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block;max-width:1000px;margin:0 auto">${defs}${over}${pitch}</svg>`
     +`<div class="shotmap-legend">${legend}</div></div>`;
+}
+/* ---- Distribution: pass-type breakdown table (below the heatmap).
+   Distance uses real pitch metres (105x68): short <15m, medium 15-30m, long >30m.
+   Direction is the pass angle relative to the attack (halves normalised to
+   attack RIGHT): forward within ±45°, backward beyond ±135°, else sideways.
+   Area = origin third of the pitch length. Passes missing a tagged origin or
+   target can't be classified and are skipped in the affected section. */
+function passTypesHTML(team){
+  const teamColor=team==='home'?'var(--home)':'var(--away)';
+  const evs=rows.filter(r=>r.team===team&&(r.event==='pass success'||r.event==='pass fail'));
+  if(!evs.length)return `<div class="chart-card pt-card"><div class="stats-empty">No passes yet.</div></div>`;
+  const tot=evs.length, suc=evs.filter(r=>r.event==='pass success').length;
+  const dir={1:attackDir(team,1),2:attackDir(team,2)};
+  const XM=105, YM=68;
+  const mk=labels=>{const o={};labels.forEach(l=>o[l]=[0,0]);return o;};   // label -> [succeeded, count]
+  const catD=mk(['Long Passes','Medium Range Passes','Short Passes']);
+  const catG=mk(['Passes Forward','Passes Sideways','Passes Backward']);
+  const catA=mk(['Passes In Final Third','Passes In Middle Third','Passes In Defensive Third']);
+  const add=(cat,k,ok)=>{cat[k][1]++;if(ok)cat[k][0]++;};
+  evs.forEach(r=>{
+    const ok=r.event==='pass success';
+    if(!r.pXY)return;
+    const flip=dir[eventHalf(r)]==='left';
+    const ax=flip?100-r.pXY.x:r.pXY.x;
+    add(catA, ax>=200/3?'Passes In Final Third':ax>=100/3?'Passes In Middle Third':'Passes In Defensive Third', ok);
+    if(!r.rXY)return;
+    const ay=flip?100-r.pXY.y:r.pXY.y, bx=flip?100-r.rXY.x:r.rXY.x, by=flip?100-r.rXY.y:r.rXY.y;
+    const dxM=(bx-ax)/100*XM, dyM=(by-ay)/100*YM, dist=Math.hypot(dxM,dyM);
+    add(catD, dist>30?'Long Passes':dist>=15?'Medium Range Passes':'Short Passes', ok);
+    const ang=Math.abs(Math.atan2(dyM,dxM))*180/Math.PI;   // 0° = straight forward, 180° = straight back
+    add(catG, ang<=45?'Passes Forward':ang>=135?'Passes Backward':'Passes Sideways', ok);
+  });
+  const rate=(n,dd)=>dd?(Math.round(n/dd*1000)/10).toFixed(1)+'%':'–';
+  const section=(title,cat)=>{
+    const base=Object.values(cat).reduce((s,v)=>s+v[1],0);
+    let h=`<tr class="pt-sec"><th>${title}</th><th>Succeeded</th><th>Count</th><th>Success Rate</th><th>Ratio</th></tr>`;
+    Object.entries(cat).forEach(([lbl,[s,n]])=>{
+      h+=`<tr><td class="pt-lbl" style="color:${teamColor}">${lbl}</td><td>${s}</td><td>${n}</td><td>${rate(s,n)}</td><td>${rate(n,base)}</td></tr>`;
+    });
+    return h;
+  };
+  const head=`<div class="pt-head"><b class="pt-title">Passes</b>`
+    +`<span>Total Pass Count <b>${tot}</b></span><span>Succeeded <b>${suc}</b></span><span>Success Rate <b>${rate(suc,tot)}</b></span></div>`;
+  return `<div class="chart-card pt-card">${head}<table class="ptable">`
+    +section('Pass Distance',catD)+section('Pass Direction',catG)+section('Area',catA)
+    +'</table></div>';
 }
 function passMatrixHTML(team){
   const {players,mtx}=passMatrix(rows,team);
