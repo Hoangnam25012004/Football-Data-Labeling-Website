@@ -1094,9 +1094,24 @@ $('fwd2').onclick=()=>video.currentTime=Math.min(video.duration,video.currentTim
 $('backF').onclick=()=>video.currentTime=Math.max(0,video.currentTime-0.2);
 $('fwdF').onclick=()=>video.currentTime=Math.min(video.duration||0,video.currentTime+0.2);
 $('rate').onchange=e=>video.playbackRate=+e.target.value;
+// +/- keys step the playback speed by 0.1 (popup video window and main tab)
+function setPlaybackRate(r){
+  r=Math.round(Math.min(4,Math.max(0.1,r))*10)/10;
+  if(video.src)video.playbackRate=r;
+}
+// mirror any speed into the in-tab dropdown — 0.1 steps land between the preset
+// options, so a single reusable "custom" option keeps the select from going blank
+video.addEventListener('ratechange',()=>{
+  const sel=$('rate'), v=String(video.playbackRate);
+  if(![...sel.options].some(o=>o.value===v&&!o.dataset.custom)){
+    let opt=sel.querySelector('option[data-custom]');
+    if(!opt){opt=document.createElement('option');opt.dataset.custom='1';sel.appendChild(opt);}
+    opt.value=v; opt.textContent=v+'×';
+  }
+  sel.value=v;
+});
 
 /* OPEN WINDOW — pop the video out to its own window; main tab shows the event table full width */
-const RATES=[0.25,0.5,1,1.2,1.5,1.7,2];
 // sport-accurate pitches/courts — viewBox sized to real dimensions so dot coordinates are spatially correct
 const PITCH_DIMS={
   football:{w:1050,h:680},   // 11-a-side  105 x 68 m
@@ -1152,12 +1167,14 @@ function pitchSVG(sport){
 // seek helpers that work on the video element wherever it lives
 function seekBy(dt){if(!video.src)return;video.currentTime=Math.min(video.duration||1e9,Math.max(0,video.currentTime+dt));}
 function togglePlay(){if(video.src)video.paused?video.play():video.pause();}
-let vidWin=null, vidWatch=null, pvUpd=null;
+let vidWin=null, vidWatch=null, pvUpd=null, pvRateUpd=null;
 function openVideoWindow(){
   if(!video.src){alert('Load a video first.');return;}
   if(vidWin&&!vidWin.closed){vidWin.focus();return;}
-  vidWin=window.open('','pitchVideo','width=960,height=620');
+  // always open filling the whole screen (like a maximized window)
+  vidWin=window.open('','pitchVideo','width='+screen.availWidth+',height='+screen.availHeight+',left=0,top=0');
   if(!vidWin){alert('Popup blocked. Allow popups for this page and try again.');return;}
+  try{vidWin.moveTo(0,0);vidWin.resizeTo(screen.availWidth,screen.availHeight);}catch(e){}
   const d=vidWin.document;
   d.title='PitchTagger — Video';
   d.body.style.cssText='margin:0;background:#000;height:100vh;display:flex;flex-direction:column;overflow:hidden;font-family:system-ui,sans-serif';
@@ -1167,29 +1184,21 @@ function openVideoWindow(){
   // move the SAME video node -> keeps its src, currentTime, and all listeners (tagging stays in sync)
   d.adoptNode(video); stage.appendChild(video);
   video.style.cssText='width:100%;height:100%;object-fit:contain;display:block';
-  // control bar (mirrors the in-tab controls)
+  // thin caption bar (bepro-style legend) — everything is keyboard-driven
   const bar=d.getElementById('pv-bar');
-  bar.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 12px;background:#161b22;color:#e6edf3;border-top:1px solid #2a3240';
-  bar.innerHTML='<button data-a="b2" title="-2s (←)">«2</button><button data-a="bf" title="-0.2s (.)">◄</button>'+
-    '<button data-a="pp" title="Space">▶</button><button data-a="ff" title="+0.2s (/)">►</button>'+
-    '<button data-a="f2" title="+2s (→)">2»</button>'+
-    '<span id="pv-tc" style="font-variant-numeric:tabular-nums;background:#000;padding:4px 8px;border-radius:6px;color:#39d98a;font-weight:600;min-width:96px;text-align:center">00:00.00</span>'+
-    '<span style="font-size:12px;color:#8b97a7">Entry</span><span id="pv-entry" style="font-variant-numeric:tabular-nums;background:#000;padding:4px 8px;border-radius:6px;color:#e6edf3;font-weight:600;min-width:70px;text-align:center">…</span>'+
-    '<label style="margin-left:auto;font-size:12px;color:#8b97a7">Speed <select id="pv-rate"></select></label>';
-  bar.querySelectorAll('button').forEach(b=>b.style.cssText='background:#1c2330;border:1px solid #2a3240;color:#e6edf3;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px');
-  const act={b2:()=>seekBy(-2),f2:()=>seekBy(2),bf:()=>seekBy(-0.2),ff:()=>seekBy(0.2),pp:togglePlay};
-  bar.querySelectorAll('button[data-a]').forEach(b=>b.onclick=()=>act[b.dataset.a]());
-  // speed selector (same options as the in-tab one, kept in sync)
-  const rateSel=d.getElementById('pv-rate');
-  rateSel.style.cssText='background:#1c2330;border:1px solid #2a3240;color:#e6edf3;border-radius:6px;padding:4px';
-  RATES.forEach(r=>{const o=d.createElement('option');o.value=r;o.textContent=r+'×';rateSel.appendChild(o);});
-  rateSel.value=String(video.playbackRate||1);
-  rateSel.onchange=()=>{video.playbackRate=+rateSel.value;$('rate').value=rateSel.value;};
-  // live timecode + play/pause glyph in the popup
-  const tcEl=d.getElementById('pv-tc'), ppBtn=bar.querySelector('button[data-a="pp"]'), entryEl=bar.querySelector('#pv-entry');
+  bar.style.cssText='display:flex;align-items:center;gap:16px;padding:3px 12px;background:#0d1117;color:#8b97a7;border-top:1px solid #2a3240;font-size:11px;white-space:nowrap;overflow:hidden;flex:none';
+  bar.innerHTML=
+    '<span>Tốc độ phát <b id="pv-rate-lbl" style="color:#39d98a;font-variant-numeric:tabular-nums">1.0</b> <span style="opacity:.75">(+ / − : ±0.1)</span></span>'+
+    '<span><span id="pv-pp" style="color:#e6edf3">▶</span> <b id="pv-tc" style="color:#39d98a;font-variant-numeric:tabular-nums">00:00.00</b></span>'+
+    '<span>Entry <b id="pv-entry" style="color:#e6edf3;font-variant-numeric:tabular-nums">…</b></span>'+
+    '<span style="margin-left:auto;opacity:.85">Space ⏯ · ←/→ ±2s · . / ±0.2s · Tab đổi đội · Giữ Shift: sân · Esc xoá dot</span>';
+  // live timecode + play/pause glyph + speed label in the popup
+  const tcEl=d.getElementById('pv-tc'), ppEl=d.getElementById('pv-pp'), entryEl=d.getElementById('pv-entry'), rateLbl=d.getElementById('pv-rate-lbl');
   pvSyncEntry=()=>{entryEl.textContent=$('playerInput').value||'…';}; pvSyncEntry();
-  pvUpd=()=>{tcEl.textContent=fmt(video.currentTime);ppBtn.textContent=video.paused?'▶':'⏸';};
+  pvUpd=()=>{tcEl.textContent=fmt(video.currentTime);ppEl.textContent=video.paused?'▶':'⏸';};
   video.addEventListener('timeupdate',pvUpd); video.addEventListener('play',pvUpd); video.addEventListener('pause',pvUpd); pvUpd();
+  pvRateUpd=()=>{rateLbl.textContent=(+video.playbackRate).toFixed(1);};
+  video.addEventListener('ratechange',pvRateUpd); pvRateUpd();
   // ---- pitch overlay for placing Player / Receiver position dots (toggle with Shift) ----
   stage.style.position='relative';
   const overlay=d.createElement('div');
@@ -1285,6 +1294,8 @@ function openVideoWindow(){
     if(e.code==='ArrowRight'){e.preventDefault();seekBy(2);return;}
     if(e.code==='Space'){e.preventDefault();togglePlay();return;}
     if(e.key==='Tab'){e.preventDefault();setTeam(state.team==='home'?'away':'home');return;}
+    if(e.key==='+'||e.key==='='){e.preventDefault();setPlaybackRate(video.playbackRate+0.1);return;}
+    if(e.key==='-'||e.key==='_'){e.preventDefault();setPlaybackRate(video.playbackRate-0.1);return;}
     // forward tagging keystrokes to the main "Enter event" box without leaving the video window
     if(e.key==='Enter'){e.preventDefault();submitEntry();pvSyncEntry();return;}
     if(e.key==='Backspace'){e.preventDefault();PI.value=PI.value.slice(0,-1);pvSyncEntry();return;}
@@ -1299,6 +1310,7 @@ function returnVideo(){
   if(vidWatch){clearInterval(vidWatch);vidWatch=null;}
   pvRedraw=null; pvTogglePitch=null; pvSyncEntry=null; pvRenderPitch=null; // popup-owned helpers are gone once docked
   if(pvUpd){video.removeEventListener('timeupdate',pvUpd);video.removeEventListener('play',pvUpd);video.removeEventListener('pause',pvUpd);pvUpd=null;}
+  if(pvRateUpd){video.removeEventListener('ratechange',pvRateUpd);pvRateUpd=null;}
   if(video.ownerDocument!==document){
     document.adoptNode(video); $('videoWrap').appendChild(video);
     video.style.cssText='';
@@ -1468,6 +1480,8 @@ $('playerInput').addEventListener('keydown',e=>{
   if(e.key==='/'){e.preventDefault();$('fwdF').click();return}
   if(e.code==='ArrowLeft'){e.preventDefault();$('back2').click();return}
   if(e.code==='ArrowRight'){e.preventDefault();$('fwd2').click();return}
+  if(e.key==='+'||e.key==='='){e.preventDefault();setPlaybackRate(video.playbackRate+0.1);return}
+  if(e.key==='-'||e.key==='_'){e.preventDefault();setPlaybackRate(video.playbackRate-0.1);return}
   if(e.key==='Enter'){e.preventDefault();submitEntry();return}
   // while editing: Esc ALWAYS just removes one dot (never clears the entry text or exits
   // edit mode) — same behaviour whether Esc is pressed here or in the video window.
@@ -2008,6 +2022,8 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'){e.preventDefault();submitEntry();return}
   if(e.code==='ArrowLeft'){e.preventDefault();$('back2').click();return}
   if(e.code==='ArrowRight'){e.preventDefault();$('fwd2').click();return}
+  if(e.key==='+'||e.key==='='){e.preventDefault();setPlaybackRate(video.playbackRate+0.1);return}
+  if(e.key==='-'||e.key==='_'){e.preventDefault();setPlaybackRate(video.playbackRate-0.1);return}
   // any printable character -> jump into the player box and type it there (Space is reserved for play/pause)
   if(e.key.length===1 && /[a-z0-9*]/i.test(e.key)){
     PI.focus(); PI.value+=e.key; e.preventDefault();
