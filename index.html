@@ -56,12 +56,13 @@
   video{width:100%;height:100%;object-fit:contain;display:block}
   .drop{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--panel2);border:2px dashed var(--line);color:var(--mut);cursor:pointer;text-align:center;flex-direction:column;gap:8px}
   .drop.drag{border-color:var(--accent);color:var(--accent)}
-  .controls{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-top:1px solid var(--line);flex-wrap:wrap}
-  .controls button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px}
-  .controls button:hover{border-color:var(--accent)}
-  .tcode{font-variant-numeric:tabular-nums;background:#000;padding:4px 8px;border-radius:6px;color:var(--accent);font-weight:600;min-width:96px;text-align:center}
-  .controls select{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px}
-  #seek{flex:1;min-width:120px;accent-color:var(--accent)}
+  /* thin caption bar under the video (same look as the popped-out video window) */
+  .controls{display:flex;align-items:center;gap:16px;padding:3px 12px;background:#0d1117;color:var(--mut);border-top:1px solid var(--line);font-size:11px;white-space:nowrap;overflow:hidden}
+  .controls b{color:var(--accent);font-variant-numeric:tabular-nums}
+  .controls .dim{opacity:.75}
+  .controls .ctl-hints{margin-left:auto;opacity:.85}
+  #ctlPP{color:var(--ink)}
+  .tcode{font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
 
   .quick{padding:12px;border-bottom:1px solid var(--line)}
   .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:10px}
@@ -320,22 +321,9 @@
     </div>
     <input type="file" id="fileInput" accept="video/*" style="display:none">
     <div class="controls" id="controls" style="display:none">
-      <button id="back2" title="-2s  ( ← )">«2</button>
-      <button id="backF" title="-0.2s  ( . )">◄</button>
-      <button id="playBtn" title="Space">▶</button>
-      <button id="fwdF" title="+0.2s  ( / )">►</button>
-      <button id="fwd2" title="+2s  ( → )">2»</button>
-      <input type="range" id="seek" min="0" max="100" value="0" step="0.01">
-      <span class="tcode" id="tcode">00:00.00</span>
-      <select id="rate">
-        <option value="0.25">0.25×</option>
-        <option value="0.5">0.5×</option>
-        <option value="1" selected>1×</option>
-        <option value="1.2">1.2×</option>
-        <option value="1.5">1.5×</option>
-        <option value="1.7">1.7×</option>
-        <option value="2">2×</option>
-      </select>
+      <span>Tốc độ phát <b id="ctlRate">1.0</b> <span class="dim">(+ / − : ±0.1)</span></span>
+      <span><span id="ctlPP">▶</span> <span class="tcode" id="tcode">00:00.00</span></span>
+      <span class="ctl-hints">Space ⏯ · ←/→ ±2s · . / ±0.2s · Tab đổi đội · Giữ Shift: sân · Esc xoá dot</span>
     </div>
     <div id="formationPanel">
       <div id="fmSubs"></div>
@@ -1073,10 +1061,8 @@ $('r2File').onchange=async e=>{
 };
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('videoModal').classList.contains('show')){e.preventDefault();closeVideoModal();}});
 
-const seek=$('seek');
 function fmt(t){const m=Math.floor(t/60),s=Math.floor(t%60),cs=Math.floor((t%1)*100);return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`}
-video.addEventListener('loadedmetadata',()=>{seek.max=video.duration});
-video.addEventListener('timeupdate',()=>{seek.value=video.currentTime;
+video.addEventListener('timeupdate',()=>{
   $('tcode').textContent=state.duration.enabled?'⚽ '+fmt(matchTime(video.currentTime)):fmt(video.currentTime)});
 // re-render the formation panel only when the video crosses a substitution snapshot boundary
 let fmSig='';
@@ -1085,31 +1071,14 @@ video.addEventListener('timeupdate',()=>{
   const sig=((state.lineups.history||[]).filter(h=>h.team===state.team&&h.t<=t).length)+'';
   if(sig!==fmSig){fmSig=sig;refreshFormation();}
 });
-seek.addEventListener('input',()=>{video.currentTime=+seek.value});
-$('playBtn').onclick=()=>{video.paused?video.play():video.pause()};
-video.addEventListener('play',()=>$('playBtn').textContent='⏸');
-video.addEventListener('pause',()=>$('playBtn').textContent='▶');
-$('back2').onclick=()=>video.currentTime=Math.max(0,video.currentTime-2);
-$('fwd2').onclick=()=>video.currentTime=Math.min(video.duration,video.currentTime+2);
-$('backF').onclick=()=>video.currentTime=Math.max(0,video.currentTime-0.2);
-$('fwdF').onclick=()=>video.currentTime=Math.min(video.duration||0,video.currentTime+0.2);
-$('rate').onchange=e=>video.playbackRate=+e.target.value;
+video.addEventListener('play',()=>$('ctlPP').textContent='⏸');
+video.addEventListener('pause',()=>$('ctlPP').textContent='▶');
 // +/- keys step the playback speed by 0.1 (popup video window and main tab)
 function setPlaybackRate(r){
   r=Math.round(Math.min(4,Math.max(0.1,r))*10)/10;
   if(video.src)video.playbackRate=r;
 }
-// mirror any speed into the in-tab dropdown — 0.1 steps land between the preset
-// options, so a single reusable "custom" option keeps the select from going blank
-video.addEventListener('ratechange',()=>{
-  const sel=$('rate'), v=String(video.playbackRate);
-  if(![...sel.options].some(o=>o.value===v&&!o.dataset.custom)){
-    let opt=sel.querySelector('option[data-custom]');
-    if(!opt){opt=document.createElement('option');opt.dataset.custom='1';sel.appendChild(opt);}
-    opt.value=v; opt.textContent=v+'×';
-  }
-  sel.value=v;
-});
+video.addEventListener('ratechange',()=>{$('ctlRate').textContent=(+video.playbackRate).toFixed(1);});
 
 /* OPEN WINDOW — pop the video out to its own window; main tab shows the event table full width */
 // sport-accurate pitches/courts — viewBox sized to real dimensions so dot coordinates are spatially correct
@@ -1476,10 +1445,10 @@ function parseChain(raw){
 $('playerInput').addEventListener('keydown',e=>{
   if(e.key==='Tab'){e.preventDefault();setTeam(state.team==='home'?'away':'home');return}
   if(e.code==='Space'){e.preventDefault();video.paused?video.play():video.pause();return}
-  if(e.key==='.'){e.preventDefault();$('backF').click();return}
-  if(e.key==='/'){e.preventDefault();$('fwdF').click();return}
-  if(e.code==='ArrowLeft'){e.preventDefault();$('back2').click();return}
-  if(e.code==='ArrowRight'){e.preventDefault();$('fwd2').click();return}
+  if(e.key==='.'){e.preventDefault();seekBy(-0.2);return}
+  if(e.key==='/'){e.preventDefault();seekBy(0.2);return}
+  if(e.code==='ArrowLeft'){e.preventDefault();seekBy(-2);return}
+  if(e.code==='ArrowRight'){e.preventDefault();seekBy(2);return}
   if(e.key==='+'||e.key==='='){e.preventDefault();setPlaybackRate(video.playbackRate+0.1);return}
   if(e.key==='-'||e.key==='_'){e.preventDefault();setPlaybackRate(video.playbackRate-0.1);return}
   if(e.key==='Enter'){e.preventDefault();submitEntry();return}
@@ -2017,11 +1986,11 @@ document.addEventListener('keydown',e=>{
   // focus is on body / a button: handle controls, then redirect typing
   if(e.key==='Tab'){e.preventDefault();setTeam(state.team==='home'?'away':'home');return}
   if(e.code==='Space'){e.preventDefault();video.paused?video.play():video.pause();return}
-  if(e.key==='.'){e.preventDefault();$('backF').click();return}
-  if(e.key==='/'){e.preventDefault();$('fwdF').click();return}
+  if(e.key==='.'){e.preventDefault();seekBy(-0.2);return}
+  if(e.key==='/'){e.preventDefault();seekBy(0.2);return}
   if(e.key==='Enter'){e.preventDefault();submitEntry();return}
-  if(e.code==='ArrowLeft'){e.preventDefault();$('back2').click();return}
-  if(e.code==='ArrowRight'){e.preventDefault();$('fwd2').click();return}
+  if(e.code==='ArrowLeft'){e.preventDefault();seekBy(-2);return}
+  if(e.code==='ArrowRight'){e.preventDefault();seekBy(2);return}
   if(e.key==='+'||e.key==='='){e.preventDefault();setPlaybackRate(video.playbackRate+0.1);return}
   if(e.key==='-'||e.key==='_'){e.preventDefault();setPlaybackRate(video.playbackRate-0.1);return}
   // any printable character -> jump into the player box and type it there (Space is reserved for play/pause)
