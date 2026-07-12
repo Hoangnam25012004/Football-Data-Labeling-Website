@@ -20,7 +20,9 @@ body>header{flex:none}
 .chart-card,.gen-form{background:transparent;border:none}
 /* Distribution: pass-type breakdown table (below the heatmap) */
 .pt-card{flex:1;max-width:900px}
-/* Distribution: pass-network map beside the Passes table */
+/* Distribution: pass-network map beside the Passes table — the row aligns both
+   cards to its bottom edge so table and map finish on the same line */
+.pt-row{align-items:flex-end}
 .pn-card{flex:1;min-width:460px}
 .pn-pitch{max-width:640px;margin:0 auto}
 .pn-stats{display:flex;justify-content:space-around;gap:12px;margin:12px auto 0;max-width:640px;
@@ -175,7 +177,7 @@ function renderStats(){
   }else if(statCat==='distribution'){
     extra=`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}${crossMapHTML(statTeam)}</div>`
       +`<div class="chart-row">${heatMapHTML(statTeam)}</div>`
-      +`<div class="chart-row">${passTypesHTML(statTeam)}${passNetHTML(statTeam)}</div>`;
+      +`<div class="chart-row pt-row">${passTypesHTML(statTeam)}${passNetHTML(statTeam)}</div>`;
   }else if(statCat==='defensive'){
     extra=`<div class="chart-row">${defMapHTML(statTeam)}</div>`;
   }else if(statCat==='other'){
