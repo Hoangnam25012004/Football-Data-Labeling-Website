@@ -20,6 +20,14 @@ body>header{flex:none}
 .chart-card,.gen-form{background:transparent;border:none}
 /* Distribution: pass-type breakdown table (below the heatmap) */
 .pt-card{flex:1;max-width:900px}
+/* Distribution: pass-network map beside the Passes table */
+.pn-card{flex:1;min-width:460px}
+.pn-pitch{max-width:640px;margin:0 auto}
+.pn-stats{display:flex;justify-content:space-around;gap:12px;margin:12px auto 0;max-width:640px;
+  border-top:1px solid var(--line);padding-top:10px}
+.pn-stats div{text-align:center}
+.pn-stats span{display:block;color:var(--mut);font-size:12px;padding-bottom:6px;white-space:nowrap}
+.pn-stats b{font-size:16px;color:var(--ink)}
 .pt-head{display:flex;align-items:center;gap:26px;padding:4px 2px 12px}
 .pt-title{font-size:17px;font-weight:800;color:var(--ink);margin-right:auto}
 .pt-head span{color:var(--mut);font-size:12px}
@@ -117,6 +125,7 @@ body>header{flex:none}
 <script>
 let rows=loadRows(), meta=loadMeta(), lineups=loadLineups(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
+let pdWin=0;      // pass-network map: index into the 15-minute time windows
 
 /* per-category column sets — the wide table split into 4 tabs.
    Defensive = Defensive + Duels; Other = Set Pieces + Discipline. */
@@ -166,7 +175,7 @@ function renderStats(){
   }else if(statCat==='distribution'){
     extra=`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}${crossMapHTML(statTeam)}</div>`
       +`<div class="chart-row">${heatMapHTML(statTeam)}</div>`
-      +`<div class="chart-row">${passTypesHTML(statTeam)}</div>`;
+      +`<div class="chart-row">${passTypesHTML(statTeam)}${passNetHTML(statTeam)}</div>`;
   }else if(statCat==='defensive'){
     extra=`<div class="chart-row">${defMapHTML(statTeam)}</div>`;
   }else if(statCat==='other'){
@@ -459,6 +468,86 @@ function passTypesHTML(team){
     +section('Pass Distance',catD)+section('Pass Direction',catG)+section('Area',catA)
     +'</table></div>';
 }
+/* ---- Distribution: pass-network map per 15-minute window (Wyscout style).
+   Windows come from the match half length (Duration settings): every half is
+   cut into 15' slices and the last slice of each half absorbs the remainder
+   plus stoppage time — 45'/half → 0-15/15-30/30-45+/45-60/60-75/75-90+,
+   40'/half → 0-15/15-30/30-40+/40-55/55-70/70-80+, and so on for shorter
+   halves. Nodes sit at each player's average pass-involvement position in the
+   window (halves normalised to attack RIGHT); arrows are completed passes. */
+function pdWindows(){
+  const L=+dur.halfLen||45, w=[];
+  for(let h=1;h<=2;h++)for(let s=0;s<L;s+=15){
+    const e=Math.min(s+15,L);
+    w.push({half:h,s,e,last:e===L,label:`${s+(h-1)*L}' - ${e+(h-1)*L}'${e===L?'+':''}`});
+  }
+  return w;
+}
+function passNetHTML(team){
+  const fill=team==='home'?'#2f81f7':'#f7682f';
+  const wins=pdWindows(); if(pdWin>=wins.length)pdWin=0;
+  const w=wins[pdWin], L=+dur.halfLen||45;
+  const opts=wins.map((x,i)=>`<option value="${i}"${i===pdWin?' selected':''}>${x.label}</option>`).join('');
+  const head=`<div class="chart-head"><div></div>`
+    +`<select class="def-sel" onchange="setPdWin(this.value)">${opts}</select></div>`;
+  const inWin=r=>{
+    if(r.t==null||eventHalf(r)!==w.half)return false;
+    const ms=matchTime(r.t)-(w.half-1)*L*60;   // seconds inside this half (stoppage keeps counting)
+    return ms>=w.s*60 && (w.last||ms<w.e*60);
+  };
+  const isPass=r=>r.event==='pass success'||r.event==='pass fail';
+  const passes=rows.filter(r=>r.team===team&&isPass(r));
+  const winPasses=passes.filter(inWin);
+  const opp=team==='home'?'away':'home';
+  const oppWin=rows.filter(r=>r.team===opp&&isPass(r)&&inWin(r)).length;
+  if(!winPasses.length)
+    return `<div class="chart-card pn-card">${head}<div class="stats-empty">No passes in ${w.label}.</div></div>`;
+  const suc=winPasses.filter(r=>r.event==='pass success').length;
+  // average involvement position per player (origin for the passer, target for the receiver)
+  const flipH={1:attackDir(team,1)==='left',2:attackDir(team,2)==='left'};
+  const pos={};
+  const addP=(p,x,y,flip)=>{p=String(p||'').trim();if(!p)return;(pos[p]=pos[p]||[]).push({x:flip?100-x:x,y:flip?100-y:y});};
+  winPasses.forEach(r=>{
+    const flip=flipH[eventHalf(r)];
+    if(r.pXY)addP(r.playerFrom,r.pXY.x,r.pXY.y,flip);
+    if(r.event==='pass success'&&r.rXY)addP(r.playerTo,r.rXY.x,r.rXY.y,flip);
+  });
+  const d=PITCH_DIMS.football, PW=d.w, PH=d.h, R=17;
+  const nodes={};
+  Object.entries(pos).forEach(([p,a])=>{
+    nodes[p]={x:a.reduce((s,v)=>s+v.x,0)/a.length/100*PW, y:a.reduce((s,v)=>s+v.y,0)/a.length/100*PH};
+  });
+  // directed edges = completed passes between two mapped players
+  const edges={};
+  winPasses.forEach(r=>{
+    if(r.event!=='pass success')return;
+    const f=String(r.playerFrom||'').trim(), t=String(r.playerTo||'').trim();
+    if(!f||!t||f===t||!nodes[f]||!nodes[t])return;
+    edges[f+'>'+t]=(edges[f+'>'+t]||0)+1;
+  });
+  const mkId='pnA'+(team==='home'?'H':'A');
+  let seg='';
+  Object.entries(edges).forEach(([k,n])=>{
+    const [f,t]=k.split('>'), a=nodes[f], b=nodes[t];
+    const dx=b.x-a.x, dy=b.y-a.y, dd=Math.hypot(dx,dy)||1, ux=dx/dd, uy=dy/dd;
+    const x1=a.x+ux*R, y1=a.y+uy*R, x2=b.x-ux*(R+7), y2=b.y-uy*(R+7);
+    seg+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"`
+      +` stroke="#e8edf4" stroke-opacity="0.85" stroke-width="${Math.min(7,1.5+n*0.9).toFixed(1)}" marker-end="url(#${mkId})"/>`;
+  });
+  const dots=Object.entries(nodes).map(([p,n])=>
+    `<g><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${R}" fill="${fill}" stroke="rgba(255,255,255,0.9)" stroke-width="2.5"/>`
+    +`<text x="${n.x.toFixed(1)}" y="${(n.y+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">${p}</text></g>`).join('');
+  const defs=`<defs><marker id="${mkId}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4"`
+    +` orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e8edf4"/></marker></defs>`;
+  const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG('right')+defs+seg+dots+'</svg>');
+  const pctS=(n,dd)=>dd?(Math.round(n/dd*1000)/10).toFixed(1)+'%':'–';
+  const stats=`<div class="pn-stats">`
+    +`<div><span>Count / Total Pass Count</span><b>${winPasses.length} / ${passes.length}</b></div>`
+    +`<div><span>Pass Accuracy</span><b>${pctS(suc,winPasses.length)}</b></div>`
+    +`<div><span>Possession</span><b>${pctS(winPasses.length,winPasses.length+oppWin)}</b></div></div>`;
+  return `<div class="chart-card pn-card">${head}<div class="shotmap-pitch pn-pitch">${pitch}</div>${stats}</div>`;
+}
+function setPdWin(i){pdWin=+i;renderStats();}
 function passMatrixHTML(team){
   const {players,mtx}=passMatrix(rows,team);
   if(!players.length)return `<div class="stats-empty">No completed passes for this team yet.</div>`;
