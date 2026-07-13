@@ -8,7 +8,7 @@ R2_ACCOUNT_ID  = "3e1025b807b311195e822c7f2d21f7d4"
 R2_BUCKET      = "football-videos"
 # Public base URL of the bucket: either the r2.dev dev URL or your custom domain.
 # TODO: paste the URL you got from "Public Development URL -> Enable" here (https://pub-XXXX.r2.dev)
-R2_PUBLIC_BASE = "https://pub-XXXXXXXX.r2.dev"
+R2_PUBLIC_BASE = "https://pub-9cdd291bf181425b9738328ada297691.r2.dev"
 # Lock the presign endpoint to your site's origin ("*" allows any origin — fine for testing).
 ALLOW_ORIGIN   = "https://hoangnam25012004.github.io"
 
