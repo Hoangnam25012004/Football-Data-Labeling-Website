@@ -116,8 +116,8 @@ body>header{flex:none}
   <div class="exports">
     <button id="expXlsx">⭳ XLSX</button>
     <button id="expCsv">⭳ CSV</button>
+    <button id="expPdf">⭳ PDF</button>
   </div>
-  <a class="back-link" href="../">← Tagging</a>
 </header>
 <div class="page">
   <div class="stats-wrap"><div id="statsHolder"></div></div>
@@ -430,10 +430,8 @@ function foulMapHTML(team){
    attack RIGHT): forward within ±45°, backward beyond ±135°, else sideways.
    Area = origin third of the pitch length. Passes missing a tagged origin or
    target can't be classified and are skipped in the affected section. */
-function passTypesHTML(team){
-  const teamColor=team==='home'?'var(--home)':'var(--away)';
+function passTypeData(team){   // shared with the PDF report (Stats/report.js)
   const evs=rows.filter(r=>r.team===team&&(r.event==='pass success'||r.event==='pass fail'));
-  if(!evs.length)return `<div class="chart-card pt-card"><div class="stats-empty">No passes yet.</div></div>`;
   const tot=evs.length, suc=evs.filter(r=>r.event==='pass success').length;
   const dir={1:attackDir(team,1),2:attackDir(team,2)};
   const XM=105, YM=68;
@@ -455,6 +453,12 @@ function passTypesHTML(team){
     const ang=Math.abs(Math.atan2(dyM,dxM))*180/Math.PI;   // 0° = straight forward, 180° = straight back
     add(catG, ang<=45?'Passes Forward':ang>=135?'Passes Backward':'Passes Sideways', ok);
   });
+  return {tot,suc,catD,catG,catA};
+}
+function passTypesHTML(team){
+  const teamColor=team==='home'?'var(--home)':'var(--away)';
+  const {tot,suc,catD,catG,catA}=passTypeData(team);
+  if(!tot)return `<div class="chart-card pt-card"><div class="stats-empty">No passes yet.</div></div>`;
   const rate=(n,dd)=>dd?(Math.round(n/dd*1000)/10).toFixed(1)+'%':'–';
   const section=(title,cat)=>{
     const base=Object.values(cat).reduce((s,v)=>s+v[1],0);
@@ -635,8 +639,8 @@ function heatHover(p){
     el.classList.toggle('dim',!!p&&el.dataset.p!==p);
   });
 }
-function drawHeat(pts){
-  const cv=$('heatCv'); if(!cv)return;
+function drawHeat(pts,cv){   // cv defaults to the Stats-tab canvas; the PDF report passes its own
+  cv=cv||$('heatCv'); if(!cv)return;
   const W=cv.width, H=cv.height;
   // grayscale density buffer: one soft radial blob per touch, stacked alpha
   const off=document.createElement('canvas'); off.width=W; off.height=H;
@@ -847,12 +851,11 @@ document.querySelectorAll('#catToggle button').forEach(b=>b.onclick=()=>{statCat
 window.addEventListener('storage',e=>{
   if(cloudMode)return;
   if(e.key===PT_KEYS.rows){rows=loadRows();renderStats();}
-  else if(e.key===PT_KEYS.meta){meta=loadMeta();syncBackLink(meta);renderStats();}
+  else if(e.key===PT_KEYS.meta){meta=loadMeta();renderStats();}
   else if(e.key===PT_KEYS.duration){dur=loadJSON(PT_KEYS.duration,dur);renderStats();}
   else if(e.key===PT_KEYS.lineups){lineups=loadLineups();if(statTeam==='general')renderStats();}
 });
 
-syncBackLink(meta);   // "← Tagging" returns to ../#match=<code>, keeping the match open
 renderStats();
 
 /* ===== standalone cloud mode =====
@@ -909,7 +912,6 @@ function dbToRow(d){
     }
     cloudMode=true;                 // from here on, ignore main-tab localStorage events
     rows=all.map(dbToRow);
-    syncBackLink(meta);
     renderStats();
     // live updates: events stream + match row (names / duration / lineups)
     let t=null; const rerender=()=>{clearTimeout(t);t=setTimeout(renderStats,120);};
@@ -930,5 +932,6 @@ function dbToRow(d){
   }catch(e){console.warn('Stats cloud load failed — using local data:',(e&&e.message)||e);}
 })();
 </script>
+<script src="report.js?v=1"></script>
 </body>
 </html>
