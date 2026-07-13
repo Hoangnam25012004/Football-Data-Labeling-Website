@@ -192,6 +192,16 @@ function timelineEvents(){
   const evs=[], yc={};
   const sorted=rows.filter(r=>r.t!=null).slice().sort((a,b)=>a.t-b.t);
   const assists=sorted.filter(r=>r.event==='assist');
+  // a penalty followed by the same player's goal collapses into one "Goal #n (Penalty)" row
+  const pens=sorted.filter(r=>r.event==='penalty kick');
+  const mergedPens=new Set(), penGoals=new Set();
+  sorted.forEach(r=>{
+    if(r.event!=='goal')return;
+    const pen=pens.find(p=>!mergedPens.has(p)&&p.team===r.team
+      &&String(p.playerFrom||'').trim()===String(r.playerFrom||'').trim()
+      &&Math.abs(p.t-r.t)<=60);
+    if(pen){mergedPens.add(pen);penGoals.add(r);}
+  });
   sorted.forEach(r=>{
     const sec=matchTime(r.t), no=esc(String(r.playerFrom||'').trim()), team=r.team;
     const push=(kind,html)=>evs.push({sec,team,kind,html});
@@ -200,10 +210,13 @@ function timelineEvents(){
       if(!as)as=assists.filter(x=>x.team===team&&Math.abs(x.t-r.t)<=45)
         .sort((x,y)=>Math.abs(x.t-r.t)-Math.abs(y.t-r.t))[0];
       const an=as?String(as.playerFrom||'').trim():'';
-      push('goal',`Goal #${no}${an?` <span style="color:${C.mut};font-weight:600;font-size:10px">(A #${esc(an)})</span>`:''}`);
+      const tags=[];
+      if(penGoals.has(r))tags.push('Penalty');
+      if(an)tags.push('A #'+esc(an));
+      push('goal',`Goal #${no}${tags.length?` <span style="color:${C.mut};font-weight:600;font-size:10px">(${tags.join(' · ')})</span>`:''}`);
     }
     else if(r.event==='own goal'||r.event==='own-goal')push('og',`Own Goal #${no}`);
-    else if(r.event==='penalty kick')push('pen',`Penalty #${no}`);
+    else if(r.event==='penalty kick'){if(!mergedPens.has(r))push('pen',`Penalty #${no}`);}
     else if(r.event==='yellow card'){
       const k=team+'#'+no; yc[k]=(yc[k]||0)+1;
       if(yc[k]===2)push('y2',`2nd Yellow → Red #${no}`); else push('yc',`Yellow #${no}`);
@@ -401,10 +414,12 @@ function distInsight(){
 const distributionPage=()=>secTitle('Distribution')+legend()
   +`<div class="rp-cmphead">Distribution</div>`+cmpRows(sectionRows(1))+insight(distInsight());
 
-/* pass-network map — whole match, nodes at average involvement, arrows = completed passes */
-function netMapSVG(team){
+/* pass-network map — nodes at average involvement, arrows = completed passes.
+   `filter` restricts the passes (used for the 15-minute windows); `idSuffix`
+   keeps SVG marker ids unique when several networks share one page. */
+function netMapSVG(team,filter,idSuffix){
   const N=normXY(team), d=PITCH_DIMS.football, R=17;
-  const passes=rows.filter(r=>r.team===team&&(r.event==='pass success'||r.event==='pass fail'));
+  const passes=rows.filter(r=>r.team===team&&(r.event==='pass success'||r.event==='pass fail')&&(!filter||filter(r)));
   if(!passes.length)return null;
   const pos={};
   const addP=(p,pt)=>{p=String(p||'').trim(); if(!p||!pt)return; (pos[p]=pos[p]||[]).push(pt);};
@@ -424,7 +439,7 @@ function netMapSVG(team){
     if(!f||!t||f===t||!nodes[f]||!nodes[t])return;
     edges[f+'>'+t]=(edges[f+'>'+t]||0)+1;
   });
-  const mk='rpNet'+team;
+  const mk='rpNet'+team+(idSuffix||'');
   let seg='';
   Object.entries(edges).forEach(([k,n])=>{
     const [f,t]=k.split('>'), a=nodes[f], b=nodes[t];
@@ -446,6 +461,46 @@ function netMapsPage(){
          :`<div class="rp-note" style="font-size:11px">No passes for ${esc(TN(team))}.</div>`)+'</div>';
   return secTitle('Distribution — Pass Networks')+card('home',h)+card('away',a)
     +`<div class="rp-note">Nodes sit at each player's average pass-involvement position (both halves normalised to attack right); arrow thickness = completed passes along that link.</div>`;
+}
+
+/* pass networks per 15-minute window — same windows as the Stats-tab dropdown
+   (pdWindows(): each half cut into 15' slices, the last slice of a half absorbs
+   the remainder plus stoppage time). Two windows per page, one run per team. */
+function winFilter(w,L){
+  return r=>{
+    if(r.t==null||eventHalf(r)!==w.half)return false;
+    const ms=matchTime(r.t)-(w.half-1)*L*60;   // seconds inside this half
+    return ms>=w.s*60&&(w.last||ms<w.e*60);
+  };
+}
+function netWindowPages(team){
+  const L=+dur.halfLen||45, wins=pdWindows();
+  const isPass=r=>r.event==='pass success'||r.event==='pass fail';
+  const all=rows.filter(r=>r.team===team&&isPass(r));
+  if(!all.length)return [];
+  const opp=team==='home'?'away':'home';
+  const cards=wins.map((w,i)=>{
+    const f=winFilter(w,L), winP=all.filter(f);
+    let body;
+    if(!winP.length)body=`<div class="rp-note" style="font-size:11px;padding:6px 0 16px">No passes in ${w.label}.</div>`;
+    else{
+      const suc=winP.filter(r=>r.event==='pass success').length;
+      const oppWin=rows.filter(r=>r.team===opp&&isPass(r)&&f(r)).length;
+      body=`<div style="width:620px;margin:0 auto">${hPitchSVG(netMapSVG(team,f,'w'+i)||'')}</div>`
+        +`<div style="display:flex;justify-content:center;gap:38px;font-size:10px;color:${C.mut};margin-top:5px">`
+        +`<span>Passes <b style="color:${C.ink}">${winP.length} / ${all.length}</b></span>`
+        +`<span>Pass Accuracy <b style="color:${C.ink}">${pct(suc,winP.length)}</b></span>`
+        +`<span>Possession <b style="color:${C.ink}">${pct(winP.length,winP.length+oppWin)}</b></span></div>`;
+    }
+    return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Pass Network ${w.label}</div>${body}</div>`;
+  });
+  const pages=[];
+  for(let i=0;i<cards.length;i+=2){
+    pages.push(secTitle(`Distribution — Pass Networks by Interval — ${esc(TN(team))}${i?' (cont.)':''}`)
+      +cards.slice(i,i+2).join('')
+      +(i+2>=cards.length?`<div class="rp-note">15-minute windows within each half; the last window of a half absorbs the remainder plus stoppage time. Nodes sit at each player's average pass-involvement position in the window; arrow thickness = completed passes.</div>`:''));
+  }
+  return pages;
 }
 
 /* passing profile — per-player volume vs accuracy scatter, one panel per team */
@@ -615,35 +670,37 @@ function defInsight(){
 const defensivePage=()=>secTitle('Defensive')+legend()
   +`<div class="rp-cmphead">Defensive</div>`+cmpRows(sectionRows(2))+insight(defInsight());
 
-/* defensive action maps — all defensive events on one pitch per team */
-const DEF_MAP_KINDS=[
-  ['tackle success','Tackle won','#39d98a'],['tackle fail','Tackle lost','#f7506b'],
-  ['interception','Interception','#4aa3ff'],['recovery','Recovery','#35d2e0'],
-  ['clearance','Clearance','#ffb020'],['block','Block','#b98bff']
-];
-function defMapsPage(){
-  const col={}; DEF_MAP_KINDS.forEach(([ev,,c])=>col[ev]=c);
-  let any=false;
-  const card=team=>{
-    const N=normXY(team), d=PITCH_DIMS.football;
-    const acts=rows.filter(r=>r.team===team&&col[r.event]&&r.pXY);
-    let inner;
-    if(!acts.length)inner=`<div class="rp-note" style="font-size:11px">No located defensive actions for ${esc(TN(team))}.</div>`;
-    else{
-      any=true;
-      const dots=acts.map(r=>{
-        const p=N(r).a, x=p.x/100*d.w, y=p.y/100*d.h;
-        return `<g><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
-          +`<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#123">${esc(String(r.playerFrom||'').trim())}</text></g>`;
-      }).join('');
-      inner=`<div style="width:620px;margin:0 auto">${hPitchSVG(dots)}</div>`;
-    }
-    return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Defensive Actions</div>${inner}</div>`;
-  };
-  const body=secTitle('Defensive — Action Maps')+card('home')+card('away')
-    +`<div class="rp-mleg">${DEF_MAP_KINDS.map(([,l,c])=>`<span><i style="background:${c}"></i>${l}</span>`).join('')}</div>`
-    +`<div class="rp-note">Both halves normalised so the team attacks right (own goal on the left).</div>`;
-  return any?body:null;
+/* defensive action maps — one page per action type, mirroring the Stats-tab
+   dropdown (DEF_CATS from the Stats page: Tackles, Interceptions, Clearances,
+   Blocks, Recoveries, Ground Duels, Aerial Duels). Categories with no located
+   event on either side are skipped. */
+function defCategoryPages(){
+  const pages=[];
+  Object.values(DEF_CATS).forEach(cat=>{
+    const col={}; cat.parts.forEach(([ev,,c])=>col[ev]=c);
+    const acts=team=>rows.filter(r=>r.team===team&&col[r.event]&&r.pXY);
+    const hA=acts('home'), aA=acts('away');
+    if(!hA.length&&!aA.length)return;
+    const card=(team,list)=>{
+      let inner;
+      if(!list.length)inner=`<div class="rp-note" style="font-size:11px">No located ${cat.label.toLowerCase()} for ${esc(TN(team))}.</div>`;
+      else{
+        const N=normXY(team), d=PITCH_DIMS.football;
+        const dots=list.map(r=>{
+          const p=N(r).a, x=p.x/100*d.w, y=p.y/100*d.h;
+          return `<g><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
+            +`<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
+        }).join('');
+        inner=`<div style="width:620px;margin:0 auto">${hPitchSVG(dots)}</div>`;
+      }
+      return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · ${cat.label}</div>${inner}</div>`;
+    };
+    const legend=cat.parts.map(([,lbl,c])=>`<span><i style="background:${c}"></i>${lbl}</span>`).join('');
+    pages.push(secTitle(`Defensive — ${cat.label}`)+card('home',hA)+card('away',aA)
+      +`<div class="rp-mleg">${legend}</div>`
+      +`<div class="rp-note">Both halves normalised so the team attacks right (own goal on the left).</div>`);
+  });
+  return pages;
 }
 
 /* defensive profile radar — min-max normalised against the higher of the two teams */
@@ -787,6 +844,8 @@ function buildPages(host){
     ...attackingPlayerPages(),
     distributionPage(),
     netMapsPage(),
+    ...netWindowPages('home'),
+    ...netWindowPages('away'),
     scatterPage(),
     matrixPage('home'),
     matrixPage('away'),
@@ -795,7 +854,7 @@ function buildPages(host){
     crossMapsPage(),
     ...distributionPlayerPages(),
     defensivePage(),
-    defMapsPage(),
+    ...defCategoryPages(),
     radarPage(),
     ...defensivePlayerPages(),
     foulMapsPage(),
@@ -812,20 +871,19 @@ function buildPages(host){
   return els;
 }
 
+let exporting=false;   // silent re-entry guard — the button keeps its normal look while the export runs
 async function exportPdf(){
+  if(exporting)return;
   if(!rows.length){alert('No data yet.');return;}
-  const btn=$('expPdf'), old=btn.textContent;
-  btn.disabled=true;
+  exporting=true;
   const host=document.createElement('div');
   host.style.cssText='position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1';
   try{
-    btn.textContent='… preparing';
     await ensureLibs();
     document.body.appendChild(host);
     const pages=buildPages(host);
     const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
     for(let i=0;i<pages.length;i++){
-      btn.textContent=`… page ${i+1}/${pages.length}`;
       const cv=await window.html2canvas(pages[i],{scale:2,backgroundColor:'#ffffff',logging:false});
       if(i)pdf.addPage();
       pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297);
@@ -836,7 +894,7 @@ async function exportPdf(){
     alert('PDF export failed: '+((e&&e.message)||e));
   }finally{
     host.remove();
-    btn.disabled=false; btn.textContent=old;
+    exporting=false;
   }
 }
 
