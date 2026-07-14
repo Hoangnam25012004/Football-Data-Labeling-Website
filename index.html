@@ -1556,6 +1556,8 @@ function submitEntry(){
     });
     applySubGroup(state.team,subsArr);
   }
+  // an edit switched the team buttons to the row's side — go back to where the user was
+  if(wasEditing&&editPrevTeam){setTeam(editPrevTeam);editPrevTeam=null;}
   state.activeEvent=evs[evs.length-1].name; renderEvents(); updateBanner();
   $('playerInput').value='';
   if(document.hasFocus())$('playerInput').focus(); // don't yank focus when typing from the video window
@@ -1748,10 +1750,14 @@ $('fmSnapBtn').onclick=()=>{
   toast('Formation saved at '+fmt(matchTime(t))+' ✓');
 };
 let scrollToRow=null;
+let editPrevTeam=null;   // side the user was on before Edit switched to the row's team — restored after submit/cancel
 /* pull an existing event back into the editor: restore its syntax + dots so it can be re-tagged.
    Submitting (Enter) then updates that same event in place (keeps its id). */
 function startEdit(idx){
   const row=state.rows[idx]; if(!row)return;
+  // remember the side the user was on (only for the FIRST edit of a run — chaining
+  // Edit clicks keeps the original side, so submitting still returns there)
+  if(!state.editingId&&!state.editingGroup)editPrevTeam=state.team;
   state.editingId=row.id;
   setTeam(row.team);
   state.activeEvent=row.event; renderEvents(); updateBanner();  // keyless re-submit keeps this event
@@ -1774,6 +1780,7 @@ function startEdit(idx){
    Submitting replaces all the old rows of the chain with the new batch. */
 function startEditGroup(grpRows){
   if(!grpRows.length)return;
+  if(!state.editingId&&!state.editingGroup)editPrevTeam=state.team;
   state.editingId=null; state.editingGroup=grpRows[0].grp;
   setTeam(grpRows[0].team);
   $('playerInput').value=grpRows[0].raw||'';
@@ -1801,6 +1808,7 @@ function startEditGroup(grpRows){
 function cancelEdit(){                     // leave edit mode without changing the row(s)
   if(!state.editingId&&!state.editingGroup)return;
   state.editingId=null; state.editingGroup=null; state.pendingDots=[];
+  if(editPrevTeam){setTeam(editPrevTeam);editPrevTeam=null;}   // back to the pre-edit side
   if(pvRedraw)pvRedraw(); renderTable();
 }
 /* one chain entry -> one display line: "17 #corner-kick #cross success #key pass 14 #shot on target".
