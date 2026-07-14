@@ -1220,11 +1220,13 @@ function openVideoWindow(){
       const grp=d.createElementNS(SVGNS,'g');
       const c=d.createElementNS(SVGNS,'circle');
       c.setAttribute('cx',vx);c.setAttribute('cy',vy);c.setAttribute('r',14);
-      c.setAttribute('fill',i===pd.length-1?'#f7b32f':'#39d98a');  // newest dot highlighted
+      // one colour for ALL dots, per team — same blue/orange as the formation dots (--home/--away;
+      // hardcoded because this overlay lives in the popup window's own document, outside the main CSS)
+      c.setAttribute('fill',state.team==='away'?'#f7682f':'#2f81f7');
       c.setAttribute('stroke','#000');c.setAttribute('stroke-width',2);
       const t=d.createElementNS(SVGNS,'text');
       t.setAttribute('x',vx);t.setAttribute('y',vy+5);t.setAttribute('text-anchor','middle');
-      t.setAttribute('font-size',15);t.setAttribute('font-weight',700);t.setAttribute('fill','#06281a');
+      t.setAttribute('font-size',15);t.setAttribute('font-weight',700);t.setAttribute('fill','#fff');
       t.textContent=String(i+1);
       grp.appendChild(c);grp.appendChild(t);
       makeDotDraggable(grp,c,t,dot);
@@ -1319,7 +1321,8 @@ video.addEventListener('click',e=>{
 
 /* TEAM */
 function setTeam(t){state.team=t;$('segHome').className=t==='home'?'act-home':'';$('segAway').className=t==='away'?'act-away':'';
-  refreshFormation();}   // the formation panel shows the selected team
+  refreshFormation();     // the formation panel shows the selected team
+  if(pvRedraw)pvRedraw();}// pending dots are team-coloured — recolour them on team switch
 $('segHome').onclick=()=>setTeam('home');
 $('segAway').onclick=()=>setTeam('away');
 // team names: push to the cloud match (matches.home_name / away_name) when changed
