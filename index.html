@@ -1763,8 +1763,8 @@ function startEdit(idx){
     ...(row.pXY?[{x:row.pXY.x,y:row.pXY.y,t:row.t}]:[]),
     ...(row.rXY?[{x:row.rXY.x,y:row.rXY.y,t:(row.rt!=null?row.rt:row.t)}]:[])
   ];
+  // dots are restored silently — the pitch stays hidden; hold Shift to see/adjust them
   if(pvRedraw)pvRedraw();
-  if(pvTogglePitch)pvTogglePitch(true);   // reveal the pitch overlay so the restored dots show
   if(pvSyncEntry)pvSyncEntry();
   renderTable();                          // highlight the row being edited
   if(document.hasFocus())$('playerInput').focus();
@@ -1791,8 +1791,8 @@ function startEditGroup(grpRows){
     seen.add(k); dots.push({x:pt.x,y:pt.y,t});};
   grpRows.forEach(r=>{push(r.pXY,r.t); if(r.rXY)push(r.rXY,r.rt!=null?r.rt:r.t);});
   state.pendingDots=dots;
+  // dots restored silently — hold Shift to reveal the pitch with them (same as startEdit)
   if(pvRedraw)pvRedraw();
-  if(pvTogglePitch)pvTogglePitch(true);
   if(pvSyncEntry)pvSyncEntry();
   renderTable();
   if(document.hasFocus())$('playerInput').focus();
