@@ -1462,11 +1462,14 @@ $('playerInput').addEventListener('keydown',e=>{
     if(pvSyncEntry)pvSyncEntry(); return;
   }
 });
-// clearing the box exits edit mode, so the next entry is a fresh event (not an update).
+// Deleting the hotkey text while editing must NOT touch the placed dots — the whole
+// point of Edit is retyping the syntax and reusing the same dots (Enter still updates
+// the row in place). Edit mode is only left when the box is cleared AND no dots remain
+// (pop them with Esc first) — then the next entry is a fresh event, not an update.
 // Also mirror every change into the video window's Entry display, so typing in the
 // main tab shows up there too (the reverse direction already goes through PI directly).
 $('playerInput').addEventListener('input',()=>{
-  if(state.editingId&&!$('playerInput').value.trim())cancelEdit();
+  if(state.editingId&&!$('playerInput').value.trim()&&!state.pendingDots.length)cancelEdit();
   if(pvSyncEntry)pvSyncEntry();
 });
 function submitEntry(){
