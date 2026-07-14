@@ -222,10 +222,10 @@ function timelineEvents(){
       if(yc[k]===2)push('y2',`2nd Yellow → Red #${no}`); else push('yc',`Yellow #${no}`);
     }
     else if(r.event==='red card')push('rc',`Red #${no}`);
-  });
-  ['home','away'].forEach(team=>{
-    (((lineups[team]||{}).subHistory)||[]).forEach(s=>
-      evs.push({sec:matchTime(s.t),team,kind:'sub',html:`Sub #${esc(s.in)} ⟵ #${esc(s.out)}`}));
+    // subs come from the event rows (playerFrom = out, playerTo = in) — NOT from
+    // lineups.subHistory, so a substitution deleted in the events table disappears
+    // from the report too.
+    else if(r.event==='substitution')push('sub',`Sub #${esc(String(r.playerTo||'').trim())} ⟵ #${no}`);
   });
   return evs.sort((a,b)=>a.sec-b.sec);
 }

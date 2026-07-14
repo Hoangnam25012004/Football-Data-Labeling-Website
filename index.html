@@ -1824,6 +1824,23 @@ function deleteRows(rs){
     const i=state.rows.indexOf(r); if(i>=0)state.rows.splice(i,1);
     window.Cloud&&window.Cloud.onLocalDelete(r.id);
   });
+  // Substitutions also live OUTSIDE the events table: applySubGroup() wrote a
+  // subHistory entry (minutes played, report timeline) and a formation snapshot
+  // into state.lineups, which is stored in matches.lineups — deleting only the
+  // event row would leave the sub visible in the formation panel and the PDF
+  // report forever. Remove those side effects and sync lineups to the cloud.
+  const subs=rs.filter(r=>r.event==='substitution'&&r.team&&state.lineups[r.team]);
+  if(subs.length){
+    const eq=(a,b)=>String(a||'').trim()===String(b||'').trim();
+    subs.forEach(r=>{
+      const lu=state.lineups[r.team];
+      if(lu.subHistory)lu.subHistory=lu.subHistory.filter(s=>
+        !(eq(s.out,r.playerFrom)&&eq(s.in,r.playerTo)&&Math.abs(s.t-r.t)<=3));
+      if(state.lineups.history)state.lineups.history=state.lineups.history.filter(h=>
+        !(h.team===r.team&&/^Substitution/.test(h.label||'')&&Math.abs(h.t-r.t)<=3));
+    });
+    saveLineups();
+  }
   renderTable();
 }
 function renderTable(){
