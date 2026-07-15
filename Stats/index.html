@@ -95,14 +95,6 @@ body>header{flex:none}
 .gf-nm{margin-top:1px;font-size:9px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.9);
   max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gf-arrow{position:absolute;top:6px;left:6px;font-size:10px;color:rgba(255,255,255,0.75);font-weight:700}
-/* General: match momentum card (below the comparison stats) */
-.mom-card{margin:0 14px 14px}
-.mom-head{display:flex;align-items:center;justify-content:space-between;padding:2px 8px 10px}
-.mom-foot{padding:8px 8px 2px}
-.mom-team{font-weight:800;font-size:14px}
-.mom-team.home{color:var(--home)}
-.mom-team.away{color:var(--away)}
-.mom-title{color:var(--mut);font-size:12px;font-weight:700;letter-spacing:0.3px}
 </style>
 </head>
 <body>
@@ -695,97 +687,7 @@ function renderGeneral(){
   });
   html+='</div>';
   $('statsHolder').innerHTML=matchSummaryHTML()
-    +`<div class="gen-layout">${formationSideHTML('home')}<div class="gen-center">${html}</div>${formationSideHTML('away')}</div>`
-    +momentumHTML();
-}
-/* ---- General: match momentum (Sofascore-style pressure graph) ----
-   Threat points per team per match minute: dangerous events score by the
-   weight table below; completed passes score by field position instead
-   (final third 1.5, attacking half 0.5 — halves normalised to attack RIGHT
-   via attackDir, so 'final third' always means the opponent's third). An own
-   goal scores — and shows the goal marker — for the team the goal counts for.
-   Each half's minute series is smoothed with a [1 2 4 2 1] kernel; momentum
-   is smoothed home − away, normalised to the match peak. Bars above the axis
-   = home pressure, below = away; stoppage time extends its half's panel. */
-const MOMENTUM_W={
-  'goal':10,'penalty kick':8,'shot on target':8,'blocked shot':6,'shot off target':5,
-  'key pass':5,'assist':4,'cross success':4,'corner-kick':4,'cross fail':2,
-  'take-on succes':3,'take-on fail':1,'step in':2,'free-kick':1
-};
-function momentumHTML(){
-  const head=`<div class="mom-head"><span class="mom-team home">${meta.home}</span><span class="mom-title">📊 Match Momentum</span></div>`;
-  const foot=`<div class="mom-foot"><span class="mom-team away">${meta.away}</span></div>`;
-  const card=inner=>`<div class="chart-card mom-card">${head}${inner}${foot}</div>`;
-  const L=+dur.halfLen||45, HL=L*60;
-  const evs=rows.filter(r=>r.t!=null);
-  if(!evs.length)return card('<div class="stats-empty">No timed events yet.</div>');
-  const dirs={home:{1:attackDir('home',1),2:attackDir('home',2)},
-              away:{1:attackDir('away',1),2:attackDir('away',2)}};
-  const bins={1:[],2:[]}, goals=[];
-  evs.forEach(r=>{
-    const h=eventHalf(r), m=Math.max(0,Math.floor((matchTime(r.t)-(h-1)*HL)/60));
-    const og=r.event==='own goal'||r.event==='own-goal';
-    const team=og?(r.team==='home'?'away':'home'):r.team;
-    let w=og?MOMENTUM_W.goal:(MOMENTUM_W[r.event]||0);
-    if(r.event==='pass success'&&r.pXY){
-      const ax=dirs[r.team][h]==='left'?100-r.pXY.x:r.pXY.x;
-      w=ax>=200/3?1.5:ax>=50?0.5:0;
-    }
-    if(w>0){const b=bins[h][m]=bins[h][m]||{home:0,away:0}; b[team]+=w;}
-    if(r.event==='goal'||og)goals.push({half:h,min:m,team});
-  });
-  const n={1:Math.max(L,bins[1].length),2:Math.max(L,bins[2].length)};
-  const K=[1,2,4,2,1];
-  const smooth=(h,team)=>{
-    const raw=Array.from({length:n[h]},(_,i)=>(bins[h][i]&&bins[h][i][team])||0);
-    return raw.map((_,i)=>{let acc=0,wt=0;
-      K.forEach((k,j)=>{const ii=i+j-2;if(ii>=0&&ii<raw.length){acc+=raw[ii]*k;wt+=k;}});
-      return acc/wt;});
-  };
-  let peak=0; const diff={};
-  [1,2].forEach(h=>{
-    const sh=smooth(h,'home'), sa=smooth(h,'away');
-    diff[h]=sh.map((v,i)=>{const d=v-sa[i];peak=Math.max(peak,Math.abs(d));return d;});
-  });
-  // geometry: one bar per minute; two panels split at half time
-  const bw=9, step=13, gapW=44, mX=10;
-  const W=mX*2+(n[1]+n[2])*step-(step-bw)+gapW+12, H=252;   // +12: room for the last minute label
-  const plotT=48, plotB=196, axisY=(plotT+plotB)/2, amp=(plotB-plotT)/2-4, lblY=216;
-  const homeBadgeY=24, awayBadgeY=236;
-  const ox={1:mX, 2:mX+n[1]*step+gapW};
-  let g='';
-  [1,2].forEach(h=>{
-    const x0=ox[h], x1=ox[h]+n[h]*step-(step-bw);
-    g+=`<line x1="${x0}" y1="${plotT}" x2="${x1}" y2="${plotT}" stroke="var(--line)" stroke-dasharray="3 5"/>`
-      +`<line x1="${x0}" y1="${plotB}" x2="${x1}" y2="${plotB}" stroke="var(--line)" stroke-dasharray="3 5"/>`
-      +`<line x1="${x0}" y1="${axisY}" x2="${x1}" y2="${axisY}" stroke="var(--line)"/>`;
-    for(let m=15;m<=n[h];m+=15)
-      g+=`<text x="${ox[h]+m*step-(step-bw)/2}" y="${lblY}" text-anchor="middle" font-size="12" fill="var(--mut)">${m+(h-1)*L}'</text>`;
-  });
-  // goal stems run outside the plot so they never cross the bars; badges are
-  // drawn in time order so the same-team overlap nudge only ever pushes right
-  goals.sort((a,b)=>(a.half-b.half)||(a.min-b.min));
-  const lastGX={home:-1e9,away:-1e9};
-  const badges=goals.map(gl=>{
-    const up=gl.team==='home';
-    let cx=ox[gl.half]+Math.min(gl.min,n[gl.half]-1)*step+bw/2;
-    cx=Math.max(cx,lastGX[gl.team]+28); lastGX[gl.team]=cx;
-    const by=up?homeBadgeY:awayBadgeY;
-    return `<line x1="${cx}" y1="${up?plotT:plotB}" x2="${cx}" y2="${by}" stroke="var(--mut)" stroke-width="1" opacity="0.6"/>`
-      +`<g transform="translate(${cx} ${by})"><rect x="-13" y="-13" width="26" height="26" rx="7" fill="#161b22" stroke="var(--line)"/>`
-      +`<text text-anchor="middle" y="5" font-size="14">⚽</text></g>`;
-  }).join('');
-  [1,2].forEach(h=>{
-    diff[h].forEach((d,i)=>{
-      const v=peak?d/peak:0, hh=Math.abs(v)*amp, bx=ox[h]+i*step;
-      if(hh<1.5)
-        g+=`<rect x="${bx}" y="${axisY-1}" width="${bw}" height="2" rx="1" fill="var(--mut)" opacity="0.5"/>`;
-      else
-        g+=`<rect x="${bx}" y="${(v>0?axisY-hh:axisY).toFixed(1)}" width="${bw}" height="${hh.toFixed(1)}" rx="2" fill="${v>0?'var(--home)':'var(--away)'}"/>`;
-    });
-  });
-  return card(`<div class="sum-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"`
-    +` style="width:100%;min-width:900px">${badges}${g}</svg></div>`);
+    +`<div class="gen-layout">${formationSideHTML('home')}<div class="gen-center">${html}</div>${formationSideHTML('away')}</div>`;
 }
 /* goals scored by a team = its own 'goal' events + opponent own goals */
 function teamGoals(team){
