@@ -1237,14 +1237,14 @@ function openVideoWindow(){
       const vx=dot.x/100*dims.w,vy=dot.y/100*dims.h;
       const grp=d.createElementNS(SVGNS,'g');
       const c=d.createElementNS(SVGNS,'circle');
-      c.setAttribute('cx',vx);c.setAttribute('cy',vy);c.setAttribute('r',14);
+      c.setAttribute('cx',vx);c.setAttribute('cy',vy);c.setAttribute('r',7);
       // one colour for ALL dots, per team — same blue/orange as the formation dots (--home/--away;
       // hardcoded because this overlay lives in the popup window's own document, outside the main CSS)
       c.setAttribute('fill',state.team==='away'?'#f7682f':'#2f81f7');
-      c.setAttribute('stroke','#000');c.setAttribute('stroke-width',2);
+      c.setAttribute('stroke','#000');c.setAttribute('stroke-width',1);
       const t=d.createElementNS(SVGNS,'text');
-      t.setAttribute('x',vx);t.setAttribute('y',vy+5);t.setAttribute('text-anchor','middle');
-      t.setAttribute('font-size',15);t.setAttribute('font-weight',700);t.setAttribute('fill','#fff');
+      t.setAttribute('x',vx);t.setAttribute('y',vy+3);t.setAttribute('text-anchor','middle');
+      t.setAttribute('font-size',8);t.setAttribute('font-weight',700);t.setAttribute('fill','#fff');
       t.textContent=String(i+1);
       grp.appendChild(c);grp.appendChild(t);
       makeDotDraggable(grp,c,t,dot);
@@ -1264,7 +1264,24 @@ function openVideoWindow(){
   }
   function renderPitch(){
     dims=PITCH_DIMS[state.sport]||PITCH_DIMS.football;
-    overlay.innerHTML=pitchSVG(state.sport)+statusHTML;
+    // goal frames on both ends — OVERLAY ONLY (pitchSVG itself is shared with the
+    // formation panels / Stats / report). Real sizes in pitch units (10 u/m; futsal
+    // 20 u/m): football 7.32 m wide × 2 m deep, 7-a-side 6×2 m, futsal 3×1 m.
+    // Goals protrude past the goal line, so the viewBox is widened — dots keep the
+    // exact same user-unit coordinates, and clicks inside a goal fall outside the
+    // field so svgPct already ignores them.
+    const G={football:{w:73.2,d:20},football7:{w:60,d:20},futsal:{w:60,d:20}}[state.sport];
+    let svgHTML=pitchSVG(state.sport);
+    if(G){
+      const I=6, gy=(dims.h-G.w)/2, pad=I+G.d+6;
+      svgHTML=svgHTML
+        .replace('viewBox="0 0 '+dims.w+' '+dims.h+'"',
+                 'viewBox="'+(-pad)+' 0 '+(dims.w+2*pad)+' '+dims.h+'"')
+        .replace('</svg>','<g fill="none" stroke="'+PITCH_LINE+'" stroke-width="3">'
+          +'<rect x="'+(I-G.d)+'" y="'+gy+'" width="'+G.d+'" height="'+G.w+'"/>'
+          +'<rect x="'+(dims.w-I)+'" y="'+gy+'" width="'+G.d+'" height="'+G.w+'"/></g></svg>');
+    }
+    overlay.innerHTML=svgHTML+statusHTML;
     overlay.querySelector('#pv-pclear').onclick=undoLastDot;
     overlay.querySelector('svg').addEventListener('click',onPitchClick);
     redraw();
