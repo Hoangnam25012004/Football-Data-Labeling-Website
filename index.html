@@ -1290,22 +1290,27 @@ function openVideoWindow(){
   pvRedraw=redraw; pvRenderPitch=renderPitch;
   const togglePitch=show=>{const vis=!!show; overlay.style.display=vis?'block':'none'; if(vis)redraw();};
   pvTogglePitch=togglePitch;
-  // keyboard shortcuts INSIDE the video window (capture phase to beat native video keys)
+  // keyboard shortcuts INSIDE the video window. Capture phase + stopPropagation:
+  // preventDefault alone is NOT enough — after clicking the seek bar the native
+  // timeline slider keeps focus and its own shadow-DOM listeners step it by ~1% of
+  // the video per arrow press (over a minute on a full match) on top of our ±2s,
+  // so the handled keys must never reach the native controls at all.
   d.addEventListener('keydown',e=>{
-    if(e.key==='Shift'){if(!e.repeat){e.preventDefault();togglePitch(true);}return;}   // hold to show pitch
-    if(e.key==='Escape'){e.preventDefault();undoLastDot();return;} // undo the last-placed dot
-    if(e.key==='.'){e.preventDefault();seekBy(-0.2);return;}
-    if(e.key==='/'){e.preventDefault();seekBy(0.2);return;}
-    if(e.code==='ArrowLeft'){e.preventDefault();seekBy(-2);return;}
-    if(e.code==='ArrowRight'){e.preventDefault();seekBy(2);return;}
-    if(e.code==='Space'){e.preventDefault();togglePlay();return;}
-    if(e.key==='Tab'){e.preventDefault();setTeam(state.team==='home'?'away':'home');return;}
-    if(e.key==='+'||e.key==='='){e.preventDefault();setPlaybackRate(video.playbackRate+0.1);return;}
-    if(e.key==='-'||e.key==='_'){e.preventDefault();setPlaybackRate(video.playbackRate-0.1);return;}
+    const stop=()=>{e.preventDefault();e.stopPropagation();};
+    if(e.key==='Shift'){if(!e.repeat){stop();togglePitch(true);}return;}   // hold to show pitch
+    if(e.key==='Escape'){stop();undoLastDot();return;} // undo the last-placed dot
+    if(e.key==='.'){stop();seekBy(-0.2);return;}
+    if(e.key==='/'){stop();seekBy(0.2);return;}
+    if(e.code==='ArrowLeft'){stop();seekBy(-2);return;}
+    if(e.code==='ArrowRight'){stop();seekBy(2);return;}
+    if(e.code==='Space'){stop();togglePlay();return;}
+    if(e.key==='Tab'){stop();setTeam(state.team==='home'?'away':'home');return;}
+    if(e.key==='+'||e.key==='='){stop();setPlaybackRate(video.playbackRate+0.1);return;}
+    if(e.key==='-'||e.key==='_'){stop();setPlaybackRate(video.playbackRate-0.1);return;}
     // forward tagging keystrokes to the main "Enter event" box without leaving the video window
-    if(e.key==='Enter'){e.preventDefault();submitEntry();pvSyncEntry();return;}
-    if(e.key==='Backspace'){e.preventDefault();PI.value=PI.value.slice(0,-1);pvSyncEntry();return;}
-    if(e.key.length===1 && /[a-z0-9*]/i.test(e.key)){e.preventDefault();PI.value+=e.key;pvSyncEntry();}
+    if(e.key==='Enter'){stop();submitEntry();pvSyncEntry();return;}
+    if(e.key==='Backspace'){stop();PI.value=PI.value.slice(0,-1);pvSyncEntry();return;}
+    if(e.key.length===1 && /[a-z0-9*]/i.test(e.key)){stop();PI.value+=e.key;pvSyncEntry();}
   },true);
   d.addEventListener('keyup',e=>{if(e.key==='Shift')togglePitch(false);},true); // release to hide pitch
   document.body.classList.add('video-popped');
@@ -2047,6 +2052,10 @@ let toastT;function toast(msg){const t=$('toast');t.textContent=msg;t.classList.
 
 /* KEYBOARD — keep typing flowing into the player box without clicking */
 const PI=$('playerInput');
+// Capture phase + stopPropagation, same as the video-window handler: if the DOCKED
+// video's native controls hold focus (e.g. after clicking the seek bar), the browser's
+// timeline slider would step ~1% of the video per arrow press on top of our ±2s seek.
+// The early returns for input fields come first, so typing there is untouched.
 document.addEventListener('keydown',e=>{
   const t=e.target;
   // let the user edit event name / hotkey cells freely
@@ -2055,21 +2064,22 @@ document.addEventListener('keydown',e=>{
   if(t.id==='playerInput') return; // its own handler covers it
 
   // focus is on body / a button: handle controls, then redirect typing
-  if(e.key==='Tab'){e.preventDefault();setTeam(state.team==='home'?'away':'home');return}
-  if(e.code==='Space'){e.preventDefault();video.paused?video.play():video.pause();return}
-  if(e.key==='.'){e.preventDefault();seekBy(-0.2);return}
-  if(e.key==='/'){e.preventDefault();seekBy(0.2);return}
-  if(e.key==='Enter'){e.preventDefault();submitEntry();return}
-  if(e.code==='ArrowLeft'){e.preventDefault();seekBy(-2);return}
-  if(e.code==='ArrowRight'){e.preventDefault();seekBy(2);return}
-  if(e.key==='+'||e.key==='='){e.preventDefault();setPlaybackRate(video.playbackRate+0.1);return}
-  if(e.key==='-'||e.key==='_'){e.preventDefault();setPlaybackRate(video.playbackRate-0.1);return}
+  const stop=()=>{e.preventDefault();e.stopPropagation();};
+  if(e.key==='Tab'){stop();setTeam(state.team==='home'?'away':'home');return}
+  if(e.code==='Space'){stop();video.paused?video.play():video.pause();return}
+  if(e.key==='.'){stop();seekBy(-0.2);return}
+  if(e.key==='/'){stop();seekBy(0.2);return}
+  if(e.key==='Enter'){stop();submitEntry();return}
+  if(e.code==='ArrowLeft'){stop();seekBy(-2);return}
+  if(e.code==='ArrowRight'){stop();seekBy(2);return}
+  if(e.key==='+'||e.key==='='){stop();setPlaybackRate(video.playbackRate+0.1);return}
+  if(e.key==='-'||e.key==='_'){stop();setPlaybackRate(video.playbackRate-0.1);return}
   // any printable character -> jump into the player box and type it there (Space is reserved for play/pause)
   if(e.key.length===1 && /[a-z0-9*]/i.test(e.key)){
-    PI.focus(); PI.value+=e.key; e.preventDefault();
+    PI.focus(); PI.value+=e.key; stop();
     if(pvSyncEntry)pvSyncEntry();   // programmatic .value change fires no 'input' event
   }
-});
+},true);
 // Esc undoes the last-placed dot from the main tab too (when the video window is open and no modal is up)
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape'||!pvRedraw)return;
