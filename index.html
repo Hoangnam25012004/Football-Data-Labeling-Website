@@ -125,6 +125,7 @@
   th.a-side,td.a-side{text-align:right}
   th.tl-col,td.tl-col{text-align:center;border-left:1px solid var(--line);border-right:1px solid var(--line);background:#0d1117}
   td.tl-col{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer}
+  td.tl-col .tl-extra{display:block;color:var(--home);font-size:11px;font-weight:600}
   td.blank{background:#0d111733}
   tr.just-added td{background:#16302488;transition:background .6s}
   .xy{font-size:10px;color:var(--mut);font-variant-numeric:tabular-nums}
@@ -936,6 +937,23 @@ function matchTime(vt){
   if(d.h2Start>0 && vt>=d.h2Start) return off+(vt-d.h2Start);
   return Math.max(0, vt-(d.h1Start||0));
 }
+// display-only stoppage time: past the half length the main clock STOPS at 45:00 /
+// 90:00 (or the equivalent for 40/35/30/... minute halves) and the overflow counts
+// separately as "+MM:SS.cc". Returns null inside regular time (plain clock applies).
+function matchClockParts(vt){
+  const d=state.duration; if(!d.enabled)return null;
+  const L=(+d.halfLen||45)*60;
+  const cap=eventHalf({t:vt})===2?2*L:L;
+  const mt=matchTime(vt);
+  if(mt<=cap)return null;
+  // format the overflow from integer centiseconds — the float subtraction lands a
+  // hair under the true value and fmt()'s floor would drop a centisecond
+  const cs=Math.round((mt-cap)*100), p2=n=>String(n).padStart(2,'0');
+  return {base:fmt(cap).slice(0,5),
+    extra:'+'+p2(Math.floor(cs/6000))+':'+p2(Math.floor(cs/100)%60)+'.'+p2(cs%100)};
+}
+// plain-text variant for the toolbar clock: "45:00 +01:05.36"
+function fmtMatchClock(vt){const p=matchClockParts(vt);return p?p.base+' '+p.extra:fmt(matchTime(vt));}
 // inverse of matchTime — map match-clock seconds back to raw video time
 // (a clock time past halfLen counts as 2nd half when the 2nd-half kick-off is set)
 function videoTimeFromMatch(mt){
@@ -1063,7 +1081,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('videoModal').cla
 
 function fmt(t){const m=Math.floor(t/60),s=Math.floor(t%60),cs=Math.floor((t%1)*100);return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`}
 video.addEventListener('timeupdate',()=>{
-  $('tcode').textContent=state.duration.enabled?'⚽ '+fmt(matchTime(video.currentTime)):fmt(video.currentTime)});
+  $('tcode').textContent=state.duration.enabled?'⚽ '+fmtMatchClock(video.currentTime):fmt(video.currentTime)});
 // re-render the formation panel only when the video crosses a substitution snapshot boundary
 let fmSig='';
 video.addEventListener('timeupdate',()=>{
@@ -1898,7 +1916,9 @@ function renderTable(){
     const blank='<td class="blank"></td>';
     const homeCell = isHome ? `<td class="h-side">${combined}</td>` : blank;
     const awayCell = !isHome ? `<td class="a-side">${combined}</td>` : blank;
-    tr.innerHTML=`${homeCell}<td class="tl-col tlink">${fmt(matchTime(r.t))}</td>${awayCell}`
+    const mc=matchClockParts(r.t);  // stoppage time: clock stops at the half length, "+MM:SS" beneath
+    const tlHTML=mc?mc.base+'<span class="tl-extra">'+mc.extra+'</span>':fmt(matchTime(r.t));
+    tr.innerHTML=`${homeCell}<td class="tl-col tlink">${tlHTML}</td>${awayCell}`
       +`<td class="rowbtns"><span class="edit" title="Edit — reload the syntax and dots">✎</span><span class="del" title="Remove">×</span></td>`;
     tr.querySelector('.tlink').onclick=()=>{if(video.src)video.currentTime=r.t};
     if(grpRows.length>1){
@@ -2186,7 +2206,7 @@ function applyCloudDuration(cfg){
   saveDuration();
   if($('durModal'))fillDur();
   renderTable();
-  if(video.src)$('tcode').textContent=state.duration.enabled?'⚽ '+fmt(matchTime(video.currentTime)):fmt(video.currentTime);
+  if(video.src)$('tcode').textContent=state.duration.enabled?'⚽ '+fmtMatchClock(video.currentTime):fmt(video.currentTime);
 }
 function openDurModal(){fillDur();$('durModal').classList.add('show');}
 function closeDurModal(){$('durModal').classList.remove('show');$('playerInput').focus();}
