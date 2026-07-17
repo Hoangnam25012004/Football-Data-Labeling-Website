@@ -61,7 +61,7 @@
   .controls b{color:var(--accent);font-variant-numeric:tabular-nums}
   .controls .dim{opacity:.75}
   .controls .ctl-hints{margin-left:auto;opacity:.85}
-  #ctlPP{color:var(--ink)}
+  #ctlPP{color:var(--ink);cursor:pointer}
   .tcode{font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
 
   .quick{padding:12px;border-bottom:1px solid var(--line)}
@@ -140,6 +140,7 @@
   /* video popped out to its own window: hide only the video + controls, keep the formation panel */
   body.video-popped .video-wrap{display:none}
   body.video-popped #controls{display:none!important}
+  body.video-popped #seekRow{display:none!important}
   .tlink{color:var(--accent);cursor:pointer;font-variant-numeric:tabular-nums}
   .rowbtns{white-space:nowrap;text-align:right}
   .rowbtns .edit,.rowbtns .del{cursor:pointer;font-weight:700;padding:0 5px}
@@ -318,7 +319,10 @@
         <div><b>Click or drag &amp; drop a video</b> (~20MB)</div>
         <div style="font-size:11px">mp4 / webm / mov</div>
       </div>
-      <video id="video" style="display:none" controls preload="auto" playsinline disablepictureinpicture></video>
+      <!-- NO native controls: their slider keeps keyboard focus after a click (arrows
+           then step ~1% of the video) and clicking the video toggles play. The app's
+           own seek bar + keyboard shortcuts replace them. -->
+      <video id="video" style="display:none" preload="auto" playsinline disablepictureinpicture></video>
     </div>
     <input type="file" id="fileInput" accept="video/*" style="display:none">
     <div class="controls" id="controls" style="display:none">
@@ -1007,14 +1011,14 @@ function loadFile(f){
   if(!f||!f.type.startsWith('video')) return;
   video.src=URL.createObjectURL(f);
   video.style.display='block'; drop.style.display='none';
-  $('controls').style.display='flex';
+  $('controls').style.display='flex'; $('seekRow').style.display='flex';
   setVideoSrcStatus('Local: '+(f.name||'file'));
 }
 // load a video from a URL (shared match video — e.g. Cloudflare R2)
 function loadVideoUrl(url){
   if(!url||video.src===url) return;
   video.src=url; video.style.display='block'; drop.style.display='none';
-  $('controls').style.display='flex';
+  $('controls').style.display='flex'; $('seekRow').style.display='flex';
   setVideoSrcStatus('URL: '+url);
 }
 drop.onclick=()=>fileInput.click();
@@ -1054,6 +1058,7 @@ $('vidLocalPick').onclick=()=>fileInput.click();
 function unloadVideo(){
   video.pause(); video.removeAttribute('src'); video.load();
   video.style.display='none'; drop.style.display=''; $('controls').style.display='none';
+  $('seekRow').style.display='none';
   setVideoSrcStatus('No video');
 }
 $('vidRemove').onclick=async()=>{
@@ -1154,6 +1159,53 @@ function pitchSVG(sport){
 // seek helpers that work on the video element wherever it lives
 function seekBy(dt){if(!video.src)return;video.currentTime=Math.min(video.duration||1e9,Math.max(0,video.currentTime+dt));}
 function togglePlay(){if(video.src)video.paused?video.play():video.pause();}
+/* custom seek bar — replaces the removed NATIVE controls (their slider kept keyboard
+   focus after a click and stepped ~1% of the video per arrow press; clicking the
+   video toggled play). Plain divs only: NOTHING here can take keyboard focus, so
+   the app's key handlers stay the single source of seeking. */
+function fmtHMS(t){t=Math.max(0,Math.floor(isFinite(t)?t:0));const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=t%60;
+  return (h?h+':':'')+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
+function makeSeekBar(doc){
+  const bar=doc.createElement('div');
+  bar.style.cssText='display:flex;align-items:center;gap:10px;padding:5px 12px;background:#0d1117;border-top:1px solid #2a3240;flex:none;user-select:none';
+  const track=doc.createElement('div');
+  track.style.cssText='position:relative;flex:1;height:14px;cursor:pointer';
+  const rail=doc.createElement('div');
+  rail.style.cssText='position:absolute;left:0;right:0;top:5px;height:4px;border-radius:2px;background:#2a3240';
+  const fill=doc.createElement('div');
+  fill.style.cssText='position:absolute;left:0;width:0;top:5px;height:4px;border-radius:2px;background:#39d98a';
+  track.appendChild(rail);track.appendChild(fill);
+  const lbl=doc.createElement('span');
+  lbl.style.cssText='flex:none;color:#8b97a7;font-size:11px;font-variant-numeric:tabular-nums';
+  lbl.textContent='00:00 / 00:00';
+  const mute=doc.createElement('span');
+  mute.style.cssText='flex:none;cursor:pointer;font-size:13px;line-height:1';
+  mute.textContent='🔊'; mute.title='Bật/tắt tiếng';
+  mute.onclick=()=>{video.muted=!video.muted;mute.textContent=video.muted?'🔇':'🔊';};
+  bar.appendChild(track);bar.appendChild(lbl);bar.appendChild(mute);
+  const pct=e=>{const r=track.getBoundingClientRect();return r.width?Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)):0;};
+  const seekTo=e=>{if(video.src&&isFinite(video.duration)&&video.duration)video.currentTime=pct(e)*video.duration;};
+  let drag=false;
+  track.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();drag=true;
+    try{track.setPointerCapture(e.pointerId);}catch(_){} seekTo(e);});
+  track.addEventListener('pointermove',e=>{if(drag)seekTo(e);});
+  const endDrag=()=>{drag=false;};
+  track.addEventListener('pointerup',endDrag);track.addEventListener('pointercancel',endDrag);
+  const upd=()=>{const dur=isFinite(video.duration)?video.duration:0;
+    fill.style.width=(dur?video.currentTime/dur*100:0)+'%';
+    lbl.textContent=fmtHMS(video.currentTime)+' / '+fmtHMS(dur);
+    mute.textContent=video.muted?'🔇':'🔊';};
+  upd();
+  return {el:bar,upd};
+}
+// docked instance — a strip between the video and the controls row. Its video
+// listeners are attached ONCE and travel with the (moving) video node; updating
+// the hidden docked bar while the video is popped out is harmless.
+const dockSeek=makeSeekBar(document);
+dockSeek.el.id='seekRow'; dockSeek.el.style.display='none';
+$('controls').parentNode.insertBefore(dockSeek.el,$('controls'));
+['timeupdate','durationchange','loadedmetadata','seeked','volumechange'].forEach(ev=>video.addEventListener(ev,dockSeek.upd));
+$('ctlPP').onclick=togglePlay;   // the ▶/⏸ indicator doubles as a play/pause button
 let vidWin=null, vidWatch=null, pvUpd=null, pvRateUpd=null;
 function openVideoWindow(){
   if(!video.src){alert('Load a video first.');return;}
@@ -1179,10 +1231,15 @@ function openVideoWindow(){
     '<span><span id="pv-pp" style="color:#e6edf3">▶</span> <b id="pv-tc" style="color:#39d98a;font-variant-numeric:tabular-nums">00:00.00</b></span>'+
     '<span>Entry <b id="pv-entry" style="color:#e6edf3;font-variant-numeric:tabular-nums">…</b></span>'+
     '<span style="margin-left:auto;opacity:.85">Space ⏯ · ←/→ ±2s · . / ±0.2s · Tab đổi đội · Giữ Shift: sân · Esc xoá dot</span>';
+  // custom seek bar between the video and the caption bar (native controls are gone)
+  const pvSeek=makeSeekBar(d);
+  d.body.insertBefore(pvSeek.el,bar);
   // live timecode + play/pause glyph + speed label in the popup
   const tcEl=d.getElementById('pv-tc'), ppEl=d.getElementById('pv-pp'), entryEl=d.getElementById('pv-entry'), rateLbl=d.getElementById('pv-rate-lbl');
+  ppEl.style.cursor='pointer'; ppEl.onclick=togglePlay;   // ▶/⏸ doubles as a button
   pvSyncEntry=()=>{entryEl.textContent=$('playerInput').value||'…';}; pvSyncEntry();
-  pvUpd=()=>{tcEl.textContent=fmt(video.currentTime);ppEl.textContent=video.paused?'▶':'⏸';};
+  // pvSeek.upd rides on pvUpd: it's detached with it on dock, so no listeners leak
+  pvUpd=()=>{tcEl.textContent=fmt(video.currentTime);ppEl.textContent=video.paused?'▶':'⏸';pvSeek.upd();};
   video.addEventListener('timeupdate',pvUpd); video.addEventListener('play',pvUpd); video.addEventListener('pause',pvUpd); pvUpd();
   pvRateUpd=()=>{rateLbl.textContent=(+video.playbackRate).toFixed(1);};
   video.addEventListener('ratechange',pvRateUpd); pvRateUpd();
