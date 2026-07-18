@@ -247,8 +247,8 @@ function arcPath(cx,cy,rr,a0,a1){
 function shootingChartHTML(team){
   const s=sumTeam(rows,team), total=s.totalShots;
   if(!total)return `<div class="chart-card"><div class="stats-empty">No shots yet.</div></div>`;
-  const goals=s.goals, onNon=Math.max(0,s.shotsOn-s.goals), off=s.shotsOff+s.shotsBlocked, miss=s.missShots;
-  const segs=[['Goals',goals,'#f7b32f'],['On Target',onNon,'#39d98a'],['Off Target / Blocked',off,'#8b97a7'],['Missed',miss,'#f7506b']];
+  const goals=s.goals, onNon=Math.max(0,s.shotsOn-s.goals), off=s.shotsOff+s.shotsBlocked+s.missShots;
+  const segs=[['Goals',goals,'#f7b32f'],['On Target',onNon,'#39d98a'],['Off Target / Blocked / Missed',off,'#8b97a7']];
   const cx=90,cy=90,rr=62,thick=26; let a=-Math.PI/2, ring='';
   segs.forEach(([lbl,val,col])=>{
     if(val<=0)return;
@@ -265,14 +265,13 @@ function shootingChartHTML(team){
      `<div class="leg-row"><span class="leg-lbl">Total Shots</span><span class="leg-val">${total}</span></div>`
     +`<div class="leg-row"><span class="leg-dot" style="background:#f7b32f"></span><span class="leg-lbl">Goals</span><span class="leg-val">${goals}</span></div>`
     +`<div class="leg-row"><span class="leg-dot" style="background:#39d98a"></span><span class="leg-lbl">On Target</span><span class="leg-val">${pct(s.shotsOn,total)}<span class="leg-sub">${s.shotsOn}/${total}</span></span></div>`
-    +`<div class="leg-row"><span class="leg-dot" style="background:#8b97a7"></span><span class="leg-lbl">Off Target / Blocked</span><span class="leg-val"><span class="leg-sub">${off}/${total}</span></span></div>`
-    +`<div class="leg-row"><span class="leg-dot" style="background:#f7506b"></span><span class="leg-lbl">Missed</span><span class="leg-val"><span class="leg-sub">${miss}/${total}</span></span></div>`;
+    +`<div class="leg-row"><span class="leg-dot" style="background:#8b97a7"></span><span class="leg-lbl">Off Target / Blocked / Missed</span><span class="leg-val"><span class="leg-sub">${off}/${total}</span></span></div>`;
   return `<div class="chart-card donut-card">`
     +`<div class="donut-wrap"><div class="donut-svg">${svg}</div><div class="donut-legend">${legend}</div></div></div>`;
 }
 /* ---- Shooting: pitch map of where each shot was taken (uses the Player dot) ---- */
 function shotMapHTML(team){
-  const kinds={'goal':'#f7b32f','shot on target':'#39d98a','shot off target':'#8b97a7','blocked shot':'#8b97a7','miss shot':'#f7506b'};
+  const kinds={'goal':'#f7b32f','shot on target':'#39d98a','shot off target':'#8b97a7','blocked shot':'#8b97a7','miss shot':'#8b97a7'};
   // split by half — attacking direction flips between halves, so 1st/2nd are shown separately
   const head=`<div class="chart-head"><div></div>`
     +`<div class="half-toggle"><button class="${shotHalf===1?'on':''}" onclick="setShotHalf(1)">1st</button>`
@@ -288,8 +287,7 @@ function shotMapHTML(team){
   const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG(attackDir(team,shotHalf))+dots+'</svg>');
   const legend=`<span class="sm-leg"><span class="leg-dot" style="background:#f7b32f"></span>Goal</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:#39d98a"></span>On target</span>`
-    +`<span class="sm-leg"><span class="leg-dot" style="background:#8b97a7"></span>Off / Blocked</span>`
-    +`<span class="sm-leg"><span class="leg-dot" style="background:#f7506b"></span>Missed</span>`;
+    +`<span class="sm-leg"><span class="leg-dot" style="background:#8b97a7"></span>Off / Blocked / Missed</span>`;
   return `<div class="chart-card map-card">${head}`
     +`<div class="shotmap-pitch">${pitch}</div><div class="shotmap-legend">${legend}</div></div>`;
 }
@@ -937,6 +935,6 @@ function dbToRow(d){
   }catch(e){console.warn('Stats cloud load failed — using local data:',(e&&e.message)||e);}
 })();
 </script>
-<script src="report.js?v=4"></script>
+<script src="report.js?v=5"></script>
 </body>
 </html>
