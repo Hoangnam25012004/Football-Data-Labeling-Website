@@ -275,7 +275,6 @@ function formationPages(team){
     let b=secTitle(`Lineups &amp; Formation — ${esc(TN(team))} (${side})${i?' — cont.':''}`);
     b+=`<div class="rp-sub" style="color:${TC(team)}">${esc(TN(team))}${ps[0].f?' — '+ps[0].f:''}</div>`;
     b+=`<div class="rp-fgrid">${ps.slice(i,i+4).map(p=>fmCard(p,team)).join('')}</div>`;
-    b+=`<div class="rp-note">Pitch shown vertically, team attacking upward. One card per formation period (start – end of the period in match time).</div>`;
     pages.push(b);
   }
   return pages;
@@ -349,8 +348,7 @@ function shotMapsPage(){
   const body=secTitle('Attacking — Shot Maps')+card('home')+card('away')
     +`<div class="rp-mleg"><span><i style="background:${C.gold}"></i>Goal</span><span><i style="background:${C.green}"></i>On target</span>`
     +`<span><i style="background:#aeb4bc"></i>Off target / blocked / missed</span><span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
-    +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span></div>`
-    +`<div class="rp-note">Both halves are normalised so the team attacks to the right.</div>`;
+    +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span></div>`;
   return any?body:null;
 }
 
@@ -459,8 +457,7 @@ function netMapsPage(){
   const card=(team,svg)=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Pass Network</div>`
     +(svg?`<div style="width:620px;margin:0 auto">${hPitchSVG(svg)}</div>`
          :`<div class="rp-note" style="font-size:11px">No passes for ${esc(TN(team))}.</div>`)+'</div>';
-  return secTitle('Distribution — Pass Networks')+card('home',h)+card('away',a)
-    +`<div class="rp-note">Nodes sit at each player's average pass-involvement position (both halves normalised to attack right); arrow thickness = completed passes along that link.</div>`;
+  return secTitle('Distribution — Pass Networks')+card('home',h)+card('away',a);
 }
 
 /* pass networks per 15-minute window — same windows as the Stats-tab dropdown
@@ -503,8 +500,7 @@ function netWindowPages(){
   const pages=[];
   for(let i=0;i<blocks.length;i+=2){
     pages.push(secTitle('Distribution : Passes ( 15 Minute Intervals )'+(i?' — cont.':''))
-      +blocks.slice(i,i+2).join('')
-      +(i+2>=blocks.length?`<div class="rp-note">15-minute windows within each half; the last window of a half absorbs the remainder plus stoppage time. Nodes sit at each player's average pass-involvement position in the window; arrow thickness = completed passes.</div>`:''));
+      +blocks.slice(i,i+2).join(''));
   }
   return pages;
 }
@@ -596,8 +592,7 @@ function heatPage(){
   };
   return secTitle('Distribution — Touch Heatmaps')+card('home')+card('away')
     +`<div class="rp-mleg"><span>Low</span><span style="width:130px;height:10px;border-radius:5px;display:inline-block;`
-    +`background:linear-gradient(90deg,rgba(0,60,255,0.55),#00c8ff,#39ff54,#ffe12b,#ff2b1e)"></span><span>High</span></div>`
-    +`<div class="rp-note">Every located event of the team (both halves normalised so the team attacks right).</div>`;
+    +`background:linear-gradient(90deg,rgba(0,60,255,0.55),#00c8ff,#39ff54,#ffe12b,#ff2b1e)"></span><span>High</span></div>`;
 }
 
 /* pass-type breakdown (distance / direction / area) — reuses passTypeData() from the Stats page */
@@ -619,8 +614,7 @@ function passTypesPage(){
       +`<tbody>${section('Pass Distance',D.catD)}${section('Pass Direction',D.catG)}${section('Area',D.catA)}</tbody></table></div>`;
   };
   return secTitle('Distribution — Pass Types')
-    +`<div style="display:flex;gap:18px">${card('home')}${card('away')}</div>`
-    +`<div class="rp-note">Distance in real pitch metres (105×68): short &lt;15m, medium 15–30m, long &gt;30m. Direction relative to the attack: forward within ±45°, backward beyond ±135°. Area = origin third of the pitch. Passes without the needed tagged locations are skipped in the affected section.</div>`;
+    +`<div style="display:flex;gap:18px">${card('home')}${card('away')}</div>`;
 }
 
 /* cross maps — origin→target arrows + zone-ratio bands, one pitch per team */
@@ -659,8 +653,7 @@ function crossMapsPage(){
     +(svg?`<div style="width:660px;margin:0 auto">${svg}</div>`
          :`<div class="rp-note" style="font-size:11px">No crosses for ${esc(TN(team))}.</div>`)+'</div>';
   return secTitle('Distribution — Cross Maps')+card('home',h)+card('away',a)
-    +`<div class="rp-mleg"><span><i style="background:#39d98a"></i>Cross success</span><span><i style="background:#f7506b"></i>Cross fail</span></div>`
-    +`<div class="rp-note">Top band: share of crosses by origin third of the pitch length. Right band: share of located cross targets by height third. Both halves normalised to attack right.</div>`;
+    +`<div class="rp-mleg"><span><i style="background:#39d98a"></i>Cross success</span><span><i style="background:#f7506b"></i>Cross fail</span></div>`;
 }
 
 /* ================= defensive ================= */
@@ -703,8 +696,7 @@ function defCategoryPages(){
     };
     const legend=cat.parts.map(([,lbl,c])=>`<span><i style="background:${c}"></i>${lbl}</span>`).join('');
     pages.push(secTitle(`Defensive — ${cat.label}`)+card('home',hA)+card('away',aA)
-      +`<div class="rp-mleg">${legend}</div>`
-      +`<div class="rp-note">Both halves normalised so the team attacks right (own goal on the left).</div>`);
+      +`<div class="rp-mleg">${legend}</div>`);
   });
   return pages;
 }
@@ -749,7 +741,6 @@ function radarPage(){
   if(la.length)ins+=` ${esc(TN('away'))} stretches the shape toward ${la.join(' and ')}.`;
   return secTitle('Defensive — Profile Radar')+legend()
     +`<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;margin:0 auto">${g}</svg>`
-    +`<div class="rp-note" style="text-align:center">Each axis is min-max normalised against the higher of the two teams (outer ring = match-high). Raw values shown beside each axis as Home · Away.</div>`
     +insight(ins);
 }
 
