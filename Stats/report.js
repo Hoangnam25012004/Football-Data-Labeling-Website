@@ -284,9 +284,9 @@ function formationPages(team){
 /* ================= attacking ================= */
 function donutCard(team){
   const s=sumTeam(rows,team), total=s.totalShots;
-  const goals=s.goals, onNon=Math.max(0,s.shotsOn-s.goals), off=s.shotsOff+s.shotsBlocked;
+  const goals=s.goals, onNon=Math.max(0,s.shotsOn-s.goals), off=s.shotsOff+s.shotsBlocked, miss=s.missShots;
   const cx=70,cy=70,rr=52,thick=22; let a=-Math.PI/2, ring=`<circle cx="${cx}" cy="${cy}" r="${rr}" fill="none" stroke="#d9dde3" stroke-width="${thick}"/>`;
-  if(total)[[goals,C.gold],[onNon,C.green],[off,C.grey]].forEach(([val,col])=>{
+  if(total)[[goals,C.gold],[onNon,C.green],[off,C.grey],[miss,C.red]].forEach(([val,col])=>{
     if(val<=0)return;
     const a1=a+val/total*2*Math.PI;
     ring+=val>=total?`<circle cx="${cx}" cy="${cy}" r="${rr}" fill="none" stroke="${col}" stroke-width="${thick}"/>`
@@ -303,6 +303,7 @@ function donutCard(team){
     +row(C.gold,'Goals',goals)
     +row(C.green,'On Target',`${pc0(s.shotsOn,total)} <span style="color:${C.mut};font-weight:400">${frac(s.shotsOn,total)}</span>`)
     +row(C.grey,'Off Target / Blocked',frac(off,total))
+    +row(C.red,'Missed',frac(miss,total))
     +'</div></div>';
 }
 function attInsight(){
@@ -328,7 +329,7 @@ function attackingPage(){
 }
 /* shot maps — both halves on one pitch, normalised to attack RIGHT */
 function shotMapsPage(){
-  const kinds={'goal':C.gold,'shot on target':C.green,'shot off target':'#aeb4bc','blocked shot':'#aeb4bc'};
+  const kinds={'goal':C.gold,'shot on target':C.green,'shot off target':'#aeb4bc','blocked shot':'#aeb4bc','miss shot':C.red};
   let any=false;
   const teamMap=team=>{
     const N=normXY(team), d=PITCH_DIMS.football;
@@ -348,7 +349,7 @@ function shotMapsPage(){
   const card=team=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Shot Locations</div>${teamMap(team)}</div>`;
   const body=secTitle('Attacking — Shot Maps')+card('home')+card('away')
     +`<div class="rp-mleg"><span><i style="background:${C.gold}"></i>Goal</span><span><i style="background:${C.green}"></i>On target</span>`
-    +`<span><i style="background:#aeb4bc"></i>Off target / blocked</span><span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
+    +`<span><i style="background:#aeb4bc"></i>Off target / blocked</span><span><i style="background:${C.red}"></i>Missed</span><span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
     +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span></div>`
     +`<div class="rp-note">Both halves are normalised so the team attacks to the right.</div>`;
   return any?body:null;
@@ -380,9 +381,9 @@ function cardCounts(team){
   return out;
 }
 const attackingPlayerPages=()=>playerStatPages('Attacking — Player Stats',
-  ['Goals','Assists','Shots','On Target','Off Target','Blocked','Shoot Acc','Offsides','Freekicks','Corners'],
+  ['Goals','Assists','Shots','On Target','Off Target','Blocked','Missed','Shoot Acc','Offsides','Freekicks','Corners'],
   s=>[dotv(s.goals),dotv(s.assists),dotv(s.totalShots),dotv(s.shotsOn),dotv(s.shotsOff),dotv(s.shotsBlocked),
-      pc0(s.shotsOn,s.totalShots),dotv(s.offsides),dotv(s.freeKicks),dotv(s.corners)]);
+      dotv(s.missShots),pc0(s.shotsOn,s.totalShots),dotv(s.offsides),dotv(s.freeKicks),dotv(s.corners)]);
 const distributionPlayerPages=()=>playerStatPages('Distribution — Player Stats',
   ['Passes','Pass Acc','Crosses','Cross Acc','Take-Ons','Step-ins'],
   s=>[frac(s.passesComp,s.passes),pc0(s.passesComp,s.passes),frac(s.crossesComp,s.crosses),
