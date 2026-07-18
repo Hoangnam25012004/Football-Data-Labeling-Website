@@ -708,7 +708,8 @@ function scoreBarHTML(){
 const SUMMARY_EVENTS={'goal':'goal','own goal':'og','own-goal':'og','yellow card':'yc','red card':'rc'};
 function matchSummaryHTML(){
   const evs=rows.filter(r=>r.t!=null&&SUMMARY_EVENTS[r.event]).sort((x,y)=>x.t-y.t)
-    .map(r=>({kind:SUMMARY_EVENTS[r.event],team:r.team,no:(r.playerFrom||'').toString().trim(),sec:matchTime(r.t)}));
+    .map(r=>({kind:SUMMARY_EVENTS[r.event],team:r.team,no:(r.playerFrom||'').toString().trim(),
+              sec:matchTime(r.t),half:eventHalf(r)}));
   if(!evs.length)return `<div class="chart-card sum-card">${scoreBarHTML()}<div class="stats-empty">No goals or cards yet.</div></div>`;
   // wide, flat viewBox keeps the card short when the SVG scales to full width
   const W=1500,H=138,mL=104,mR=30,axisY=66,hl=(+dur.halfLen||45)*60;
@@ -731,17 +732,22 @@ function matchSummaryHTML(){
   const icon=k=>k==='goal'?'<text text-anchor="middle" font-size="17" y="6">⚽</text>'
     :k==='og'?'<circle r="10" fill="#f7506b"/><text text-anchor="middle" font-size="9" font-weight="800" fill="#fff" y="3.5">OG</text>'
     :`<rect x="-5.5" y="-8" width="11" height="16" rx="2" fill="${k==='yc'?'#ffd23f':'#e5484d'}" stroke="#0d1117"/>`;
+  // stoppage-time minutes are capped by the half: a 45:52 first-half goal is
+  // 45+1', a 95:30 second-half goal is 90+6' (never 46' / 96')
+  const halfMin=hl/60;
+  const minLbl=e=>{const m=Math.floor(e.sec/60)+1, cap=e.half*halfMin;
+    return m>cap?`${cap}+${m-cap}'`:`${m}'`;};
   // every event sits on one lane per team — home above the axis, away below;
   // near-simultaneous events of the same team are nudged right so icons never overlap
   const lastX={home:-1e9,away:-1e9};
   const marks=evs.map(e=>{
     const x=Math.max(X(e.sec),lastX[e.team]+24), up=e.team==='home', col=up?'var(--home)':'var(--away)';
     lastX[e.team]=x;
-    const y=up?axisY-26:axisY+32, m=Math.floor(e.sec/60)+1;
+    const y=up?axisY-26:axisY+32;
     const noBadge=e.no?`<circle cy="${up?-24:26}" r="9.5" fill="${col}" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>`
       +`<text text-anchor="middle" y="${up?-20.5:29.5}" font-size="10" font-weight="800" fill="#fff">${e.no}</text>`:'';
     return `<g transform="translate(${x.toFixed(1)} ${y})">${icon(e.kind)}${noBadge}`
-      +`<text text-anchor="middle" y="${up?20:-16}" font-size="10" fill="var(--mut)">${m}'</text></g>`;
+      +`<text text-anchor="middle" y="${up?20:-16}" font-size="10" fill="var(--mut)">${minLbl(e)}</text></g>`;
   }).join('');
   return `<div class="chart-card sum-card">${scoreBarHTML()}<div class="sum-wrap">`
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;min-width:900px">${g}${marks}</svg></div></div>`;
@@ -935,6 +941,6 @@ function dbToRow(d){
   }catch(e){console.warn('Stats cloud load failed — using local data:',(e&&e.message)||e);}
 })();
 </script>
-<script src="report.js?v=7"></script>
+<script src="report.js?v=8"></script>
 </body>
 </html>

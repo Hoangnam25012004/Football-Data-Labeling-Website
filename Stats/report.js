@@ -22,7 +22,10 @@ const TRGB=t=>t==='home'?C.homeRGB:C.awayRGB;
 const TN=t=>t==='home'?meta.home:meta.away;
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mmss=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
-const minLbl=sec=>Math.floor(sec/60)+1+"'";
+/* stoppage-time minutes are capped by the half: 45:52 in the 1st half is 45+1',
+   95:30 in the 2nd is 90+6' (never 46' / 96') */
+const minLbl=(sec,half)=>{const L=+dur.halfLen||45, m=Math.floor(sec/60)+1, cap=(half||2)*L;
+  return m>cap?`${cap}+${m-cap}'`:`${m}'`;};
 const dotv=v=>v?v:'<span style="color:#c9cfd9">·</span>';
 const pc0=(n,d)=>d?Math.round(n/d*100)+'%':'0%';
 const frac=(n,d)=>`${n}/${d}`;
@@ -203,8 +206,8 @@ function timelineEvents(){
     if(pen){mergedPens.add(pen);penGoals.add(r);}
   });
   sorted.forEach(r=>{
-    const sec=matchTime(r.t), no=esc(String(r.playerFrom||'').trim()), team=r.team;
-    const push=(kind,html)=>evs.push({sec,team,kind,html});
+    const sec=matchTime(r.t), no=esc(String(r.playerFrom||'').trim()), team=r.team, half=eventHalf(r);
+    const push=(kind,html)=>evs.push({sec,team,kind,half,html});
     if(r.event==='goal'){
       let as=assists.find(x=>x.team===team&&x.grp!=null&&x.grp===r.grp);
       if(!as)as=assists.filter(x=>x.team===team&&Math.abs(x.t-r.t)<=45)
@@ -241,7 +244,7 @@ function tlIcon(e){
 function tlRow(e){
   const item=`${tlIcon(e)}<span style="color:${TC(e.team)}">${e.html}</span>`;
   return `<div class="rp-tlrow"><div class="rp-tlh">${e.team==='home'?item:''}</div>`
-    +`<span class="rp-pillt">${minLbl(e.sec)}</span>`
+    +`<span class="rp-pillt">${minLbl(e.sec,e.half)}</span>`
     +`<div class="rp-tla">${e.team==='away'?item:''}</div></div>`;
 }
 function timelinePages(){
