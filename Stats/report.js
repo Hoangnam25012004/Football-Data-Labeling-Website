@@ -75,11 +75,11 @@ table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
 .rp-pillt{flex:none;background:${C.navy};color:#fff;border-radius:11px;padding:3px 14px;font-size:10.5px;font-weight:800}
 .rp-cardi{display:inline-block;width:9px;height:13px;border-radius:2px;border:1px solid rgba(0,0,0,0.25);vertical-align:-2px}
 .rp-badge{display:inline-flex;width:16px;height:16px;border-radius:50%;color:#fff;font-size:8px;font-weight:800;align-items:center;justify-content:center;line-height:1}
-.rp-fgrid{display:flex;flex-wrap:wrap;gap:12px}
-.rp-fcard{width:calc(50% - 6px);box-sizing:border-box;border:1px solid ${C.line};border-radius:8px;padding:9px 9px 11px;text-align:center}
-.rp-fttl{font-size:11.5px;color:#5b6572;margin-bottom:7px}
+.rp-fgrid{display:flex;flex-wrap:wrap;gap:26px 14px;margin-top:6px}
+.rp-fcard{width:calc(50% - 7px);box-sizing:border-box;border:1px solid ${C.line};border-radius:8px;padding:12px 9px 14px;text-align:center}
+.rp-fttl{font-size:11.5px;color:#5b6572;margin-bottom:8px}
 .rp-fttl b{color:${C.ink}}
-.rp-fpitch{position:relative;width:186px;margin:0 auto}
+.rp-fpitch{position:relative;width:206px;margin:0 auto}
 .rp-fdot{position:absolute;transform:translate(-50%,-50%);width:22px;height:22px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;color:#fff;font-size:9.5px;font-weight:800;
   border:2px solid rgba(255,255,255,0.9);box-shadow:0 1px 2px rgba(0,0,0,0.35)}
@@ -271,10 +271,10 @@ function formationPages(team){
   const side=team==='home'?'Home':'Away';
   if(!ps.length)return [secTitle(`Lineups &amp; Formation — ${esc(TN(team))} (${side})`)
     +`<div class="rp-note" style="font-size:11px">No starting lineup set for this team (see Player lists).</div>`];
-  for(let i=0;i<ps.length;i+=6){
+  for(let i=0;i<ps.length;i+=4){
     let b=secTitle(`Lineups &amp; Formation — ${esc(TN(team))} (${side})${i?' — cont.':''}`);
     b+=`<div class="rp-sub" style="color:${TC(team)}">${esc(TN(team))}${ps[0].f?' — '+ps[0].f:''}</div>`;
-    b+=`<div class="rp-fgrid">${ps.slice(i,i+6).map(p=>fmCard(p,team)).join('')}</div>`;
+    b+=`<div class="rp-fgrid">${ps.slice(i,i+4).map(p=>fmCard(p,team)).join('')}</div>`;
     b+=`<div class="rp-note">Pitch shown vertically, team attacking upward. One card per formation period (start – end of the period in match time).</div>`;
     pages.push(b);
   }
@@ -473,32 +473,38 @@ function winFilter(w,L){
     return ms>=w.s*60&&(w.last||ms<w.e*60);
   };
 }
-function netWindowPages(team){
+function netWindowPages(){
   const L=+dur.halfLen||45, wins=pdWindows();
   const isPass=r=>r.event==='pass success'||r.event==='pass fail';
-  const all=rows.filter(r=>r.team===team&&isPass(r));
-  if(!all.length)return [];
-  const opp=team==='home'?'away':'home';
-  const cards=wins.map((w,i)=>{
-    const f=winFilter(w,L), winP=all.filter(f);
-    let body;
-    if(!winP.length)body=`<div class="rp-note" style="font-size:11px;padding:6px 0 16px">No passes in ${w.label}.</div>`;
-    else{
-      const suc=winP.filter(r=>r.event==='pass success').length;
-      const oppWin=rows.filter(r=>r.team===opp&&isPass(r)&&f(r)).length;
-      body=`<div style="width:620px;margin:0 auto">${hPitchSVG(netMapSVG(team,f,'w'+i)||'')}</div>`
-        +`<div style="display:flex;justify-content:center;gap:38px;font-size:10px;color:${C.mut};margin-top:5px">`
-        +`<span>Passes <b style="color:${C.ink}">${winP.length} / ${all.length}</b></span>`
-        +`<span>Pass Accuracy <b style="color:${C.ink}">${pct(suc,winP.length)}</b></span>`
-        +`<span>Possession <b style="color:${C.ink}">${pct(winP.length,winP.length+oppWin)}</b></span></div>`;
-    }
-    return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Pass Network ${w.label}</div>${body}</div>`;
+  const all={home:rows.filter(r=>r.team==='home'&&isPass(r)),
+             away:rows.filter(r=>r.team==='away'&&isPass(r))};
+  if(!all.home.length&&!all.away.length)return [];
+  // one column of the interval row: team name, network pitch, stats line
+  const half=(team,w,f,i)=>{
+    const winP=all[team].filter(f), opp=team==='home'?'away':'home';
+    const head=`<div class="rp-mtitle" style="color:${TC(team)};font-size:11px;margin-bottom:4px">${esc(TN(team))}</div>`;
+    if(!winP.length)
+      return `<div style="flex:1;min-width:0">${head}<div class="rp-note" style="font-size:10px">No passes in ${w.label}.</div></div>`;
+    const suc=winP.filter(r=>r.event==='pass success').length;
+    const oppWin=all[opp].filter(f).length;
+    const st=(l,v)=>`<span>${l}<br><b style="color:${C.ink};font-size:9.5px">${v}</b></span>`;
+    return `<div style="flex:1;min-width:0">${head}${hPitchSVG(netMapSVG(team,f,team+'w'+i)||'')}`
+      +`<div style="display:flex;justify-content:space-between;font-size:8.5px;color:${C.mut};margin-top:4px;text-align:left">`
+      +st('Count / Total Pass Count',`${winP.length} / ${all[team].length}`)
+      +st('Pass Accuracy',pct(suc,winP.length))
+      +st('Possession',pct(winP.length,winP.length+oppWin))+`</div></div>`;
+  };
+  // one row per interval: centred interval label, home network left, away right
+  const blocks=wins.map((w,i)=>{
+    const f=winFilter(w,L);
+    return `<div class="rp-mapcard"><div style="text-align:center;font-size:13.5px;font-weight:800;color:${C.navy};margin:2px 0 7px">${w.label}</div>`
+      +`<div style="display:flex;gap:18px">${half('home',w,f,i)}${half('away',w,f,i)}</div></div>`;
   });
   const pages=[];
-  for(let i=0;i<cards.length;i+=2){
-    pages.push(secTitle(`Distribution — Pass Networks by Interval — ${esc(TN(team))}${i?' (cont.)':''}`)
-      +cards.slice(i,i+2).join('')
-      +(i+2>=cards.length?`<div class="rp-note">15-minute windows within each half; the last window of a half absorbs the remainder plus stoppage time. Nodes sit at each player's average pass-involvement position in the window; arrow thickness = completed passes.</div>`:''));
+  for(let i=0;i<blocks.length;i+=2){
+    pages.push(secTitle('Distribution : Passes ( 15 Minute Intervals )'+(i?' — cont.':''))
+      +blocks.slice(i,i+2).join('')
+      +(i+2>=blocks.length?`<div class="rp-note">15-minute windows within each half; the last window of a half absorbs the remainder plus stoppage time. Nodes sit at each player's average pass-involvement position in the window; arrow thickness = completed passes.</div>`:''));
   }
   return pages;
 }
@@ -844,8 +850,7 @@ function buildPages(host){
     ...attackingPlayerPages(),
     distributionPage(),
     netMapsPage(),
-    ...netWindowPages('home'),
-    ...netWindowPages('away'),
+    ...netWindowPages(),
     scatterPage(),
     matrixPage('home'),
     matrixPage('away'),
