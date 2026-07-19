@@ -814,7 +814,8 @@ const RP_FOULS=new Set(['foul','foul throw','handball foul']);
 function foulMapsPage(){
   let any=false;
   const card=team=>{
-    const N=normXY(team), d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
+    // home shown attacking RIGHT, away mirrored to attack LEFT
+    const N=normXY(team), d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT, flip=team==='away';
     const evs=rows.filter(r=>r.team===team&&RP_FOULS.has(r.event)&&r.pXY);
     let inner;
     if(!evs.length)inner=`<div class="rp-note" style="font-size:11px">No located fouls for ${esc(TN(team))}.</div>`;
@@ -828,7 +829,7 @@ function foulMapsPage(){
         });
         return best;};
       const fl=evs.map(r=>{const p=N(r).a;
-        return {x:p.x/100*PW, y:p.y/100*PH, half:eventHalf(r), no:esc(String(r.playerFrom||'').trim()), card:cardFor(r)};});
+        return {x:(flip?100-p.x:p.x)/100*PW, y:(flip?100-p.y:p.y)/100*PH, half:eventHalf(r), no:esc(String(r.playerFrom||'').trim()), card:cardFor(r)};});
       const oCnt=[0,0,0]; fl.forEach(f=>oCnt[Math.min(2,Math.floor(f.x/PW*3))]++);
       const tCnt=[0,0,0]; fl.forEach(f=>tCnt[Math.min(2,Math.floor(f.y/PH*3))]++);
       const pctL=n=>(Math.round(n/fl.length*1000)/10)+'%';
@@ -848,8 +849,9 @@ function foulMapsPage(){
         return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${f.no}</text></g>`;
       }).join('');
       let grass=''; for(let i=0;i<7;i++)grass+=`<rect x="${(i*PW/7).toFixed(1)}" y="0" width="${(PW/7).toFixed(1)}" height="${PH}" fill="${i%2?'#2a733f':'#2e7d46'}"/>`;
-      const pitch=`<g transform="translate(0 ${mT})">${grass}<rect width="${PW/3}" height="${PH}" fill="url(#${patId})"/>`
-        +`<g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG('right')}${dots}</g>`;
+      // dangerous zone = own defensive third: left when attacking right, right when mirrored
+      const pitch=`<g transform="translate(0 ${mT})">${grass}<rect x="${flip?(2*PW/3).toFixed(1):0}" width="${PW/3}" height="${PH}" fill="url(#${patId})"/>`
+        +`<g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG(flip?'left':'right')}${dots}</g>`;
       inner=`<div style="width:660px;margin:0 auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">${defs}${over}${pitch}</svg></div>`;
     }
     return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Foul Map</div>${inner}</div>`;
