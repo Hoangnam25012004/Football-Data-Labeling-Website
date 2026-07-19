@@ -335,19 +335,20 @@ function shotMapsPage(){
   const kinds={'goal':C.gold,'shot on target':C.green,'shot off target':'#aeb4bc','blocked shot':'#aeb4bc','miss shot':'#aeb4bc'};
   let any=false;
   const teamMap=team=>{
-    const N=normXY(team), d=PITCH_DIMS.football;
+    // home shown attacking RIGHT, away mirrored to attack LEFT
+    const N=normXY(team), d=PITCH_DIMS.football, flip=team==='away';
     const shots=rows.filter(r=>r.team===team&&kinds[r.event]&&r.pXY);
     if(!shots.length)return `<div class="rp-note" style="font-size:11px">No located shots for ${esc(TN(team))}.</div>`;
     any=true;
     const dots=shots.map(r=>{
-      const p=N(r).a, x=p.x/100*d.w, y=p.y/100*d.h, col=kinds[r.event];
+      const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h, col=kinds[r.event];
       const no=esc(String(r.playerFrom||'').trim());
       const shape=eventHalf(r)===1
         ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="14" fill="${col}" stroke="#fff" stroke-width="2.5"/>`
         :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${col}" stroke="#fff" stroke-width="2.5"/>`;
       return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+5).toFixed(1)}" text-anchor="middle" font-size="14" font-weight="800" fill="#fff">${no}</text></g>`;
     }).join('');
-    return `<div style="width:620px;margin:0 auto">${hPitchSVG(dots)}</div>`;
+    return `<div style="width:620px;margin:0 auto">${hPitchSVG(dots,flip?'left':'right')}</div>`;
   };
   const card=team=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Shot Locations</div>${teamMap(team)}</div>`;
   const body=secTitle('Attacking — Shot Maps')+card('home')+card('away')
@@ -431,9 +432,11 @@ function netMapSVG(team,filter,idSuffix){
     addP(r.playerFrom,n.a);
     if(r.event==='pass success')addP(r.playerTo,n.b);
   });
-  const nodes={};
+  const nodes={}, flip=team==='away';   // away mirrored to attack LEFT
   Object.entries(pos).forEach(([p,a])=>{
-    nodes[p]={x:a.reduce((s,v)=>s+v.x,0)/a.length/100*d.w, y:a.reduce((s,v)=>s+v.y,0)/a.length/100*d.h};
+    let mx=a.reduce((s,v)=>s+v.x,0)/a.length, my=a.reduce((s,v)=>s+v.y,0)/a.length;
+    if(flip){mx=100-mx;my=100-my;}
+    nodes[p]={x:mx/100*d.w, y:my/100*d.h};
   });
   const edges={};
   passes.forEach(r=>{
@@ -460,7 +463,7 @@ function netMapsPage(){
   const h=netMapSVG('home'), a=netMapSVG('away');
   if(!h&&!a)return null;
   const card=(team,svg)=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Pass Network</div>`
-    +(svg?`<div style="width:620px;margin:0 auto">${hPitchSVG(svg)}</div>`
+    +(svg?`<div style="width:620px;margin:0 auto">${hPitchSVG(svg,team==='away'?'left':'right')}</div>`
          :`<div class="rp-note" style="font-size:11px">No passes for ${esc(TN(team))}.</div>`)+'</div>';
   return secTitle('Distribution — Pass Networks')+card('home',h)+card('away',a);
 }
@@ -490,7 +493,7 @@ function netWindowPages(){
     const suc=winP.filter(r=>r.event==='pass success').length;
     const oppWin=all[opp].filter(f).length;
     const st=(l,v)=>`<span>${l}<br><b style="color:${C.ink};font-size:9.5px">${v}</b></span>`;
-    return `<div style="flex:1;min-width:0">${head}${hPitchSVG(netMapSVG(team,f,team+'w'+i)||'')}`
+    return `<div style="flex:1;min-width:0">${head}${hPitchSVG(netMapSVG(team,f,team+'w'+i)||'',team==='away'?'left':'right')}`
       +`<div style="display:flex;justify-content:space-between;font-size:8.5px;color:${C.mut};margin-top:4px;text-align:left">`
       +st('Count / Total Pass Count',`${winP.length} / ${all[team].length}`)
       +st('Pass Accuracy',pct(suc,winP.length))
@@ -592,7 +595,7 @@ function heatPage(){
       +`<div class="rp-note" style="font-size:11px">No located events.</div></div>`;
     return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Touch Heatmap`
       +` <span style="color:${C.mut};font-weight:400;font-size:10px">(${pts.length} located touches)</span></div>`
-      +`<div style="position:relative;width:620px;margin:0 auto">${hPitchSVG('')}`
+      +`<div style="position:relative;width:620px;margin:0 auto">${hPitchSVG('',team==='away'?'left':'right')}`
       +`<canvas class="rp-heat" data-team="${team}" width="1050" height="680" style="position:absolute;left:0;top:0;width:100%;height:100%"></canvas></div></div>`;
   };
   return secTitle('Distribution — Touch Heatmaps')+card('home')+card('away')
@@ -627,7 +630,9 @@ function crossMapSVG(team){
   const N=normXY(team), d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
   const evs=rows.filter(r=>r.team===team&&(r.event==='cross success'||r.event==='cross fail')&&r.pXY);
   if(!evs.length)return null;
-  const cr=evs.map(r=>{const n=N(r); return {a:{x:n.a.x/100*PW,y:n.a.y/100*PH}, b:n.b?{x:n.b.x/100*PW,y:n.b.y/100*PH}:null, ok:r.event==='cross success'};});
+  // home shown attacking RIGHT, away mirrored to attack LEFT (ratio bands follow the flipped points)
+  const flip=team==='away', F=p=>p?{x:(flip?100-p.x:p.x)/100*PW, y:(flip?100-p.y:p.y)/100*PH}:null;
+  const cr=evs.map(r=>{const n=N(r); return {a:F(n.a), b:F(n.b), ok:r.event==='cross success'};});
   const oCnt=[0,0,0]; cr.forEach(c=>oCnt[Math.min(2,Math.floor(c.a.x/PW*3))]++);
   const tgt=cr.filter(c=>c.b), tCnt=[0,0,0]; tgt.forEach(c=>tCnt[Math.min(2,Math.floor(c.b.y/PH*3))]++);
   const pctL=(n,dd)=>dd?(Math.round(n/dd*1000)/10)+'%':'–';
@@ -648,7 +653,7 @@ function crossMapSVG(team){
     +`<marker id="${noId}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#f7506b"/></marker></defs>`;
   let grass=''; for(let i=0;i<7;i++)grass+=`<rect x="${(i*PW/7).toFixed(1)}" y="0" width="${(PW/7).toFixed(1)}" height="${PH}" fill="${i%2?'#2a733f':'#2e7d46'}"/>`;
   const pitch=`<g transform="translate(0 ${mT})">${grass}`
-    +`<g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG('right')}${seg}</g>`;
+    +`<g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG(flip?'left':'right')}${seg}</g>`;
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">${defs}${over}${pitch}</svg>`;
 }
 function crossMapsPage(){
@@ -901,8 +906,13 @@ function buildPages(host){
     host.appendChild(d);
     return d;
   });
-  // heatmap canvases can only be painted once they are in the DOM
-  host.querySelectorAll('canvas.rp-heat').forEach(cv=>drawHeat(touchPoints(cv.dataset.team),cv));
+  // heatmap canvases can only be painted once they are in the DOM;
+  // away touches are rotated 180° so the away heatmap reads attacking LEFT
+  host.querySelectorAll('canvas.rp-heat').forEach(cv=>{
+    let pts=touchPoints(cv.dataset.team);
+    if(cv.dataset.team==='away')pts=pts.map(t=>Object.assign({},t,{x:100-t.x,y:100-t.y}));
+    drawHeat(pts,cv);
+  });
   return els;
 }
 
