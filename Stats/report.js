@@ -230,7 +230,9 @@ function timelineEvents(){
     // from the report too.
     else if(r.event==='substitution')push('sub',`Sub #${esc(String(r.playerTo||'').trim())} ⟵ #${no}`);
   });
-  return evs.sort((a,b)=>a.sec-b.sec);
+  // half first, then time: first-half stoppage (45+X') overlaps the opening
+  // second-half minutes in match seconds, so a plain sec sort put 46' before 45+1'
+  return evs.sort((a,b)=>a.half-b.half||a.sec-b.sec);
 }
 function tlIcon(e){
   if(e.kind==='goal')return BALL;

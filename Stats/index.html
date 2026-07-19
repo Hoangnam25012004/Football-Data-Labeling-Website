@@ -713,10 +713,18 @@ function matchSummaryHTML(){
   if(!evs.length)return `<div class="chart-card sum-card">${scoreBarHTML()}<div class="stats-empty">No goals or cards yet.</div></div>`;
   // wide, flat viewBox keeps the card short when the SVG scales to full width
   const W=1500,H=138,mL=104,mR=30,axisY=66,hl=(+dur.halfLen||45)*60;
-  const total=Math.max(2*hl,...evs.map(e=>e.sec))+90;
+  // the axis uses the REAL length of each half (incl. stoppage): HT sits at the
+  // half-time whistle and FT at the full-time whistle (from the Duration settings
+  // when set, else stretched to the half's last event), so 45+X' events stay
+  // before HT and 90+X' before FT whatever the configured minutes-per-half.
+  const maxSec=h=>Math.max(0,...evs.filter(e=>e.half===h).map(e=>e.sec));
+  const H1=Math.max(hl,(dur.h2Start>0&&dur.h1End>dur.h1Start)?dur.h1End-dur.h1Start:0,maxSec(1)?maxSec(1)+30:0);
+  const H2=Math.max(hl,(dur.h2Start>0&&dur.h2End>dur.h2Start)?dur.h2End-dur.h2Start:0,maxSec(2)?maxSec(2)-hl+30:0);
+  const total=H1+H2;
+  const pos=e=>e.half===1?e.sec:H1+(e.sec-hl);   // piecewise: half-2 seconds resume at the HT tick
   const X=s=>mL+s/total*(W-mL-mR);
   let g=`<line x1="${mL}" y1="${axisY}" x2="${W-mR}" y2="${axisY}" stroke="var(--line)" stroke-width="4" stroke-linecap="round"/>`;
-  [[0,"0'"],[hl,'HT'],[2*hl,'FT']].forEach(([s,lb])=>{
+  [[0,"0'"],[H1,'HT'],[total,'FT']].forEach(([s,lb])=>{
     g+=`<line x1="${X(s)}" y1="${axisY-7}" x2="${X(s)}" y2="${axisY+7}" stroke="var(--mut)" stroke-width="2"/>`
       +`<text x="${X(s)}" y="${axisY+22}" text-anchor="middle" font-size="12" fill="var(--mut)">${lb}</text>`;
   });
@@ -741,7 +749,7 @@ function matchSummaryHTML(){
   // near-simultaneous events of the same team are nudged right so icons never overlap
   const lastX={home:-1e9,away:-1e9};
   const marks=evs.map(e=>{
-    const x=Math.max(X(e.sec),lastX[e.team]+24), up=e.team==='home', col=up?'var(--home)':'var(--away)';
+    const x=Math.max(X(pos(e)),lastX[e.team]+24), up=e.team==='home', col=up?'var(--home)':'var(--away)';
     lastX[e.team]=x;
     const y=up?axisY-26:axisY+32;
     const noBadge=e.no?`<circle cy="${up?-24:26}" r="9.5" fill="${col}" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>`
@@ -941,6 +949,6 @@ function dbToRow(d){
   }catch(e){console.warn('Stats cloud load failed — using local data:',(e&&e.message)||e);}
 })();
 </script>
-<script src="report.js?v=8"></script>
+<script src="report.js?v=9"></script>
 </body>
 </html>
