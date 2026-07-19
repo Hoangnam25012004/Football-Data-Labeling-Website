@@ -72,11 +72,18 @@ table.rpt{width:100%;border-collapse:collapse;font-size:10.5px}
 table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
 .rpm th{background:${C.navy};color:#fff;padding:5px 4px;min-width:24px;font-weight:700}
 .rpm td{border:1px solid #f0f2f6;text-align:center;padding:5px 4px;font-weight:600}
-.rp-tlrow{display:flex;align-items:center;border-bottom:1px solid #f0f2f6;padding:3.5px 0;font-size:11px}
-.rp-tlh{flex:1;display:flex;justify-content:flex-end;align-items:center;gap:6px;font-weight:700;padding-right:12px}
-.rp-tla{flex:1;display:flex;justify-content:flex-start;align-items:center;gap:6px;font-weight:700;padding-left:12px}
-.rp-pillt{flex:none;background:${C.navy};color:#fff;border-radius:11px;padding:3px 14px;font-size:10.5px;font-weight:800}
-.rp-cardi{display:inline-block;width:9px;height:13px;border-radius:2px;border:1px solid rgba(0,0,0,0.25);vertical-align:-2px}
+.rp-tlwrap{position:relative;padding:2px 0}
+.rp-tlspine{position:absolute;left:50%;top:12px;bottom:12px;width:2px;margin-left:-1px;background:#dfe5ee}
+.rp-tlrow{display:flex;align-items:center;padding:4.5px 0;font-size:11px;position:relative}
+.rp-tlh{flex:1;display:flex;justify-content:flex-end;align-items:center;gap:7px;font-weight:700;padding-right:14px}
+.rp-tla{flex:1;display:flex;justify-content:flex-start;align-items:center;gap:7px;font-weight:700;padding-left:14px}
+.rp-tlmin{flex:none;min-width:58px;box-sizing:border-box;text-align:center;background:${C.navy};color:#fff;
+  border-radius:15px;border:3px solid #fff;padding:3.5px 8px;font-size:10.5px;font-weight:800;position:relative}
+.rp-tlsc{color:${C.navy};font-weight:800;font-size:9.5px;background:#eef3f9;border:1px solid #d9e3f0;border-radius:9px;padding:1.5px 7px;white-space:nowrap}
+.rp-tlsep{text-align:center;margin:10px 0;position:relative}
+.rp-tlsep span{display:inline-block;background:#eef3f9;color:${C.navy};border:1px solid #d9e3f0;border-radius:15px;
+  padding:4.5px 18px;font-size:9.5px;font-weight:800;letter-spacing:1.2px;position:relative}
+.rp-cardi{display:inline-block;width:10px;height:14px;border-radius:2px;border:1px solid rgba(0,0,0,0.25);vertical-align:-2px}
 .rp-badge{display:inline-flex;width:16px;height:16px;border-radius:50%;color:#fff;font-size:8px;font-weight:800;align-items:center;justify-content:center;line-height:1}
 .rp-fgrid{display:flex;flex-wrap:wrap;gap:26px 14px;margin-top:6px}
 .rp-fcard{width:calc(50% - 7px);box-sizing:border-box;border:1px solid ${C.line};border-radius:8px;padding:12px 9px 14px;text-align:center}
@@ -219,16 +226,12 @@ function timelineEvents(){
       push('goal',`Goal #${no}${tags.length?` <span style="color:${C.mut};font-weight:600;font-size:10px">(${tags.join(' · ')})</span>`:''}`);
     }
     else if(r.event==='own goal'||r.event==='own-goal')push('og',`Own Goal #${no}`);
-    else if(r.event==='penalty kick'){if(!mergedPens.has(r))push('pen',`Penalty #${no}`);}
     else if(r.event==='yellow card'){
       const k=team+'#'+no; yc[k]=(yc[k]||0)+1;
-      if(yc[k]===2)push('y2',`2nd Yellow → Red #${no}`); else push('yc',`Yellow #${no}`);
+      if(yc[k]===2)push('y2',`2nd Yellow → Red #${no}`); else push('yc',`Yellow Card #${no}`);
     }
-    else if(r.event==='red card')push('rc',`Red #${no}`);
-    // subs come from the event rows (playerFrom = out, playerTo = in) — NOT from
-    // lineups.subHistory, so a substitution deleted in the events table disappears
-    // from the report too.
-    else if(r.event==='substitution')push('sub',`Sub #${esc(String(r.playerTo||'').trim())} ⟵ #${no}`);
+    else if(r.event==='red card')push('rc',`Red Card #${no}`);
+    // substitutions are intentionally left off the report timeline
   });
   // half first, then time: first-half stoppage (45+X') overlaps the opening
   // second-half minutes in match seconds, so a plain sec sort put 46' before 45+1'
@@ -237,28 +240,46 @@ function timelineEvents(){
 function tlIcon(e){
   if(e.kind==='goal')return BALL;
   if(e.kind==='og')return `<span class="rp-badge" style="background:${C.red}">OG</span>`;
-  if(e.kind==='pen')return `<span class="rp-badge" style="background:#c47f17">P</span>`;
-  if(e.kind==='sub')return `<span class="rp-badge" style="background:#e8862f;font-size:11px">⇄</span>`;
   if(e.kind==='yc')return `<span class="rp-cardi" style="background:#f5c518"></span>`;
   if(e.kind==='rc')return `<span class="rp-cardi" style="background:${C.red}"></span>`;
   return `<span class="rp-cardi" style="background:#f5c518"></span><span class="rp-cardi" style="background:${C.red};margin-left:-4px"></span>`;
 }
-function tlRow(e){
-  const item=`${tlIcon(e)}<span style="color:${TC(e.team)}">${e.html}</span>`;
+function tlRow(e,score){
+  const item=`${tlIcon(e)}<span style="color:${TC(e.team)}">${e.html}</span>`
+    +(score?`<span class="rp-tlsc">${score}</span>`:'');
   return `<div class="rp-tlrow"><div class="rp-tlh">${e.team==='home'?item:''}</div>`
-    +`<span class="rp-pillt">${minLbl(e.sec,e.half)}</span>`
+    +`<span class="rp-tlmin">${minLbl(e.sec,e.half)}</span>`
     +`<div class="rp-tla">${e.team==='away'?item:''}</div></div>`;
 }
+/* rows + KICK-OFF / HALF-TIME / FULL-TIME separator chips on a central spine;
+   goals and own goals carry the running score */
+function timelineItems(){
+  const evs=timelineEvents();
+  if(!evs.length)return null;
+  const sep=lbl=>`<div class="rp-tlsep"><span>${lbl}</span></div>`;
+  const sc={home:0,away:0};
+  const items=[sep('KICK-OFF')];
+  let curHalf=1;
+  evs.forEach(e=>{
+    if(e.half===2&&curHalf===1){curHalf=2;items.push(sep(`HALF-TIME&nbsp;&nbsp;${sc.home} – ${sc.away}`));}
+    let score=null;
+    if(e.kind==='goal'){sc[e.team]++;score=`${sc.home} – ${sc.away}`;}
+    else if(e.kind==='og'){sc[e.team==='home'?'away':'home']++;score=`${sc.home} – ${sc.away}`;}
+    items.push(tlRow(e,score));
+  });
+  items.push(sep(`FULL-TIME&nbsp;&nbsp;${teamGoals('home')} – ${teamGoals('away')}`));
+  return items;
+}
 function timelinePages(){
-  const evs=timelineEvents(), chunks=[];
-  if(evs.length){chunks.push(evs.slice(0,26)); for(let i=26;i<evs.length;i+=34)chunks.push(evs.slice(i,i+34));}
+  const items=timelineItems(), chunks=[];
+  if(items){chunks.push(items.slice(0,22)); for(let i=22;i<items.length;i+=30)chunks.push(items.slice(i,i+30));}
   else chunks.push(null);
   return chunks.map((ch,ci)=>
     (ci===0?headerBlock():'')
     +secTitle('Match Timeline'+(ci?' (continued)':''))
     +legend()
-    +(ch?`<div>${ch.map(tlRow).join('')}</div>`
-        :`<div class="rp-note" style="text-align:center;padding:26px 0;font-size:11px">No goals, cards or substitutions tagged yet.</div>`));
+    +(ch?`<div class="rp-tlwrap"><div class="rp-tlspine"></div>${ch.join('')}</div>`
+        :`<div class="rp-note" style="text-align:center;padding:26px 0;font-size:11px">No goals or cards tagged yet.</div>`));
 }
 
 /* ================= lineups & formation pages ================= */
