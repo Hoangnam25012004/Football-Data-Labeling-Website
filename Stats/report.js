@@ -863,6 +863,57 @@ function foulMapsPage(){
   return any?body:null;
 }
 
+/* offside maps — home and away side by side (home attacks RIGHT, away mirrored
+   LEFT), marker shape = half, with a top-5 offsides ranking under each map */
+function offsideMapsPage(){
+  const evs=team=>rows.filter(r=>r.team===team&&r.event==='offside'&&r.pXY);
+  const hA=evs('home'), aA=evs('away');
+  if(!hA.length&&!aA.length)return null;
+  const top5=team=>{
+    const counts={};
+    rows.forEach(r=>{
+      if(r.team!==team||r.event!=='offside')return;
+      const no=String(r.playerFrom||'').trim(); if(!no)return;
+      counts[no]=(counts[no]||0)+1;
+    });
+    const list=Object.entries(counts)
+      .sort((x,y)=>y[1]-x[1]||(+x[0]||1e9)-(+y[0]||1e9)).slice(0,5);
+    if(!list.length)return '';
+    const roster=(lineups[team]&&lineups[team].roster)||[];
+    const nameOf=no=>{const p=roster.find(q=>String(q.no)===String(no));return p&&p.name?p.name:'Player '+no;};
+    let prev=null;
+    const trs=list.map(([no,t],i)=>{
+      const tied=prev===t; prev=t;
+      return `<tr><td style="color:${C.mut}">${tied?'':i+1}</td>`
+        +`<td style="text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td>${t}</td></tr>`;
+    }).join('');
+    return `<table class="rpt" style="font-size:9px;margin-top:8px"><thead><tr><th>Rank</th>`
+      +`<th style="text-align:left">Player</th><th>Total</th></tr></thead><tbody>${trs}</tbody></table>`;
+  };
+  const card=(team,list)=>{
+    const flip=team==='away';
+    let map;
+    if(!list.length)map=`<div class="rp-note" style="font-size:10px">No located offsides for ${esc(TN(team))}.</div>`;
+    else{
+      const N=normXY(team), d=PITCH_DIMS.football;
+      const dots=list.map(r=>{
+        const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h;
+        const shape=eventHalf(r)===1
+          ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${TC(team)}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
+          :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${TC(team)}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`;
+        return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
+      }).join('');
+      map=hPitchSVG(dots,flip?'left':'right');
+    }
+    return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}</div>${map}${top5(team)}</div>`;
+  };
+  const legend=`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
+    +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span>`;
+  return secTitle('Discipline — Offsides')
+    +`<div class="rp-mleg" style="margin:0 0 10px">${legend}</div>`
+    +`<div style="display:flex;gap:18px;align-items:flex-start">${card('home',hA)}${card('away',aA)}</div>`;
+}
+
 /* ================= goalkeeper + discipline ================= */
 function gkNo(team){
   const lu=lineups[team]; if(!lu||!lu.xi||!lu.xi.length)return null;
@@ -921,6 +972,7 @@ function buildPages(host){
     radarPage(),
     ...defensivePlayerPages(),
     foulMapsPage(),
+    offsideMapsPage(),
     gkPage()
   ].filter(Boolean);
   const els=list.map(html=>{
