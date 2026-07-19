@@ -226,8 +226,8 @@ function defMapHTML(team){
     +`<div class="half-toggle"><button class="${defHalf===1?'on':''}" onclick="setDefHalf(1)">1st</button>`
     +`<button class="${defHalf===2?'on':''}" onclick="setDefHalf(2)">2nd</button></div></div></div>`;
   const col={}; cat.parts.forEach(([ev,,c])=>col[ev]=c);
+  // no data -> keep the pitch, just draw no dots
   const acts=rows.filter(r=>r.team===team && col[r.event] && r.pXY && eventHalf(r)===defHalf);
-  if(!acts.length)return `<div class="chart-card map-card">${head}<div class="stats-empty">No ${cat.label.toLowerCase()} in the ${defHalf===1?'1st':'2nd'} half.</div></div>`;
   const d=PITCH_DIMS.football, W=d.w, H=d.h;
   const dots=acts.map(r=>{const cx=(r.pXY.x/100*W).toFixed(1), cy=(r.pXY.y/100*H).toFixed(1);
     return `<g><circle cx="${cx}" cy="${cy}" r="13" fill="${col[r.event]}" fill-opacity="0.9" stroke="#0d1117" stroke-width="2"/>`
@@ -276,8 +276,8 @@ function shotMapHTML(team){
   const head=`<div class="chart-head"><div></div>`
     +`<div class="half-toggle"><button class="${shotHalf===1?'on':''}" onclick="setShotHalf(1)">1st</button>`
     +`<button class="${shotHalf===2?'on':''}" onclick="setShotHalf(2)">2nd</button></div></div>`;
+  // no data -> keep the pitch, just draw no dots
   const shots=rows.filter(r=>r.team===team && kinds[r.event] && r.pXY && eventHalf(r)===shotHalf);
-  if(!shots.length)return `<div class="chart-card map-card">${head}<div class="stats-empty">No shots in the ${shotHalf===1?'1st':'2nd'} half.</div></div>`;
   const d=PITCH_DIMS.football, W=d.w, H=d.h;
   const dots=shots.map(r=>{
     const cx=(r.pXY.x/100*W).toFixed(1), cy=(r.pXY.y/100*H).toFixed(1), col=kinds[r.event];
@@ -338,8 +338,8 @@ function passScatterHTML(team){
 function crossMapHTML(team){
   const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
   const teamColor=team==='home'?'var(--home)':'var(--away)';
+  // no data -> keep the pitch and 0% bands, just draw no arrows
   const evs=rows.filter(r=>r.team===team&&(r.event==='cross success'||r.event==='cross fail')&&r.pXY);
-  if(!evs.length)return `<div class="chart-card cross-card"><div class="stats-empty">No crosses yet.</div></div>`;
   const dir={1:attackDir(team,1),2:attackDir(team,2)};
   const cr=evs.map(r=>{
     const flip=dir[eventHalf(r)]==='left', f=p=>({x:(flip?100-p.x:p.x)/100*PW, y:(flip?100-p.y:p.y)/100*PH});
@@ -347,7 +347,7 @@ function crossMapHTML(team){
   });
   const oCnt=[0,0,0]; cr.forEach(c=>oCnt[Math.min(2,Math.floor(c.a.x/PW*3))]++);
   const tgt=cr.filter(c=>c.b), tCnt=[0,0,0]; tgt.forEach(c=>tCnt[Math.min(2,Math.floor(c.b.y/PH*3))]++);
-  const pctL=(n,dd)=>dd?(Math.round(n/dd*1000)/10)+'%':'–';
+  const pctL=(n,dd)=>dd?(Math.round(n/dd*1000)/10)+'%':'0%';
   let over='';
   for(let i=0;i<3;i++)
     over+=`<text x="${((i+0.5)*PW/3).toFixed(0)}" y="40" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${pctL(oCnt[i],cr.length)}</text>`;
@@ -388,8 +388,8 @@ function setOthCat(v){othCat=v;renderStats();}
 function foulMapHTML(team){
   const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
   const teamColor=team==='home'?'var(--home)':'var(--away)', fill=team==='home'?'#2f81f7':'#f7682f';
+  // no data -> keep the pitch and 0% bands, just draw no dots
   const evs=rows.filter(r=>r.team===team&&FOUL_EVENTS.has(r.event)&&r.pXY);
-  if(!evs.length)return `<div class="chart-card cross-card">${othHead()}<div class="stats-empty">No located fouls yet.</div></div>`;
   const cards=rows.filter(r=>r.team===team&&(r.event==='yellow card'||r.event==='red card')&&r.t!=null);
   const cardFor=f=>{let best=null,bd=90;
     cards.forEach(c=>{
@@ -405,7 +405,7 @@ function foulMapHTML(team){
   });
   const oCnt=[0,0,0]; fl.forEach(f=>oCnt[Math.min(2,Math.floor(f.x/PW*3))]++);
   const tCnt=[0,0,0]; fl.forEach(f=>tCnt[Math.min(2,Math.floor(f.y/PH*3))]++);
-  const pctL=n=>(Math.round(n/fl.length*1000)/10)+'%';
+  const pctL=n=>fl.length?(Math.round(n/fl.length*1000)/10)+'%':'0%';
   let over='';
   for(let i=0;i<3;i++)
     over+=`<text x="${((i+0.5)*PW/3).toFixed(0)}" y="40" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${pctL(oCnt[i])}</text>`;
@@ -439,8 +439,8 @@ function foulMapHTML(team){
 function offsideMapHTML(team){
   const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
   const teamColor=team==='home'?'var(--home)':'var(--away)', fill=team==='home'?'#2f81f7':'#f7682f';
+  // no data -> keep the pitch and 0% bands, just draw no dots
   const evs=rows.filter(r=>r.team===team&&r.event==='offside'&&r.pXY);
-  if(!evs.length)return `<div class="chart-card cross-card">${othHead()}<div class="stats-empty">No located offsides yet.</div></div>`;
   const dir={1:attackDir(team,1),2:attackDir(team,2)};
   const fl=evs.map(r=>{
     const h=eventHalf(r), flip=dir[h]==='left';
@@ -449,7 +449,7 @@ function offsideMapHTML(team){
   });
   const oCnt=[0,0,0]; fl.forEach(f=>oCnt[Math.min(2,Math.floor(f.x/PW*3))]++);
   const tCnt=[0,0,0]; fl.forEach(f=>tCnt[Math.min(2,Math.floor(f.y/PH*3))]++);
-  const pctL=n=>(Math.round(n/fl.length*1000)/10)+'%';
+  const pctL=n=>fl.length?(Math.round(n/fl.length*1000)/10)+'%':'0%';
   let over='';
   for(let i=0;i<3;i++)
     over+=`<text x="${((i+0.5)*PW/3).toFixed(0)}" y="40" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${pctL(oCnt[i])}</text>`;
@@ -553,8 +553,7 @@ function passNetHTML(team){
   const winPasses=passes.filter(inWin);
   const opp=team==='home'?'away':'home';
   const oppWin=rows.filter(r=>r.team===opp&&isPass(r)&&inWin(r)).length;
-  if(!winPasses.length)
-    return `<div class="chart-card pn-card">${head}<div class="stats-empty">No passes in ${w.label}.</div></div>`;
+  // no passes in the window -> keep the pitch, stats read 0 / 0%
   const suc=winPasses.filter(r=>r.event==='pass success').length;
   // average involvement position per player (origin for the passer, target for the receiver)
   const flipH={1:attackDir(team,1)==='left',2:attackDir(team,2)==='left'};
@@ -593,7 +592,7 @@ function passNetHTML(team){
   const defs=`<defs><marker id="${mkId}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4"`
     +` orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e8edf4"/></marker></defs>`;
   const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG('right')+defs+seg+dots+'</svg>');
-  const pctS=(n,dd)=>dd?(Math.round(n/dd*1000)/10).toFixed(1)+'%':'–';
+  const pctS=(n,dd)=>dd?(Math.round(n/dd*1000)/10).toFixed(1)+'%':'0.0%';
   const stats=`<div class="pn-stats">`
     +`<div><span>Count / Total Pass Count</span><b>${winPasses.length} / ${passes.length}</b></div>`
     +`<div><span>Pass Accuracy</span><b>${pctS(suc,winPasses.length)}</b></div>`
@@ -647,9 +646,8 @@ function heatMapHTML(team){
     +`<div class="half-toggle"><button class="${heatHalf===0?'on':''}" onclick="setHeatHalf(0)">All</button>`
     +`<button class="${heatHalf===1?'on':''}" onclick="setHeatHalf(1)">1st</button>`
     +`<button class="${heatHalf===2?'on':''}" onclick="setHeatHalf(2)">2nd</button></div></div>`;
+  // no data -> keep the pitch, just no heat/markers
   const pts=touchPoints(team).filter(t=>!heatHalf||t.half===heatHalf);
-  if(!pts.length)
-    return `<div class="chart-card map-card">${head}<div class="stats-empty">No located events${heatHalf?` in the ${heatHalf===1?'1st':'2nd'} half`:''}.</div></div>`;
   _heatBy={}; pts.forEach(t=>{const k=t.p; (_heatBy[k]=_heatBy[k]||[]).push(t);});
   _heatOrder=Object.keys(_heatBy).filter(p=>p!=='')
     .sort((a,b)=>{const na=+a,nb=+b;return(!isNaN(na)&&!isNaN(nb))?na-nb:a.localeCompare(b);});
@@ -993,6 +991,6 @@ function dbToRow(d){
   }catch(e){console.warn('Stats cloud load failed — using local data:',(e&&e.message)||e);}
 })();
 </script>
-<script src="report.js?v=16"></script>
+<script src="report.js?v=17"></script>
 </body>
 </html>

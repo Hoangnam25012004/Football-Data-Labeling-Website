@@ -356,11 +356,11 @@ function shotMapsPage(){
   const kinds={'goal':C.gold,'shot on target':C.green,'shot off target':'#aeb4bc','blocked shot':'#aeb4bc','miss shot':'#aeb4bc'};
   let any=false;
   const teamMap=team=>{
-    // home shown attacking RIGHT, away mirrored to attack LEFT
+    // home shown attacking RIGHT, away mirrored to attack LEFT;
+    // a side with no data keeps the empty pitch (no dots)
     const N=normXY(team), d=PITCH_DIMS.football, flip=team==='away';
     const shots=rows.filter(r=>r.team===team&&kinds[r.event]&&r.pXY);
-    if(!shots.length)return `<div class="rp-note" style="font-size:11px">No located shots for ${esc(TN(team))}.</div>`;
-    any=true;
+    if(shots.length)any=true;
     const dots=shots.map(r=>{
       const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h, col=kinds[r.event];
       const no=esc(String(r.playerFrom||'').trim());
@@ -484,8 +484,7 @@ function netMapsPage(){
   const h=netMapSVG('home'), a=netMapSVG('away');
   if(!h&&!a)return null;
   const card=(team,svg)=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Pass Network</div>`
-    +(svg?`<div style="width:620px;margin:0 auto">${hPitchSVG(svg,team==='away'?'left':'right')}</div>`
-         :`<div class="rp-note" style="font-size:11px">No passes for ${esc(TN(team))}.</div>`)+'</div>';
+    +`<div style="width:620px;margin:0 auto">${hPitchSVG(svg||'',team==='away'?'left':'right')}</div></div>`;
   return secTitle('Distribution — Pass Networks')+card('home',h)+card('away',a);
 }
 
@@ -509,8 +508,7 @@ function netWindowPages(){
   const half=(team,w,f,i)=>{
     const winP=all[team].filter(f), opp=team==='home'?'away':'home';
     const head=`<div class="rp-mtitle" style="color:${TC(team)};font-size:11px;margin-bottom:4px">${esc(TN(team))}</div>`;
-    if(!winP.length)
-      return `<div style="flex:1;min-width:0">${head}<div class="rp-note" style="font-size:10px">No passes in ${w.label}.</div></div>`;
+    // an empty window keeps the pitch; the stats line reads 0 / 0%
     const suc=winP.filter(r=>r.event==='pass success').length;
     const oppWin=all[opp].filter(f).length;
     const st=(l,v)=>`<span>${l}<br><b style="color:${C.ink};font-size:9.5px">${v}</b></span>`;
@@ -611,9 +609,7 @@ function matrixPage(team){
 /* touch heatmaps — canvas drawn after the page is mounted (see buildPages) */
 function heatPage(){
   const card=team=>{
-    const pts=touchPoints(team);
-    if(!pts.length)return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Touch Heatmap</div>`
-      +`<div class="rp-note" style="font-size:11px">No located events.</div></div>`;
+    const pts=touchPoints(team);   // 0 touches -> empty pitch, blank canvas
     return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Touch Heatmap`
       +` <span style="color:${C.mut};font-weight:400;font-size:10px">(${pts.length} located touches)</span></div>`
       +`<div style="position:relative;width:620px;margin:0 auto">${hPitchSVG('',team==='away'?'left':'right')}`
@@ -650,13 +646,13 @@ function passTypesPage(){
 function crossMapSVG(team){
   const N=normXY(team), d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
   const evs=rows.filter(r=>r.team===team&&(r.event==='cross success'||r.event==='cross fail')&&r.pXY);
-  if(!evs.length)return null;
-  // home shown attacking RIGHT, away mirrored to attack LEFT (ratio bands follow the flipped points)
+  // home shown attacking RIGHT, away mirrored to attack LEFT (ratio bands follow the flipped
+  // points); a side with no crosses keeps the empty pitch and 0% bands
   const flip=team==='away', F=p=>p?{x:(flip?100-p.x:p.x)/100*PW, y:(flip?100-p.y:p.y)/100*PH}:null;
   const cr=evs.map(r=>{const n=N(r); return {a:F(n.a), b:F(n.b), ok:r.event==='cross success'};});
   const oCnt=[0,0,0]; cr.forEach(c=>oCnt[Math.min(2,Math.floor(c.a.x/PW*3))]++);
   const tgt=cr.filter(c=>c.b), tCnt=[0,0,0]; tgt.forEach(c=>tCnt[Math.min(2,Math.floor(c.b.y/PH*3))]++);
-  const pctL=(n,dd)=>dd?(Math.round(n/dd*1000)/10)+'%':'–';
+  const pctL=(n,dd)=>dd?(Math.round(n/dd*1000)/10)+'%':'0%';
   let over='';
   for(let i=0;i<3;i++)over+=`<text x="${((i+0.5)*PW/3).toFixed(0)}" y="42" text-anchor="middle" font-size="30" font-weight="700" fill="${TC(team)}">${pctL(oCnt[i],cr.length)}</text>`;
   [1,2].forEach(i=>over+=`<line x1="${i*PW/3}" y1="10" x2="${i*PW/3}" y2="${mT-16}" stroke="${C.line}" stroke-width="2"/>`);
@@ -678,12 +674,11 @@ function crossMapSVG(team){
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">${defs}${over}${pitch}</svg>`;
 }
 function crossMapsPage(){
-  const h=crossMapSVG('home'), a=crossMapSVG('away');
-  if(!h&&!a)return null;
-  const card=(team,svg)=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Cross Map</div>`
-    +(svg?`<div style="width:660px;margin:0 auto">${svg}</div>`
-         :`<div class="rp-note" style="font-size:11px">No crosses for ${esc(TN(team))}.</div>`)+'</div>';
-  return secTitle('Distribution — Cross Maps')+card('home',h)+card('away',a)
+  const isCross=r=>(r.event==='cross success'||r.event==='cross fail')&&r.pXY;
+  if(!rows.some(isCross))return null;   // page skipped only when NEITHER team crossed
+  const card=team=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Cross Map</div>`
+    +`<div style="width:660px;margin:0 auto">${crossMapSVG(team)}</div></div>`;
+  return secTitle('Distribution — Cross Maps')+card('home')+card('away')
     +`<div class="rp-mleg"><span><i style="background:#39d98a"></i>Cross success</span><span><i style="background:#f7506b"></i>Cross fail</span></div>`;
 }
 
@@ -723,7 +718,14 @@ function defCategoryPages(){
       });
       const list=Object.entries(counts)
         .sort((x,y)=>y[1].t-x[1].t||y[1].s-x[1].s||(+x[0]||1e9)-(+y[0]||1e9)).slice(0,5);
-      if(!list.length)return '';
+      const header=`<table class="rpt" style="font-size:9px;margin-top:8px"><thead><tr><th>Rank</th>`
+        +`<th style="text-align:left">Player</th><th>Total</th>${two?'<th>Succ.</th><th>Success Rate</th>':''}</tr></thead>`;
+      if(!list.length){   // no data -> dashed placeholder rows, like the reference
+        let h='';
+        for(let i=1;i<=5;i++)h+=`<tr><td style="color:${C.mut}">${i}</td><td style="text-align:left;color:#c9cfd9">–</td>`
+          +`<td style="color:#c9cfd9">–</td>${two?'<td style="color:#c9cfd9">–</td><td style="color:#c9cfd9">–</td>':''}</tr>`;
+        return header+`<tbody>${h}</tbody></table>`;
+      }
       const roster=(lineups[team]&&lineups[team].roster)||[];
       const nameOf=no=>{const p=roster.find(q=>String(q.no)===String(no));return p&&p.name?p.name:'Player '+no;};
       let prev=null;
@@ -733,27 +735,22 @@ function defCategoryPages(){
           +`<td style="text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td>${c.t}</td>`
           +(two?`<td>${c.s}</td><td>${pc0(c.s,c.t)}</td>`:'')+'</tr>';
       }).join('');
-      return `<table class="rpt" style="font-size:9px;margin-top:8px"><thead><tr><th>Rank</th>`
-        +`<th style="text-align:left">Player</th><th>Total</th>${two?'<th>Succ.</th><th>Success Rate</th>':''}</tr></thead>`
-        +`<tbody>${trs}</tbody></table>`;
+      return header+`<tbody>${trs}</tbody></table>`;
     };
     // side-by-side row: home attacks RIGHT, away mirrored to attack LEFT;
-    // marker shape = half (circle 1st, square 2nd), colour = won/lost part
+    // marker shape = half (circle 1st, square 2nd), colour = won/lost part;
+    // a side with no data keeps the empty pitch
     const card=(team,list)=>{
       const flip=team==='away';
-      let map;
-      if(!list.length)map=`<div class="rp-note" style="font-size:10px">No located ${cat.label.toLowerCase()} for ${esc(TN(team))}.</div>`;
-      else{
-        const N=normXY(team), d=PITCH_DIMS.football;
-        const dots=list.map(r=>{
-          const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h;
-          const shape=eventHalf(r)===1
-            ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
-            :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`;
-          return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
-        }).join('');
-        map=hPitchSVG(dots,flip?'left':'right');
-      }
+      const N=normXY(team), d=PITCH_DIMS.football;
+      const dots=list.map(r=>{
+        const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h;
+        const shape=eventHalf(r)===1
+          ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
+          :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`;
+        return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
+      }).join('');
+      const map=hPitchSVG(dots,flip?'left':'right');
       return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}</div>${map}${top5(team)}</div>`;
     };
     const legend=cat.parts.map(([,lbl,c])=>`<span><i style="background:${c}"></i>${lbl}</span>`).join('')
@@ -817,10 +814,10 @@ function foulMapsPage(){
     // home shown attacking RIGHT, away mirrored to attack LEFT
     const N=normXY(team), d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT, flip=team==='away';
     const evs=rows.filter(r=>r.team===team&&RP_FOULS.has(r.event)&&r.pXY);
+    // a side with no located fouls keeps the empty pitch and 0% bands
     let inner;
-    if(!evs.length)inner=`<div class="rp-note" style="font-size:11px">No located fouls for ${esc(TN(team))}.</div>`;
-    else{
-      any=true;
+    if(evs.length)any=true;
+    {
       const cards=rows.filter(r=>r.team===team&&(r.event==='yellow card'||r.event==='red card')&&r.t!=null);
       const cardFor=f=>{let best=null,bd=90;
         cards.forEach(c=>{
@@ -832,7 +829,7 @@ function foulMapsPage(){
         return {x:(flip?100-p.x:p.x)/100*PW, y:(flip?100-p.y:p.y)/100*PH, half:eventHalf(r), no:esc(String(r.playerFrom||'').trim()), card:cardFor(r)};});
       const oCnt=[0,0,0]; fl.forEach(f=>oCnt[Math.min(2,Math.floor(f.x/PW*3))]++);
       const tCnt=[0,0,0]; fl.forEach(f=>tCnt[Math.min(2,Math.floor(f.y/PH*3))]++);
-      const pctL=n=>(Math.round(n/fl.length*1000)/10)+'%';
+      const pctL=n=>fl.length?(Math.round(n/fl.length*1000)/10)+'%':'0%';
       let over='';
       for(let i=0;i<3;i++)over+=`<text x="${((i+0.5)*PW/3).toFixed(0)}" y="42" text-anchor="middle" font-size="30" font-weight="700" fill="${TC(team)}">${pctL(oCnt[i])}</text>`;
       [1,2].forEach(i=>over+=`<line x1="${i*PW/3}" y1="10" x2="${i*PW/3}" y2="${mT-16}" stroke="${C.line}" stroke-width="2"/>`);
@@ -878,7 +875,14 @@ function offsideMapsPage(){
     });
     const list=Object.entries(counts)
       .sort((x,y)=>y[1]-x[1]||(+x[0]||1e9)-(+y[0]||1e9)).slice(0,5);
-    if(!list.length)return '';
+    const header=`<table class="rpt" style="font-size:9px;margin-top:8px"><thead><tr><th>Rank</th>`
+      +`<th style="text-align:left">Player</th><th>Total</th></tr></thead>`;
+    if(!list.length){   // no data -> dashed placeholder rows, like the reference
+      let h='';
+      for(let i=1;i<=5;i++)h+=`<tr><td style="color:${C.mut}">${i}</td>`
+        +`<td style="text-align:left;color:#c9cfd9">–</td><td style="color:#c9cfd9">–</td></tr>`;
+      return header+`<tbody>${h}</tbody></table>`;
+    }
     const roster=(lineups[team]&&lineups[team].roster)||[];
     const nameOf=no=>{const p=roster.find(q=>String(q.no)===String(no));return p&&p.name?p.name:'Player '+no;};
     let prev=null;
@@ -887,24 +891,20 @@ function offsideMapsPage(){
       return `<tr><td style="color:${C.mut}">${tied?'':i+1}</td>`
         +`<td style="text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td>${t}</td></tr>`;
     }).join('');
-    return `<table class="rpt" style="font-size:9px;margin-top:8px"><thead><tr><th>Rank</th>`
-      +`<th style="text-align:left">Player</th><th>Total</th></tr></thead><tbody>${trs}</tbody></table>`;
+    return header+`<tbody>${trs}</tbody></table>`;
   };
+  // a side with no data keeps the empty pitch
   const card=(team,list)=>{
     const flip=team==='away';
-    let map;
-    if(!list.length)map=`<div class="rp-note" style="font-size:10px">No located offsides for ${esc(TN(team))}.</div>`;
-    else{
-      const N=normXY(team), d=PITCH_DIMS.football;
-      const dots=list.map(r=>{
-        const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h;
-        const shape=eventHalf(r)===1
-          ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${TC(team)}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
-          :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${TC(team)}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`;
-        return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
-      }).join('');
-      map=hPitchSVG(dots,flip?'left':'right');
-    }
+    const N=normXY(team), d=PITCH_DIMS.football;
+    const dots=list.map(r=>{
+      const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h;
+      const shape=eventHalf(r)===1
+        ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${TC(team)}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
+        :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${TC(team)}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`;
+      return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
+    }).join('');
+    const map=hPitchSVG(dots,flip?'left':'right');
     return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}</div>${map}${top5(team)}</div>`;
   };
   const legend=`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
