@@ -682,27 +682,60 @@ function defCategoryPages(){
   const pages=[];
   Object.values(DEF_CATS).forEach(cat=>{
     const col={}; cat.parts.forEach(([ev,,c])=>col[ev]=c);
+    const okEv=cat.parts[0][0], two=cat.parts.length>1;   // first part = the 'won' event
     const acts=team=>rows.filter(r=>r.team===team&&col[r.event]&&r.pXY);
     const hA=acts('home'), aA=acts('away');
     if(!hA.length&&!aA.length)return;
+    // top-5 ranking under each map — counts ALL events of the category (located
+    // or not); ties (same totals) share a rank shown blank, like the reference
+    const top5=team=>{
+      const counts={};
+      rows.forEach(r=>{
+        if(r.team!==team||!col[r.event])return;
+        const no=String(r.playerFrom||'').trim(); if(!no)return;
+        const o=counts[no]=counts[no]||{t:0,s:0}; o.t++; if(r.event===okEv)o.s++;
+      });
+      const list=Object.entries(counts)
+        .sort((x,y)=>y[1].t-x[1].t||y[1].s-x[1].s||(+x[0]||1e9)-(+y[0]||1e9)).slice(0,5);
+      if(!list.length)return '';
+      const roster=(lineups[team]&&lineups[team].roster)||[];
+      const nameOf=no=>{const p=roster.find(q=>String(q.no)===String(no));return p&&p.name?p.name:'Player '+no;};
+      let prev=null;
+      const trs=list.map(([no,c],i)=>{
+        const tied=prev&&prev.t===c.t&&(!two||prev.s===c.s); prev=c;
+        return `<tr><td style="color:${C.mut}">${tied?'':i+1}</td>`
+          +`<td style="text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td>${c.t}</td>`
+          +(two?`<td>${c.s}</td><td>${pc0(c.s,c.t)}</td>`:'')+'</tr>';
+      }).join('');
+      return `<table class="rpt" style="font-size:9px;margin-top:8px"><thead><tr><th>Rank</th>`
+        +`<th style="text-align:left">Player</th><th>Total</th>${two?'<th>Succ.</th><th>Success Rate</th>':''}</tr></thead>`
+        +`<tbody>${trs}</tbody></table>`;
+    };
+    // side-by-side row: home attacks RIGHT, away mirrored to attack LEFT;
+    // marker shape = half (circle 1st, square 2nd), colour = won/lost part
     const card=(team,list)=>{
-      let inner;
-      if(!list.length)inner=`<div class="rp-note" style="font-size:11px">No located ${cat.label.toLowerCase()} for ${esc(TN(team))}.</div>`;
+      const flip=team==='away';
+      let map;
+      if(!list.length)map=`<div class="rp-note" style="font-size:10px">No located ${cat.label.toLowerCase()} for ${esc(TN(team))}.</div>`;
       else{
-        // mirror the two sides: home shown attacking RIGHT, away attacking LEFT
-        const N=normXY(team), d=PITCH_DIMS.football, flip=team==='away';
+        const N=normXY(team), d=PITCH_DIMS.football;
         const dots=list.map(r=>{
           const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h;
-          return `<g><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
-            +`<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
+          const shape=eventHalf(r)===1
+            ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
+            :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`;
+          return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
         }).join('');
-        inner=`<div style="width:620px;margin:0 auto">${hPitchSVG(dots,flip?'left':'right')}</div>`;
+        map=hPitchSVG(dots,flip?'left':'right');
       }
-      return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · ${cat.label}</div>${inner}</div>`;
+      return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}</div>${map}${top5(team)}</div>`;
     };
-    const legend=cat.parts.map(([,lbl,c])=>`<span><i style="background:${c}"></i>${lbl}</span>`).join('');
-    pages.push(secTitle(`Defensive — ${cat.label}`)+card('home',hA)+card('away',aA)
-      +`<div class="rp-mleg">${legend}</div>`);
+    const legend=cat.parts.map(([,lbl,c])=>`<span><i style="background:${c}"></i>${lbl}</span>`).join('')
+      +`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
+      +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span>`;
+    pages.push(secTitle(`Defensive — ${cat.label}`)
+      +`<div class="rp-mleg" style="margin:0 0 10px">${legend}</div>`
+      +`<div style="display:flex;gap:18px;align-items:flex-start">${card('home',hA)}${card('away',aA)}</div>`);
   });
   return pages;
 }
