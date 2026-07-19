@@ -126,13 +126,13 @@ function sectionRows(si){
 }
 
 /* ---- report pitches (literal colours, striped grass like the reference) ---- */
-function hPitchSVG(inner){
+function hPitchSVG(inner,dir){   // dir: attacking direction arrow, defaults to right
   const d=PITCH_DIMS.football, W=d.w, H=d.h;
   let g='';
   for(let i=0;i<7;i++)g+=`<rect x="${(i*W/7).toFixed(1)}" y="0" width="${(W/7).toFixed(1)}" height="${H}" fill="${i%2?'#2a733f':'#2e7d46'}"/>`;
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;border-radius:6px">${g}`
     +`<g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3">${pitchFootball(W,H,false)}</g>`
-    +dirArrowSVG('right')+(inner||'')+'</svg>';
+    +dirArrowSVG(dir||'right')+(inner||'')+'</svg>';
 }
 function vPitchSVG(){
   const d=PITCH_DIMS.football, W=d.h, H=d.w;   // vertical: 680 wide x 1050 tall
@@ -689,13 +689,14 @@ function defCategoryPages(){
       let inner;
       if(!list.length)inner=`<div class="rp-note" style="font-size:11px">No located ${cat.label.toLowerCase()} for ${esc(TN(team))}.</div>`;
       else{
-        const N=normXY(team), d=PITCH_DIMS.football;
+        // mirror the two sides: home shown attacking RIGHT, away attacking LEFT
+        const N=normXY(team), d=PITCH_DIMS.football, flip=team==='away';
         const dots=list.map(r=>{
-          const p=N(r).a, x=p.x/100*d.w, y=p.y/100*d.h;
+          const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h;
           return `<g><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
             +`<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
         }).join('');
-        inner=`<div style="width:620px;margin:0 auto">${hPitchSVG(dots)}</div>`;
+        inner=`<div style="width:620px;margin:0 auto">${hPitchSVG(dots,flip?'left':'right')}</div>`;
       }
       return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · ${cat.label}</div>${inner}</div>`;
     };
