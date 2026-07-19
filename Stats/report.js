@@ -873,29 +873,36 @@ function buildPages(host){
   return els;
 }
 
-let exporting=false;   // silent re-entry guard — the button keeps its normal look while the export runs
+let exporting=false;   // re-entry guard — the button shows live % progress while the export runs
 async function exportPdf(){
   if(exporting)return;
   if(!rows.length){alert('No data yet.');return;}
   exporting=true;
+  const btn=$('expPdf'), orig=btn.textContent;
+  const setPct=p=>{btn.textContent='⭳ PDF '+p+'%';};
+  btn.disabled=true; setPct(0);
   const host=document.createElement('div');
   host.style.cssText='position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1';
   try{
-    await ensureLibs();
+    await ensureLibs(); setPct(3);
     document.body.appendChild(host);
-    const pages=buildPages(host);
+    const pages=buildPages(host); setPct(8);
     const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
+    // page rendering is ~all the work: 8% -> 98% spread over the pages
     for(let i=0;i<pages.length;i++){
       const cv=await window.html2canvas(pages[i],{scale:2,backgroundColor:'#ffffff',logging:false});
       if(i)pdf.addPage();
       pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297);
+      setPct(8+Math.round((i+1)/pages.length*90));
     }
+    setPct(100);
     pdf.save(matchName().replace(/[^\w-]+/g,'_')+'_Match_Report.pdf');
   }catch(e){
     console.error('PDF export failed:',e);
     alert('PDF export failed: '+((e&&e.message)||e));
   }finally{
     host.remove();
+    btn.disabled=false; btn.textContent=orig;
     exporting=false;
   }
 }
