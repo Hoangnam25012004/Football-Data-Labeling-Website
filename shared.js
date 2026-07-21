@@ -86,7 +86,7 @@ const FORMATION_GRID=[
   ['CF','CAM','CM','CDM','CB','GK'],
   ['LF','LW','LM','LWB','LB','']
 ];
-const PZ_COLORS=['red','green','green','blue','blue','gold'];
+const PZ_COLORS=['green','green','green','green','green','green']; // single grass-green zones
 // switching attacking direction rotates the whole map 180°, so BOTH axes flip:
 // columns (GK side) AND rows (which flank is the Right side). Flipping only columns
 // left R/L on the same screen half, so a right-back showed as a left-back when the
