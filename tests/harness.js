@@ -57,7 +57,7 @@ function grabConst(name){
 
 // everything the substitution / entry flow needs, in dependency order
 const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
-  'TRANSFER_EVENTS','TRAILING_EXTRA_DOT','newId','duelClass','scrollToRow','editPrevTeam'];
+  'TRANSFER_EVENTS','TRAILING_EXTRA_DOT','newId','SHOT_EVENTS','evtClass','scrollToRow','editPrevTeam'];
 const FUNCS=['fmt','parseTime','eventHalf','matchTime','zoneAt','eventForKey','parseChain',
   'effectiveLU','planSubGroup','swapInSnapshot','applySubGroup','subSideEffects',
   'removeSubSideEffects','submitEntry','chainHTML','deleteRows','startEdit','startEditGroup'];
@@ -96,8 +96,10 @@ function makeApp(opts){
     pvRedraw:null,pvSyncEntry:null,
   };
   vm.createContext(ctx);
-  vm.runInContext(CONSTS.map(grabConst).concat(FUNCS.map(grabFunction)).join('\n'),ctx,
-    {filename:'index.html-extract.js'});
+  // `function` declarations land on the context by themselves; const/let do not, so they
+  // are re-exported explicitly (app.k.evtClass, …) for tests that need them directly
+  vm.runInContext(CONSTS.map(grabConst).concat(FUNCS.map(grabFunction)).join('\n')
+    +'\n;globalThis.k={'+CONSTS.join(',')+'};',ctx,{filename:'index.html-extract.js'});
   return ctx;
 }
 

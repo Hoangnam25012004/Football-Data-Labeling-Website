@@ -132,6 +132,10 @@
   .evt{font-weight:700;color:var(--ink)}   /* event names in the DEFAULT text colour (side = column) */
   .evt.duel-ground{color:#b5713f}          /* #ground duel success / fail — brown */
   .evt.duel-aerial{color:#ef4444}          /* #aerial duel success / fail — red */
+  /* goal + every shot type: a BLACK badge. Plain black text would vanish into the dark
+     table background, so the black is the fill and the label stays light on top of it. */
+  .evt.shot{background:#000;color:#f2f6fa;border:1px solid #454e5e;border-radius:4px;
+            padding:0 5px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
   .pnum{font-weight:700;color:var(--ink)}
   td.ed,.ed,.ed-ev{cursor:pointer}
   td.ed:hover,.ed:hover,.ed-ev:hover{outline:1px dashed var(--accent);outline-offset:1px;border-radius:3px}
@@ -2036,9 +2040,13 @@ function cancelEdit(){                     // leave edit mode without changing t
    Rows are grouped by touch (same player_from): the player number prints once,
    then ALL of that touch's events, and only then the receiver number — so solo
    events sitting next to a transfer don't re-print the passer's number. */
-// per-event colour override for the Events table (matched by name prefix, so it
-// covers both the success and fail variants regardless of the configured hotkeys)
-const duelClass=n=>/^ground duel/i.test(n||'')?' duel-ground':/^aerial duel/i.test(n||'')?' duel-aerial':'';
+// per-event colour override for the Events table. Matched on the NAME (by prefix /
+// keyword, so both the success and fail variants are covered whatever hotkeys are
+// configured, and a renamed or newly added shot type is picked up on its own).
+const SHOT_EVENTS=/shot|^goal$|^own goal$/i;      // goal + shot on/off target, blocked, miss…
+const evtClass=n=>SHOT_EVENTS.test(n||'')?' shot'
+  :/^ground duel/i.test(n||'')?' duel-ground'
+  :/^aerial duel/i.test(n||'')?' duel-aerial':'';
 function chainHTML(grpRows,evClass){
   let html='', printed=null, i=0;
   while(i<grpRows.length){
@@ -2046,7 +2054,7 @@ function chainHTML(grpRows,evClass){
     const run=[]; while(i<grpRows.length&&(grpRows[i].playerFrom||'')===from){run.push(grpRows[i]);i++;}
     if(from&&from!==printed){html+=(html?' ':'')+`<span class="pnum">${from}</span>`;printed=from;}
     let to=null;
-    run.forEach(r=>{html+=` <span class="evt ${evClass}${duelClass(r.event)}">#${r.event}</span>`; if(r.playerTo)to=r.playerTo;});
+    run.forEach(r=>{html+=` <span class="evt ${evClass}${evtClass(r.event)}">#${r.event}</span>`; if(r.playerTo)to=r.playerTo;});
     if(to){html+=` <span class="pnum">${to}</span>`;printed=to;}
   }
   return html;
@@ -2098,7 +2106,7 @@ function renderTable(){
       // single event: "<player_from> <event> <player_to>", numbers/event editable by double-click
       const pf=`<span class="pnum ed" data-edit="from" title="Double-click to edit">${r.playerFrom||'—'}</span>`;
       const pt=r.playerTo?` <span class="pnum ed" data-edit="to" title="Double-click to edit">${r.playerTo}</span>`:'';
-      const evSpan=`<span class="evt ${evClass}${duelClass(r.event)} ed-ev" title="Double-click: type a hotkey to change the event">#${r.event}</span>`;
+      const evSpan=`<span class="evt ${evClass}${evtClass(r.event)} ed-ev" title="Double-click: type a hotkey to change the event">#${r.event}</span>`;
       combined=`${pf} ${evSpan}${pt}`;
     }
     const blank='<td class="blank"></td>';
