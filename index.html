@@ -1607,6 +1607,33 @@ function submitEntry(){
   // 1s2s3), or re-editing an existing chain — deletes the old row(s) and creates the new
   // batch fresh (a chain can't map onto one row / keep a single id).
   const editInPlace=state.editingId&&evs.length===1;
+  // Rows this entry replaces, captured BEFORE they are dropped/overwritten: a substitution
+  // among them owns a formation snapshot that has to be rolled back, or a re-tag would
+  // stack a second snapshot on top of the wrong one it was meant to fix.
+  const replacedSubs=(state.editingGroup
+      ? state.rows.filter(r=>r.grp===state.editingGroup)
+      : (state.editingId?state.rows.filter(r=>r.id===state.editingId):[]))
+    .filter(r=>r.event==='substitution')
+    .map(r=>({event:r.event,team:r.team,t:r.t,playerFrom:r.playerFrom,playerTo:r.playerTo}));
+  // Substitutions rewrite the formation, so the WHOLE entry is vetted before a single row
+  // is written: one impossible pair aborts the entry instead of quietly landing a snapshot
+  // that ignores it, and a pair typed back-to-front is corrected here — in the event row
+  // as well as in the formation, so the table and the pitch can't disagree.
+  let subPlan=null;
+  if(allSubs){
+    const keepT=editInPlace?(state.rows.find(r=>r.id===state.editingId)||{}).t:null;
+    const fallbackT=keepT!=null?keepT:(video.src?video.currentTime:0);
+    const pairs=evs.map((ev,k)=>{
+      const dk=dots[k]||null, t=dk?dk.t:fallbackT;
+      // dots are stored in half-1 orientation, so a 2nd-half dot mirrors back to canonical
+      const pos=dk?(eventHalf({t})===2?{x:100-dk.x,y:100-dk.y}:{x:dk.x,y:dk.y}):null;
+      return {out:ev.from,in:ev.to,t,pos};
+    });
+    subPlan=planSubGroup(state.team,pairs,Math.min(...pairs.map(s=>s.t)),subSideEffects(replacedSubs).hist);
+    if(subPlan.errors.length){
+      alert('Thay người không hợp lệ — chưa ghi nhận gì:\n\n• '+subPlan.errors.join('\n• '));return}
+    subPlan.pairs.forEach((p,k)=>{evs[k].from=p.out;evs[k].to=p.in;});
+  }
   if(state.editingGroup||(state.editingId&&!editInPlace)){
     const ids=state.editingGroup
       ? state.rows.filter(r=>r.grp===state.editingGroup).map(r=>r.id)
@@ -1646,15 +1673,14 @@ function submitEntry(){
   renderTable();
   toast(evs.length>1?(evs.length+' events ✓'):(evs[0].name+' ✓'));
   // substitutions -> new formation snapshot from this moment (the starting lineup
-  // in Player lists stays untouched). Dot = where the OUT player stood; stored in
-  // half-1 orientation, so a 2nd-half dot is mirrored back to canonical coords.
-  if(!wasEditing&&allSubs&&evs.every(e=>e.from&&e.to)){
-    const subsArr=evs.map((ev,k)=>{
-      const dk=dots[k]||null, t=dk?dk.t:lastRow.t;
-      const pos=dk?(eventHalf({t})===2?{x:100-dk.x,y:100-dk.y}:{x:dk.x,y:dk.y}):null;
-      return {out:ev.from,in:ev.to,t,pos};
-    });
-    applySubGroup(state.team,subsArr);
+  // in Player lists stays untouched). The pairs were vetted above; re-tagging one first
+  // rolls back the snapshot the old row left behind, so the fix replaces it.
+  if(subPlan&&subPlan.noLineup){toast('⚠ '+subPlan.notices[0]);subPlan=null;}
+  if(subPlan){
+    const undone=replacedSubs.length?removeSubSideEffects(replacedSubs):false;
+    if(!applySubGroup(state.team,subPlan.pairs,subPlan.notices)&&undone)saveLineups();
+  }else if(replacedSubs.length){   // no longer a substitution -> its snapshot must go too
+    if(removeSubSideEffects(replacedSubs))saveLineups();
   }
   // an edit switched the team buttons to the row's side — go back to where the user was
   if(wasEditing&&editPrevTeam){setTeam(editPrevTeam);editPrevTeam=null;}
@@ -1668,40 +1694,135 @@ function submitEntry(){
    Every substitution moment appends a snapshot to lineups.history:
    {t, team, xi, subs, label} — the formation valid FROM that time on.
    The main-tab pitch always shows the formation effective at the video time. */
-function effectiveLU(team,t){
+const numEq=(a,b)=>String(a==null?'':a).trim()===String(b==null?'':b).trim();
+// hist0 lets a caller ask "what would the XI be if THESE snapshots didn't exist" —
+// used when an existing substitution entry is edited (its own snapshot must not
+// count as the starting point for re-applying it).
+function effectiveLU(team,t,hist0){
   const lu=state.lineups[team];
-  const hist=(state.lineups.history||[]).filter(h=>h.team===team&&h.t<=t).sort((a,b)=>a.t-b.t);
+  const hist=(hist0||state.lineups.history||[]).filter(h=>h.team===team&&h.t<=t).sort((a,b)=>a.t-b.t);
   const last=hist[hist.length-1];
   return last?{xi:last.xi,subs:last.subs,dir:lu.dir,roster:lu.roster}
              :{xi:lu.xi,subs:lu.subs,dir:lu.dir,roster:lu.roster};
 }
+/* Vet a whole entry's substitution pairs against the XI in effect at t0 BEFORE anything
+   is written. Every pair has to take one player OFF the pitch and bring one ON:
+     OUT on pitch,  IN off pitch  -> fine
+     OUT off pitch, IN on pitch   -> the pair was typed the wrong way round; the only
+                                     reading that makes sense is to swap it, so we do,
+                                     and say so ("21sub13" with 13 playing -> 13▼ 21▲)
+     anything else                -> reject the ENTRY (nothing written at all)
+   A shirt number may only appear once per entry — "7sub3*7sub5" is a typo, not two subs.
+   Before this, an unusable pair was only flagged with a toast that the next toast
+   overwrote a millisecond later, and the snapshot silently kept 12 players (or dropped
+   the pair entirely) — the double sub looked like it had only registered one player. */
+function planSubGroup(team,pairs,t0,hist0){
+  const lu=state.lineups[team]||{}, errors=[], notices=[], out=[], seen=new Set();
+  const eff=effectiveLU(team,t0,hist0);
+  const onPitch=(eff.xi||[]).map(x=>String(x.no==null?'':x.no).trim()).filter(Boolean);
+  // no starting XI entered for this team yet: nothing to validate against and nothing
+  // sensible to draw, so the events are still tagged and the formation is left alone
+  if(!onPitch.length)return {pairs:[],errors:[],notices:
+    ['Chưa có đội hình xuất phát cho đội này — event đã lưu, formation giữ nguyên'],noLineup:true};
+  const at=fmt(matchTime(t0));
+  pairs.forEach((p,k)=>{
+    const tag=pairs.length>1?('Cặp '+(k+1)+': '):'';
+    const o0=String(p.out==null?'':p.out).trim(), i0=String(p.in==null?'':p.in).trim();
+    let o=o0, i=i0;
+    if(!o||!i){errors.push(tag+'thiếu số áo — cú pháp là <RA>sub<VÀO>.');return}
+    if(numEq(o,i)){errors.push(tag+'No.'+o+' không thể thay cho chính mình.');return}
+    const oOn=onPitch.includes(o), iOn=onPitch.includes(i);
+    if(!oOn&&iOn){o=i0;i=o0;notices.push('đảo chiều '+o0+'▼'+i0+'▲ → '+o+'▼'+i+'▲');}
+    else if(!oOn&&!iOn){errors.push(tag+'No.'+o+' không có trên sân lúc '+at+' (No.'+i+' cũng không) — kiểm tra lại số áo.');return}
+    else if(oOn&&iOn){errors.push(tag+'No.'+o+' và No.'+i+' đều đang trên sân lúc '+at+' — không thể thay cho nhau.');return}
+    const dup=[o,i].find(n=>seen.has(n));
+    if(dup){errors.push(tag+'No.'+dup+' xuất hiện hai lần trong cùng một lần nhập.');return}
+    seen.add(o); seen.add(i);
+    onPitch.splice(onPitch.indexOf(o),1); onPitch.push(i);   // later pairs see the earlier ones
+    if(lu.roster&&!lu.roster.some(r=>numEq(r.no,i)))
+      notices.push('No.'+i+' chưa có trong danh sách đăng ký — thêm ở Player lists');
+    out.push({...p,out:o,in:i});
+  });
+  return {pairs:out,errors,notices};
+}
+/* in one already-stored snapshot, put `inNo` where `outNo` stands (keeping that period's
+   own position) and move `outNo` to its bench. No-op unless the swap still makes sense
+   there, so periods that moved on by themselves are left alone. */
+function swapInSnapshot(h,outNo,inNo,dir){
+  const i=h.xi.findIndex(x=>numEq(x.no,outNo));
+  if(i<0||h.xi.some(x=>numEq(x.no,inNo)))return false;
+  const spot={x:h.xi[i].x,y:h.xi[i].y};
+  h.xi.splice(i,1);
+  h.xi.push({no:String(inNo),x:spot.x,y:spot.y,pos:zoneAt(spot.x,spot.y,dir||'lr')});
+  if(!h.subs.some(n=>numEq(n,outNo)))h.subs.push(String(outNo));
+  const bi=h.subs.findIndex(n=>numEq(n,inNo)); if(bi>=0)h.subs.splice(bi,1);
+  return true;
+}
 /* apply one entry's substitutions ("38sub6*27sub43") as ONE new snapshot:
    OUT -> bench, IN takes the dot position (or OUT's old spot). The starting
-   lineup stays untouched — Player lists keeps showing the original XI. */
-function applySubGroup(team,subsArr){
-  const lu=state.lineups[team], eq=(a,b)=>String(a)===String(b);
+   lineup stays untouched — Player lists keeps showing the original XI.
+   Pairs must already have been through planSubGroup(); anything it would have
+   rejected is skipped here too, so the XI can never end up with 12 players. */
+function applySubGroup(team,subsArr,notices){
+  const lu=state.lineups[team];
   const t0=Math.min(...subsArr.map(s=>s.t));
   const eff=effectiveLU(team,t0);
   const xi=eff.xi.map(x=>({...x})), bench=eff.subs.slice();
+  const done=[];
   subsArr.forEach(s=>{
-    if(!lu.roster.some(p=>eq(p.no,s.in)))toast('⚠ No.'+s.in+' is not in the match squad — add them in Player lists');
-    const i=xi.findIndex(x=>eq(x.no,s.out));
-    if(i<0)toast('⚠ No.'+s.out+' is not on the pitch at this time');
-    const spot=s.pos||(i>=0?{x:xi[i].x,y:xi[i].y}:{x:50,y:50});
-    if(i>=0)xi.splice(i,1);
-    if(!bench.some(n=>eq(n,s.out)))bench.push(String(s.out));       // OUT -> bench
-    const bi=bench.findIndex(n=>eq(n,s.in)); if(bi>=0)bench.splice(bi,1); // IN -> off the bench
-    if(!xi.some(x=>eq(x.no,s.in)))
-      xi.push({no:String(s.in),x:spot.x,y:spot.y,pos:zoneAt(spot.x,spot.y,lu.dir||'lr')});
+    const i=xi.findIndex(x=>numEq(x.no,s.out));
+    if(i<0)return;                                                   // not on the pitch -> not a sub
+    if(xi.some(x=>numEq(x.no,s.in)))return;                          // already playing -> not a sub
+    const spot=s.pos||{x:xi[i].x,y:xi[i].y};
+    xi.splice(i,1);
+    if(!bench.some(n=>numEq(n,s.out)))bench.push(String(s.out));     // OUT -> bench
+    const bi=bench.findIndex(n=>numEq(n,s.in)); if(bi>=0)bench.splice(bi,1); // IN -> off the bench
+    xi.push({no:String(s.in),x:spot.x,y:spot.y,pos:zoneAt(spot.x,spot.y,lu.dir||'lr')});
     (lu.subHistory=lu.subHistory||[]).push({out:String(s.out),in:String(s.in),t:s.t}); // minutes played
+    done.push(s);
   });
+  if(!done.length){toast('⚠ Không ghi nhận được thay người nào — formation giữ nguyên');return false}
   (state.lineups.history=state.lineups.history||[]).push({
     t:t0, team, xi, subs:bench,
-    label:'Substitution: '+subsArr.map(s=>s.out+'▼ '+s.in+'▲').join(', ')});
+    label:'Substitution: '+done.map(s=>s.out+'▼ '+s.in+'▲').join(', ')});
+  // Periods snapshotted LATER already exist when a sub is tagged out of order (rewinding
+  // the video, or fixing an early sub after a late one). Carry the swap through them —
+  // each keeps its own shape, only the shirt changes — or the sub would vanish again
+  // from the first later period on.
+  state.lineups.history.filter(h=>h.team===team&&h.t>t0&&h.xi&&h.subs).forEach(h=>{
+    done.forEach(s=>swapInSnapshot(h,s.out,s.in,lu.dir));});
   state.lineups.history.sort((a,b)=>a.t-b.t);
   saveLineups();
   openFmModal(team);   // fine-tune the NEW period here (Player lists keeps the original)
-  toast('Substitution '+subsArr.map(s=>s.out+'▼'+s.in+'▲').join(' ')+' — adjust the new formation if needed');
+  toast('Substitution '+done.map(s=>s.out+'▼'+s.in+'▲').join(' ')
+    +((notices&&notices.length)?' ⚠ '+notices.join(' · '):' — adjust the new formation if needed'));
+  return true;
+}
+/* A substitution ALSO lives outside the events table: applySubGroup() wrote a subHistory
+   entry (minutes played, report timeline) and a formation snapshot into state.lineups.
+   Deleting or re-tagging the event row has to undo those too, or the sub stays visible in
+   the formation panel and the PDF report forever. `hist` is the history those rows' own
+   snapshots removed — pass it to effectiveLU/planSubGroup to plan a replacement. */
+function subSideEffects(rows){
+  const subs=(rows||[]).filter(r=>r&&r.event==='substitution'&&r.team&&state.lineups[r.team]);
+  let hist=(state.lineups.history||[]).slice();
+  subs.forEach(r=>{hist=hist.filter(h=>
+    !(h.team===r.team&&/^Substitution/.test(h.label||'')&&Math.abs(h.t-r.t)<=3));});
+  return {subs,hist};
+}
+function removeSubSideEffects(rows){
+  const {subs,hist}=subSideEffects(rows);
+  if(!subs.length)return false;
+  subs.forEach(r=>{
+    const lu=state.lineups[r.team];
+    if(lu.subHistory)lu.subHistory=lu.subHistory.filter(s=>
+      !(numEq(s.out,r.playerFrom)&&numEq(s.in,r.playerTo)&&Math.abs(s.t-r.t)<=3));
+    // mirror of the forward carry in applySubGroup: later periods put the OUT player back
+    hist.filter(h=>h.team===r.team&&h.t>r.t&&h.xi&&h.subs).forEach(h=>
+      swapInSnapshot(h,r.playerTo,r.playerFrom,lu.dir));
+  });
+  state.lineups.history=hist;
+  return true;
 }
 
 /* ===== FORMATION MODAL — view/adjust each period's formation, both teams ===== */
@@ -1938,23 +2059,8 @@ function deleteRows(rs){
     const i=state.rows.indexOf(r); if(i>=0)state.rows.splice(i,1);
     window.Cloud&&window.Cloud.onLocalDelete(r.id);
   });
-  // Substitutions also live OUTSIDE the events table: applySubGroup() wrote a
-  // subHistory entry (minutes played, report timeline) and a formation snapshot
-  // into state.lineups, which is stored in matches.lineups — deleting only the
-  // event row would leave the sub visible in the formation panel and the PDF
-  // report forever. Remove those side effects and sync lineups to the cloud.
-  const subs=rs.filter(r=>r.event==='substitution'&&r.team&&state.lineups[r.team]);
-  if(subs.length){
-    const eq=(a,b)=>String(a||'').trim()===String(b||'').trim();
-    subs.forEach(r=>{
-      const lu=state.lineups[r.team];
-      if(lu.subHistory)lu.subHistory=lu.subHistory.filter(s=>
-        !(eq(s.out,r.playerFrom)&&eq(s.in,r.playerTo)&&Math.abs(s.t-r.t)<=3));
-      if(state.lineups.history)state.lineups.history=state.lineups.history.filter(h=>
-        !(h.team===r.team&&/^Substitution/.test(h.label||'')&&Math.abs(h.t-r.t)<=3));
-    });
-    saveLineups();
-  }
+  // drop the formation snapshot / subHistory the sub rows created (see subSideEffects)
+  if(removeSubSideEffects(rs))saveLineups();
   renderTable();
 }
 function renderTable(){

@@ -24,6 +24,17 @@ In the repository: **Settings → Pages → Build and deployment → Source: Git
 Just open `index.html` in your browser. For the "auto-save to file" feature (File System
 Access API), serve it over `http://localhost` (e.g. `python -m http.server`) in Chrome/Edge.
 
+## Tests
+```bash
+node tests/run.js
+```
+No dependencies and no install step: the suite lifts the functions it exercises straight
+out of the `<script>` in [`index.html`](index.html) and runs them in a `vm` sandbox against
+stubs for the DOM/video/cloud, so it always tests the shipped code. Covered today: the
+substitution → formation-history flow (single/double/triple swaps in one entry, pairs typed
+back-to-front, impossible pairs, dots and 2nd-half mirroring, re-tagging, deleting, and
+substitutions tagged out of order). `tests/` is not part of the deployed site.
+
 ## Real-time cloud sync (Supabase)
 Tagged events can be saved to a shared Postgres database and synced live between everyone
 viewing the same match (video stays local — only event metadata is stored).
