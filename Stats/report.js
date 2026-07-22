@@ -20,7 +20,7 @@ const C={
 const TC=t=>t==='home'?C.home:C.away;
 const TRGB=t=>t==='home'?C.homeRGB:C.awayRGB;
 const TN=t=>t==='home'?meta.home:meta.away;
-const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* esc() lives in shared.js (loaded first) — both this file and the Stats page need it */
 const mmss=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 /* stoppage-time minutes are capped by the half: 45:52 in the 1st half is 45+1',
    95:30 in the 2nd is 90+6' (never 46' / 96') */
@@ -67,6 +67,7 @@ function ensureCss(){
 table.rpt{width:100%;border-collapse:collapse;font-size:10.5px}
 .rpt th{background:${C.navy};color:#fff;font-weight:700;padding:6px 5px;text-align:center;white-space:nowrap}
 .rpt td{padding:4.5px 5px;text-align:center;border-bottom:1px solid #eef1f5}
+.rpt td.rp-pl{text-align:left;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rpt tr:nth-child(even) td{background:#f6f8fb}
 .rp-pill{display:inline-block;min-width:26px;padding:2px 7px;border-radius:11px;color:#fff;font-weight:800;font-size:10px;box-sizing:border-box}
 table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
@@ -381,12 +382,16 @@ function shotMapsPage(){
 
 /* ================= player stat tables (chunked over pages) ================= */
 function teamTable(team,headers,rowFor){
-  const P=computeStats(rows,team), list=sortedPlayers(P);
+  // the whole matchday squad (same as the Stats page): a substitute who came on and
+  // never touched the ball still belongs in the report, with his zeroes
+  const P=withSquad(computeStats(rows,team),lineups,team), list=sortedPlayers(P);
   if(!list.length)return {rows:0,html:`<div class="rp-note" style="font-size:11px">No events for ${esc(TN(team))} yet.</div>`};
-  const body=list.map(no=>`<tr><td>${pill(no,team)}</td>${rowFor(P[no],no,team).map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');
+  const names=squadNames(lineups,team);
+  const body=list.map(no=>`<tr><td>${pill(no,team)}</td><td class="rp-pl">${esc(playerLabel(names,no))}</td>`
+    +`${rowFor(P[no],no,team).map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');
   return {rows:list.length,
     html:`<div class="rp-sub" style="color:${TC(team)}">${esc(TN(team))}</div>`
-      +`<table class="rpt"><thead><tr><th>No</th>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`};
+      +`<table class="rpt"><thead><tr><th>No</th><th>Player</th>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`};
 }
 function playerStatPages(title,headers,rowFor){
   const h=teamTable('home',headers,rowFor), a=teamTable('away',headers,rowFor);

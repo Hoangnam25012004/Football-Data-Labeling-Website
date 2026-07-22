@@ -41,6 +41,7 @@ table.stats .grp.g3{background:#3a2440;color:#e8c9f0}
 table.stats .grp.g4{background:#3a3a1f;color:#eeeec0}
 table.stats .grp.g5{background:#402427;color:#f0c9cf}
 table.stats td.no,table.stats th.no{font-weight:700;color:var(--accent);background:var(--panel2);position:sticky;left:0;z-index:1}
+table.stats td.pl,table.stats th.pl{text-align:left}   /* registered name next to the shirt number */
 table.stats tbody tr:hover td{background:#1c233066}
 .stats-empty{padding:24px;text-align:center;color:var(--mut)}
 

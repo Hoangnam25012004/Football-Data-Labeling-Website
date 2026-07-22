@@ -6,6 +6,8 @@
    page).
    ========================================================================== */
 const $ = id => document.getElementById(id);
+// squad names and team names come from user input and land in innerHTML all over both pages
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* localStorage keys — must match the ones the main app (index.html) writes */
 const PT_KEYS = {
@@ -175,6 +177,42 @@ function statRow(no,s){return[no,s.goals,s.assists,s.totalShots,s.shotsOn,s.shot
   s.corners,s.freeKicks,s.throwIns,s.goalKicks,s.fouls,s.offsides,s.saves];}
 function sortedPlayers(P){return Object.keys(P).sort((a,b)=>{const na=+a,nb=+b;
   if(!isNaN(na)&&!isNaN(nb))return na-nb; return a.localeCompare(b);});}
+
+/* ---- who actually took the pitch ----
+   computeStats() only ever hears about players with a tagged event, so a substitute
+   who came on and never touched the ball vanished from every table and from the
+   heatmap — as if he had not played. These read the squad from the lineups instead:
+   the starting XI plus everyone who shows up in a later formation snapshot or as the
+   incoming side of a substitution. */
+function squadOnPitch(lineups,team){
+  const out=[], seen=new Set();
+  const add=n=>{const s=String(n==null?'':n).trim();
+    if(!s||seen.has(s))return; seen.add(s); out.push(s);};
+  const lu=(lineups&&lineups[team])||null; if(!lu)return out;
+  (lu.xi||[]).forEach(p=>add(p&&p.no));                       // starting XI
+  ((lineups&&lineups.history)||[]).filter(h=>h&&h.team===team)
+    .slice().sort((a,b)=>(a.t||0)-(b.t||0))
+    .forEach(h=>(h.xi||[]).forEach(p=>add(p&&p.no)));         // every later period
+  (lu.subHistory||[]).forEach(s=>add(s&&s.in));               // and every player brought on
+  return out;
+}
+// shirt number -> registered name (Player lists); missing when the squad has no name
+function squadNames(lineups,team){
+  const m={}, lu=(lineups&&lineups[team])||null; if(!lu)return m;
+  (lu.roster||[]).forEach(p=>{const k=String(p&&p.no==null?'':p.no).trim();
+    if(k&&p&&p.name)m[k]=String(p.name).trim();});
+  return m;
+}
+// label for a shirt number: the registered name, else the old "Player 7" placeholder
+const playerLabel=(names,no)=>{const k=String(no==null?'':no).trim();
+  if(!k)return '';
+  return (names&&names[k])||(isNaN(+k)?k:'Player '+k);};
+// pad a computeStats() result with a zero row for everyone who played but never
+// appeared in an event, so the tables list the whole matchday squad
+function withSquad(P,lineups,team){
+  squadOnPitch(lineups,team).forEach(no=>{if(!P[no])P[no]=newStat();});
+  return P;
+}
 
 /* ---- pass distribution matrix ---- */
 const PASS_EVENTS=new Set(['pass success','cross success']);

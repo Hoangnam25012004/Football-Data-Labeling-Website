@@ -6,7 +6,7 @@
 <title>Stats — Pitch Tagger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="../shared.css?v=6">
+<link rel="stylesheet" href="../shared.css?v=7">
 <style>
 /* fill the viewport exactly: header + page + stats-wrap as a flex column, so no
    dead band is left under the scroll area regardless of header/padding heights */
@@ -65,6 +65,8 @@ body>header{flex:none}
 .hm-row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;font-size:13px;color:var(--ink);cursor:default}
 .hm-row:hover,.hm-row.sel{background:var(--panel2)}
 .hm-row.dim{opacity:0.45}
+.hm-row.hm-off .hm-no{opacity:0.5}                       /* played, but no located touch */
+.hm-row.hm-off .hm-name,.hm-row.hm-off .hm-cnt{color:var(--mut)}
 .hm-no{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-weight:800;font-size:11px;color:#fff}
 .hm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -123,7 +125,7 @@ body>header{flex:none}
   <div class="stats-wrap"><div id="statsHolder"></div></div>
 </div>
 
-<script src="../shared.js?v=6"></script>
+<script src="../shared.js?v=7"></script>
 <script>
 let rows=loadRows(), meta=loadMeta(), lineups=loadLineups(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles', othCat='fouls';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
@@ -164,11 +166,14 @@ function renderStats(){
   document.querySelectorAll('#catToggle button').forEach(b=>b.className=b.dataset.cat===statCat?'act-gen':'');
   const holder=$('statsHolder');
   if(statTeam==='general'){renderGeneral();return;}
-  const P=computeStats(rows,statTeam), players=sortedPlayers(P);
+  // the whole matchday squad, not just the players who happened to be tagged: a
+  // substitute who came on without touching the ball still gets his (zero) row
+  const P=withSquad(computeStats(rows,statTeam),lineups,statTeam), players=sortedPlayers(P);
   if(!players.length){holder.innerHTML='<div class="stats-empty">No events for this team yet.</div>';return;}
-  const cols=STAT_CATS[statCat];
-  const head='<th class="no">No</th>'+cols.map(c=>`<th>${c[0]}</th>`).join('');
-  const body=players.map(no=>'<tr><td class="no">'+no+'</td>'
+  const names=squadNames(lineups,statTeam), cols=STAT_CATS[statCat];
+  const head='<th class="no">No</th><th class="pl">Player</th>'+cols.map(c=>`<th>${c[0]}</th>`).join('');
+  const body=players.map(no=>'<tr><td class="no">'+esc(no)+'</td>'
+    +`<td class="pl">${esc(playerLabel(names,no))}</td>`
     +cols.map(c=>`<td>${c[1](P[no])}</td>`).join('')+'</tr>').join('');
   const table=`<table class="stats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
   // charts sit BELOW the table. Shooting: donut + shot-location map side by side.
@@ -649,19 +654,26 @@ function heatMapHTML(team){
   // no data -> keep the pitch, just no heat/markers
   const pts=touchPoints(team).filter(t=>!heatHalf||t.half===heatHalf);
   _heatBy={}; pts.forEach(t=>{const k=t.p; (_heatBy[k]=_heatBy[k]||[]).push(t);});
+  // everyone who took the pitch is listed, even with no located touch — a substitute who
+  // came on and never got on the ball used to disappear from the map entirely. He has no
+  // average position to mark, so he gets a list row with 0 and no marker.
+  squadOnPitch(lineups,team).forEach(no=>{if(!_heatBy[no])_heatBy[no]=[];});
   _heatOrder=Object.keys(_heatBy).filter(p=>p!=='')
     .sort((a,b)=>{const na=+a,nb=+b;return(!isNaN(na)&&!isNaN(nb))?na-nb:a.localeCompare(b);});
-  const markers=_heatOrder.map(p=>{
+  const markers=_heatOrder.filter(p=>_heatBy[p].length).map(p=>{
     const a=_heatBy[p];
     const mx=a.reduce((s,t)=>s+t.x,0)/a.length, my=a.reduce((s,t)=>s+t.y,0)/a.length;
     return `<div class="hm-mark" data-p="${p}" style="left:${mx.toFixed(1)}%;top:${my.toFixed(1)}%;background:${fill}"`
       +` onmouseenter="heatHover('${p}')" onmouseleave="heatHover('')">${p}</div>`;
   }).join('');
-  const list=_heatOrder.map(p=>
-    `<div class="hm-row" data-p="${p}" onmouseenter="heatHover('${p}')" onmouseleave="heatHover('')">`
-    +`<span class="hm-no" style="background:${fill}">${p}</span>`
-    +`<span class="hm-name">${isNaN(+p)?p:'Player '+p}</span>`
-    +`<span class="hm-cnt">${_heatBy[p].length}</span></div>`).join('');
+  const names=squadNames(lineups,team);
+  const list=_heatOrder.map(p=>{
+    const n=_heatBy[p].length;
+    return `<div class="hm-row${n?'':' hm-off'}" data-p="${p}" onmouseenter="heatHover('${p}')" onmouseleave="heatHover('')">`
+      +`<span class="hm-no" style="background:${fill}">${esc(p)}</span>`
+      +`<span class="hm-name" title="${esc(playerLabel(names,p))}">${esc(playerLabel(names,p))}</span>`
+      +`<span class="hm-cnt">${n}</span></div>`;
+  }).join('');
   const d=PITCH_DIMS.football;
   const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG('right')+'</svg>');
   const legend=`<span class="sm-leg">Low</span>`
@@ -672,7 +684,8 @@ function heatMapHTML(team){
     +`<div><div class="shotmap-pitch" id="hmPitch">${pitch}`
     +`<canvas id="heatCv" width="${d.w}" height="${d.h}"></canvas>${markers}</div>`
     +`<div class="shotmap-legend">${legend}</div></div>`
-    +`<div class="hm-list"><div class="hm-hint">Markers = average position · hover a player to isolate his heatmap</div>${list}`
+    +`<div class="hm-list"><div class="hm-hint">Markers = average position · hover a player to isolate his heatmap`
+    +`<br>Faded = played, no located touch</div>${list}`
     +`<div class="hm-cnt-foot">Located touches: ${pts.length}</div></div></div></div>`;
 }
 /* hover with '' restores the whole-team heatmap */
@@ -862,13 +875,18 @@ function buildSheets(){
           ['team_stats',teamStatsSheet()]];
 }
 function statsSheet(team){
-  const P=computeStats(rows,team), players=sortedPlayers(P);
-  const h1=new Array(STAT_HEADERS.length).fill(''); const merges=[];
-  let c=0; STAT_GROUPS.forEach(g=>{if(g[0]){h1[c]=g[0]; if(g[1]>1)merges.push({s:{r:0,c},e:{r:0,c:c+g[1]-1}});} c+=g[1];});
-  merges.push({s:{r:0,c:0},e:{r:1,c:0}});
-  const aoa=[h1,STAT_HEADERS,...players.map(no=>statRow(no,P[no]))];
+  // same squad padding + name column as the on-screen table, so the export matches it
+  const P=withSquad(computeStats(rows,team),lineups,team), players=sortedPlayers(P);
+  const names=squadNames(lineups,team);
+  const headers=[STAT_HEADERS[0],'Player',...STAT_HEADERS.slice(1)];
+  const h1=new Array(headers.length).fill(''); const merges=[];
+  let c=0; STAT_GROUPS.forEach((g,i)=>{const span=i===0?g[1]+1:g[1];   // 'No' group also holds 'Player'
+    if(g[0]){h1[c]=g[0]; if(span>1)merges.push({s:{r:0,c},e:{r:0,c:c+span-1}});} c+=span;});
+  merges.push({s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}});
+  const aoa=[h1,headers,...players.map(no=>{const r=statRow(no,P[no]);
+    return [r[0],playerLabel(names,no),...r.slice(1)];})];
   const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!merges']=merges;
-  ws['!cols']=STAT_HEADERS.map((h,i)=>({wch:i===0?5:Math.max(7,h.length)}));
+  ws['!cols']=headers.map((h,i)=>({wch:i===0?5:i===1?18:Math.max(7,h.length)}));
   return ws;
 }
 function teamStatsSheet(){
@@ -912,7 +930,9 @@ window.addEventListener('storage',e=>{
   if(e.key===PT_KEYS.rows){rows=loadRows();renderStats();}
   else if(e.key===PT_KEYS.meta){meta=loadMeta();renderStats();}
   else if(e.key===PT_KEYS.duration){dur=loadJSON(PT_KEYS.duration,dur);renderStats();}
-  else if(e.key===PT_KEYS.lineups){lineups=loadLineups();if(statTeam==='general')renderStats();}
+  // lineups feed the General formation AND the per-player tables / heatmap squad, so
+  // a lineup edit in the main tab has to re-render whatever is on screen
+  else if(e.key===PT_KEYS.lineups){lineups=loadLineups();renderStats();}
 });
 
 renderStats();
@@ -991,6 +1011,6 @@ function dbToRow(d){
   }catch(e){console.warn('Stats cloud load failed — using local data:',(e&&e.message)||e);}
 })();
 </script>
-<script src="report.js?v=17"></script>
+<script src="report.js?v=18"></script>
 </body>
 </html>

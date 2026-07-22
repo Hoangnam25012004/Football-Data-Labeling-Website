@@ -110,4 +110,19 @@ function submit(app,raw,dots){
   app.submitEntry();
 }
 
-module.exports={makeApp,submit,grabFunction,grabConst,SRC,EVENTS};
+/* shared.js is the plain script both sub-pages load. It has no top-level side effects,
+   so the whole file runs in a sandbox and hands back its helpers (const/let bindings
+   are not context properties, hence the explicit re-export). */
+const SHARED=fs.readFileSync(path.join(ROOT,'shared.js'),'utf8');
+const SHARED_EXPORTS=['esc','squadOnPitch','squadNames','playerLabel','withSquad',
+  'computeStats','sortedPlayers','newStat','statRow','sumTeam','passMatrix','pct',
+  'blankTeamLU','zoneAt','EVENT_INC','STAT_HEADERS','STAT_GROUPS'];
+function loadShared(){
+  const ctx={console,document:{getElementById:()=>null},location:{hash:''},
+    localStorage:{getItem:()=>null,setItem(){}}};
+  vm.createContext(ctx);
+  vm.runInContext(SHARED+'\n;globalThis.S={'+SHARED_EXPORTS.join(',')+'};',ctx,{filename:'shared.js'});
+  return ctx.S;
+}
+
+module.exports={makeApp,submit,grabFunction,grabConst,loadShared,SRC,SHARED,EVENTS};
