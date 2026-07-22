@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Player lists — Pitch Tagger</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="../shared.css?v=7">
+<link rel="stylesheet" href="../shared.css?v=8">
 </head>
 <body>
 <header>
@@ -27,44 +27,77 @@
     để tạo hoặc join một match rồi mở lại trang này.
   </div>
   <div class="lineup-body">
-    <div class="lu-left">
-      <!-- players stored on the team in the database (no shirt numbers — those are per match) -->
-      <div class="lu-sec"><b>Team players — database</b> <span class="mini" id="dbStatus">…</span></div>
-      <div class="lu-add" id="dbAddRow" style="display:none">
-        <input id="dbName" placeholder="New player name" style="flex:1;width:auto">
-        <button id="dbAdd" title="Save the player to the team in the database">+</button>
+
+    <!-- 1. the pool: every player available to this team; ticking one puts him in the squad -->
+    <section class="lu-card">
+      <div class="lu-toolbar">
+        <div class="lu-add">
+          <input id="dbName" placeholder="New player name" autocomplete="off">
+          <button id="dbAdd" title="Thêm cầu thủ mới cho đội">+</button>
+        </div>
+        <div class="lu-search"><input id="dbSearch" placeholder="Search for players" autocomplete="off"></div>
       </div>
-      <!-- filter the team's DB players by name (searches players already in the system) -->
-      <div class="lu-search" id="dbSearchRow" style="display:none">
-        <input id="dbSearch" placeholder="Search for players" autocomplete="off">
+      <div class="lu-tblwrap">
+        <table class="lu-tbl">
+          <thead><tr>
+            <th class="c-chk"><input type="checkbox" class="lu-chk" id="poolAll" title="Bỏ chọn tất cả"></th>
+            <th class="c-no sortable" data-sort="no">No</th>
+            <th class="c-pos sortable" data-sort="pos">Position</th>
+            <th class="sortable" data-sort="first">Tên</th>
+            <th class="sortable" data-sort="last">Last name</th>
+          </tr></thead>
+          <tbody id="poolBody"></tbody>
+        </table>
       </div>
-      <div class="lu-roster" id="dbRoster" style="flex:none;max-height:32vh"></div>
-      <!-- this match's squad: DB players with the shirt number they wear TODAY -->
-      <div class="lu-sec"><b>Match squad</b> <span class="mini">shirt numbers for this match</span></div>
-      <div class="lu-add" id="luAddRow">
-        <input id="luNo" placeholder="No" inputmode="numeric">
-        <input id="luName" placeholder="Player name">
-        <button id="luAdd" title="add player">+</button>
+      <div class="lu-foot" id="dbStatus">…</div>
+    </section>
+
+    <!-- 2 + 3. the squad, split into starters and substitutes -->
+    <section class="lu-card">
+      <div class="lu-cardhead"><b>Final Lineup</b><span class="mini" id="luCount"></span></div>
+      <div class="lu-tblwrap">
+        <table class="lu-tbl">
+          <thead><tr>
+            <th class="c-no sortable" data-sort="no">No</th>
+            <th class="c-pos">Position</th>
+            <th>Tên</th>
+            <th class="c-act"></th>
+          </tr></thead>
+          <tbody id="xiBody"></tbody>
+          <tbody id="subBody"></tbody>
+        </table>
       </div>
-      <div class="lu-roster" id="luRoster"></div>
-    </div>
-    <div class="lu-right">
-      <div class="lu-pitchwrap"><div class="lu-pitch" id="luPitch"></div></div>
-      <div class="lu-dir">
-        <button id="luDir">⇄ Switch Attacking Direction</button>
-        <span id="luCount"></span>
+    </section>
+
+    <!-- 4. where the starters stand -->
+    <section class="lu-card lu-form">
+      <div class="lu-cardhead"><b>Đội hình</b><span class="mini">Optional</span></div>
+      <div class="lu-formbody">
+        <div class="lu-pitchwrap"><div class="lu-pitch" id="luPitch"></div></div>
+        <div class="lu-dir">
+          <button id="luDir">⇄ Switch Attacking Direction</button>
+          <span class="mini">Kéo cầu thủ trên sân để chỉnh vị trí</span>
+        </div>
       </div>
-      <div class="lu-subs"><b>Substitutes</b><div id="luSubs"></div></div>
-    </div>
+    </section>
+
   </div>
 </div>
 
-<script src="../shared.js?v=7"></script>
+<script src="../shared.js?v=8"></script>
 <script>
 let lineups=loadLineups(), meta=loadMeta(), lineupTeam='home';
+let poolSort={key:'no',dir:1}, finalSort={key:'no',dir:1};
 function teamLU(){return lineups[lineupTeam];}
 function maxXI(){return MAX_XI[meta.sport]||11;}
-function rosterPlayer(t,no){return t.roster.find(p=>p.no===no);}
+function rosterPlayer(t,no){return t.roster.find(p=>String(p.no)===String(no));}
+const sameNo=(a,b)=>String(a==null?'':a).trim()===String(b==null?'':b).trim();
+// "Nguyen Van Anh" -> {first:'Nguyen Van', last:'Anh'}; a single word stays in `first`
+function splitName(name){
+  const parts=String(name||'').trim().split(/\s+/).filter(Boolean);
+  if(parts.length<2)return {first:parts[0]||'',last:''};
+  return {first:parts.slice(0,-1).join(' '),last:parts[parts.length-1]};
+}
 // save = localStorage (main tab mirrors it live via `storage`) + push straight to the
 // match row in Supabase, so saving never depends on the main tab being open to relay —
 // before this, edits made here could be overwritten by the stale cloud copy on reload.
@@ -83,24 +116,25 @@ function save(){
 }
 
 /* ===== team players from the DATABASE (public.players) =====
-   Players must be stored on the team in the database BEFORE they can join the
-   match squad. DB players carry no shirt number — the number is assigned here,
-   per match, when the player is added to the squad. */
+   Players live on the team in the database and carry no shirt number — the number
+   is assigned here, per match, when the player is ticked into the squad. Without a
+   database link the same pool is filled from this match's own squad instead. */
 const CLOUD_CFG='pitchtagger.cloud.cfg';
 let sb=null, dbPlayers={home:[],away:[]}, dbErr='';
 function teamIdFor(team){return team==='home'?meta.homeTeamId:meta.awayTeamId;}
+function dbOn(){return !!(sb&&teamIdFor(lineupTeam));}
 async function initDB(){
   let c={}; try{c=JSON.parse(localStorage.getItem(CLOUD_CFG))||{};}catch(e){}
-  if(!c.url||!c.key||!window.supabase){dbErr='chưa cấu hình Cloud (kết nối ở tab chính)';renderDbRoster();return;}
+  if(!c.url||!c.key||!window.supabase){dbErr='chưa cấu hình Cloud (kết nối ở tab chính)';renderPool();return;}
   try{
     sb=window.supabase.createClient(c.url,c.key);
     const {data:{session}}=await sb.auth.getSession();
     if(!session){const {error}=await sb.auth.signInAnonymously(); if(error)throw error;}
-  }catch(e){sb=null;dbErr='không kết nối được database';renderDbRoster();return;}
+  }catch(e){sb=null;dbErr='không kết nối được database';renderPool();return;}
   await loadDbPlayers();
 }
 async function loadDbPlayers(){
-  if(!sb)return renderDbRoster();
+  if(!sb)return renderPool();
   for(const team of ['home','away']){
     const tid=teamIdFor(team);
     if(!tid){dbPlayers[team]=[];continue;}
@@ -108,95 +142,202 @@ async function loadDbPlayers(){
     if(error){dbErr=error.message;dbPlayers[team]=[];}
     else dbPlayers[team]=data||[];
   }
-  renderDbRoster();
-}
-function renderDbRoster(){
-  const box=$('dbRoster'), st=$('dbStatus'), t=teamLU();
-  const tid=teamIdFor(lineupTeam), dbOn=!!(sb&&tid);
-  // enforce the DB flow: manual (offline) add is only available without a database link
-  $('dbAddRow').style.display=dbOn?'flex':'none';
-  $('dbSearchRow').style.display=dbOn?'flex':'none';
-  $('luAddRow').style.display=dbOn?'none':'flex';
-  box.innerHTML='';
-  if(!dbOn){
-    st.textContent=sb?'⚠ match chưa gắn team — tạo match từ Cloud (chọn team database)':'⚠ '+(dbErr||'offline');
-    return;
-  }
-  const all=dbPlayers[lineupTeam];
-  const q=($('dbSearch').value||'').trim().toLowerCase();
-  const list=q?all.filter(p=>(p.name||'').toLowerCase().includes(q)):all;
-  st.textContent='✓ '+(q?list.length+'/'+all.length:all.length)+' cầu thủ';
-  list.forEach(p=>{
-    const inSquad=t.roster.find(r=>r.pid===p.id);
-    const row=document.createElement('div'); row.className='lu-prow';
-    row.innerHTML=`<span class="pname">${p.name}</span><span class="ppos">${p.position||''}</span>`;
-    const b=document.createElement('button');
-    if(inSquad){b.textContent='#'+inSquad.no;b.className='on';b.title='đã trong danh sách trận';b.disabled=true;}
-    else{b.textContent='→ squad';b.title='thêm vào danh sách trận (nhập số áo)';b.onclick=()=>addToSquad(p);}
-    row.appendChild(b); box.appendChild(row);
-  });
-  if(!all.length){
-    const e=document.createElement('div');
-    e.style.cssText='color:var(--mut);font-size:11px;padding:8px;text-align:center';
-    e.textContent='Team chưa có cầu thủ nào trong database — thêm bằng ô bên trên.';
-    box.appendChild(e);
-  }else if(!list.length){
-    const e=document.createElement('div');
-    e.style.cssText='color:var(--mut);font-size:11px;padding:8px;text-align:center';
-    e.textContent='Không tìm thấy cầu thủ khớp "'+$('dbSearch').value.trim()+'".';
-    box.appendChild(e);
-  }
-}
-// save a NEW player on the team in the database (no shirt number)
-async function addDbPlayer(){
-  const name=$('dbName').value.trim(); if(!name)return;
-  const tid=teamIdFor(lineupTeam);
-  if(!sb||!tid){alert('Chưa kết nối database hoặc match chưa gắn team.');return;}
-  if(dbPlayers[lineupTeam].some(p=>p.name.toLowerCase()===name.toLowerCase())
-     && !confirm('"'+name+'" đã có trong database. Vẫn tạo bản ghi mới?'))return;
-  const {error}=await sb.from('players').insert({team_id:tid,name,position:null});
-  if(error){alert('Không lưu được cầu thủ: '+error.message);return;}
-  $('dbName').value='';$('dbName').focus();
-  await loadDbPlayers();
-}
-// DB player -> match squad: assign the shirt number worn in THIS match
-function addToSquad(p){
-  const t=teamLU();
-  let no=prompt('Số áo của '+p.name+' trong trận này:'); if(no==null)return;
-  no=String(no).trim();
-  if(!no){alert('Cần nhập số áo.');return;}
-  if(t.roster.some(r=>String(r.no)===no)){alert('Số '+no+' đã được dùng trong danh sách trận.');return;}
-  t.roster.push({no,name:p.name,pid:p.id});
-  save();renderLineup();
+  renderPool();
 }
 
-function renderLineup(){
-  syncBackLink(meta);   // "← Tagging" returns to ../#match=<code>, keeping the match open
-  // no open match -> show the notice instead of the editor
-  const open=!!meta.matchId;
-  $('noMatchMsg').style.display=open?'none':'block';
-  document.querySelector('.lineup-body').style.display=open?'':'none';
-  if(!open)return;
-  $('luHomeBtn').className=lineupTeam==='home'?'act-home':'';
-  $('luAwayBtn').className=lineupTeam==='away'?'act-away':'';
-  $('luHomeBtn').textContent=meta.home;
-  $('luAwayBtn').textContent=meta.away;
-  const t=teamLU(), ros=$('luRoster'); ros.innerHTML='';
-  t.roster.forEach(p=>{
-    const xiE=t.xi.find(x=>x.no===p.no), inXI=!!xiE, inSub=t.subs.includes(p.no);
-    const row=document.createElement('div'); row.className='lu-prow';
-    row.innerHTML=`<span class="num">${p.no}</span><span class="pname">${p.name||''}</span><span class="ppos">${xiE?zoneAt(xiE.x,xiE.y,t.dir):''}</span>`;
-    const xiB=document.createElement('button');xiB.textContent='XI';if(inXI)xiB.className='on';xiB.onclick=()=>toggleXI(p.no);
-    const sB=document.createElement('button');sB.textContent='Sub';if(inSub)sB.className='on';sB.onclick=()=>toggleSub(p.no);
-    const rm=document.createElement('button');rm.className='rm';rm.textContent='×';rm.title='remove';rm.onclick=()=>removeLuPlayer(p.no);
-    row.append(xiB,sB,rm); ros.appendChild(row);
+/* ===== the pool =====
+   One row per player available to this team: the database squad, plus anyone already
+   in this match's squad who has no database record (offline / hand-typed). */
+function poolRows(){
+  const t=teamLU(), out=[], seenPid=new Set();
+  (dbPlayers[lineupTeam]||[]).forEach(p=>{
+    seenPid.add(p.id);
+    const r=t.roster.find(x=>x.pid===p.id);
+    out.push({pid:p.id,name:p.name||'',dbPos:p.position||'',no:r?String(r.no):'',inSquad:!!r});
   });
-  const subs=$('luSubs'); subs.innerHTML='';
-  t.subs.forEach(no=>{const p=rosterPlayer(t,no);if(!p)return;const c=document.createElement('span');c.className='lu-chip';c.innerHTML=`<span class="num">${p.no}</span>${p.name||''}`;subs.appendChild(c);});
-  $('luCount').textContent='Starters '+t.xi.length+'/'+maxXI()+' · Subs '+t.subs.length;
-  renderDbRoster();
-  renderLuPitch();
+  t.roster.forEach(r=>{
+    if(r.pid&&seenPid.has(r.pid))return;
+    out.push({pid:r.pid||null,name:r.name||'',dbPos:'',no:String(r.no),inSquad:true});
+  });
+  return out;
 }
+// position shown for a squad player: his zone on the pitch, else the database position
+function posOf(no,dbPos){
+  const t=teamLU(), x=t.xi.find(e=>sameNo(e.no,no));
+  return x?(zoneAt(x.x,x.y,t.dir)||'-'):(dbPos||'-');
+}
+function sortRows(rows,srt){
+  const k=srt.key, d=srt.dir;
+  return rows.slice().sort((a,b)=>{
+    if(k==='no'){                                  // squad numbers first, in numeric order
+      const na=a.no===''?Infinity:+a.no, nb=b.no===''?Infinity:+b.no;
+      if(na!==nb)return (na-nb)*d;
+      return String(a.name).localeCompare(String(b.name));
+    }
+    const va=String(k==='pos'?a.pos:k==='last'?a.last:a.first||'');
+    const vb=String(k==='pos'?b.pos:k==='last'?b.last:b.first||'');
+    return va.localeCompare(vb)*d||String(a.name).localeCompare(String(b.name));
+  });
+}
+function markSortHeaders(){
+  document.querySelectorAll('.lu-tbl th.sortable').forEach(th=>{
+    const own=th.closest('table').querySelector('#poolBody')?poolSort:finalSort;
+    const on=own.key===th.dataset.sort;
+    th.innerHTML=esc(th.dataset.label)+(on?`<span class="arw">${own.dir>0?'▲':'▼'}</span>`:'');
+  });
+}
+function renderPool(){
+  const box=$('poolBody'), st=$('dbStatus');
+  const linked=dbOn();
+  $('dbName').placeholder=linked?'New player name':'New player name (chỉ cho trận này)';
+  box.innerHTML='';
+  const all=poolRows();
+  const q=($('dbSearch').value||'').trim().toLowerCase();
+  const rows=sortRows(all.map(p=>{const n=splitName(p.name);
+    return {...p,first:n.first,last:n.last,pos:posOf(p.no,p.dbPos)};})
+    .filter(p=>!q||p.name.toLowerCase().includes(q)||String(p.no).includes(q)),poolSort);
+  const picked=all.filter(p=>p.inSquad).length;
+  $('poolAll').checked=!!all.length&&picked===all.length;
+  $('poolAll').indeterminate=picked>0&&picked<all.length;
+  rows.forEach(p=>{
+    const tr=document.createElement('tr');
+    const chk=`<input type="checkbox" class="lu-chk"${p.inSquad?' checked':''}>`;
+    const no=p.inSquad?`<span class="lu-no" title="Đổi số áo">${esc(p.no)}</span>`
+                      :`<span class="lu-no none">—</span>`;
+    tr.innerHTML=`<td class="c-chk">${chk}</td><td class="c-no">${no}</td>`
+      +`<td class="c-pos${p.pos==='-'?' t-mut':''}">${esc(p.pos)}</td>`
+      +`<td title="${esc(p.first)}">${esc(p.first)}</td>`
+      +`<td class="${p.last?'':'t-mut'}" title="${esc(p.last)}">${esc(p.last||'—')}</td>`;
+    tr.querySelector('input').onchange=e=>e.target.checked?pick(p):unpick(p.no);
+    if(p.inSquad)tr.querySelector('.lu-no').onclick=()=>changeNo(p.no,p.name);
+    box.appendChild(tr);
+  });
+  if(!rows.length){
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td colspan="5" class="lu-empty">${all.length
+      ?'Không tìm thấy cầu thủ khớp "'+esc($('dbSearch').value.trim())+'".'
+      :(linked?'Đội chưa có cầu thủ nào — thêm bằng ô "New player name".'
+              :'Chưa có cầu thủ nào cho trận này — thêm bằng ô "New player name".')}</td>`;
+    box.appendChild(tr);
+  }
+  st.textContent=linked
+    ? '✓ '+(q?rows.length+'/'+all.length:all.length)+' cầu thủ · đã chọn '+picked
+    : (sb?'⚠ match chưa gắn team — tạo match từ Cloud (chọn team database)'
+         :'⚠ '+(dbErr||'offline')+' — cầu thủ chỉ lưu cho trận này');
+  markSortHeaders();
+}
+
+/* ===== the final lineup: starters + substitutes ===== */
+function lineupRow(no,group){
+  const t=teamLU(), p=rosterPlayer(t,no)||{no,name:''};
+  const tr=document.createElement('tr');
+  const full=maxXI()-t.xi.length<=0;
+  tr.innerHTML=`<td class="c-no"><span class="lu-no" title="Đổi số áo">${esc(String(no))}</span></td>`
+    +`<td class="c-pos${posOf(no,'')==='-'?' t-mut':''}">${esc(posOf(no,''))}</td>`
+    +`<td title="${esc(p.name||'')}">${esc(p.name||'—')}</td>`
+    +`<td class="c-act"><button class="lu-act swap" title="${group==='xi'?'Chuyển xuống dự bị':'Đưa lên đội hình chính'}"`
+    +`${group==='sub'&&full?' disabled':''}>⇅</button>`
+    +`<button class="lu-act rm" title="Bỏ khỏi danh sách thi đấu">⊖</button></td>`;
+  const [swap,rm]=tr.querySelectorAll('button');
+  swap.onclick=()=>group==='xi'?toSub(no):toXI(no);
+  rm.onclick=()=>unpick(no);
+  tr.querySelector('.lu-no').onclick=()=>changeNo(no,p.name);
+  return tr;
+}
+function renderFinal(){
+  const t=teamLU(), xiBox=$('xiBody'), subBox=$('subBody');
+  xiBox.innerHTML=''; subBox.innerHTML='';
+  const order=list=>sortRows(list.map(no=>({no:String(no),name:(rosterPlayer(t,no)||{}).name||''})),finalSort);
+  const starters=order(t.xi.map(x=>x.no)), bench=order(t.subs);
+  starters.forEach(r=>xiBox.appendChild(lineupRow(r.no,'xi')));
+  if(!starters.length){const tr=document.createElement('tr');
+    tr.innerHTML='<td colspan="4" class="lu-empty">Chưa chọn cầu thủ đá chính — tick ở bảng bên trái.</td>';
+    xiBox.appendChild(tr);}
+  const split=document.createElement('tr'); split.className='lu-split';
+  split.innerHTML='<td colspan="4">Dự bị</td>'; subBox.appendChild(split);
+  bench.forEach(r=>subBox.appendChild(lineupRow(r.no,'sub')));
+  if(!bench.length){const tr=document.createElement('tr');
+    tr.innerHTML='<td colspan="4" class="lu-empty">Chưa có cầu thủ dự bị.</td>';
+    subBox.appendChild(tr);}
+  $('luCount').textContent='Starts '+t.xi.length+' / Subs '+t.subs.length;
+}
+
+/* ===== squad edits ===== */
+// ask for the shirt number this player wears TODAY, refusing duplicates
+function askNo(name,cur){
+  const t=teamLU();
+  for(;;){
+    let no=prompt('Số áo của '+(name||'cầu thủ')+' trong trận này:',cur==null?'':String(cur));
+    if(no==null)return null;
+    no=String(no).trim();
+    if(!no){alert('Cần nhập số áo.');continue;}
+    if(t.roster.some(r=>sameNo(r.no,no)&&!sameNo(r.no,cur))){alert('Số '+no+' đã được dùng trong danh sách trận.');continue;}
+    return no;
+  }
+}
+// a squad player is always in exactly one of the two lists — starters until they are full
+function addToLineup(no){
+  const t=teamLU();
+  if(t.xi.some(x=>sameNo(x.no,no))||t.subs.some(n=>sameNo(n,no)))return;
+  if(t.xi.length<maxXI()){const x=50,y=Math.min(90,12+t.xi.length*8);
+    t.xi.push({no,x,y,pos:zoneAt(x,y,t.dir)});}
+  else t.subs.push(no);
+}
+function pick(p){                      // tick in the pool -> into the matchday squad
+  const t=teamLU();
+  let no=p.no;
+  if(!t.roster.some(r=>sameNo(r.no,no))){
+    no=askNo(p.name); if(no==null){renderLineup();return;}
+    t.roster.push(p.pid?{no,name:p.name,pid:p.pid}:{no,name:p.name});
+  }
+  addToLineup(no); save(); renderLineup();
+}
+function unpick(no){                   // untick, or ⊖ in the final lineup
+  const t=teamLU();
+  t.roster=t.roster.filter(p=>!sameNo(p.no,no));
+  t.xi=t.xi.filter(x=>!sameNo(x.no,no));
+  t.subs=t.subs.filter(n=>!sameNo(n,no));
+  save(); renderLineup();
+}
+function toSub(no){const t=teamLU();
+  t.xi=t.xi.filter(x=>!sameNo(x.no,no));
+  if(!t.subs.some(n=>sameNo(n,no)))t.subs.push(String(no));
+  save(); renderLineup();}
+function toXI(no){const t=teamLU();
+  if(t.xi.length>=maxXI()){alert('Đội hình chính đã đủ '+maxXI()+' người — chuyển một người xuống dự bị trước.');return;}
+  t.subs=t.subs.filter(n=>!sameNo(n,no));
+  addToLineup(String(no));
+  save(); renderLineup();}
+// change the shirt number a squad player wears in this match (roster + both lists)
+function changeNo(oldNo,name){
+  const t=teamLU(), no=askNo(name,oldNo);
+  if(no==null||sameNo(no,oldNo))return;
+  const r=rosterPlayer(t,oldNo); if(r)r.no=no;
+  t.xi.forEach(x=>{if(sameNo(x.no,oldNo))x.no=no;});
+  t.subs=t.subs.map(n=>sameNo(n,oldNo)?no:n);
+  save(); renderLineup();
+}
+// add a player: to the team in the database when linked, else straight into this match
+async function addPlayer(){
+  const name=$('dbName').value.trim(); if(!name)return;
+  if(dbOn()){
+    if(dbPlayers[lineupTeam].some(p=>(p.name||'').toLowerCase()===name.toLowerCase())
+       && !confirm('"'+name+'" đã có trong database. Vẫn tạo bản ghi mới?'))return;
+    const {error}=await sb.from('players').insert({team_id:teamIdFor(lineupTeam),name,position:null});
+    if(error){alert('Không lưu được cầu thủ: '+error.message);return;}
+    $('dbName').value=''; $('dbName').focus();
+    await loadDbPlayers();
+    return;
+  }
+  // no database behind this team (offline, or the match was created without one):
+  // the player still joins THIS match's squad, exactly as the old manual add row did
+  const t=teamLU(), no=askNo(name); if(no==null)return;
+  t.roster.push({no,name}); addToLineup(no);
+  $('dbName').value=''; $('dbName').focus();
+  save(); renderLineup();
+}
+
+/* ===== formation ===== */
 function renderLuPitch(){
   const t=teamLU(), pit=$('luPitch');
   pit.innerHTML=pitchSVG('football')+gridHTML(t.dir);
@@ -205,7 +346,7 @@ function renderLuPitch(){
     const dot=document.createElement('div');
     dot.className='lu-dot'+(lineupTeam==='away'?' away':'');
     dot.style.left=x.x+'%'; dot.style.top=x.y+'%';
-    dot.innerHTML=`${x.no}<span class="lbl">${p?(p.name||''):''}</span>`;
+    dot.innerHTML=`${esc(String(x.no))}<span class="lbl">${esc(p?(p.name||''):'')}</span>`;
     luDrag(dot,x); pit.appendChild(dot);
   });
 }
@@ -222,34 +363,54 @@ function luDrag(dot,x){
     document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
   };
 }
-function toggleXI(no){const t=teamLU(), i=t.xi.findIndex(x=>x.no===no);
-  if(i>=0)t.xi.splice(i,1);
-  else{if(t.xi.length>=maxXI()){alert('Starting lineup is full ('+maxXI()+').');return;}
-    t.subs=t.subs.filter(n=>n!==no); const nx=50,ny=Math.min(90,12+t.xi.length*8); t.xi.push({no,x:nx,y:ny,pos:zoneAt(nx,ny,t.dir)});}
-  save();renderLineup();}
-function toggleSub(no){const t=teamLU();
-  if(t.subs.includes(no))t.subs=t.subs.filter(n=>n!==no);
-  else{t.xi=t.xi.filter(x=>x.no!==no); t.subs.push(no);}
-  save();renderLineup();}
-function removeLuPlayer(no){const t=teamLU();
-  t.roster=t.roster.filter(p=>p.no!==no); t.xi=t.xi.filter(x=>x.no!==no); t.subs=t.subs.filter(n=>n!==no);
-  save();renderLineup();}
-function addLuPlayer(){const no=$('luNo').value.trim(); if(!no)return; const t=teamLU();
-  if(t.roster.some(p=>p.no===no)){alert('No. '+no+' already exists.');return;}
-  t.roster.push({no,name:$('luName').value.trim()});
-  $('luNo').value='';$('luName').value=''; save();renderLineup(); $('luNo').focus();}
 function luSwitchDir(){const t=teamLU(); t.dir=t.dir==='rl'?'lr':'rl';
   t.xi.forEach(x=>{x.x=100-x.x; x.pos=zoneAt(x.x,x.y,t.dir);}); save();renderLineup();}
 
+function renderLineup(){
+  syncBackLink(meta);   // "← Tagging" returns to ../#match=<code>, keeping the match open
+  // no open match -> show the notice instead of the editor
+  const open=!!meta.matchId;
+  $('noMatchMsg').style.display=open?'none':'block';
+  document.querySelector('.lineup-body').style.display=open?'':'none';
+  if(!open)return;
+  $('luHomeBtn').className=lineupTeam==='home'?'act-home':'';
+  $('luAwayBtn').className=lineupTeam==='away'?'act-away':'';
+  $('luHomeBtn').textContent=meta.home;
+  $('luAwayBtn').textContent=meta.away;
+  // the squad has exactly two groups now; anything left over from the old three-state
+  // editor (in the squad but neither a starter nor a sub) joins the substitutes
+  const t=teamLU(); let fixed=false;
+  t.roster.forEach(p=>{
+    if(!t.xi.some(x=>sameNo(x.no,p.no))&&!t.subs.some(n=>sameNo(n,p.no))){addToLineup(p.no);fixed=true;}
+  });
+  if(fixed)save();
+  renderPool(); renderFinal(); renderLuPitch();
+}
+
 $('luHomeBtn').onclick=()=>{lineupTeam='home';renderLineup();};
 $('luAwayBtn').onclick=()=>{lineupTeam='away';renderLineup();};
-$('luAdd').onclick=addLuPlayer;
-$('luName').addEventListener('keydown',e=>{if(e.key==='Enter')addLuPlayer();});
-$('luNo').addEventListener('keydown',e=>{if(e.key==='Enter')$('luName').focus();});
-$('dbAdd').onclick=addDbPlayer;
-$('dbName').addEventListener('keydown',e=>{if(e.key==='Enter')addDbPlayer();});
-$('dbSearch').addEventListener('input',renderDbRoster);
+$('dbAdd').onclick=addPlayer;
+$('dbName').addEventListener('keydown',e=>{if(e.key==='Enter')addPlayer();});
+$('dbSearch').addEventListener('input',renderPool);
 $('luDir').onclick=luSwitchDir;
+$('poolAll').onclick=e=>{                    // header tick only clears — adding needs a number each
+  e.preventDefault();
+  const picked=poolRows().filter(p=>p.inSquad);
+  if(!picked.length){alert('Tick từng cầu thủ để thêm vào danh sách thi đấu (cần nhập số áo).');return;}
+  if(!confirm('Bỏ '+picked.length+' cầu thủ khỏi danh sách thi đấu?'))return;
+  const t=teamLU(); t.roster=[]; t.xi=[]; t.subs=[];
+  save(); renderLineup();
+};
+document.querySelectorAll('.lu-tbl th.sortable').forEach(th=>{
+  th.dataset.label=th.textContent;
+  th.onclick=()=>{
+    const inPool=!!th.closest('table').querySelector('#poolBody');
+    const srt=inPool?poolSort:finalSort;
+    if(srt.key===th.dataset.sort)srt.dir=-srt.dir; else{srt.key=th.dataset.sort;srt.dir=1;}
+    inPool?renderPool():renderFinal();
+    markSortHeaders();
+  };
+});
 
 /* live sync with the main tagging tab (team names / sport / team ids / cloud edits) */
 window.addEventListener('storage',e=>{

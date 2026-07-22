@@ -107,44 +107,69 @@ table.pmtx tbody tr:last-child td,table.pmtx tbody tr:last-child th{background:v
 .gen-bar .bh{background:var(--home);height:100%}
 .gen-bar .ba{background:var(--away);height:100%}
 
-/* ---- Player lists / formation ---- */
-.lineup-body{display:flex;gap:14px}
-.lu-left{width:350px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
-.lu-sec{font-size:12px;display:flex;gap:6px;align-items:baseline;margin-top:2px}
-.lu-sec .mini{color:var(--mut);font-size:11px;font-weight:400}
+/* ---- Player lists: player pool | final lineup, formation underneath ----
+   Three tables and a pitch: the pool picks who is in the matchday squad, the
+   final lineup splits that squad into starters and substitutes, and the
+   (optional) formation places the starters. */
+.lineup-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:1080px){.lineup-body{grid-template-columns:minmax(0,1fr)}}
+.lu-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.lu-card.lu-form{grid-column:1/-1}
+.lu-cardhead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.lu-cardhead b{font-size:14px}
+.lu-cardhead .mini{color:var(--mut);font-size:12px;font-weight:400}
+.lu-toolbar{display:flex;flex-direction:column;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
 .lu-add{display:flex;gap:6px}
-.lu-add input#dbName{flex:1;width:auto}
-.lu-add input{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 8px;font-size:12px;width:54px}
-.lu-add input#luName{flex:1;width:auto}
-.lu-add button{background:var(--accent);color:#06281a;border:none;border-radius:6px;padding:0 12px;font-weight:700;cursor:pointer}
+.lu-add input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:7px 10px;font-size:12px}
+.lu-add input:focus{outline:none;border-color:var(--accent)}
+.lu-add input::placeholder{color:var(--mut)}
+.lu-add button{background:var(--accent);color:#06281a;border:none;border-radius:6px;padding:0 14px;font-weight:700;font-size:15px;cursor:pointer}
+.lu-add button:disabled{background:var(--panel2);color:var(--mut);cursor:not-allowed}
 .lu-search{display:flex}
 .lu-search input{flex:1;background:var(--panel2) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238b97a7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat 10px center;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:7px 10px 7px 32px;font-size:12px}
 .lu-search input:focus{outline:none;border-color:var(--accent)}
 .lu-search input::placeholder{color:var(--mut)}
-.lu-roster{flex:1;overflow:auto;max-height:calc(100vh - 190px);display:flex;flex-direction:column;gap:4px}
-.lu-prow{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px}
-.lu-prow .num{width:26px;height:22px;display:flex;align-items:center;justify-content:center;background:#000;border-radius:4px;color:var(--accent);font-weight:700;font-size:11px;flex-shrink:0}
-.lu-prow .pname{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lu-prow .ppos{color:var(--mut);width:38px;text-align:right}
-.lu-prow button{border:1px solid var(--line);background:var(--panel);color:var(--mut);border-radius:5px;padding:2px 7px;cursor:pointer;font-size:11px}
-.lu-prow button.on{border-color:var(--accent);color:var(--accent);font-weight:700}
-.lu-prow .rm{color:var(--danger);border:none;background:none;font-size:14px}
-.lu-right{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
-.lu-pitchwrap{background:#142b18;border:1px solid var(--line);border-radius:8px;overflow:hidden;padding:6px}
+
+/* the three tables share one look */
+.lu-tblwrap{overflow:auto;max-height:44vh;min-height:120px}
+table.lu-tbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+.lu-tbl th{position:sticky;top:0;z-index:1;background:var(--panel2);color:var(--mut);font-weight:600;text-align:left;
+  padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.lu-tbl th.sortable{cursor:pointer;user-select:none}
+.lu-tbl th.sortable:hover{color:var(--ink)}
+.lu-tbl th .arw{color:var(--accent);font-size:9px;margin-left:2px}
+.lu-tbl td{padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lu-tbl tbody tr:hover td{background:var(--panel2)}
+.lu-tbl .c-chk{width:38px}
+.lu-tbl .c-no{width:70px}
+.lu-tbl .c-pos{width:88px}
+.lu-tbl .c-act{width:66px;text-align:right}
+.lu-chk{width:15px;height:15px;accent-color:var(--accent2);cursor:pointer;vertical-align:middle}
+.lu-no{font-weight:700;color:var(--ink);cursor:pointer;border-bottom:1px dotted var(--mut)}
+.lu-no:hover{color:var(--accent)}
+.lu-no.none{font-weight:400;color:var(--mut);border-bottom-style:none}
+.lu-tbl .t-mut{color:var(--mut)}
+.lu-split td{background:var(--panel2);color:var(--mut);text-align:center;font-size:11px;font-weight:600;letter-spacing:.03em}
+.lu-act{border:none;background:none;cursor:pointer;font-size:14px;line-height:1;padding:0 3px}
+.lu-act.swap{color:var(--accent2)}
+.lu-act.rm{color:var(--danger)}
+.lu-act:hover{filter:brightness(1.35)}
+.lu-act:disabled{color:var(--mut);cursor:not-allowed;filter:none}
+.lu-empty{color:var(--mut);font-size:11px;text-align:center;padding:16px 10px}
+.lu-foot{padding:8px 14px;border-top:1px solid var(--line);color:var(--mut);font-size:11px}
+
+/* formation card */
+.lu-formbody{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.lu-pitchwrap{background:#142b18;border:1px solid var(--line);border-radius:8px;overflow:hidden;padding:6px;width:100%;max-width:860px;margin:0 auto}
 .lu-pitch{position:relative;width:100%;aspect-ratio:105/68;touch-action:none}
 .lu-pitch svg{position:absolute;inset:0;width:100%;height:100%}
 .lu-dot{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;cursor:grab;border:2px solid #000;user-select:none;z-index:2;touch-action:none}
 .lu-dot.away{background:var(--away)}
 .lu-dot .lbl{position:absolute;top:31px;left:50%;transform:translateX(-50%);font-size:10px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600;pointer-events:none}
-.lu-dir{display:flex;align-items:center;gap:12px}
+.lu-dir{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .lu-dir button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px}
 .lu-dir button:hover{border-color:var(--accent)}
-.lu-dir #luCount{color:var(--mut);font-size:12px}
-.lu-subs{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
-.lu-subs b{font-size:12px}
-.lu-subs #luSubs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;min-height:20px}
-.lu-chip{display:inline-flex;align-items:center;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:3px 9px;font-size:11px}
-.lu-chip .num{color:var(--accent);font-weight:700}
+.lu-dir .mini{color:var(--mut);font-size:12px}
 
 /* position-zone grid */
 .pz{position:absolute;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:rgba(255,255,255,.55);box-sizing:border-box;border:1px solid rgba(255,255,255,.10);z-index:1;pointer-events:none}

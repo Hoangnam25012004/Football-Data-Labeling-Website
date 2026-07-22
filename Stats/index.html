@@ -6,7 +6,7 @@
 <title>Stats — Pitch Tagger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="../shared.css?v=7">
+<link rel="stylesheet" href="../shared.css?v=8">
 <style>
 /* fill the viewport exactly: header + page + stats-wrap as a flex column, so no
    dead band is left under the scroll area regardless of header/padding heights */
@@ -125,7 +125,7 @@ body>header{flex:none}
   <div class="stats-wrap"><div id="statsHolder"></div></div>
 </div>
 
-<script src="../shared.js?v=7"></script>
+<script src="../shared.js?v=8"></script>
 <script>
 let rows=loadRows(), meta=loadMeta(), lineups=loadLineups(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles', othCat='fouls';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
