@@ -217,6 +217,7 @@ const CONFIG = {
     await openMatchRow(data);
   }
   async function openMatchRow(row) {
+    const switchingMatch = matchId && matchId !== row.id;   // opening a DIFFERENT match
     matchId = row.id; matchCode = row.code || '';
     if ($('cloudMatchId')) $('cloudMatchId').value = matchCode || matchId;
     setTeamInputs(row.home_name, row.away_name);   // load this match's team names
@@ -226,8 +227,12 @@ const CONFIG = {
     // lineups belong to THIS match: load them, or start blank when the match has none yet
     if (row.lineups) PT().applyCloudLineups(row.lineups);
     else if (PT().resetLineups) PT().resetLineups();
+    // the video belongs to THIS match: load its shared URL, or — when switching to a match
+    // that has none — unload whatever was playing, or the PREVIOUS match's video keeps
+    // running on the new one (bug: 32746's video played on 51977).
     lastVideoUrl = row.video_url || null;
-    if (row.video_url) PT().loadVideoUrl(row.video_url);   // load the shared video for this match
+    if (row.video_url) PT().loadVideoUrl(row.video_url);
+    else if (switchingMatch && PT().unloadVideo) PT().unloadVideo();
     // Load ALL events in pages — Supabase caps a single select at 1000 rows, so a
     // busy match (1300+ events) silently truncated to the first ~63 minutes on reload.
     const PAGE = 1000;
@@ -262,8 +267,11 @@ const CONFIG = {
           setTeamInputs(p.new.home_name, p.new.away_name);
           if (p.new.config) PT().applyCloudDuration(p.new.config);
           if (p.new.lineups) PT().applyCloudLineups(p.new.lineups);
-          if (p.new.video_url && p.new.video_url !== lastVideoUrl) {
-            lastVideoUrl = p.new.video_url; PT().loadVideoUrl(p.new.video_url);
+          // video changed on THIS match (a URL was set, swapped, or removed)
+          if ((p.new.video_url || null) !== lastVideoUrl) {
+            lastVideoUrl = p.new.video_url || null;
+            if (p.new.video_url) PT().loadVideoUrl(p.new.video_url);
+            else if (PT().unloadVideo) PT().unloadVideo();
           }
         })
       .subscribe();
