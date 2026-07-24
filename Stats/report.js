@@ -107,6 +107,22 @@ table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
 .rp-sgright{flex:1;min-width:0}
 .rp-sgleg{justify-content:flex-start;gap:9px;font-size:8.5px;margin-top:7px}
 .rp-sgleg i{width:8px;height:8px;margin-right:4px}
+.rp-duo{display:flex;gap:14px;margin-bottom:2px}
+.rp-gkcard{flex:1;border:1px solid ${C.line};border-radius:8px;padding:12px 14px}
+.rp-gkteam{font-size:12.5px;font-weight:800;margin-bottom:7px}
+.rp-gkwho{display:flex;align-items:center;gap:7px;margin-bottom:10px}
+.rp-gkname{font-size:11px;font-weight:700;color:#3d4754;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-gkbody{display:flex;align-items:center;gap:13px}
+.rp-gkarc{flex:none;text-align:center}
+.rp-gkarc div{font-size:9px;color:${C.mut};margin-top:1px}
+.rp-gkfig{flex:1;display:flex;gap:8px}
+.rp-gkstat{flex:1}
+.rp-gkstat b{display:block;font-size:18px;font-weight:800;color:${C.navy};line-height:1.2}
+.rp-gkstat span{font-size:8.5px;color:${C.mut};display:block;line-height:1.25}
+.rp-dcbox{flex:1;border:1px solid ${C.line};border-radius:8px;padding:9px 13px;display:flex;align-items:center;gap:9px}
+.rp-dcteam{flex:1;font-size:11.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-dcv{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:${C.navy}}
+.rp-dcv em{font-style:normal;font-size:8.5px;font-weight:600;color:${C.mut}}
 .rp-dcard{flex:1;border:1px solid ${C.line};border-radius:8px;padding:12px;display:flex;gap:14px;align-items:center}
 .rp-drows{flex:1;font-size:10.5px}
 .rp-drow{display:flex;align-items:center;gap:6px;padding:3.5px 0;border-bottom:1px solid #f0f2f6}
@@ -971,30 +987,63 @@ function gkNo(team){
   const dir=lu.dir||'lr';
   return lu.xi.reduce((b,p)=>{const x=dir==='rl'?100-p.x:p.x; return (!b||x<b.x)?{no:p.no,x}:b;},null).no;
 }
+/* save-rate ring for a keeper card (grey track + coloured arc, % in the middle) */
+function gkArcSVG(rate,col){
+  const cx=33,cy=33,r=25,w=7, a0=-Math.PI/2;
+  let ring=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e6eaf0" stroke-width="${w}"/>`;
+  if(rate!=null&&rate>0)ring+=rate>=100
+    ?`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${col}" stroke-width="${w}"/>`
+    :`<path d="${arcPath(cx,cy,r,a0,a0+rate/100*2*Math.PI)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/>`;
+  return `<svg viewBox="0 0 66 66" width="66" height="66">${ring}`
+    +`<text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="15" font-weight="800" fill="${C.navy}">`
+    +`${rate==null?'–':rate+'%'}</text></svg>`;
+}
 function gkPage(){
   const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
   const gcH=teamGoals('away'), gcA=teamGoals('home');
-  const rateH=h.saves+gcH?Math.round(h.saves/(h.saves+gcH)*100):0;
-  const rateA=a.saves+gcA?Math.round(a.saves/(a.saves+gcA)*100):0;
-  const card=(team,s,gc,rate)=>{
-    const no=gkNo(team);
-    const big=(v,l)=>`<div style="flex:1;text-align:center"><div style="font-size:26px;font-weight:800;color:${C.navy}">${v}</div><div style="font-size:10px;color:${C.mut}">${l}</div></div>`;
-    return `<div style="flex:1;border:1px solid ${C.line};border-radius:8px;padding:14px;text-align:center">`
-      +`<div style="font-size:13px;font-weight:800;color:${TC(team)};margin-bottom:6px">${esc(TN(team))}</div>`
-      +(no!=null?`<div style="margin-bottom:10px"><span class="rp-pill" style="background:${TC(team)}">GK #${esc(no)}</span></div>`:'')
-      +`<div style="display:flex">${big(s.saves,'Saves')}${big(gc,'Goals Conceded')}${big(rate+'%','Save Rate')}</div></div>`;
+  // shots on target faced = the ones kept out plus the ones that went in
+  const facedH=h.saves+gcH, facedA=a.saves+gcA;
+  const rateH=facedH?Math.round(h.saves/facedH*100):null;
+  const rateA=facedA?Math.round(a.saves/facedA*100):null;
+  // one card per keeper — the numbers appear ONCE here, not repeated as bars above
+  const card=(team,s,gc,faced,rate)=>{
+    const no=gkNo(team), names=squadNames(lineups,team);
+    const stat=(v,l)=>`<div class="rp-gkstat"><b>${v}</b><span>${l}</span></div>`;
+    return `<div class="rp-gkcard"><div class="rp-gkteam" style="color:${TC(team)}">${esc(TN(team))}</div>`
+      +`<div class="rp-gkwho">`
+      +(no!=null?`<span class="rp-pill" style="background:${TC(team)}">${esc(no)}</span>`
+                +`<span class="rp-gkname">${esc(playerLabel(names,no))}</span>`
+                :`<span class="rp-gkname">No keeper in the lineup</span>`)
+      +`</div><div class="rp-gkbody">`
+      +`<div class="rp-gkarc">${gkArcSVG(rate,TC(team))}<div>Save rate</div></div>`
+      +`<div class="rp-gkfig">${stat(s.saves,'Saves')}${stat(gc,'Conceded')}${stat(faced,'On target<br>faced')}</div>`
+      +`</div></div>`;
   };
-  let ins=`${esc(TN('home'))}'s keeper made ${h.saves} save${h.saves===1?'':'s'} and conceded ${gcH}; ${esc(TN('away'))}'s made ${a.saves} and conceded ${gcA}.`;
-  if(rateH!==rateA){
-    const L=rateH>rateA?'home':'away';
-    ins+=` The ${rateH>rateA?rateH:rateA}% save rate favours ${esc(TN(L))} — the other keeper's number reflects the volume and quality of chances faced rather than pure shot-stopping.`;
-  }
+  // the unit is spelled out once, then implied — reads like a note, not a template
+  const line=(team,s,faced,rate,brief)=>faced
+    ? `${esc(TN(team))} kept out ${s.saves} of ${faced}${brief?'':` shot${faced===1?'':'s'} on target`} (${rate}%)`
+    : `${esc(TN(team))} faced no shots on target`;
+  const ins=line('home',h,facedH,rateH,false)+'; '+line('away',a,facedA,rateA,true)+'.';
+  // cards belong on a page called Discipline — they were missing entirely before
+  const cardTot=team=>{const c=cardCounts(team); let yc=0,rc=0;
+    Object.keys(c).forEach(k=>{yc+=c[k].yc;rc+=c[k].rc;}); return {yc,rc};};
+  const cardBox=team=>{const t=cardTot(team);
+    return `<div class="rp-dcbox"><span class="rp-dcteam" style="color:${TC(team)}">${esc(TN(team))}</span>`
+      +`<span class="rp-dcv"><span class="rp-cardi" style="background:#f5c518"></span>${t.yc} <em>Yellow</em></span>`
+      +`<span class="rp-dcv"><span class="rp-cardi" style="background:${C.red}"></span>${t.rc} <em>Red</em></span></div>`;};
+  const discRows=[['Fouls',h.fouls,a.fouls],['Fouls Won',h.foulsWon,a.foulsWon],['Offsides',h.offsides,a.offsides]];
+  // set pieces: drop rows neither side recorded, so the block carries only real numbers
+  const spRows=[['Corners',h.corners,a.corners],['Free-kicks',h.freeKicks,a.freeKicks],
+    ['Throw-ins',h.throwIns,a.throwIns],['Goal Kicks',h.goalKicks,a.goalKicks],
+    ['Penalty Kicks',h.penalties,a.penalties]].filter(([,hv,av])=>hv||av);
   return secTitle('Goalkeeper &amp; Discipline')+legend()
-    +`<div class="rp-cmphead">Goalkeeper — Comparison</div>`
-    +cmpRows([['Saves',h.saves,a.saves],['Goals Conceded',gcH,gcA],['Save Rate',rateH+'%',rateA+'%']])
-    +`<div style="display:flex;gap:14px;margin-top:8px">${card('home',h,gcH,rateH)}${card('away',a,gcA,rateA)}</div>`
+    +`<div class="rp-cmphead">Goalkeeper</div>`
+    +`<div class="rp-duo">${card('home',h,gcH,facedH,rateH)}${card('away',a,gcA,facedA,rateA)}</div>`
     +insight(ins)
-    +`<div class="rp-cmphead">Discipline &amp; Set Pieces</div>`+cmpRows(sectionRows(3).filter(([l])=>l!=='Goals Conceded'&&l!=='Saves'));
+    +`<div class="rp-cmphead">Discipline</div>`
+    +`<div class="rp-duo">${cardBox('home')}${cardBox('away')}</div>`
+    +cmpRows(discRows)
+    +(spRows.length?`<div class="rp-cmphead">Set Pieces</div>`+cmpRows(spRows):'');
 }
 
 /* ================= assembly + export ================= */
