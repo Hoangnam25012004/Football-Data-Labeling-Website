@@ -6,7 +6,7 @@
 <title>Stats — Pitch Tagger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="../shared.css?v=9">
+<link rel="stylesheet" href="../shared.css?v=10">
 <style>
 /* fill the viewport exactly: header + page + stats-wrap as a flex column, so no
    dead band is left under the scroll area regardless of header/padding heights */
@@ -125,7 +125,7 @@ body>header{flex:none}
   <div class="stats-wrap"><div id="statsHolder"></div></div>
 </div>
 
-<script src="../shared.js?v=10"></script>
+<script src="../shared.js?v=11"></script>
 <script>
 let rows=loadRows(), meta=loadMeta(), lineups=loadLineups(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles', othCat='fouls';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
@@ -180,7 +180,8 @@ function renderStats(){
   // Distribution: pass matrix on the left, volume/accuracy scatter on its right.
   let extra='';
   if(statCat==='shooting'){
-    extra=`<div class="chart-row">${shootingChartHTML(statTeam)}${shotMapHTML(statTeam)}</div>`;
+    extra=`<div class="chart-row">${shootingChartHTML(statTeam)}${shotMapHTML(statTeam)}</div>`
+      +`<div class="chart-row">${shotEventListHTML(statTeam)}</div>`;
   }else if(statCat==='distribution'){
     extra=`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}${crossMapHTML(statTeam)}</div>`
       +`<div class="chart-row">${heatMapHTML(statTeam)}</div>`
@@ -300,6 +301,33 @@ function shotMapHTML(team){
     +`<div class="shotmap-pitch">${pitch}</div><div class="shotmap-legend">${legend}</div></div>`;
 }
 function setShotHalf(h){shotHalf=h;renderStats();}
+// match-minute label for the event list: "8'", "45+3'" (stoppage capped by the half)
+function minLabel(r){
+  const sec=matchTime(r.t), half=eventHalf(r), L=+dur.halfLen||45;
+  const m=Math.floor(sec/60)+1, cap=half*L;
+  return m>cap?`${cap}+${m-cap}'`:`${m}'`;
+}
+const SHOT_LABEL={'goal':'Goal','shot on target':'On target','shot off target':'Off target',
+  'blocked shot':'Blocked','miss shot':'Missed'};
+/* ---- Shooting: Event List — every shot in time order, with the body part it was
+   taken with (reads the body-part event tagged in the same chain). ---- */
+function shotEventListHTML(team){
+  const list=shotList(rows,team);
+  if(!list.length)return `<div class="chart-card"><div class="chart-title">Event List</div>`
+    +`<div class="stats-empty">No shots yet.</div></div>`;
+  const names=squadNames(lineups,team);
+  const body=list.map(s=>{
+    const nm=playerLabel(names,s.no);
+    return `<tr title="${esc(SHOT_LABEL[s.event]||s.event)}">`
+      +`<td class="el-idx"><span class="el-dot" style="background:${shotColor(s.event)}">${s.idx}</span></td>`
+      +`<td class="el-t">${esc(minLabel(s))}</td>`
+      +`<td class="el-pl">${esc(s.no)}${nm?'. '+esc(nm):''}</td>`
+      +`<td class="el-bp">${s.bodyPart?esc(s.bodyPart):'<span class="t-mut">—</span>'}</td></tr>`;
+  }).join('');
+  return `<div class="chart-card el-card"><div class="chart-title">Event List <span class="el-cnt">${list.length}</span></div>`
+    +`<table class="el-tbl"><thead><tr><th class="el-idx"></th><th class="el-t">Time</th>`
+    +`<th class="el-pl">Player</th><th class="el-bp">Body Part</th></tr></thead><tbody>${body}</tbody></table></div>`;
+}
 /* ---- Distribution: each player a bubble at (pass accuracy %, pass volume) (image 2) ---- */
 function passScatterHTML(team){
   const P=computeStats(rows,team), fill=team==='home'?'#2f81f7':'#f7682f';
@@ -1015,6 +1043,6 @@ function dbToRow(d){
   }catch(e){console.warn('Stats cloud load failed — using local data:',(e&&e.message)||e);}
 })();
 </script>
-<script src="report.js?v=19"></script>
+<script src="report.js?v=20"></script>
 </body>
 </html>

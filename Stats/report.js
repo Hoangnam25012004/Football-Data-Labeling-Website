@@ -70,6 +70,9 @@ table.rpt{width:100%;border-collapse:collapse;font-size:10.5px}
 .rpt td.rp-pl{text-align:left;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rpt tr:nth-child(even) td{background:#f6f8fb}
 .rp-pill{display:inline-block;min-width:26px;padding:2px 7px;border-radius:11px;color:#fff;font-weight:800;font-size:10px;box-sizing:border-box}
+table.rpt-el td{text-align:left}
+.rpt-el th.el-c,.rpt-el td.el-c{text-align:center}
+.rp-elidx{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:50%;color:#123;font-weight:800;font-size:10px;text-align:center}
 table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
 .rpm th{background:${C.navy};color:#fff;padding:5px 4px;min-width:24px;font-weight:700}
 .rpm td{border:1px solid #f0f2f6;text-align:center;padding:5px 4px;font-weight:600}
@@ -378,6 +381,32 @@ function shotMapsPage(){
     +`<span><i style="background:#aeb4bc"></i>Off target / blocked / missed</span><span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
     +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span></div>`;
   return any?body:null;
+}
+/* Attacking — Event List: every shot in time order, with the body part it was taken
+   with (from the body-part event tagged in the same chain). One table per team. */
+function shotEventListPages(){
+  const teamTbl=team=>{
+    const list=shotList(rows,team);
+    if(!list.length)return null;
+    const names=squadNames(lineups,team);
+    const body=list.map(s=>{
+      const dot=`<span class="rp-elidx" style="background:${shotColor(s.event)}">${s.idx}</span>`;
+      return `<tr><td class="el-c">${dot}</td><td class="el-c">${esc(minLbl(matchTime(s.t),eventHalf({t:s.t})))}</td>`
+        +`<td>${esc(s.no)}. ${esc(playerLabel(names,s.no))}</td>`
+        +`<td>${s.bodyPart?esc(s.bodyPart):'<span style="color:#c9cfd9">–</span>'}</td></tr>`;
+    }).join('');
+    return {rows:list.length,
+      html:`<div class="rp-sub" style="color:${TC(team)}">${esc(TN(team))}</div>`
+        +`<table class="rpt rpt-el"><thead><tr><th class="el-c">#</th><th class="el-c">Time</th>`
+        +`<th>Player</th><th>Body Part</th></tr></thead><tbody>${body}</tbody></table>`};
+  };
+  const h=teamTbl('home'), a=teamTbl('away'), blocks=[h,a].filter(Boolean);
+  if(!blocks.length)return [];
+  const title='Attacking — Shot Event List';
+  const total=blocks.reduce((n,b)=>n+b.rows,0);
+  // both fit on one page when short; otherwise a page each
+  if(total<=32)return [secTitle(title)+blocks.map(b=>b.html).join('<div style="height:14px"></div>')];
+  return blocks.map((b,i)=>secTitle(i?title+' — cont.':title)+b.html);
 }
 
 /* ================= player stat tables (chunked over pages) ================= */
@@ -964,6 +993,7 @@ function buildPages(host){
     ...formationPages('away'),
     attackingPage(),
     shotMapsPage(),
+    ...shotEventListPages(),
     ...attackingPlayerPages(),
     distributionPage(),
     netMapsPage(),

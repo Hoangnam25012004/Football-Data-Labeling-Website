@@ -179,6 +179,32 @@ function statRow(no,s){return[no,s.goals,s.assists,s.totalShots,s.shotsOn,s.shot
 function sortedPlayers(P){return Object.keys(P).sort((a,b)=>{const na=+a,nb=+b;
   if(!isNaN(na)&&!isNaN(nb))return na-nb; return a.localeCompare(b);});}
 
+/* ---- shots + body part (Event List) ----
+   Every shot attempt is one of these events. The body part it was taken with is a
+   separate event tagged in the SAME chain entry ("2 free-kick shot-on-target left-foot"),
+   so it is looked up by the shot's group id, falling back to the nearest same-player one. */
+const SHOT_KINDS=new Set(['goal','shot on target','shot off target','blocked shot','miss shot']);
+const BODY_PARTS={'right foot':'Right Foot','left foot':'Left Foot','head':'Header',
+  'upper body':'Upper Body','lower body':'Lower Body'};
+function shotBodyPart(rows,shot){
+  const bp=r=>BODY_PARTS[r.event];
+  if(shot.grp!=null){const g=rows.find(r=>r.grp===shot.grp&&bp(r)); if(g)return BODY_PARTS[g.event];}
+  const eq=(a,b)=>String(a==null?'':a).trim()===String(b==null?'':b).trim();
+  const same=rows.filter(r=>bp(r)&&r.team===shot.team&&eq(r.playerFrom,shot.playerFrom))
+    .sort((a,b)=>Math.abs((a.t||0)-(shot.t||0))-Math.abs((b.t||0)-(shot.t||0)));
+  return same.length?BODY_PARTS[same[0].event]:'';
+}
+// time-ordered list of a team's shots (or both teams when team==null), numbered from 1
+function shotList(rows,team){
+  return rows.filter(r=>SHOT_KINDS.has(r.event)&&(team==null||r.team===team)&&r.t!=null)
+    .sort((a,b)=>a.t-b.t)
+    .map((r,i)=>({idx:i+1,t:r.t,team:r.team,no:String(r.playerFrom||'').trim(),
+      event:r.event,bodyPart:shotBodyPart(rows,r)}));
+}
+// dot colour by shot outcome — matches the donut / shot-map legend
+const SHOT_COLOR={'goal':'#f7b32f','shot on target':'#39d98a'};
+const shotColor=e=>SHOT_COLOR[e]||'#8b97a7';
+
 /* ---- who actually took the pitch ----
    computeStats() only ever hears about players with a tagged event, so a substitute
    who came on and never touched the ball vanished from every table and from the

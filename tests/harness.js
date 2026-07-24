@@ -118,7 +118,8 @@ function submit(app,raw,dots){
 const SHARED=fs.readFileSync(path.join(ROOT,'shared.js'),'utf8');
 const SHARED_EXPORTS=['esc','squadOnPitch','squadNames','playerLabel','withSquad',
   'computeStats','sortedPlayers','newStat','statRow','sumTeam','passMatrix','pct',
-  'blankTeamLU','zoneAt','EVENT_INC','STAT_HEADERS','STAT_GROUPS'];
+  'blankTeamLU','zoneAt','EVENT_INC','STAT_HEADERS','STAT_GROUPS',
+  'SHOT_KINDS','BODY_PARTS','shotBodyPart','shotList','shotColor'];
 function loadShared(){
   const ctx={console,document:{getElementById:()=>null},location:{hash:''},
     localStorage:{getItem:()=>null,setItem(){}}};
