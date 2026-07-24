@@ -233,7 +233,10 @@ function headerBlock(){
     +`Home (Blue)${fH?' '+fH:''} · Away (Amber)${fA?' '+fA:''}</div>`;
 }
 function timelineEvents(){
-  const evs=[], yc={};
+  const evs=[];
+  // a 2nd yellow already reads as "2nd Yellow → Red"; classifyCards drops a redundant
+  // explicit red for the same dismissal so it isn't listed twice
+  const cardKind=classifyCards(rows);
   const sorted=rows.filter(r=>r.t!=null).slice().sort((a,b)=>a.t-b.t);
   const assists=sorted.filter(r=>r.event==='assist');
   // a penalty followed by the same player's goal collapses into one "Goal #n (Penalty)" row
@@ -260,11 +263,9 @@ function timelineEvents(){
       push('goal',`Goal #${no}${tags.length?` <span style="color:${C.mut};font-weight:600;font-size:10px">(${tags.join(' · ')})</span>`:''}`);
     }
     else if(r.event==='own goal'||r.event==='own-goal')push('og',`Own Goal #${no}`);
-    else if(r.event==='yellow card'){
-      const k=team+'#'+no; yc[k]=(yc[k]||0)+1;
-      if(yc[k]===2)push('y2',`2nd Yellow → Red #${no}`); else push('yc',`Yellow Card #${no}`);
-    }
-    else if(r.event==='red card')push('rc',`Red Card #${no}`);
+    else if(r.event==='yellow card')
+      push(cardKind.get(r),cardKind.get(r)==='y2'?`2nd Yellow → Red #${no}`:`Yellow Card #${no}`);
+    else if(r.event==='red card'){ if(cardKind.get(r)==='rc')push('rc',`Red Card #${no}`); }
     // substitutions are intentionally left off the report timeline
   });
   // half first, then time: first-half stoppage (45+X') overlaps the opening

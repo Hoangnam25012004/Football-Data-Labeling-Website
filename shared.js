@@ -209,6 +209,27 @@ function shotList(rows,team){
 const SHOT_COLOR={'goal':'#f7b32f','shot on target':'#39d98a'};
 const shotColor=e=>SHOT_COLOR[evKey(e)]||'#8b97a7';
 
+/* ---- cards on the match timeline ----
+   A player's 2nd yellow IS a sending-off and reads as "2nd Yellow → Red". When the tagger
+   ALSO tags an explicit red card for that same dismissal, the two describe one event — the
+   timeline was listing it twice (a "2nd Yellow → Red" line AND a "Red Card" line, and two
+   markers on the Stats timeline). classifyCards() decides, per card row, what to show:
+     'yc' first yellow · 'y2' second yellow → red · 'rc' a red that is NOT a 2nd-yellow red
+   and OMITS an explicit red for a player who already has two yellows (that dismissal is
+   already shown as 'y2'). Returns a Map keyed by the row object. Total yellows are counted
+   up front, so two cards tagged in the same second are handled whatever order they sort in. */
+function classifyCards(rows){
+  const out=new Map(), yc={}, total={};
+  const key=r=>r.team+'#'+String(r.playerFrom==null?'':r.playerFrom).trim();
+  (rows||[]).forEach(r=>{if(evKey(r.event)==='yellow card')total[key(r)]=(total[key(r)]||0)+1;});
+  (rows||[]).filter(r=>r&&r.t!=null).slice().sort((a,b)=>a.t-b.t).forEach(r=>{
+    const e=evKey(r.event), k=key(r);
+    if(e==='yellow card'){yc[k]=(yc[k]||0)+1; out.set(r, yc[k]>=2?'y2':'yc');}
+    else if(e==='red card'){ if((total[k]||0)<2)out.set(r,'rc'); }   // else: same as the 2nd-yellow red
+  });
+  return out;
+}
+
 /* ---- who actually took the pitch ----
    computeStats() only ever hears about players with a tagged event, so a substitute
    who came on and never touched the ball vanished from every table and from the
