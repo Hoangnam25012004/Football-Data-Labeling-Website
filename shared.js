@@ -145,21 +145,22 @@ const EVENT_INC={
   'throw-ins':['throwIns'],'throw-in':['throwIns'],
   'goal kick':['goalKicks'],
   'foul':['fouls'],'foul throw':['fouls'],'handball foul':['fouls'],
+  'foul won':['foulsWon'],
   'offside':['offsides'],
   'mistake':['mistakes'],
   'save':['saves']
 };
-const STAT_GROUPS=[['',1],['Shooting',8],['Distribution',10],['Defensive',8],['Duels',4],['Set Pieces',4],['Discipline',3]];
+const STAT_GROUPS=[['',1],['Shooting',8],['Distribution',10],['Defensive',8],['Duels',4],['Set Pieces',4],['Discipline',4]];
 const STAT_HEADERS=['No','Goals','Assists','Total Shots','Shots On Target','Shots Off Target','Blocked Shots','Miss Shots','Shooting Accuracy',
   'Passes','Passes Completed','Pass Accuracy','Crosses','Crosses Completed','Cross Accuracy',
   'Take-ons','Take-ons Won','Take-on Success','Step-ins',
   'Tackles','Tackles Won','Tackle Success','Interceptions','Clearances','Blocks','Recoveries','Mistakes',
   'Ground Duels','Ground Duels Won','Aerial Duels','Aerial Duels Won',
-  'Corners','Free-kicks','Throw-ins','Goal Kicks','Fouls','Offsides','Saves'];
+  'Corners','Free-kicks','Throw-ins','Goal Kicks','Fouls','Fouls Won','Offsides','Saves'];
 function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,shotsOff:0,shotsBlocked:0,missShots:0,passes:0,passesComp:0,
   crosses:0,crossesComp:0,takeOns:0,takeOnsWon:0,stepIns:0,tackles:0,tacklesWon:0,interceptions:0,
   clearances:0,blocks:0,recoveries:0,groundDuels:0,groundDuelsWon:0,aerialDuels:0,aerialDuelsWon:0,
-  corners:0,freeKicks:0,penalties:0,throwIns:0,goalKicks:0,fouls:0,offsides:0,mistakes:0,saves:0};}
+  corners:0,freeKicks:0,penalties:0,throwIns:0,goalKicks:0,fouls:0,foulsWon:0,offsides:0,mistakes:0,saves:0};}
 const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
 function computeStats(rows,team){
   const P={}; const get=n=>{if(!P[n])P[n]=newStat();return P[n];};
@@ -174,7 +175,7 @@ function statRow(no,s){return[no,s.goals,s.assists,s.totalShots,s.shotsOn,s.shot
   s.takeOns,s.takeOnsWon,pct(s.takeOnsWon,s.takeOns),s.stepIns,
   s.tackles,s.tacklesWon,pct(s.tacklesWon,s.tackles),s.interceptions,s.clearances,s.blocks,s.recoveries,s.mistakes,
   s.groundDuels,s.groundDuelsWon,s.aerialDuels,s.aerialDuelsWon,
-  s.corners,s.freeKicks,s.throwIns,s.goalKicks,s.fouls,s.offsides,s.saves];}
+  s.corners,s.freeKicks,s.throwIns,s.goalKicks,s.fouls,s.foulsWon,s.offsides,s.saves];}
 function sortedPlayers(P){return Object.keys(P).sort((a,b)=>{const na=+a,nb=+b;
   if(!isNaN(na)&&!isNaN(nb))return na-nb; return a.localeCompare(b);});}
 

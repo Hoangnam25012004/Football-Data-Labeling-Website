@@ -125,7 +125,7 @@ body>header{flex:none}
   <div class="stats-wrap"><div id="statsHolder"></div></div>
 </div>
 
-<script src="../shared.js?v=9"></script>
+<script src="../shared.js?v=10"></script>
 <script>
 let rows=loadRows(), meta=loadMeta(), lineups=loadLineups(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles', othCat='fouls';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
@@ -153,7 +153,7 @@ const STAT_CATS={
   other:[
     ['Corners',s=>s.corners],['Free-kicks',s=>s.freeKicks],['Penalty Kicks',s=>s.penalties],
     ['Throw-ins',s=>s.throwIns],['Goal Kicks',s=>s.goalKicks],
-    ['Fouls',s=>s.fouls],['Offsides',s=>s.offsides],['Saves',s=>s.saves]]
+    ['Fouls',s=>s.fouls],['Fouls Won',s=>s.foulsWon],['Offsides',s=>s.offsides],['Saves',s=>s.saves]]
 };
 
 function renderStats(){
@@ -188,7 +188,10 @@ function renderStats(){
   }else if(statCat==='defensive'){
     extra=`<div class="chart-row">${defMapHTML(statTeam)}</div>`;
   }else if(statCat==='other'){
-    extra=`<div class="chart-row">${othCat==='offsides'?offsideMapHTML(statTeam):foulMapHTML(statTeam)}</div>`;
+    const othMap=othCat==='fouls'?foulMapHTML(statTeam)
+      :othCat==='foulsWon'?plainEventMapHTML(statTeam,'foul won')
+      :plainEventMapHTML(statTeam,'offside');
+    extra=`<div class="chart-row">${othMap}</div>`;
   }
   holder.innerHTML=table+extra;
   if(statCat==='distribution')heatHover('');   // canvas must exist in the DOM first
@@ -383,8 +386,8 @@ function crossMapHTML(team){
    fouls that led to a card (same player's card event within 90s). Hatched area
    = dangerous zone (own defensive third); ratio bands like the cross map. */
 const FOUL_EVENTS=new Set(['foul','foul throw','handball foul']);
-/* Other tab: dropdown switches between the foul map and the offside map */
-const OTH_CATS={fouls:'Fouls',offsides:'Offsides'};
+/* Other tab: dropdown switches between the foul map, the foul-won map and the offside map */
+const OTH_CATS={fouls:'Fouls',foulsWon:'Fouls Won',offsides:'Offsides'};
 const othHead=()=>`<div class="chart-head"><div></div>`
   +`<select class="def-sel" onchange="setOthCat(this.value)">`
   +Object.entries(OTH_CATS).map(([k,l])=>`<option value="${k}"${k===othCat?' selected':''}>${l}</option>`).join('')
@@ -439,13 +442,14 @@ function foulMapHTML(team){
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block;max-width:1000px;margin:0 auto">${defs}${over}${pitch}</svg>`
     +`<div class="shotmap-legend">${legend}</div></div>`;
 }
-/* ---- Other: offside map — every located offside, both halves normalised to
-   attack RIGHT; circle = 1st half, square = 2nd half; ratio bands like the foul map. */
-function offsideMapHTML(team){
+/* ---- Other: plain located-event map (offside, foul won…) — every located event of
+   that type, both halves normalised to attack RIGHT; circle = 1st half, square = 2nd
+   half; ratio bands like the foul map, but no cards / dangerous-zone overlay. */
+function plainEventMapHTML(team,eventName){
   const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
   const teamColor=team==='home'?'var(--home)':'var(--away)', fill=team==='home'?'#2f81f7':'#f7682f';
   // no data -> keep the pitch and 0% bands, just draw no dots
-  const evs=rows.filter(r=>r.team===team&&r.event==='offside'&&r.pXY);
+  const evs=rows.filter(r=>r.team===team&&r.event===eventName&&r.pXY);
   const dir={1:attackDir(team,1),2:attackDir(team,2)};
   const fl=evs.map(r=>{
     const h=eventHalf(r), flip=dir[h]==='left';
@@ -1011,6 +1015,6 @@ function dbToRow(d){
   }catch(e){console.warn('Stats cloud load failed — using local data:',(e&&e.message)||e);}
 })();
 </script>
-<script src="report.js?v=18"></script>
+<script src="report.js?v=19"></script>
 </body>
 </html>

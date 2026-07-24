@@ -420,12 +420,12 @@ const distributionPlayerPages=()=>playerStatPages('Distribution — Player Stats
 function defensivePlayerPages(){
   const cards={home:cardCounts('home'),away:cardCounts('away')};
   return playerStatPages('Defensive — Player Stats',
-    ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Ground','Fouls','Mistakes','YC','RC'],
+    ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Ground','Fouls','F.Won','Mistakes','YC','RC'],
     (s,no,team)=>{
       const c=cards[team][no]||{yc:0,rc:0};
       return [frac(s.tacklesWon,s.tackles),pc0(s.tacklesWon,s.tackles),dotv(s.interceptions),dotv(s.clearances),
         dotv(s.blocks),dotv(s.recoveries),frac(s.aerialDuelsWon,s.aerialDuels),frac(s.groundDuelsWon,s.groundDuels),
-        dotv(s.fouls),dotv(s.mistakes),dotv(c.yc),dotv(c.rc)];
+        dotv(s.fouls),dotv(s.foulsWon),dotv(s.mistakes),dotv(c.yc),dotv(c.rc)];
     });
 }
 
@@ -865,16 +865,17 @@ function foulMapsPage(){
   return any?body:null;
 }
 
-/* offside maps — home and away side by side (home attacks RIGHT, away mirrored
-   LEFT), marker shape = half, with a top-5 offsides ranking under each map */
-function offsideMapsPage(){
-  const evs=team=>rows.filter(r=>r.team===team&&r.event==='offside'&&r.pXY);
+/* plain located-event maps (offside, foul won…) — home and away side by side (home
+   attacks RIGHT, away mirrored LEFT), marker shape = half, with a top-5 ranking under
+   each map. `title` names the section; `eventName` is the event filtered on. */
+function eventMapsPage(eventName,title){
+  const evs=team=>rows.filter(r=>r.team===team&&r.event===eventName&&r.pXY);
   const hA=evs('home'), aA=evs('away');
   if(!hA.length&&!aA.length)return null;
   const top5=team=>{
     const counts={};
     rows.forEach(r=>{
-      if(r.team!==team||r.event!=='offside')return;
+      if(r.team!==team||r.event!==eventName)return;
       const no=String(r.playerFrom||'').trim(); if(!no)return;
       counts[no]=(counts[no]||0)+1;
     });
@@ -914,10 +915,12 @@ function offsideMapsPage(){
   };
   const legend=`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
     +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span>`;
-  return secTitle('Discipline — Offsides')
+  return secTitle(title)
     +`<div class="rp-mleg" style="margin:0 0 10px">${legend}</div>`
     +`<div style="display:flex;gap:18px;align-items:flex-start">${card('home',hA)}${card('away',aA)}</div>`;
 }
+const offsideMapsPage=()=>eventMapsPage('offside','Discipline — Offsides');
+const foulWonMapsPage=()=>eventMapsPage('foul won','Discipline — Fouls Won');
 
 /* ================= goalkeeper + discipline ================= */
 function gkNo(team){
@@ -977,6 +980,7 @@ function buildPages(host){
     radarPage(),
     ...defensivePlayerPages(),
     foulMapsPage(),
+    foulWonMapsPage(),
     offsideMapsPage(),
     gkPage()
   ].filter(Boolean);
