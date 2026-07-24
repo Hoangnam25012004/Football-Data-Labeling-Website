@@ -1505,6 +1505,10 @@ function eventForKey(k){const ev=curEvents().find(o=>o.key&&o.key===k);return ev
    entry ENDS with a failed pass/cross (opponent-recovery position). */
 const TRANSFER_EVENTS=new Set(['pass success','pass fail','cross success','cross fail','substitution']);
 const TRAILING_EXTRA_DOT=new Set(['pass fail','cross fail']);
+// cards carry no ball-touch location, so — like substitutions — a card-only entry needs
+// no dot ("13rc", "13yc*rc"). Placed inside a chain with a located event ("13f*yc*rc")
+// the chain's own dots still apply as usual.
+const CARD_EVENTS=new Set(['yellow card','red card']);
 function parseChain(raw){
   raw=(raw||'').trim().toLowerCase();
   const tokens=raw.match(/\d+|[a-z*]+/g)||[];
@@ -1596,12 +1600,17 @@ function submitEntry(){
   const allSubs=evs.length>0&&evs.every(e=>e.name==='substitution');
   if(!allSubs&&evs.some(e=>e.name==='substitution')){
     alert('Không trộn substitution với event khác trong một lần nhập.');return}
+  const allCards=evs.length>0&&evs.every(e=>CARD_EVENTS.has(e.name));
   const last=evs[evs.length-1];
   const needExtra=(!allSubs&&last&&!last.to&&TRAILING_EXTRA_DOT.has(last.name))?1:0;
   const need=touches+needExtra;
   if(allSubs){
     if(dots.length!==0&&dots.length!==evs.length){
       alert('Thay người: chấm '+evs.length+' dots tại vị trí cầu thủ bị thay RA (hoặc không chấm dot).');return}
+  }else if(allCards){
+    // a card has no location; a dot is allowed but never required
+    if(dots.length!==0&&dots.length!==touches){
+      alert('Thẻ phạt: chấm '+touches+' dots tại vị trí cầu thủ (hoặc không chấm dot).');return}
   }else if(touches>0&&dots.length!==need){
     alert('Cần kiểm tra lại dots — cần '+need+' dots: '+touches+' lần chạm bóng'
       +(needExtra?' + 1 dot tại thời điểm đối phương đoạt bóng':'')+'.');return}
@@ -1612,13 +1621,15 @@ function submitEntry(){
   // batch fresh (a chain can't map onto one row / keep a single id).
   const editInPlace=state.editingId&&evs.length===1;
   // Rows this entry replaces, captured BEFORE they are dropped/overwritten: a substitution
-  // among them owns a formation snapshot that has to be rolled back, or a re-tag would
-  // stack a second snapshot on top of the wrong one it was meant to fix.
-  const replacedSubs=(state.editingGroup
+  // or a red card among them owns a formation snapshot that has to be rolled back, or a
+  // re-tag would stack a second snapshot on top of the wrong one it was meant to fix.
+  const replaced=state.editingGroup
       ? state.rows.filter(r=>r.grp===state.editingGroup)
-      : (state.editingId?state.rows.filter(r=>r.id===state.editingId):[]))
-    .filter(r=>r.event==='substitution')
+      : (state.editingId?state.rows.filter(r=>r.id===state.editingId):[]);
+  const replacedSubs=replaced.filter(r=>r.event==='substitution')
     .map(r=>({event:r.event,team:r.team,t:r.t,playerFrom:r.playerFrom,playerTo:r.playerTo}));
+  const replacedReds=replaced.filter(r=>r.event==='red card')
+    .map(r=>({event:r.event,team:r.team,t:r.t,playerFrom:r.playerFrom}));
   // Substitutions rewrite the formation, so the WHOLE entry is vetted before a single row
   // is written: one impossible pair aborts the entry instead of quietly landing a snapshot
   // that ignores it, and a pair typed back-to-front is corrected here — in the event row
@@ -1649,7 +1660,7 @@ function submitEntry(){
   // events born from ONE entry share a group id -> shown as ONE line in the table
   // (each still stored as its own row/event in Supabase)
   const grpId=evs.length>1?newId():null;
-  let lastRow=null;
+  let lastRow=null; const writtenRows=[];
   evs.forEach((ev,k)=>{
     // substitutions map dot k -> pair k (position of the outgoing player); no receiver dot
     const pD=allSubs?(dots[k]||null):(ev.fromIdx!=null?dots[ev.fromIdx]:(touches===0?dots[0]:null));
@@ -1667,7 +1678,7 @@ function submitEntry(){
     if(existing){Object.assign(existing,data);row=existing;}   // edit in place — keep the same id
     else{row=Object.assign({id:newId()},data);state.rows.push(row);}
     window.Cloud&&window.Cloud.onLocalUpsert(row);             // each event syncs to the cloud
-    lastRow=row;
+    lastRow=row; writtenRows.push(row);
   });
   state.editingId=null;
   state.pendingDots=[];              // consume the dots
@@ -1685,6 +1696,18 @@ function submitEntry(){
     if(!applySubGroup(state.team,subPlan.pairs,subPlan.notices)&&undone)saveLineups();
   }else if(replacedSubs.length){   // no longer a substitution -> its snapshot must go too
     if(removeSubSideEffects(replacedSubs))saveLineups();
+  }
+  // red card -> the carded player leaves the pitch (XI drops to 10). Handled after the
+  // rows are written and independently of subs, since a red card can sit inside a chain
+  // ("13f*yc*rc"). A re-tag/delete rolls back the snapshot the old row left behind first.
+  if(replacedReds.length)removeRedSideEffects(replacedReds);
+  const redRows=writtenRows.filter(r=>r.event==='red card'&&r.playerFrom);
+  let redOut=[];
+  redRows.forEach(r=>{if(applyRedCard(r.team,r.playerFrom,r.t))redOut.push(r.playerFrom);});
+  if(redOut.length||replacedReds.length){
+    saveLineups();
+    if(redOut.length)toast('🟥 No.'+redOut.join(', ')+' rời sân — đội hình còn '
+      +effectiveLU(redRows[0].team,redRows[0].t).xi.length+' người');
   }
   // an edit switched the team buttons to the row's side — go back to where the user was
   if(wasEditing&&editPrevTeam){setTeam(editPrevTeam);editPrevTeam=null;}
@@ -1824,6 +1847,54 @@ function removeSubSideEffects(rows){
     // mirror of the forward carry in applySubGroup: later periods put the OUT player back
     hist.filter(h=>h.team===r.team&&h.t>r.t&&h.xi&&h.subs).forEach(h=>
       swapInSnapshot(h,r.playerTo,r.playerFrom,lu.dir));
+  });
+  state.lineups.history=hist;
+  return true;
+}
+/* ===== RED CARD ===== a sent-off player leaves the pitch and does NOT go to the bench,
+   so the XI drops to 10 from this moment on. Like a substitution it appends a formation
+   snapshot to lineups.history; unlike one it has no incoming player. Works whether the
+   red card is solo ("13rc") or part of a chain ("13f*yc*rc"). */
+function applyRedCard(team,no,t){
+  const lu=state.lineups[team];
+  const eff=effectiveLU(team,t);
+  const i=(eff.xi||[]).findIndex(x=>numEq(x.no,no));
+  if(i<0)return false;                       // not on the pitch (bench / already off) -> no snapshot
+  const xi=eff.xi.map(x=>({...x})), bench=eff.subs.slice();
+  const offSpot={x:xi[i].x,y:xi[i].y};
+  xi.splice(i,1);                            // sent off: removed, and NOT added to the bench
+  (state.lineups.history=state.lineups.history||[]).push({
+    t, team, xi, subs:bench,
+    off:String(no), offSpot,                 // remembered so a delete/edit can put him back
+    label:'Red card: '+no+'🟥'});
+  // periods snapshotted LATER (subs tagged before this card, or a rewind) must drop him too
+  state.lineups.history.filter(h=>h.team===team&&h.t>t&&h.xi).forEach(h=>{
+    const j=h.xi.findIndex(x=>numEq(x.no,no)); if(j>=0)h.xi.splice(j,1);
+    if(h.subs)h.subs=h.subs.filter(n=>!numEq(n,no));
+  });
+  state.lineups.history.sort((a,b)=>a.t-b.t);
+  return true;
+}
+/* the snapshots a set of red-card rows created, matched by team + time + player, plus the
+   history with them stripped out — the mirror of subSideEffects for sendings-off. */
+function redSideEffects(rows){
+  const reds=(rows||[]).filter(r=>r&&r.event==='red card'&&r.team&&state.lineups[r.team]);
+  const removed=[]; let hist=(state.lineups.history||[]).slice();
+  reds.forEach(r=>{hist=hist.filter(h=>{
+    const hit=h.team===r.team&&h.off!=null&&numEq(h.off,r.playerFrom)&&Math.abs(h.t-r.t)<=3;
+    if(hit)removed.push(h); return !hit;
+  });});
+  return {reds,hist,removed};
+}
+function removeRedSideEffects(rows){
+  const {reds,hist,removed}=redSideEffects(rows);
+  if(!reds.length)return false;
+  // put each sent-off player back into every period that came AFTER his card
+  removed.forEach(h=>{
+    const no=String(h.off), spot=h.offSpot||{x:50,y:50};
+    hist.filter(o=>o.team===h.team&&o.t>h.t&&o.xi&&!o.xi.some(x=>numEq(x.no,no)))
+      .forEach(o=>{const lu=state.lineups[o.team];
+        o.xi.push({no,x:spot.x,y:spot.y,pos:zoneAt(spot.x,spot.y,(lu&&lu.dir)||'lr')});});
   });
   state.lineups.history=hist;
   return true;
@@ -2067,8 +2138,11 @@ function deleteRows(rs){
     const i=state.rows.indexOf(r); if(i>=0)state.rows.splice(i,1);
     window.Cloud&&window.Cloud.onLocalDelete(r.id);
   });
-  // drop the formation snapshot / subHistory the sub rows created (see subSideEffects)
-  if(removeSubSideEffects(rs))saveLineups();
+  // drop the formation snapshots the sub / red-card rows created (see subSideEffects,
+  // redSideEffects) — a sent-off player comes back onto the pitch, a sub is undone
+  let luChanged=removeSubSideEffects(rs);
+  if(removeRedSideEffects(rs))luChanged=true;
+  if(luChanged)saveLineups();
   renderTable();
 }
 function renderTable(){

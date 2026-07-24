@@ -57,10 +57,12 @@ function grabConst(name){
 
 // everything the substitution / entry flow needs, in dependency order
 const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
-  'TRANSFER_EVENTS','TRAILING_EXTRA_DOT','newId','SHOT_EVENTS','evtClass','scrollToRow','editPrevTeam'];
+  'TRANSFER_EVENTS','TRAILING_EXTRA_DOT','CARD_EVENTS','newId','SHOT_EVENTS','evtClass',
+  'scrollToRow','editPrevTeam'];
 const FUNCS=['fmt','parseTime','eventHalf','matchTime','zoneAt','eventForKey','parseChain',
   'effectiveLU','planSubGroup','swapInSnapshot','applySubGroup','subSideEffects',
-  'removeSubSideEffects','submitEntry','chainHTML','deleteRows','startEdit','startEditGroup'];
+  'removeSubSideEffects','applyRedCard','redSideEffects','removeRedSideEffects',
+  'submitEntry','chainHTML','deleteRows','startEdit','startEditGroup'];
 
 /* ---- a fresh sandbox per test, so no scenario can leak into the next ---- */
 function makeApp(opts){
