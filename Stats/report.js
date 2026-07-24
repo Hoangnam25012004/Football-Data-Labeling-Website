@@ -462,8 +462,8 @@ function cardCounts(team){
   rows.forEach(r=>{
     if(r.team!==team)return;
     const no=String(r.playerFrom||'').trim(); if(!no)return;
-    const o=out[no]=out[no]||{yc:0,rc:0};
-    if(r.event==='yellow card')o.yc++; else if(r.event==='red card')o.rc++;
+    const o=out[no]=out[no]||{yc:0,rc:0}, e=evKey(r.event);
+    if(e==='yellow card')o.yc++; else if(e==='red card')o.rc++;
   });
   return out;
 }
@@ -475,16 +475,13 @@ const distributionPlayerPages=()=>playerStatPages('Distribution — Player Stats
   ['Passes','Pass Acc','Crosses','Cross Acc','Take-Ons','Step-ins'],
   s=>[frac(s.passesComp,s.passes),pc0(s.passesComp,s.passes),frac(s.crossesComp,s.crosses),
       pc0(s.crossesComp,s.crosses),frac(s.takeOnsWon,s.takeOns),dotv(s.stepIns)]);
+// cards are reported on the Goalkeeper & Discipline page, not here
 function defensivePlayerPages(){
-  const cards={home:cardCounts('home'),away:cardCounts('away')};
   return playerStatPages('Defensive — Player Stats',
-    ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Ground','Fouls','F.Won','Mistakes','YC','RC'],
-    (s,no,team)=>{
-      const c=cards[team][no]||{yc:0,rc:0};
-      return [frac(s.tacklesWon,s.tackles),pc0(s.tacklesWon,s.tackles),dotv(s.interceptions),dotv(s.clearances),
-        dotv(s.blocks),dotv(s.recoveries),frac(s.aerialDuelsWon,s.aerialDuels),frac(s.groundDuelsWon,s.groundDuels),
-        dotv(s.fouls),dotv(s.foulsWon),dotv(s.mistakes),dotv(c.yc),dotv(c.rc)];
-    });
+    ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Ground','Fouls','F.Won','Mistakes'],
+    s=>[frac(s.tacklesWon,s.tackles),pc0(s.tacklesWon,s.tackles),dotv(s.interceptions),dotv(s.clearances),
+      dotv(s.blocks),dotv(s.recoveries),frac(s.aerialDuelsWon,s.aerialDuels),frac(s.groundDuelsWon,s.groundDuels),
+      dotv(s.fouls),dotv(s.foulsWon),dotv(s.mistakes)]);
 }
 
 /* ================= distribution ================= */
@@ -1032,10 +1029,11 @@ function gkPage(){
       +`<span class="rp-dcv"><span class="rp-cardi" style="background:#f5c518"></span>${t.yc} <em>Yellow</em></span>`
       +`<span class="rp-dcv"><span class="rp-cardi" style="background:${C.red}"></span>${t.rc} <em>Red</em></span></div>`;};
   const discRows=[['Fouls',h.fouls,a.fouls],['Fouls Won',h.foulsWon,a.foulsWon],['Offsides',h.offsides,a.offsides]];
-  // set pieces: drop rows neither side recorded, so the block carries only real numbers
+  // every set piece is listed, including a 0 vs 0 one — the block reads the same on
+  // every report, so a missing row can't be mistaken for a missing stat
   const spRows=[['Corners',h.corners,a.corners],['Free-kicks',h.freeKicks,a.freeKicks],
     ['Throw-ins',h.throwIns,a.throwIns],['Goal Kicks',h.goalKicks,a.goalKicks],
-    ['Penalty Kicks',h.penalties,a.penalties]].filter(([,hv,av])=>hv||av);
+    ['Penalty Kicks',h.penalties,a.penalties]];
   return secTitle('Goalkeeper &amp; Discipline')+legend()
     +`<div class="rp-cmphead">Goalkeeper</div>`
     +`<div class="rp-duo">${card('home',h,gcH,facedH,rateH)}${card('away',a,gcA,facedA,rateA)}</div>`
@@ -1043,7 +1041,7 @@ function gkPage(){
     +`<div class="rp-cmphead">Discipline</div>`
     +`<div class="rp-duo">${cardBox('home')}${cardBox('away')}</div>`
     +cmpRows(discRows)
-    +(spRows.length?`<div class="rp-cmphead">Set Pieces</div>`+cmpRows(spRows):'');
+    +`<div class="rp-cmphead">Set Pieces</div>`+cmpRows(spRows);
 }
 
 /* ================= assembly + export ================= */

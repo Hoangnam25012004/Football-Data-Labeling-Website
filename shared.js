@@ -162,11 +162,15 @@ function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,s
   clearances:0,blocks:0,recoveries:0,groundDuels:0,groundDuelsWon:0,aerialDuels:0,aerialDuelsWon:0,
   corners:0,freeKicks:0,penalties:0,throwIns:0,goalKicks:0,fouls:0,foulsWon:0,offsides:0,mistakes:0,saves:0};}
 const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
+/* Event names come from a user-editable list, so the spelling of a type is whatever the
+   tagger typed ("throw-Ins", "Goal"). Every lookup against a fixed dictionary here goes
+   through evKey, or an event tagged with different capitalisation silently counts zero. */
+const evKey=e=>String(e==null?'':e).trim().toLowerCase();
 function computeStats(rows,team){
   const P={}; const get=n=>{if(!P[n])P[n]=newStat();return P[n];};
   rows.filter(r=>r.team===team).forEach(r=>{
     const a=(r.playerFrom||'').toString().trim(); if(!a)return;
-    const inc=EVENT_INC[r.event]; if(inc){const p=get(a);inc.forEach(k=>p[k]++);}
+    const inc=EVENT_INC[evKey(r.event)]; if(inc){const p=get(a);inc.forEach(k=>p[k]++);}
   });
   return P;
 }
@@ -187,23 +191,23 @@ const SHOT_KINDS=new Set(['goal','shot on target','shot off target','blocked sho
 const BODY_PARTS={'right foot':'Right Foot','left foot':'Left Foot','head':'Header',
   'upper body':'Upper Body','lower body':'Lower Body'};
 function shotBodyPart(rows,shot){
-  const bp=r=>BODY_PARTS[r.event];
-  if(shot.grp!=null){const g=rows.find(r=>r.grp===shot.grp&&bp(r)); if(g)return BODY_PARTS[g.event];}
+  const bp=r=>BODY_PARTS[evKey(r.event)];
+  if(shot.grp!=null){const g=rows.find(r=>r.grp===shot.grp&&bp(r)); if(g)return bp(g);}
   const eq=(a,b)=>String(a==null?'':a).trim()===String(b==null?'':b).trim();
   const same=rows.filter(r=>bp(r)&&r.team===shot.team&&eq(r.playerFrom,shot.playerFrom))
     .sort((a,b)=>Math.abs((a.t||0)-(shot.t||0))-Math.abs((b.t||0)-(shot.t||0)));
-  return same.length?BODY_PARTS[same[0].event]:'';
+  return same.length?bp(same[0]):'';
 }
 // time-ordered list of a team's shots (or both teams when team==null), numbered from 1
 function shotList(rows,team){
-  return rows.filter(r=>SHOT_KINDS.has(r.event)&&(team==null||r.team===team)&&r.t!=null)
+  return rows.filter(r=>SHOT_KINDS.has(evKey(r.event))&&(team==null||r.team===team)&&r.t!=null)
     .sort((a,b)=>a.t-b.t)
     .map((r,i)=>({idx:i+1,t:r.t,team:r.team,no:String(r.playerFrom||'').trim(),
       event:r.event,bodyPart:shotBodyPart(rows,r)}));
 }
 // dot colour by shot outcome — matches the donut / shot-map legend
 const SHOT_COLOR={'goal':'#f7b32f','shot on target':'#39d98a'};
-const shotColor=e=>SHOT_COLOR[e]||'#8b97a7';
+const shotColor=e=>SHOT_COLOR[evKey(e)]||'#8b97a7';
 
 /* ---- who actually took the pitch ----
    computeStats() only ever hears about players with a tagged event, so a substitute

@@ -2383,7 +2383,10 @@ function computeStats(team){
   const P={}; const get=n=>{if(!P[n])P[n]=newStat();return P[n];};
   state.rows.filter(r=>r.team===team).forEach(r=>{
     const a=(r.playerFrom||'').toString().trim(); if(!a)return;
-    const inc=EVENT_INC[r.event]; if(inc){const p=get(a);inc.forEach(k=>p[k]++);}
+    // event names are user-editable, so match the dictionary case-insensitively —
+    // an event tagged "throw-Ins" must still count as a throw-in (same as shared.js)
+    const inc=EVENT_INC[String(r.event==null?'':r.event).trim().toLowerCase()];
+    if(inc){const p=get(a);inc.forEach(k=>p[k]++);}
   });
   return P;
 }
