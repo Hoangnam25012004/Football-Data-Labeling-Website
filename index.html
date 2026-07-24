@@ -1505,10 +1505,6 @@ function eventForKey(k){const ev=curEvents().find(o=>o.key&&o.key===k);return ev
    entry ENDS with a failed pass/cross (opponent-recovery position). */
 const TRANSFER_EVENTS=new Set(['pass success','pass fail','cross success','cross fail','substitution']);
 const TRAILING_EXTRA_DOT=new Set(['pass fail','cross fail']);
-// cards carry no ball-touch location, so — like substitutions — a card-only entry needs
-// no dot ("13rc", "13yc*rc"). Placed inside a chain with a located event ("13f*yc*rc")
-// the chain's own dots still apply as usual.
-const CARD_EVENTS=new Set(['yellow card','red card']);
 function parseChain(raw){
   raw=(raw||'').trim().toLowerCase();
   const tokens=raw.match(/\d+|[a-z*]+/g)||[];
@@ -1600,17 +1596,14 @@ function submitEntry(){
   const allSubs=evs.length>0&&evs.every(e=>e.name==='substitution');
   if(!allSubs&&evs.some(e=>e.name==='substitution')){
     alert('Không trộn substitution với event khác trong một lần nhập.');return}
-  const allCards=evs.length>0&&evs.every(e=>CARD_EVENTS.has(e.name));
   const last=evs[evs.length-1];
   const needExtra=(!allSubs&&last&&!last.to&&TRAILING_EXTRA_DOT.has(last.name))?1:0;
   const need=touches+needExtra;
+  // only substitutions are dot-free; every other event (cards included) is placed on the
+  // pitch — a card's dot marks where the card was shown / the foul that earned it happened
   if(allSubs){
     if(dots.length!==0&&dots.length!==evs.length){
       alert('Thay người: chấm '+evs.length+' dots tại vị trí cầu thủ bị thay RA (hoặc không chấm dot).');return}
-  }else if(allCards){
-    // a card has no location; a dot is allowed but never required
-    if(dots.length!==0&&dots.length!==touches){
-      alert('Thẻ phạt: chấm '+touches+' dots tại vị trí cầu thủ (hoặc không chấm dot).');return}
   }else if(touches>0&&dots.length!==need){
     alert('Cần kiểm tra lại dots — cần '+need+' dots: '+touches+' lần chạm bóng'
       +(needExtra?' + 1 dot tại thời điểm đối phương đoạt bóng':'')+'.');return}

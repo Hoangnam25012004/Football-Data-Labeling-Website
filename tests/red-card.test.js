@@ -36,12 +36,19 @@ const xiOf=(a,t)=>a.effectiveLU(a.state.team,t).xi.map(x=>String(x.no)).sort((p,
 const benchOf=(a,t)=>a.effectiveLU(a.state.team,t).subs.map(String).sort((p,q)=>p-q);
 const onPitch=(a,t,no)=>xiOf(a,t).includes(String(no));
 const rowText=a=>a.state.rows.map(r=>[r.playerFrom,r.event,r.playerTo].filter(Boolean).join(' ')).join(' | ');
+// a card is a located event now: one pitch dot per shirt number, at the current video time
+// (where the card was shown / the foul that earned it happened)
+function card(a,raw,t){
+  t=t==null?a.video.currentTime:t;
+  const n=(raw.match(/\d+/g)||[]).length;
+  submit(a,raw,Array.from({length:n},(_,i)=>({x:40+i*8,y:50,t})));
+}
 
 /* ================= 1. the reported bug ================= */
 
 test('the reported case: a red card drops the XI to 10 and removes the player', ()=>{
   const a=app(null,3600);
-  submit(a,'13rc');
+  card(a,'13rc');
   eq(a.state.lineups.history.length,1,'one formation period is created');
   const t=3700;
   eq(xiOf(a,t).length,10,'ten players on the pitch (was staying 11)');
@@ -66,7 +73,7 @@ test('a red card inside a chain (foul + 2nd yellow + red) still sends the player
 
 test('a red card for a bench player leaves the pitch untouched', ()=>{
   const a=app(null,3600);
-  submit(a,'14rc');                        // 14 is a substitute
+  card(a,'14rc');                          // 14 is a substitute
   eq(a.state.rows.length,1,'the event is still recorded');
   eq(a.state.lineups.history.length,0,'but no formation period');
   eq(xiOf(a,3700).length,11);
@@ -75,15 +82,15 @@ test('a red card for a bench player leaves the pitch untouched', ()=>{
 test('a red card with no starting XI records the event and leaves the formation alone', ()=>{
   const a=app(null,3600);
   a.state.lineups.home.xi=[];
-  submit(a,'13rc');
+  card(a,'13rc');
   eq(a.state.rows.length,1);
   eq(a.state.lineups.history.length,0);
 });
 
 test('the same player red-carded twice never creates a second snapshot', ()=>{
   const a=app(null,3600);
-  submit(a,'13rc');
-  a.video.currentTime=3800; submit(a,'13rc');
+  card(a,'13rc');
+  a.video.currentTime=3800; card(a,'13rc');
   eq(a.state.lineups.history.length,1);
   eq(xiOf(a,3900).length,10);
 });
@@ -92,8 +99,8 @@ test('the same player red-carded twice never creates a second snapshot', ()=>{
 
 test('two red cards take the XI down to 9', ()=>{
   const a=app(null,3600);
-  submit(a,'13rc');
-  a.video.currentTime=3800; submit(a,'9rc');
+  card(a,'13rc');
+  a.video.currentTime=3800; card(a,'9rc');
   eq(a.state.lineups.history.length,2);
   const t=3900;
   eq(xiOf(a,t).length,9);
@@ -107,7 +114,7 @@ test('a red card carries through a substitution snapshot tagged earlier', ()=>{
   const a=app(null,3600);
   // a sub happens LATER in the match but is tagged first
   a.video.currentTime=4000; submit(a,'6sub14');
-  a.video.currentTime=3600; submit(a,'13rc');   // earlier red card, tagged after
+  a.video.currentTime=3600; card(a,'13rc');   // earlier red card, tagged after
   eq(a.state.lineups.history.length,2);
   const late=4100;
   eq(xiOf(a,late).length,10,'still 10 after both the sub and the earlier red card');
@@ -118,7 +125,7 @@ test('a red card carries through a substitution snapshot tagged earlier', ()=>{
 
 test('a red card BEFORE a later sub: the sub still applies on the 10 men', ()=>{
   const a=app(null,3600);
-  submit(a,'13rc');
+  card(a,'13rc');
   a.video.currentTime=4000; submit(a,'6sub14');
   const t=4100;
   eq(xiOf(a,t).length,10);
@@ -129,7 +136,7 @@ test('a red card BEFORE a later sub: the sub still applies on the 10 men', ()=>{
 
 test('deleting a red card row brings the player back and restores 11', ()=>{
   const a=app(null,3600);
-  submit(a,'13rc');
+  card(a,'13rc');
   a.deleteRows(a.state.rows.slice());
   eq(a.state.lineups.history.length,0);
   eq(xiOf(a,3700).length,11);
@@ -138,7 +145,7 @@ test('deleting a red card row brings the player back and restores 11', ()=>{
 
 test('deleting a red card restores the player in a later sub period too', ()=>{
   const a=app(null,3600);
-  submit(a,'13rc');
+  card(a,'13rc');
   a.video.currentTime=4000; submit(a,'6sub14');
   a.deleteRows(a.state.rows.filter(r=>r.event==='red card'));
   const t=4100;
@@ -149,7 +156,7 @@ test('deleting a red card restores the player in a later sub period too', ()=>{
 
 test('deleting the red card out of a chain keeps the foul/yellow but restores the XI', ()=>{
   const a=app(null,3600);
-  submit(a,'13f*yc*rc');
+  card(a,'13f*yc*rc');
   a.deleteRows(a.state.rows.slice());       // the whole chain
   eq(a.state.lineups.history.length,0);
   eq(xiOf(a,3700).length,11);
@@ -159,9 +166,9 @@ test('deleting the red card out of a chain keeps the foul/yellow but restores th
 
 test('re-tagging a red card onto a different player moves the sending-off', ()=>{
   const a=app(null,3600);
-  submit(a,'13rc');
+  card(a,'13rc');
   a.startEdit(0);
-  submit(a,'9rc');
+  card(a,'9rc');
   eq(a.state.lineups.history.length,1,'still one period');
   const t=3700;
   eq(xiOf(a,t).length,10);
@@ -173,7 +180,7 @@ test('re-tagging a red card onto a different player moves the sending-off', ()=>
 
 test('editing a red card into an ordinary event restores the XI', ()=>{
   const a=app(null,3600);
-  submit(a,'13rc');
+  card(a,'13rc');
   a.startEdit(0);
   submit(a,'13qq',[{x:50,y:50,t:3600}]);    // recovery (qq) — a located event needs its dot
   eq(a.state.lineups.history.length,0,'the sending-off snapshot is gone');
@@ -194,7 +201,7 @@ test('a substitution still drops the outgoing player to the bench (not sent off)
 
 test('a red card then a substitution: 10 men, and the sub does not re-add the sent-off player', ()=>{
   const a=app(null,3600);
-  submit(a,'13rc');
+  card(a,'13rc');
   a.video.currentTime=3800; submit(a,'6sub14');
   const t=3900;
   eq(xiOf(a,t).length,10);
@@ -204,11 +211,45 @@ test('a red card then a substitution: 10 men, and the sub does not re-add the se
 
 test('the away side keeps its own sendings-off', ()=>{
   const a=app(null,3600);
-  submit(a,'13rc');
+  card(a,'13rc');
   a.state.team='away';
-  submit(a,'9rc');
+  card(a,'9rc');
   a.state.team='home';
   eq(xiOf(a,3700).length,10); notOk(onPitch(a,3700,'13'));
   a.state.team='away';
   eq(xiOf(a,3700).length,10); notOk(onPitch(a,3700,'9')); ok(onPitch(a,3700,'13'));
+});
+
+/* ================= 8. a card MUST be placed on the pitch (only subs are dot-free) ======= */
+
+test('a red card with no dot is rejected — nothing written', ()=>{
+  const a=app(null,3600);
+  submit(a,'13rc');                          // no dot
+  eq(a.state.rows.length,0,'no event row');
+  eq(a.state.lineups.history.length,0,'no formation period');
+  eq(a.log.alerts.length,1,'the tagger is told a dot is needed');
+  ok(onPitch(a,3700,'13'),'13 is still on the pitch');
+});
+
+test('a yellow card with no dot is rejected too', ()=>{
+  const a=app(null,3600);
+  submit(a,'13yc');
+  eq(a.state.rows.length,0);
+  eq(a.log.alerts.length,1);
+});
+
+test('a card chain (foul+yellow+red) with no dot is rejected', ()=>{
+  const a=app(null,3600);
+  submit(a,'13f*yc*rc');                     // one touch, no dot
+  eq(a.state.rows.length,0);
+  eq(a.state.lineups.history.length,0);
+  eq(a.log.alerts.length,1);
+});
+
+test('a card WITH its dot is accepted and keeps the dot as the event location', ()=>{
+  const a=app(null,3600);
+  card(a,'13rc');
+  eq(a.state.rows.length,1);
+  ok(a.state.rows[0].pXY,'the red card row carries a pitch coordinate');
+  eq(a.state.lineups.history.length,1,'and the formation drops to 10');
 });
