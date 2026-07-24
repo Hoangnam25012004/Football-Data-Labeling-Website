@@ -102,6 +102,11 @@ table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
 .rp-mleg{display:flex;justify-content:center;flex-wrap:wrap;gap:16px;font-size:10px;color:#3d4754;margin-top:6px}
 .rp-mleg i{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:-1px}
 .rp-donuts{display:flex;gap:14px;margin-bottom:4px}
+.rp-sgwrap{display:flex;gap:18px;align-items:flex-start}
+.rp-sgleft{width:292px;flex:none}
+.rp-sgright{flex:1;min-width:0}
+.rp-sgleg{justify-content:flex-start;gap:9px;font-size:8.5px;margin-top:7px}
+.rp-sgleg i{width:8px;height:8px;margin-right:4px}
 .rp-dcard{flex:1;border:1px solid ${C.line};border-radius:8px;padding:12px;display:flex;gap:14px;align-items:center}
 .rp-drows{flex:1;font-size:10.5px}
 .rp-drow{display:flex;align-items:center;gap:6px;padding:3.5px 0;border-bottom:1px solid #f0f2f6}
@@ -145,12 +150,21 @@ function hPitchSVG(inner,dir){   // dir: attacking direction arrow, defaults to 
     +`<g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3">${pitchFootball(W,H,false)}</g>`
     +dirArrowSVG(dir||'right')+(inner||'')+'</svg>';
 }
-function vPitchSVG(){
+function vPitchSVG(inner){   // `inner` is drawn in vertical coords, on top of the markings
   const d=PITCH_DIMS.football, W=d.h, H=d.w;   // vertical: 680 wide x 1050 tall
   let g='';
   for(let i=0;i<7;i++)g+=`<rect x="0" y="${(i*H/7).toFixed(1)}" width="${W}" height="${(H/7).toFixed(1)}" fill="${i%2?'#2a733f':'#2e7d46'}"/>`;
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;border-radius:6px">${g}`
-    +`<g transform="translate(0 ${H}) rotate(-90)"><g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="4">${pitchFootball(H,W,false)}</g></g></svg>`;
+    +`<g transform="translate(0 ${H}) rotate(-90)"><g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="4">${pitchFootball(H,W,false)}</g></g>`
+    +(inner||'')+'</svg>';
+}
+// "Attacking ↑" marker for the vertical shot map
+function vUpArrowSVG(){
+  const d=PITCH_DIMS.football, W=d.h, H=d.w, cx=W/2;
+  return `<g opacity="0.5" stroke="#fff" fill="none" stroke-width="7">`
+    +`<line x1="${cx}" y1="${(H*0.72).toFixed(0)}" x2="${cx}" y2="${(H*0.55).toFixed(0)}"/>`
+    +`<polyline points="${cx-17},${(H*0.588).toFixed(0)} ${cx},${(H*0.55).toFixed(0)} ${cx+17},${(H*0.588).toFixed(0)}"/></g>`
+    +`<text x="${cx}" y="${(H*0.762).toFixed(0)}" text-anchor="middle" font-size="26" fill="#fff" opacity="0.6">Attacking</text>`;
 }
 /* both-halves normalisation: flip events from a half where the team attacked left */
 function normXY(team){
@@ -348,65 +362,64 @@ function attInsight(){
   }else t+=' Neither side found a decisive edge in front of goal.';
   return t;
 }
-function attackingPage(){
-  return secTitle('Attacking')
-    +`<div class="rp-donuts">${donutCard('home')}${donutCard('away')}</div>`
+/* Attacking — team comparison on its own page (the donuts now live on each team's
+   own "Shots & Goals" page, so this one is purely the head-to-head bars). */
+function attackingComparisonPage(){
+  return secTitle('Attacking — Team Comparison')
     +legend()
     +`<div class="rp-cmphead">Attacking</div>`+cmpRows(sectionRows(0))
     +insight(attInsight());
 }
-/* shot maps — both halves on one pitch, normalised to attack RIGHT */
-function shotMapsPage(){
-  const kinds={'goal':C.gold,'shot on target':C.green,'shot off target':'#aeb4bc','blocked shot':'#aeb4bc','miss shot':'#aeb4bc'};
-  let any=false;
-  const teamMap=team=>{
-    // home shown attacking RIGHT, away mirrored to attack LEFT;
-    // a side with no data keeps the empty pitch (no dots)
-    const N=normXY(team), d=PITCH_DIMS.football, flip=team==='away';
-    const shots=rows.filter(r=>r.team===team&&kinds[r.event]&&r.pXY);
-    if(shots.length)any=true;
-    const dots=shots.map(r=>{
-      const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h, col=kinds[r.event];
-      const no=esc(String(r.playerFrom||'').trim());
+/* ---- "Shots & Goals" — ONE page per team: the shot map on the left, the summary donut
+   and the shot-by-shot Event List on the right. Map markers carry the same number as the
+   list row, so the two read together. Both halves are normalised to attack UP. ---- */
+const SHOT_MAP_COLORS={'goal':C.gold,'shot on target':C.green,
+  'shot off target':'#aeb4bc','blocked shot':'#aeb4bc','miss shot':'#aeb4bc'};
+function shotDotsV(team){
+  const N=normXY(team), d=PITCH_DIMS.football, W=d.h, H=d.w;
+  // same filter + order as shotList(), so index N on the map is row N in the list
+  return rows.filter(r=>r.team===team&&SHOT_KINDS.has(r.event)&&r.t!=null)
+    .sort((a,b)=>a.t-b.t)
+    .map((r,i)=>{
+      if(!r.pXY)return '';                       // no location tagged -> list only
+      const p=N(r).a;
+      // horizontal (attacking right) -> vertical (attacking up): left = y, top = 100 - x
+      const vx=p.y/100*W, vy=(100-p.x)/100*H, col=SHOT_MAP_COLORS[r.event]||'#aeb4bc';
       const shape=eventHalf(r)===1
-        ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="14" fill="${col}" stroke="#fff" stroke-width="2.5"/>`
-        :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${col}" stroke="#fff" stroke-width="2.5"/>`;
-      return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+5).toFixed(1)}" text-anchor="middle" font-size="14" font-weight="800" fill="#fff">${no}</text></g>`;
+        ?`<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="18" fill="${col}" stroke="#fff" stroke-width="3"/>`
+        :`<rect x="${(vx-16).toFixed(1)}" y="${(vy-16).toFixed(1)}" width="32" height="32" rx="5" fill="${col}" stroke="#fff" stroke-width="3"/>`;
+      return `<g>${shape}<text x="${vx.toFixed(1)}" y="${(vy+6.5).toFixed(1)}" text-anchor="middle" `
+        +`font-size="18" font-weight="800" fill="#fff">${i+1}</text></g>`;
     }).join('');
-    return `<div style="width:620px;margin:0 auto">${hPitchSVG(dots,flip?'left':'right')}</div>`;
-  };
-  const card=team=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Shot Locations</div>${teamMap(team)}</div>`;
-  const body=secTitle('Attacking — Shot Maps')+card('home')+card('away')
-    +`<div class="rp-mleg"><span><i style="background:${C.gold}"></i>Goal</span><span><i style="background:${C.green}"></i>On target</span>`
-    +`<span><i style="background:#aeb4bc"></i>Off target / blocked / missed</span><span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
-    +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span></div>`;
-  return any?body:null;
 }
-/* Attacking — Event List: every shot in time order, with the body part it was taken
-   with (from the body-part event tagged in the same chain). One table per team. */
-function shotEventListPages(){
-  const teamTbl=team=>{
-    const list=shotList(rows,team);
-    if(!list.length)return null;
-    const names=squadNames(lineups,team);
-    const body=list.map(s=>{
-      const dot=`<span class="rp-elidx" style="background:${shotColor(s.event)}">${s.idx}</span>`;
-      return `<tr><td class="el-c">${dot}</td><td class="el-c">${esc(minLbl(matchTime(s.t),eventHalf({t:s.t})))}</td>`
-        +`<td>${esc(s.no)}. ${esc(playerLabel(names,s.no))}</td>`
-        +`<td>${s.bodyPart?esc(s.bodyPart):'<span style="color:#c9cfd9">–</span>'}</td></tr>`;
-    }).join('');
-    return {rows:list.length,
-      html:`<div class="rp-sub" style="color:${TC(team)}">${esc(TN(team))}</div>`
-        +`<table class="rpt rpt-el"><thead><tr><th class="el-c">#</th><th class="el-c">Time</th>`
-        +`<th>Player</th><th>Body Part</th></tr></thead><tbody>${body}</tbody></table>`};
-  };
-  const h=teamTbl('home'), a=teamTbl('away'), blocks=[h,a].filter(Boolean);
-  if(!blocks.length)return [];
-  const title='Attacking — Shot Event List';
-  const total=blocks.reduce((n,b)=>n+b.rows,0);
-  // both fit on one page when short; otherwise a page each
-  if(total<=32)return [secTitle(title)+blocks.map(b=>b.html).join('<div style="height:14px"></div>')];
-  return blocks.map((b,i)=>secTitle(i?title+' — cont.':title)+b.html);
+function shotsAndGoalsPages(team){
+  const list=shotList(rows,team), names=squadNames(lineups,team);
+  const tr=s=>`<tr><td class="el-c"><span class="rp-elidx" style="background:${shotColor(s.event)}">${s.idx}</span></td>`
+    +`<td class="el-c">${esc(minLbl(matchTime(s.t),eventHalf({t:s.t})))}</td>`
+    +`<td>${esc(s.no)}. ${esc(playerLabel(names,s.no))}</td>`
+    +`<td>${s.bodyPart?esc(s.bodyPart):'<span style="color:#c9cfd9">–</span>'}</td></tr>`;
+  const table=slice=>`<table class="rpt rpt-el"><thead><tr><th class="el-c">#</th><th class="el-c">Time</th>`
+    +`<th>Player</th><th>Body Part</th></tr></thead><tbody>${slice.map(tr).join('')}</tbody></table>`;
+  const title=`Shots &amp; Goals — ${esc(TN(team))}`;
+  const left=`<div class="rp-sgleft"><div class="rp-mtitle" style="color:${TC(team)}">Shots</div>`
+    +vPitchSVG(vUpArrowSVG()+shotDotsV(team))
+    +`<div class="rp-mleg rp-sgleg"><span><i style="background:${C.gold}"></i>Goal</span>`
+    +`<span><i style="background:${C.green}"></i>On target</span>`
+    +`<span><i style="background:#aeb4bc"></i>Off / blocked / missed</span>`
+    +`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
+    +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span></div></div>`;
+  // 26 rows exactly fill the column beside the map/summary (measured against the 1123px
+  // page); 25 leaves a row of headroom for a long team name wrapping in the donut card.
+  // A continuation page is title + table only, so it takes 33 of the ~28px rows.
+  const FIRST=25, CONT=33;
+  const right=`<div class="rp-sgright"><div class="rp-mtitle">Summary</div>${donutCard(team)}`
+    +`<div class="rp-mtitle" style="margin-top:13px">Event List</div>`
+    +(list.length?table(list.slice(0,FIRST)):`<div class="rp-note">No shots recorded.</div>`)
+    +`</div>`;
+  const pages=[secTitle(title)+`<div class="rp-sgwrap">${left}${right}</div>`];
+  for(let i=FIRST;i<list.length;i+=CONT)
+    pages.push(secTitle(title+' — cont.')+table(list.slice(i,i+CONT)));
+  return pages;
 }
 
 /* ================= player stat tables (chunked over pages) ================= */
@@ -991,9 +1004,9 @@ function buildPages(host){
     ...timelinePages(),
     ...formationPages('home'),
     ...formationPages('away'),
-    attackingPage(),
-    shotMapsPage(),
-    ...shotEventListPages(),
+    ...shotsAndGoalsPages('home'),
+    ...shotsAndGoalsPages('away'),
+    attackingComparisonPage(),
     ...attackingPlayerPages(),
     distributionPage(),
     netMapsPage(),
