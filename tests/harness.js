@@ -39,20 +39,24 @@ function scan(s,start,stop){
   }
   throw new Error('unbalanced source while scanning from '+start);
 }
-function grabFunction(name){
-  const m=new RegExp('(?:^|\\n)function '+name+'\\s*\\(').exec(SRC);
-  if(!m)throw new Error('function '+name+' not found in index.html');
-  const from=m.index+(SRC[m.index]==='\n'?1:0);
-  const brace=SRC.indexOf('{',m.index);        // params never destructure here
-  const end=scan(SRC,brace,(d,c,i)=>c==='}'&&d===0?i+1:null);
-  return SRC.slice(from,end);
+/* `src`/`what` default to index.html; pass cloud-sync.js to lift its helpers too (their
+   declarations sit indented inside the module IIFE, hence the optional leading blanks). */
+function grabFunction(name,src,what){
+  src=src||SRC; what=what||'index.html';
+  const m=new RegExp('(?:^|\\n)[ \\t]*(?:async +)?function '+name+'\\s*\\(').exec(src);
+  if(!m)throw new Error('function '+name+' not found in '+what);
+  const from=m.index+(src[m.index]==='\n'?1:0);
+  const brace=src.indexOf('{',m.index);        // params never destructure here
+  const end=scan(src,brace,(d,c,i)=>c==='}'&&d===0?i+1:null);
+  return src.slice(from,end);
 }
-function grabConst(name){
-  const m=new RegExp('(?:^|\\n)(?:const|let) '+name+'\\s*=').exec(SRC);
-  if(!m)throw new Error('const '+name+' not found in index.html');
-  const from=m.index+(SRC[m.index]==='\n'?1:0);
-  const end=scan(SRC,from,(d,c,i)=>c===';'&&d===0?i+1:null);
-  return SRC.slice(from,end);
+function grabConst(name,src,what){
+  src=src||SRC; what=what||'index.html';
+  const m=new RegExp('(?:^|\\n)[ \\t]*(?:const|let) '+name+'\\s*=').exec(src);
+  if(!m)throw new Error('const '+name+' not found in '+what);
+  const from=m.index+(src[m.index]==='\n'?1:0);
+  const end=scan(src,from,(d,c,i)=>c===';'&&d===0?i+1:null);
+  return src.slice(from,end);
 }
 
 // everything the substitution / entry flow needs, in dependency order
@@ -100,7 +104,7 @@ function makeApp(opts){
   vm.createContext(ctx);
   // `function` declarations land on the context by themselves; const/let do not, so they
   // are re-exported explicitly (app.k.evtClass, …) for tests that need them directly
-  vm.runInContext(CONSTS.map(grabConst).concat(FUNCS.map(grabFunction)).join('\n')
+  vm.runInContext(CONSTS.map(n=>grabConst(n)).concat(FUNCS.map(n=>grabFunction(n))).join('\n')
     +'\n;globalThis.k={'+CONSTS.join(',')+'};',ctx,{filename:'index.html-extract.js'});
   return ctx;
 }
@@ -116,16 +120,29 @@ function submit(app,raw,dots){
    so the whole file runs in a sandbox and hands back its helpers (const/let bindings
    are not context properties, hence the explicit re-export). */
 const SHARED=fs.readFileSync(path.join(ROOT,'shared.js'),'utf8');
+const CLOUD=fs.readFileSync(path.join(ROOT,'cloud-sync.js'),'utf8');
 const SHARED_EXPORTS=['esc','squadOnPitch','squadNames','playerLabel','withSquad',
   'computeStats','sortedPlayers','newStat','statRow','sumTeam','passMatrix','pct',
-  'blankTeamLU','zoneAt','EVENT_INC','STAT_HEADERS','STAT_GROUPS',
-  'SHOT_KINDS','BODY_PARTS','shotBodyPart','shotList','shotColor','evKey','classifyCards'];
-function loadShared(){
+  'blankTeamLU','blankLineups','zoneAt','EVENT_INC','STAT_HEADERS','STAT_GROUPS',
+  'SHOT_KINDS','BODY_PARTS','shotBodyPart','shotList','shotColor','evKey','classifyCards',
+  'PT_KEYS','loadLineups','saveLineupsLS','luStamp','lineupsAreFor','lineupsEmpty','migrateLineupStamp'];
+function loadShared(store){
   const ctx={console,document:{getElementById:()=>null},location:{hash:''},
-    localStorage:{getItem:()=>null,setItem(){}}};
+    localStorage:store||{getItem:()=>null,setItem(){}}};
   vm.createContext(ctx);
   vm.runInContext(SHARED+'\n;globalThis.S={'+SHARED_EXPORTS.join(',')+'};',ctx,{filename:'shared.js'});
   return ctx.S;
 }
 
-module.exports={makeApp,submit,grabFunction,grabConst,loadShared,SRC,SHARED,EVENTS};
+/* a localStorage stand-in that also records the ORDER of the writes — the lineups store
+   and its match stamp must land in the right sequence for other tabs to read them */
+function fakeStorage(seed){
+  const map=new Map(Object.entries(seed||{})), writes=[];
+  return {writes,
+    getItem:k=>map.has(k)?map.get(k):null,
+    setItem(k,v){map.set(k,String(v));writes.push(k);},
+    removeItem(k){map.delete(k);},
+    snapshot:()=>Object.fromEntries(map)};
+}
+
+module.exports={makeApp,submit,grabFunction,grabConst,loadShared,fakeStorage,SRC,SHARED,CLOUD,EVENTS};

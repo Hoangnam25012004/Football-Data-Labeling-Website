@@ -680,9 +680,31 @@ const DEFAULT_EVENTS = {
 const SPORTS=['football','football7','futsal','basketball'];
 /* lineups store — declared before `state` so loadLineups() has no temporal-dead-zone issue */
 const LU_STORE='pitchtagger.lineups.v1';
+const LU_MATCH_STORE='pitchtagger.lineups.match.v1';
 const blankTeamLU=dir=>({roster:[],xi:[],subs:[],dir:dir||'lr'});
 function loadLineups(){try{const s=localStorage.getItem(LU_STORE);if(s){const o=JSON.parse(s);if(o&&o.home&&o.away)return o;}}catch(e){}
   return {home:blankTeamLU('lr'),away:blankTeamLU('rl')};}
+/* ---- which match the stored lineups belong to (mirrored in shared.js for the sub-pages) ----
+   A lineup set belongs to exactly ONE match, but localStorage is shared by every tab and by
+   every match this browser has ever opened. The stamp records which match the stored copy is
+   for: readers check it before trusting the copy, writers set it. Without it a second window
+   sitting on another match — or on no match at all — wrote its own, usually empty, squad over
+   the open match's, here AND (relayed to the cloud below) in the database, and the lineup +
+   formation that had just been entered were gone for good. */
+function luStamp(){try{const s=localStorage.getItem(LU_MATCH_STORE);return s==null?null:String(s);}catch(e){return null;}}
+const lineupsAreFor=id=>!!id&&luStamp()===String(id);
+const teamLUEmpty=t=>!t||(!(t.roster||[]).length&&!(t.xi||[]).length&&!(t.subs||[]).length);
+const lineupsEmpty=l=>!l||(teamLUEmpty(l.home)&&teamLUEmpty(l.away)&&!((l.history||[]).length));
+/* Stamp FIRST, then the lineups: a tab woken by the lineups event then always reads the stamp
+   that goes with the copy it is being handed. A write with no match open is refused while the
+   store still holds a real squad — that copy is the only one there is until its match is
+   opened again. Returns false when the write was refused. */
+function writeLineupsLS(l,matchId){
+  const id=String(matchId||'');
+  if(!id&&!lineupsEmpty(loadLineups()))return false;
+  try{localStorage.setItem(LU_MATCH_STORE,id);localStorage.setItem(LU_STORE,JSON.stringify(l));}catch(e){}
+  return true;
+}
 // team ids (public.teams) + match id/code of the currently open match — restored via the meta store
 function loadTeamIds(){try{const m=JSON.parse(localStorage.getItem('pitchtagger.meta.v1'))||{};
   return {home:m.homeTeamId||null,away:m.awayTeamId||null,matchId:m.matchId||null,code:m.matchCode||null};}
@@ -698,6 +720,10 @@ const state = {
   teamIds:loadTeamIds(),       // {home:uuid|null, away:uuid|null} — teams table ids of the open match
   rows:[], fps:25
 };
+// one-off: a store written before the stamp existed belongs to the match the meta store
+// still names — the two were only ever written together, for the match that was open.
+try{if(localStorage.getItem(LU_MATCH_STORE)==null)
+  localStorage.setItem(LU_MATCH_STORE,String(state.teamIds.matchId||''));}catch(e){}
 let pvRedraw=null, pvTogglePitch=null, pvSyncEntry=null, pvRenderPitch=null; // set while the video window is open
 const fmtXY=xy=>xy?Math.round(xy.x)+','+Math.round(xy.y):'—';
 // remove the most-recently-placed pitch dot — Esc undoes one at a time
@@ -735,28 +761,54 @@ function subPageUrl(page){
   const c=state.teamIds.code||state.teamIds.matchId;
   return page+'/'+(state.teamIds.matchId&&c?'#match='+c:'');
 }
-// blank both lineups (a lineup belongs to ONE match — used when no match is open,
-// or when the opened match has no lineups saved yet)
-function resetLineups(){
+/* The opened match carries no lineups yet. That normally means nobody has entered one,
+   BUT it also happens when the squad was entered on the Player lists tab while it could
+   not reach the database — then the copy stamped for this very match in this browser is
+   the ONLY one there is, and blanking it here threw it away. So: adopt it and push it up
+   instead. (`lineups` only stays null until the first save ever, so an intentional clear —
+   which writes an empty object — is still respected.) */
+function resetLineups(matchId){
+  const id=matchId||state.teamIds.matchId||'';
+  const local=loadLineups();
+  if(lineupsAreFor(id)&&!lineupsEmpty(local)){
+    state.lineups=local;
+    writeLineupsLS(local,id);
+    window.Cloud&&window.Cloud.onLineupsChanged&&window.Cloud.onLineupsChanged(local,id);
+    refreshFormation();
+    return;
+  }
   state.lineups={home:blankTeamLU('lr'),away:blankTeamLU('rl')};
-  try{localStorage.setItem(LU_STORE,JSON.stringify(state.lineups));}catch(e){}
+  writeLineupsLS(state.lineups,id);
   refreshFormation();
 }
 // live sync FROM the sub-pages: Player-Lists edits lineups -> refresh the main-tab formation
 window.addEventListener('storage',e=>{
-  if(e.key===LU_STORE){try{const o=JSON.parse(e.newValue);if(o&&o.home&&o.away){
-    state.lineups=o; refreshFormation();
-    window.Cloud&&window.Cloud.onLineupsChanged&&window.Cloud.onLineupsChanged(o);
-  }}catch(_){}}
+  if(e.key!==LU_STORE)return;
+  // Only a copy stamped for the match THIS tab has open may be adopted — and only such a
+  // copy may be relayed to the database. A second window on another match (or on none)
+  // used to push its own, usually empty, squad over this match's and wipe it for everyone.
+  const id=state.teamIds.matchId;
+  if(!lineupsAreFor(id))return;
+  try{const o=JSON.parse(e.newValue); if(!o||!o.home||!o.away)return;
+    state.lineups=o;
+    if($('lineupModal')&&$('lineupModal').classList.contains('show'))renderLineup();
+    if($('fmModal')&&$('fmModal').classList.contains('show'))renderFmModal();
+    refreshFormation();
+    window.Cloud&&window.Cloud.onLineupsChanged&&window.Cloud.onLineupsChanged(o,id);
+  }catch(_){}
 });
 
 /* ===================== PLAYER LISTS / FORMATION ===================== */
-function saveLineups(){try{localStorage.setItem(LU_STORE,JSON.stringify(state.lineups));}catch(e){}
-  window.Cloud&&window.Cloud.onLineupsChanged&&window.Cloud.onLineupsChanged(state.lineups); refreshFormation();}
-function applyCloudLineups(l){
+function saveLineups(){
+  const id=state.teamIds.matchId;
+  writeLineupsLS(state.lineups,id);
+  window.Cloud&&window.Cloud.onLineupsChanged&&window.Cloud.onLineupsChanged(state.lineups,id);
+  refreshFormation();
+}
+function applyCloudLineups(l,matchId){
   if(!l||!l.home||!l.away)return;
   state.lineups=l;
-  try{localStorage.setItem(LU_STORE,JSON.stringify(l));}catch(e){}
+  writeLineupsLS(l,matchId||state.teamIds.matchId);
   if($('lineupModal')&&$('lineupModal').classList.contains('show'))renderLineup();
   if($('fmModal')&&$('fmModal').classList.contains('show'))renderFmModal();
   refreshFormation();
@@ -906,7 +958,9 @@ function renderFormationSubs(){
 function refreshFormation(){ renderFormationMain(); }   // formation is always shown on the main tab
 // '_blank' (not a fixed window name) so this always opens a fresh new tab instead of
 // re-navigating a previously-opened one (which some browsers surface as "replacing" the tab)
-$('lineupBtn').onclick=()=>{saveMeta();saveLineups();window.open(subPageUrl('Player-Lists'),'_blank');};
+// saveLineups() only when a match is open: with none, `state.lineups` is the blank
+// placeholder and saving it would clear the stored squad the next opened match needs
+$('lineupBtn').onclick=()=>{saveMeta();if(state.teamIds.matchId)saveLineups();window.open(subPageUrl('Player-Lists'),'_blank');};
 $('lineupClose').onclick=()=>$('lineupModal').classList.remove('show');
 $('lineupModal').addEventListener('click',e=>{if(e.target===$('lineupModal'))$('lineupModal').classList.remove('show');});
 $('luHomeBtn').onclick=()=>{lineupTeam='home';renderLineup();};
@@ -2664,13 +2718,14 @@ function renderMatchPreview(res){
   };
 }
 
-// opening the site WITHOUT a #match= link means no match is open -> drop any
-// leftover match link + lineups from the previous session (lineups are per-match;
-// re-opening a match reloads its own lineups from the matches table)
+// Opening the site WITHOUT a #match= link means no match is open -> drop the leftover
+// match link and show no formation. The STORED lineups are deliberately left alone: they
+// stay stamped with the match they belong to, so re-opening that match picks them up
+// again. Blanking the store here was the wipe itself — a second window still live on that
+// match saw the change, relayed it to the database, and the squad + formation were gone.
 if(!/match=/i.test(location.hash)){
-  state.teamIds={home:null,away:null,matchId:null};
+  state.teamIds={home:null,away:null,matchId:null,code:null};
   state.lineups={home:blankTeamLU('lr'),away:blankTeamLU('rl')};
-  try{localStorage.setItem(LU_STORE,JSON.stringify(state.lineups));}catch(e){}
   saveMeta();
 }
 
@@ -2680,6 +2735,6 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
 </script>
-<script src="cloud-sync.js?v=42"></script>
+<script src="cloud-sync.js?v=43"></script>
 </body>
 </html>

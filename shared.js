@@ -13,6 +13,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;',
 const PT_KEYS = {
   events:'pitchtagger.events.v1',
   lineups:'pitchtagger.lineups.v1',
+  lineupsMatch:'pitchtagger.lineups.match.v1',
   duration:'pitchtagger.duration.v1',
   rows:'pitchtagger.rows.v1',
   meta:'pitchtagger.meta.v1'
@@ -20,8 +21,36 @@ const PT_KEYS = {
 function loadJSON(k,def){try{const s=localStorage.getItem(k);if(s){const o=JSON.parse(s);if(o!=null)return o;}}catch(e){}return def;}
 function loadRows(){const r=loadJSON(PT_KEYS.rows,[]);return Array.isArray(r)?r:[];}
 const blankTeamLU=dir=>({roster:[],xi:[],subs:[],dir:dir||'lr'});
-function loadLineups(){const o=loadJSON(PT_KEYS.lineups,null);return (o&&o.home&&o.away)?o:{home:blankTeamLU('lr'),away:blankTeamLU('rl')};}
-function saveLineupsLS(l){try{localStorage.setItem(PT_KEYS.lineups,JSON.stringify(l));}catch(e){}}
+const blankLineups=()=>({home:blankTeamLU('lr'),away:blankTeamLU('rl')});
+function loadLineups(){const o=loadJSON(PT_KEYS.lineups,null);return (o&&o.home&&o.away)?o:blankLineups();}
+
+/* ---- which match the stored lineups belong to ----
+   A lineup set belongs to exactly ONE match, but localStorage is shared by every tab and
+   by every match this browser has ever opened. The stamp records which match the stored
+   copy is for: readers check it before trusting the copy, writers set it. Without it a
+   window sitting on another match — or on no match at all — wrote its own, usually empty,
+   squad over the open match's, in localStorage AND (relayed by the tagging tab) in the
+   database, and the lineup + formation that had just been entered simply disappeared. */
+const luStamp=()=>{try{const s=localStorage.getItem(PT_KEYS.lineupsMatch);return s==null?null:String(s);}catch(e){return null;}};
+const lineupsAreFor=id=>!!id&&luStamp()===String(id);
+const teamLUEmpty=t=>!t||(!(t.roster||[]).length&&!(t.xi||[]).length&&!(t.subs||[]).length);
+const lineupsEmpty=l=>!l||(teamLUEmpty(l.home)&&teamLUEmpty(l.away)&&!((l.history||[]).length));
+/* Stamp FIRST, then the lineups: a tab woken by the lineups event then always reads the
+   stamp that goes with the copy it is being handed. A write with no match open is refused
+   while the store still holds a real squad — that copy is the only one there is until its
+   match is opened again. */
+function saveLineupsLS(l,matchId){
+  const id=String(matchId||'');
+  if(!id&&!lineupsEmpty(loadLineups()))return false;
+  try{localStorage.setItem(PT_KEYS.lineupsMatch,id);localStorage.setItem(PT_KEYS.lineups,JSON.stringify(l));}catch(e){}
+  return true;
+}
+// one-off: a store written before the stamp existed belongs to the match the meta store
+// still names — the two were only ever written together, for the match that was open.
+function migrateLineupStamp(matchId){
+  try{if(localStorage.getItem(PT_KEYS.lineupsMatch)==null)
+    localStorage.setItem(PT_KEYS.lineupsMatch,String(matchId||''));}catch(e){}
+}
 function loadMeta(){const m=loadJSON(PT_KEYS.meta,null)||{};return {home:m.home||'Home',away:m.away||'Away',sport:m.sport||'football',
   homeTeamId:m.homeTeamId||null,awayTeamId:m.awayTeamId||null,matchId:m.matchId||null,matchCode:m.matchCode||null};}
 /* "← Tagging" must return WITH the match (…/#match=<code>) or the main tab treats the

@@ -225,8 +225,9 @@ const CONFIG = {
     if (PT().setMatchTeams) PT().setMatchTeams(row.home_team_id || null, row.away_team_id || null, row.id, row.code || null);
     if (row.config) PT().applyCloudDuration(row.config);   // load this match's duration mapping
     // lineups belong to THIS match: load them, or start blank when the match has none yet
-    if (row.lineups) PT().applyCloudLineups(row.lineups);
-    else if (PT().resetLineups) PT().resetLineups();
+    // (the match id travels along so the local copy is stamped for the right match)
+    if (row.lineups) PT().applyCloudLineups(row.lineups, row.id);
+    else if (PT().resetLineups) PT().resetLineups(row.id);
     // the video belongs to THIS match: load its shared URL, or — when switching to a match
     // that has none — unload whatever was playing, or the PREVIOUS match's video keeps
     // running on the new one (bug: 32746's video played on 51977).
@@ -266,7 +267,7 @@ const CONFIG = {
           if (!p.new) return;
           setTeamInputs(p.new.home_name, p.new.away_name);
           if (p.new.config) PT().applyCloudDuration(p.new.config);
-          if (p.new.lineups) PT().applyCloudLineups(p.new.lineups);
+          if (p.new.lineups) PT().applyCloudLineups(p.new.lineups, matchId);
           // video changed on THIS match (a URL was set, swapped, or removed)
           if ((p.new.video_url || null) !== lastVideoUrl) {
             lastVideoUrl = p.new.video_url || null;
@@ -334,13 +335,23 @@ const CONFIG = {
       if (error) console.warn('duration save:', error.message);
     }, 250);
   }
-  // called by the app when player lists / formation change -> save on the match (matches.lineups)
+  // Called by the app when player lists / formation change -> save on the match
+  // (matches.lineups). `forMatchId` names the match the caller's lineups belong to and
+  // MUST match the open one: a lineup set is per-match, and a copy that came from another
+  // match (or from a window with no match open, i.e. an empty one) would otherwise be
+  // written straight over this match's squad and formation — the data-loss bug.
   let luTimer = null;
-  function onLineupsChanged(l) {
+  function onLineupsChanged(l, forMatchId) {
     if (!connected || !matchId) return;
+    if (String(forMatchId || '') !== String(matchId)) {
+      console.warn('lineups save skipped: copy belongs to match', forMatchId || '(none)', 'not', matchId);
+      return;
+    }
+    const forId = matchId;
     clearTimeout(luTimer);
     luTimer = setTimeout(async () => {
-      const { error } = await sb.from('matches').update({ lineups: l }).eq('id', matchId);
+      if (forId !== matchId) return;                 // another match was opened while we waited
+      const { error } = await sb.from('matches').update({ lineups: l }).eq('id', forId);
       if (error) console.warn('lineups save:', error.message);
     }, 300);
   }

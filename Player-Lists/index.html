@@ -82,9 +82,19 @@
   </div>
 </div>
 
-<script src="../shared.js?v=13"></script>
+<script src="../shared.js?v=14"></script>
 <script>
-let lineups=loadLineups(), meta=loadMeta(), lineupTeam='home';
+let meta=loadMeta();
+migrateLineupStamp(meta.matchId);                 // stores written before stamps existed
+/* `lineups` is only ever this ONE match's squad. localStorage is shared by every tab and
+   by every match this browser has opened, so the copy stored there is trusted only while
+   it is stamped for the open match (`luMatchId`); the match row in the database is the
+   source of truth and is read on load and on every match change. `luReady` stays false
+   until that resolves — and nothing is saved while it is false, or a squad belonging to
+   another match would be written over this one's, locally and in the database. */
+let luMatchId=meta.matchId||null, luReady=false;
+let lineups=lineupsAreFor(luMatchId)?loadLineups():blankLineups();
+let lineupTeam='home';
 let poolSort={key:'no',dir:1}, finalSort={key:'no',dir:1};
 function teamLU(){return lineups[lineupTeam];}
 function maxXI(){return MAX_XI[meta.sport]||11;}
@@ -96,21 +106,57 @@ function splitName(name){
   if(parts.length<2)return {first:parts[0]||'',last:''};
   return {first:parts.slice(0,-1).join(' '),last:parts[parts.length-1]};
 }
+function setSaveStatus(txt,warn){const st=$('saveStatus');
+  if(st){st.textContent=txt||'';st.style.color=warn?'var(--warn)':'var(--accent)';}}
 // save = localStorage (main tab mirrors it live via `storage`) + push straight to the
 // match row in Supabase, so saving never depends on the main tab being open to relay —
 // before this, edits made here could be overwritten by the stale cloud copy on reload.
+// Both writes are stamped with the match they belong to and are skipped entirely until
+// `lineups` is known to be that match's, so this page can never clear another match's squad.
 let pushTimer=null;
 function save(){
-  saveLineupsLS(lineups);
-  if(sb&&meta.matchId){
+  const id=meta.matchId;
+  if(!luReady||!id||id!==luMatchId)return;
+  saveLineupsLS(lineups,id);
+  if(sb){
     clearTimeout(pushTimer);
     pushTimer=setTimeout(async()=>{
-      const {error}=await sb.from('matches').update({lineups}).eq('id',meta.matchId);
-      const st=$('saveStatus');
-      if(st){st.textContent=error?'⚠ cloud save failed: '+error.message:'☁ saved to the match';st.style.color=error?'var(--warn)':'var(--accent)';}
+      if(meta.matchId!==id)return;            // another match was opened while we waited
+      const {error}=await sb.from('matches').update({lineups}).eq('id',id);
+      setSaveStatus(error?'⚠ cloud save failed: '+error.message:'☁ saved to the match',!!error);
       if(error)console.warn('lineups save:',error.message);
     },300);
   }
+}
+/* Read this match's squad from the match row — the source of truth — and only fall back to
+   the local copy when it is stamped for this same match. Called on load and whenever the
+   tagging tab opens a different match. */
+async function loadMatchLineups(){
+  const id=meta.matchId||null;
+  luMatchId=id; luReady=false;
+  lineups=lineupsAreFor(id)?loadLineups():blankLineups();   // usable straight away
+  renderLineup();
+  if(!id)return;
+  if(!sb){                                  // no database: the local copy is all there is
+    luReady=lineupsAreFor(id);
+    if(!luReady)setSaveStatus('⚠ '+(dbErr||'offline')+' — open this match in the tagging tab first',true);
+    renderLineup(); return;
+  }
+  const {data,error}=await sb.from('matches').select('lineups').eq('id',id).maybeSingle();
+  if(meta.matchId!==id)return;               // the open match changed while we waited
+  if(error){                                 // luReady stays false: never write over a copy we could not read
+    setSaveStatus('⚠ could not load this match’s squad: '+error.message,true);
+    console.warn('lineups load:',error.message); return;
+  }
+  const cloud=data&&data.lineups;
+  const hadLocal=lineupsAreFor(id)&&!lineupsEmpty(lineups);
+  if(cloud&&cloud.home&&cloud.away){lineups=cloud;saveLineupsLS(lineups,id);}
+  else if(!hadLocal)lineups=blankLineups();
+  luReady=true;
+  // the match has nothing saved yet but this browser does (entered while offline) —
+  // that copy is the only one there is, so put it in the match row now
+  if(!(cloud&&cloud.home&&cloud.away)&&hadLocal)save();
+  renderLineup();
 }
 
 /* ===== team players from the DATABASE (public.players) =====
@@ -118,14 +164,22 @@ function save(){
    is assigned here, per match, when the player is ticked into the squad. Without a
    database link the same pool is filled from this match's own squad instead. */
 const CLOUD_CFG='pitchtagger.cloud.cfg';
+const SB_CONFIG={   // public values — keep in sync with CONFIG in ../cloud-sync.js
+  url:'https://xtzmtdcohoixoxqusyyz.supabase.co',
+  anonKey:'sb_publishable_ZcIbdPmEdfW0POArBW_eNg_aZbc-lFa'
+};
 let sb=null, dbPlayers={home:[],away:[]}, dbErr='';
 function teamIdFor(team){return team==='home'?meta.homeTeamId:meta.awayTeamId;}
 function dbOn(){return !!(sb&&teamIdFor(lineupTeam));}
 async function initDB(){
   let c={}; try{c=JSON.parse(localStorage.getItem(CLOUD_CFG))||{};}catch(e){}
-  if(!c.url||!c.key||!window.supabase){dbErr='Cloud is not configured (connect it in the tagging tab)';renderPool();return;}
+  // fall back to the built-in public values (as the Stats page does), so this page reaches
+  // the database even in a browser where the tagging tab has never pressed Connect —
+  // without it the squad entered here lived in localStorage only, one wipe from gone
+  const url=c.url||SB_CONFIG.url, key=c.key||SB_CONFIG.anonKey;
+  if(!url||!key||!window.supabase){dbErr='Cloud is not configured (connect it in the tagging tab)';renderPool();return;}
   try{
-    sb=window.supabase.createClient(c.url,c.key);
+    sb=window.supabase.createClient(url,key);
     const {data:{session}}=await sb.auth.getSession();
     if(!session){const {error}=await sb.auth.signInAnonymously(); if(error)throw error;}
   }catch(e){sb=null;dbErr='could not reach the database';renderPool();return;}
@@ -411,12 +465,22 @@ document.querySelectorAll('.lu-tbl th.sortable').forEach(th=>{
 
 /* live sync with the main tagging tab (team names / sport / team ids / cloud edits) */
 window.addEventListener('storage',e=>{
-  if(e.key===PT_KEYS.meta){meta=loadMeta();renderLineup();loadDbPlayers();}
-  else if(e.key===PT_KEYS.lineups){lineups=loadLineups();renderLineup();}
+  if(e.key===PT_KEYS.meta){
+    const prev=meta.matchId; meta=loadMeta(); loadDbPlayers();
+    // a DIFFERENT match was opened over there -> load its squad, never carry this one over
+    if(meta.matchId!==prev)loadMatchLineups(); else renderLineup();
+  }
+  else if(e.key===PT_KEYS.lineups){
+    if(!lineupsAreFor(meta.matchId))return;   // another match's copy — not ours to show or save
+    lineups=loadLineups(); luMatchId=meta.matchId; luReady=true; renderLineup();
+  }
 });
 
-renderLineup();
-initDB();
+(async function boot(){
+  renderLineup();            // paint immediately; the squad below may still be on its way
+  await initDB();            // players database (also gives us `sb` for the match row)
+  await loadMatchLineups();  // the match row decides which squad this page edits
+})();
 </script>
 </body>
 </html>
