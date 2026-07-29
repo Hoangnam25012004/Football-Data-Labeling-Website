@@ -156,7 +156,9 @@ const EVENT_INC={
   'cross fail':['crosses'],
   'take-on succes':['takeOns','takeOnsWon'],
   'take-on fail':['takeOns'],
-  'take-on concern':['takeOns'],
+  // a take-on the defender made uncomfortable: still one of this player's take-ons
+  // (Distribution), and counted on its own under Defensive
+  'take-on concern':['takeOns','takeOnConcerns'],
   'step in':['stepIns'],
   'tackle success':['tackles','tacklesWon'],
   'tackle fail':['tackles'],
@@ -179,15 +181,15 @@ const EVENT_INC={
   'mistake':['mistakes'],
   'save':['saves']
 };
-const STAT_GROUPS=[['',1],['Shooting',8],['Distribution',10],['Defensive',8],['Duels',4],['Set Pieces',4],['Discipline',4]];
+const STAT_GROUPS=[['',1],['Shooting',8],['Distribution',10],['Defensive',9],['Duels',4],['Set Pieces',4],['Discipline',4]];
 const STAT_HEADERS=['No','Goals','Assists','Total Shots','Shots On Target','Shots Off Target','Blocked Shots','Miss Shots','Shooting Accuracy',
   'Passes','Passes Completed','Pass Accuracy','Crosses','Crosses Completed','Cross Accuracy',
   'Take-ons','Take-ons Won','Take-on Success','Step-ins',
-  'Tackles','Tackles Won','Tackle Success','Interceptions','Clearances','Blocks','Recoveries','Mistakes',
+  'Tackles','Tackles Won','Tackle Success','Interceptions','Clearances','Blocks','Recoveries','Take-on Concerns','Mistakes',
   'Ground Duels','Ground Duels Won','Aerial Duels','Aerial Duels Won',
   'Corners','Free-kicks','Throw-ins','Goal Kicks','Fouls','Fouls Won','Offsides','Saves'];
 function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,shotsOff:0,shotsBlocked:0,missShots:0,passes:0,passesComp:0,
-  crosses:0,crossesComp:0,takeOns:0,takeOnsWon:0,stepIns:0,tackles:0,tacklesWon:0,interceptions:0,
+  crosses:0,crossesComp:0,takeOns:0,takeOnsWon:0,takeOnConcerns:0,stepIns:0,tackles:0,tacklesWon:0,interceptions:0,
   clearances:0,blocks:0,recoveries:0,groundDuels:0,groundDuelsWon:0,aerialDuels:0,aerialDuelsWon:0,
   corners:0,freeKicks:0,penalties:0,throwIns:0,goalKicks:0,fouls:0,foulsWon:0,offsides:0,mistakes:0,saves:0};}
 const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
@@ -206,7 +208,7 @@ function computeStats(rows,team){
 function statRow(no,s){return[no,s.goals,s.assists,s.totalShots,s.shotsOn,s.shotsOff,s.shotsBlocked,s.missShots,pct(s.shotsOn,s.totalShots),
   s.passes,s.passesComp,pct(s.passesComp,s.passes),s.crosses,s.crossesComp,pct(s.crossesComp,s.crosses),
   s.takeOns,s.takeOnsWon,pct(s.takeOnsWon,s.takeOns),s.stepIns,
-  s.tackles,s.tacklesWon,pct(s.tacklesWon,s.tackles),s.interceptions,s.clearances,s.blocks,s.recoveries,s.mistakes,
+  s.tackles,s.tacklesWon,pct(s.tacklesWon,s.tackles),s.interceptions,s.clearances,s.blocks,s.recoveries,s.takeOnConcerns,s.mistakes,
   s.groundDuels,s.groundDuelsWon,s.aerialDuels,s.aerialDuelsWon,
   s.corners,s.freeKicks,s.throwIns,s.goalKicks,s.fouls,s.foulsWon,s.offsides,s.saves];}
 function sortedPlayers(P){return Object.keys(P).sort((a,b)=>{const na=+a,nb=+b;
@@ -333,7 +335,7 @@ const TEAM_SECTIONS=[
     ['Recoveries',(s,o)=>s.recoveries],['Clearances',(s,o)=>s.clearances],['Blocks',(s,o)=>s.blocks],
     ['Aerial Duels',(s,o)=>s.aerialDuels],['Aerial Duels Won',(s,o)=>s.aerialDuelsWon],
     ['Ground Duels',(s,o)=>s.groundDuels],['Ground Duels Won',(s,o)=>s.groundDuelsWon],
-    ['Mistakes',(s,o)=>s.mistakes]]],
+    ['Take-on Concerns',(s,o)=>s.takeOnConcerns],['Mistakes',(s,o)=>s.mistakes]]],
   ['Discipline & GK',[
     ['Goals Conceded',(s,o)=>o.goals],['Saves',(s,o)=>s.saves],['Fouls',(s,o)=>s.fouls],
     ['Offsides',(s,o)=>s.offsides],['Corners',(s,o)=>s.corners],

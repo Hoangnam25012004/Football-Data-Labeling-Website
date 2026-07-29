@@ -79,11 +79,13 @@ table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
 .rp-tlwrap{position:relative;padding:2px 0}
 .rp-tlspine{position:absolute;left:50%;top:12px;bottom:12px;width:2px;margin-left:-1px;background:#dfe5ee}
 .rp-tlrow{display:flex;align-items:center;padding:4.5px 0;font-size:11px;position:relative}
-.rp-tlh{flex:1;display:flex;justify-content:flex-end;align-items:center;gap:7px;font-weight:700;padding-right:14px}
-.rp-tla{flex:1;display:flex;justify-content:flex-start;align-items:center;gap:7px;font-weight:700;padding-left:14px}
+.rp-tlh{flex:1;min-width:0;display:flex;justify-content:flex-end;align-items:center;gap:7px;font-weight:700;padding-right:14px}
+.rp-tla{flex:1;min-width:0;display:flex;justify-content:flex-start;align-items:center;gap:7px;font-weight:700;padding-left:14px}
+/* the label carries the player's name now, so it is the part that gives way on a long one */
+.rp-tltxt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rp-tlmin{flex:none;min-width:58px;box-sizing:border-box;text-align:center;background:${C.navy};color:#fff;
   border-radius:15px;border:3px solid #fff;padding:3.5px 8px;font-size:10.5px;font-weight:800;position:relative}
-.rp-tlsc{color:${C.navy};font-weight:800;font-size:9.5px;background:#eef3f9;border:1px solid #d9e3f0;border-radius:9px;padding:1.5px 7px;white-space:nowrap}
+.rp-tlsc{flex:none;color:${C.navy};font-weight:800;font-size:9.5px;background:#eef3f9;border:1px solid #d9e3f0;border-radius:9px;padding:1.5px 7px;white-space:nowrap}
 .rp-tlsep{text-align:center;margin:10px 0;position:relative}
 .rp-tlsep span{display:inline-block;background:#eef3f9;color:${C.navy};border:1px solid #d9e3f0;border-radius:15px;
   padding:4.5px 18px;font-size:9.5px;font-weight:800;letter-spacing:1.2px;position:relative}
@@ -140,14 +142,19 @@ const legend=()=>`<div class="rp-leg"><span><i style="background:${C.home}"></i>
 const pill=(no,team)=>`<span class="rp-pill" style="background:${TC(team)}">${esc(no)}</span>`;
 const BALL=`<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px"><circle cx="10" cy="10" r="9" fill="#fff" stroke="#333" stroke-width="1.6"/><polygon points="10,5.5 13.8,8.3 12.4,12.8 7.6,12.8 6.2,8.3" fill="#333"/></svg>`;
 
-/* comparison bars — home fill anchors right (grows toward centre), away anchors left */
+/* Comparison bars — home fill anchors right (grows toward centre), away anchors left.
+   Each side gets its SHARE of the two values, exactly as the Stats tab's General view
+   does: 2 goals each reads 50% / 50%. Scaling both against the larger value instead
+   pinned whoever led at 100%, so every row the home side won looked maxed out and the
+   two bars no longer said anything about how close the contest was. Nothing to compare
+   (0 – 0) splits down the middle. */
 function cmpRows(rowsArr){
   return rowsArr.map(([lbl,hv,av])=>{
-    const hn=numOf(hv), an=numOf(av), mx=Math.max(hn,an)||1;
+    const hn=numOf(hv), an=numOf(av), tot=hn+an, hp=tot?hn/tot*100:50;
     return `<div class="rp-cmprow"><span class="rp-cv" style="color:${C.home}">${hv}</span>`
-      +`<span class="rp-track"><span class="rp-fill rp-fh" style="width:${(hn/mx*100).toFixed(1)}%;background:${C.home}"></span></span>`
+      +`<span class="rp-track"><span class="rp-fill rp-fh" style="width:${hp.toFixed(1)}%;background:${C.home}"></span></span>`
       +`<span class="rp-cl">${lbl}</span>`
-      +`<span class="rp-track"><span class="rp-fill" style="width:${(an/mx*100).toFixed(1)}%;background:${C.away}"></span></span>`
+      +`<span class="rp-track"><span class="rp-fill" style="width:${(100-hp).toFixed(1)}%;background:${C.away}"></span></span>`
       +`<span class="rp-cv" style="color:${C.away};text-align:left">${av}</span></div>`;
   }).join('');
 }
@@ -232,6 +239,15 @@ function headerBlock(){
     +`<div style="text-align:center;font-size:11.5px;color:${C.mut};margin-bottom:18px">`
     +`Home (Blue)${fH?' '+fH:''} · Away (Amber)${fA?' '+fA:''}</div>`;
 }
+/* "#9 Bacuna" — the shirt number always, plus the registered name when Player lists has
+   one for it. playerLabel() would fall back to "Player 9", which only repeats the number,
+   so an unregistered shirt stays bare. */
+const tlNames={};
+function tlWho(team,no){
+  const n=String(no==null?'':no).trim(); if(!n)return '';
+  const names=tlNames[team]||(tlNames[team]=squadNames(lineups,team)||{});
+  return `#${esc(n)}${names[n]?' '+esc(names[n]):''}`;
+}
 function timelineEvents(){
   const evs=[];
   // a 2nd yellow already reads as "2nd Yellow → Red"; classifyCards drops a redundant
@@ -250,22 +266,22 @@ function timelineEvents(){
     if(pen){mergedPens.add(pen);penGoals.add(r);}
   });
   sorted.forEach(r=>{
-    const sec=matchTime(r.t), no=esc(String(r.playerFrom||'').trim()), team=r.team, half=eventHalf(r);
+    const sec=matchTime(r.t), team=r.team, half=eventHalf(r), who=tlWho(team,r.playerFrom);
     const push=(kind,html)=>evs.push({sec,team,kind,half,html});
     if(r.event==='goal'){
       let as=assists.find(x=>x.team===team&&x.grp!=null&&x.grp===r.grp);
       if(!as)as=assists.filter(x=>x.team===team&&Math.abs(x.t-r.t)<=45)
         .sort((x,y)=>Math.abs(x.t-r.t)-Math.abs(y.t-r.t))[0];
-      const an=as?String(as.playerFrom||'').trim():'';
+      const an=as?tlWho(team,as.playerFrom):'';
       const tags=[];
       if(penGoals.has(r))tags.push('Penalty');
-      if(an)tags.push('A #'+esc(an));
-      push('goal',`Goal #${no}${tags.length?` <span style="color:${C.mut};font-weight:600;font-size:10px">(${tags.join(' · ')})</span>`:''}`);
+      if(an)tags.push('A '+an);
+      push('goal',`Goal ${who}${tags.length?` <span style="color:${C.mut};font-weight:600;font-size:10px">(${tags.join(' · ')})</span>`:''}`);
     }
-    else if(r.event==='own goal'||r.event==='own-goal')push('og',`Own Goal #${no}`);
+    else if(r.event==='own goal'||r.event==='own-goal')push('og',`Own Goal ${who}`);
     else if(r.event==='yellow card')
-      push(cardKind.get(r),cardKind.get(r)==='y2'?`2nd Yellow → Red #${no}`:`Yellow Card #${no}`);
-    else if(r.event==='red card'){ if(cardKind.get(r)==='rc')push('rc',`Red Card #${no}`); }
+      push(cardKind.get(r),cardKind.get(r)==='y2'?`2nd Yellow → Red ${who}`:`Yellow Card ${who}`);
+    else if(r.event==='red card'){ if(cardKind.get(r)==='rc')push('rc',`Red Card ${who}`); }
     // substitutions are intentionally left off the report timeline
   });
   // half first, then time: first-half stoppage (45+X') overlaps the opening
@@ -280,7 +296,7 @@ function tlIcon(e){
   return `<span class="rp-cardi" style="background:#f5c518"></span><span class="rp-cardi" style="background:${C.red};margin-left:-4px"></span>`;
 }
 function tlRow(e,score){
-  const item=`${tlIcon(e)}<span style="color:${TC(e.team)}">${e.html}</span>`
+  const item=`${tlIcon(e)}<span class="rp-tltxt" style="color:${TC(e.team)}">${e.html}</span>`
     +(score?`<span class="rp-tlsc">${score}</span>`:'');
   return `<div class="rp-tlrow"><div class="rp-tlh">${e.team==='home'?item:''}</div>`
     +`<span class="rp-tlmin">${minLbl(e.sec,e.half)}</span>`
@@ -479,10 +495,10 @@ const distributionPlayerPages=()=>playerStatPages('Distribution — Player Stats
 // cards are reported on the Goalkeeper & Discipline page, not here
 function defensivePlayerPages(){
   return playerStatPages('Defensive — Player Stats',
-    ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Ground','Fouls','F.Won','Mistakes'],
+    ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Ground','Fouls','F.Won','T-on Con','Mistakes'],
     s=>[frac(s.tacklesWon,s.tackles),pc0(s.tacklesWon,s.tackles),dotv(s.interceptions),dotv(s.clearances),
       dotv(s.blocks),dotv(s.recoveries),frac(s.aerialDuelsWon,s.aerialDuels),frac(s.groundDuelsWon,s.groundDuels),
-      dotv(s.fouls),dotv(s.foulsWon),dotv(s.mistakes)]);
+      dotv(s.fouls),dotv(s.foulsWon),dotv(s.takeOnConcerns),dotv(s.mistakes)]);
 }
 
 /* ================= distribution ================= */
@@ -756,79 +772,103 @@ function defInsight(){
 const defensivePage=()=>secTitle('Defensive')+legend()
   +`<div class="rp-cmphead">Defensive</div>`+cmpRows(sectionRows(2))+insight(defInsight());
 
-/* defensive action maps — one page per action type, mirroring the Stats-tab
-   dropdown (DEF_CATS from the Stats page: Tackles, Interceptions, Clearances,
-   Blocks, Recoveries, Ground Duels, Aerial Duels). Categories with no located
-   event on either side are skipped. */
-function defCategoryPages(){
-  const pages=[];
-  Object.values(DEF_CATS).forEach(cat=>{
-    const col={}; cat.parts.forEach(([ev,,c])=>col[ev]=c);
-    const okEv=cat.parts[0][0], two=cat.parts.length>1;   // first part = the 'won' event
-    const acts=team=>rows.filter(r=>r.team===team&&col[r.event]&&r.pXY);
-    const hA=acts('home'), aA=acts('away');
-    if(!hA.length&&!aA.length)return;
-    // top-5 ranking under each map — counts ALL events of the category (located
-    // or not); ties (same totals) share a rank shown blank, like the reference
-    const top5=team=>{
-      const counts={};
-      rows.forEach(r=>{
-        if(r.team!==team||!col[r.event])return;
-        const no=String(r.playerFrom||'').trim(); if(!no)return;
-        const o=counts[no]=counts[no]||{t:0,s:0}; o.t++; if(r.event===okEv)o.s++;
-      });
-      const list=Object.entries(counts)
-        .sort((x,y)=>y[1].t-x[1].t||y[1].s-x[1].s||(+x[0]||1e9)-(+y[0]||1e9)).slice(0,5);
-      const header=`<table class="rpt" style="font-size:9px;margin-top:8px"><thead><tr><th>Rank</th>`
-        +`<th style="text-align:left">Player</th><th>Total</th>${two?'<th>Succ.</th><th>Success Rate</th>':''}</tr></thead>`;
-      if(!list.length){   // no data -> dashed placeholder rows, like the reference
-        let h='';
-        for(let i=1;i<=5;i++)h+=`<tr><td style="color:${C.mut}">${i}</td><td style="text-align:left;color:#c9cfd9">–</td>`
-          +`<td style="color:#c9cfd9">–</td>${two?'<td style="color:#c9cfd9">–</td><td style="color:#c9cfd9">–</td>':''}</tr>`;
-        return header+`<tbody>${h}</tbody></table>`;
-      }
-      const roster=(lineups[team]&&lineups[team].roster)||[];
-      const nameOf=no=>{const p=roster.find(q=>String(q.no)===String(no));return p&&p.name?p.name:'Player '+no;};
-      let prev=null;
-      const trs=list.map(([no,c],i)=>{
-        const tied=prev&&prev.t===c.t&&(!two||prev.s===c.s); prev=c;
-        return `<tr><td style="color:${C.mut}">${tied?'':i+1}</td>`
-          +`<td style="text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td>${c.t}</td>`
-          +(two?`<td>${c.s}</td><td>${pc0(c.s,c.t)}</td>`:'')+'</tr>';
-      }).join('');
-      return header+`<tbody>${trs}</tbody></table>`;
-    };
-    // side-by-side row: home attacks RIGHT, away mirrored to attack LEFT;
-    // marker shape = half (circle 1st, square 2nd), colour = won/lost part;
-    // a side with no data keeps the empty pitch
-    const card=(team,list)=>{
-      const flip=team==='away';
-      const N=normXY(team), d=PITCH_DIMS.football;
-      const dots=list.map(r=>{
-        const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h;
-        const shape=eventHalf(r)===1
-          ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
-          :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${col[r.event]}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`;
-        return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
-      }).join('');
-      const map=hPitchSVG(dots,flip?'left':'right');
-      return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}</div>${map}${top5(team)}</div>`;
-    };
-    const legend=cat.parts.map(([,lbl,c])=>`<span><i style="background:${c}"></i>${lbl}</span>`).join('')
-      +`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
-      +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span>`;
-    pages.push(secTitle(`Defensive — ${cat.label}`)
-      +`<div class="rp-mleg" style="margin:0 0 10px">${legend}</div>`
-      +`<div style="display:flex;gap:18px;align-items:flex-start">${card('home',hA)}${card('away',aA)}</div>`);
-  });
-  return pages;
+/* One located-action map page for a category of events: home and away pitches side by
+   side (home attacks RIGHT, away mirrored LEFT), one colour per event type, marker shape
+   by half, and a top-5 ranking under each map. `cat` is a Stats-tab DEF_CATS entry —
+   {label, parts:[[event, legend, colour], …]} — so the two pages that use this stay in
+   step with the dropdown. Returns null when neither side has a located event.
+   A two-part category (won / lost) also gets Succ. + Success Rate columns, its first
+   part being the successful event; one- and three-part categories just get Total. */
+function actionMapsPage(cat,title){
+  // keyed through evKey: the event dictionary is user-editable, so "Take-on Concern"
+  // has to find the same rows as "take-on concern" (see the evKey note in shared.js)
+  const col={}; cat.parts.forEach(([ev,,c])=>col[evKey(ev)]=c);
+  const two=cat.parts.length===2, okEv=two?evKey(cat.parts[0][0]):null;
+  const acts=team=>rows.filter(r=>r.team===team&&col[evKey(r.event)]&&r.pXY);
+  const hA=acts('home'), aA=acts('away');
+  if(!hA.length&&!aA.length)return null;
+  // top-5 ranking under each map — counts ALL events of the category (located
+  // or not); ties (same totals) share a rank shown blank, like the reference
+  const top5=team=>{
+    const counts={};
+    rows.forEach(r=>{
+      if(r.team!==team||!col[evKey(r.event)])return;
+      const no=String(r.playerFrom||'').trim(); if(!no)return;
+      const o=counts[no]=counts[no]||{t:0,s:0}; o.t++; if(evKey(r.event)===okEv)o.s++;
+    });
+    const list=Object.entries(counts)
+      .sort((x,y)=>y[1].t-x[1].t||y[1].s-x[1].s||(+x[0]||1e9)-(+y[0]||1e9)).slice(0,5);
+    const header=`<table class="rpt" style="font-size:9px;margin-top:8px"><thead><tr><th>Rank</th>`
+      +`<th style="text-align:left">Player</th><th>Total</th>${two?'<th>Succ.</th><th>Success Rate</th>':''}</tr></thead>`;
+    if(!list.length){   // no data -> dashed placeholder rows, like the reference
+      let h='';
+      for(let i=1;i<=5;i++)h+=`<tr><td style="color:${C.mut}">${i}</td><td style="text-align:left;color:#c9cfd9">–</td>`
+        +`<td style="color:#c9cfd9">–</td>${two?'<td style="color:#c9cfd9">–</td><td style="color:#c9cfd9">–</td>':''}</tr>`;
+      return header+`<tbody>${h}</tbody></table>`;
+    }
+    const roster=(lineups[team]&&lineups[team].roster)||[];
+    const nameOf=no=>{const p=roster.find(q=>String(q.no)===String(no));return p&&p.name?p.name:'Player '+no;};
+    let prev=null;
+    const trs=list.map(([no,c],i)=>{
+      const tied=prev&&prev.t===c.t&&(!two||prev.s===c.s); prev=c;
+      return `<tr><td style="color:${C.mut}">${tied?'':i+1}</td>`
+        +`<td style="text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td>${c.t}</td>`
+        +(two?`<td>${c.s}</td><td>${pc0(c.s,c.t)}</td>`:'')+'</tr>';
+    }).join('');
+    return header+`<tbody>${trs}</tbody></table>`;
+  };
+  // side-by-side row: home attacks RIGHT, away mirrored to attack LEFT;
+  // marker shape = half (circle 1st, square 2nd), colour = the event's part;
+  // a side with no data keeps the empty pitch
+  const card=(team,list)=>{
+    const flip=team==='away';
+    const N=normXY(team), d=PITCH_DIMS.football;
+    const dots=list.map(r=>{
+      const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h, c=col[evKey(r.event)];
+      const shape=eventHalf(r)===1
+        ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${c}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
+        :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${c}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`;
+      return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
+    }).join('');
+    const map=hPitchSVG(dots,flip?'left':'right');
+    return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}</div>${map}${top5(team)}</div>`;
+  };
+  const legend=cat.parts.map(([,lbl,c])=>`<span><i style="background:${c}"></i>${lbl}</span>`).join('')
+    +`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
+    +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span>`;
+  return secTitle(title)
+    +`<div class="rp-mleg" style="margin:0 0 10px">${legend}</div>`
+    +`<div style="display:flex;gap:18px;align-items:flex-start">${card('home',hA)}${card('away',aA)}</div>`;
 }
+/* one page per defensive action type, mirroring the Stats-tab dropdown (DEF_CATS:
+   Tackles, Interceptions, Clearances, Blocks, Recoveries, Ground/Aerial Duels,
+   Take-on Concern, Mistakes). Types with no located event on either side are skipped. */
+function defCategoryPages(){
+  return Object.values(DEF_CATS)
+    .map(cat=>actionMapsPage(cat,`Defensive — ${cat.label}`))
+    .filter(Boolean);
+}
+/* where a team took defenders on and where it stepped in — the three events share ONE
+   map per side, told apart by colour */
+const TAKEON_CAT={label:'Take-ons & Step-ins',parts:[
+  ['take-on succes','Take-on success','#39d98a'],
+  ['take-on fail','Take-on fail','#f7506b'],
+  ['step in','Step-in','#2f81f7']]};
+const takeOnMapsPage=()=>actionMapsPage(TAKEON_CAT,'Distribution — Take-ons &amp; Step-ins');
 
-/* defensive profile radar — min-max normalised against the higher of the two teams */
+/* Defensive profile radar — each axis normalised against the higher of the two teams,
+   then scaled into RMAX so the leader stops short of the outer ring. Mapping the leader
+   straight onto 1.0 pinned it to the edge on EVERY axis it led, which read as a maxed-out
+   shape rather than a lead, and left the two polygons touching the grid and the labels.
+   RMIN keeps a zero visible as a dot on the axis instead of collapsing into the centre. */
+const RADAR_MAX=0.82;
+const RADAR_MIN=0.05;
 function radarPage(){
   const axes=[['Tackles Won','tacklesWon'],['Interceptions','interceptions'],['Recoveries','recoveries'],
     ['Clearances','clearances'],['Blocks','blocks'],['Aerial Won','aerialDuelsWon'],['Ground Won','groundDuelsWon']];
   const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
+  const axFrac=(s,k)=>{const mx=Math.max(h[k],a[k]);
+    return mx?Math.max(RADAR_MIN,s[k]/mx*RADAR_MAX):RADAR_MIN;};
   const W=694,H=560,cx=W/2,cy=290,R=185,Nn=axes.length;   // full content width so edge labels never clip
   const ang=i=>-Math.PI/2+i*2*Math.PI/Nn;
   const pt=(i,f)=>[cx+R*f*Math.cos(ang(i)),cy+R*f*Math.sin(ang(i))];
@@ -839,12 +879,9 @@ function radarPage(){
   }
   axes.forEach((_,i)=>{const [x,y]=pt(i,1);g+=`<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#d7dde6" stroke-dasharray="4 4"/>`;});
   const poly=(s,rgb)=>{
-    const p=axes.map(([,k],i)=>{
-      const mx=Math.max(h[k],a[k]);
-      return pt(i,mx?Math.max(0.04,s[k]/mx):0.04).map(v=>v.toFixed(1)).join(',');
-    }).join(' ');
+    const p=axes.map(([,k],i)=>pt(i,axFrac(s,k)).map(v=>v.toFixed(1)).join(',')).join(' ');
     return `<polygon points="${p}" fill="rgba(${rgb},0.28)" stroke="rgb(${rgb})" stroke-width="2.5"/>`
-      +axes.map(([,k],i)=>{const mx=Math.max(h[k],a[k]);const [x,y]=pt(i,mx?Math.max(0.04,s[k]/mx):0.04);
+      +axes.map(([,k],i)=>{const [x,y]=pt(i,axFrac(s,k));
         return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="rgb(${rgb})"/>`;}).join('');
   };
   g+=poly(a,C.awayRGB)+poly(h,C.homeRGB);
@@ -1065,6 +1102,7 @@ function buildPages(host){
     heatPage(),
     passTypesPage(),
     crossMapsPage(),
+    takeOnMapsPage(),
     ...distributionPlayerPages(),
     defensivePage(),
     ...defCategoryPages(),

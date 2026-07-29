@@ -124,6 +124,7 @@ const CLOUD=fs.readFileSync(path.join(ROOT,'cloud-sync.js'),'utf8');
 const SHARED_EXPORTS=['esc','squadOnPitch','squadNames','playerLabel','withSquad',
   'computeStats','sortedPlayers','newStat','statRow','sumTeam','passMatrix','pct',
   'blankTeamLU','blankLineups','zoneAt','EVENT_INC','STAT_HEADERS','STAT_GROUPS',
+  'TEAM_SECTIONS','numOf',
   'SHOT_KINDS','BODY_PARTS','shotBodyPart','shotList','shotColor','evKey','classifyCards',
   'PT_KEYS','loadLineups','saveLineupsLS','luStamp','lineupsAreFor','lineupsEmpty','migrateLineupStamp'];
 function loadShared(store){

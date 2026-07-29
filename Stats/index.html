@@ -149,7 +149,7 @@ const STAT_CATS={
     ['Interceptions',s=>s.interceptions],['Clearances',s=>s.clearances],['Blocks',s=>s.blocks],['Recoveries',s=>s.recoveries],
     ['Ground Duels',s=>s.groundDuels],['Ground Duels Won',s=>s.groundDuelsWon],
     ['Aerial Duels',s=>s.aerialDuels],['Aerial Duels Won',s=>s.aerialDuelsWon],
-    ['Mistakes',s=>s.mistakes]],
+    ['Take-on Concerns',s=>s.takeOnConcerns],['Mistakes',s=>s.mistakes]],
   other:[
     ['Corners',s=>s.corners],['Free-kicks',s=>s.freeKicks],['Penalty Kicks',s=>s.penalties],
     ['Throw-ins',s=>s.throwIns],['Goal Kicks',s=>s.goalKicks],
@@ -225,6 +225,7 @@ const DEF_CATS={
   recoveries:{label:'Recoveries',parts:[['recovery','Recovery','#2f81f7']]},
   ground:{label:'Ground Duels',parts:[['ground duel success','Won','#39d98a'],['ground duel fail','Lost','#f7506b']]},
   aerial:{label:'Aerial Duels',parts:[['aerial duel success','Won','#39d98a'],['aerial duel fail','Lost','#f7506b']]},
+  takeOnConcern:{label:'Take-on Concern',parts:[['take-on concern','Take-on Concern','#ff8a3d']]},
   mistakes:{label:'Mistakes',parts:[['mistake','Mistake','#f7b32f']]}
 };
 function defMapHTML(team){
@@ -234,12 +235,14 @@ function defMapHTML(team){
     +`<div class="head-ctrls"><select class="def-sel" onchange="setDefCat(this.value)">${opts}</select>`
     +`<div class="half-toggle"><button class="${defHalf===1?'on':''}" onclick="setDefHalf(1)">1st</button>`
     +`<button class="${defHalf===2?'on':''}" onclick="setDefHalf(2)">2nd</button></div></div></div>`;
-  const col={}; cat.parts.forEach(([ev,,c])=>col[ev]=c);
+  // keyed through evKey: event names come from a user-editable list, so "Take-on Concern"
+  // must find the same dots as "take-on concern" (see the evKey note in shared.js)
+  const col={}; cat.parts.forEach(([ev,,c])=>col[evKey(ev)]=c);
   // no data -> keep the pitch, just draw no dots
-  const acts=rows.filter(r=>r.team===team && col[r.event] && r.pXY && eventHalf(r)===defHalf);
+  const acts=rows.filter(r=>r.team===team && col[evKey(r.event)] && r.pXY && eventHalf(r)===defHalf);
   const d=PITCH_DIMS.football, W=d.w, H=d.h;
   const dots=acts.map(r=>{const cx=(r.pXY.x/100*W).toFixed(1), cy=(r.pXY.y/100*H).toFixed(1);
-    return `<g><circle cx="${cx}" cy="${cy}" r="13" fill="${col[r.event]}" fill-opacity="0.9" stroke="#0d1117" stroke-width="2"/>`
+    return `<g><circle cx="${cx}" cy="${cy}" r="13" fill="${col[evKey(r.event)]}" fill-opacity="0.9" stroke="#0d1117" stroke-width="2"/>`
       +`<text x="${cx}" y="${(+cy+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#06281a">${r.playerFrom||''}</text></g>`;}).join('');
   const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG(attackDir(team,defHalf))+dots+'</svg>');
   const legend=cat.parts.map(([,lbl,c])=>`<span class="sm-leg"><span class="leg-dot" style="background:${c}"></span>${lbl}</span>`).join('');
@@ -1054,6 +1057,6 @@ function dbToRow(d){
   }catch(e){console.warn('Stats cloud load failed — using local data:',(e&&e.message)||e);}
 })();
 </script>
-<script src="report.js?v=24"></script>
+<script src="report.js?v=25"></script>
 </body>
 </html>

@@ -1,0 +1,251 @@
+/* Match-report visuals: the comparison bars, the timeline labels, the located-action
+   maps and the defensive radar. report.js is one IIFE with no exports, so the functions
+   under test are lifted out of the source and run against stubs for the drawing helpers —
+   a rename or a behaviour change there fails here loudly. */
+const fs=require('fs'), path=require('path'), vm=require('vm');
+const {test,eq,ok,notOk,deepEq}=require('./tiny-test');
+const {grabFunction,grabConst,loadShared}=require('./harness');
+
+const REPORT=fs.readFileSync(path.join(__dirname,'..','Stats','report.js'),'utf8');
+const S=loadShared();
+const grabR=n=>grabFunction(n,REPORT,'Stats/report.js');
+const grabRC=n=>grabConst(n,REPORT,'Stats/report.js');
+
+/* a sandbox holding the shared.js helpers report.js reads as globals, plus stubs for
+   the pitch/section chrome (this suite is about the numbers, not the SVG furniture) */
+function makeReport(opts,names,src){
+  opts=opts||{};
+  const ctx={console,
+    rows:opts.rows||[], lineups:opts.lineups||{home:{roster:[]},away:{roster:[]}},
+    dur:{enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0},
+    meta:{home:opts.home||'Curacao',away:opts.away||'Saint Lucia'},
+    esc:S.esc, numOf:S.numOf, pct:S.pct, evKey:S.evKey, sumTeam:S.sumTeam,
+    squadNames:S.squadNames, classifyCards:S.classifyCards,
+    PITCH_DIMS:{football:{w:1050,h:680}},
+    eventHalf:r=>r.half||1, matchTime:t=>t,
+    pitchFootball:()=>'', dirArrowSVG:()=>'', hPitchSVG:(inner)=>`<svg>${inner||''}</svg>`,
+    normXY:()=>r=>({a:r.pXY,b:r.rXY}), attackDir:()=>'right',
+    DEF_CATS:opts.DEF_CATS||{}};
+  vm.createContext(ctx);
+  const consts=['C','TC','TRGB','TN','secTitle','insight','legend','pc0','frac','dotv','mmss'];
+  vm.runInContext(consts.map(grabRC).join('\n')
+    +'\n'+(names||[]).map(grabR).join('\n')
+    +'\n'+(src||'')
+    // const/let bindings are not context properties — re-export everything by name so the
+    // tests can call the arrow-function helpers (takeOnMapsPage, TAKEON_CAT, …) as well
+    +'\n;Object.assign(globalThis,{'+consts.join(',')+'});'
+    +'\n;globalThis.exp=name=>eval(name);',ctx,{filename:'report.js-extract.js'});
+  return ctx;
+}
+// bar widths out of one cmpRows() row, in source order [home, away]
+const widths=html=>[...html.matchAll(/width:([\d.]+)%/g)].map(m=>+m[1]);
+
+/* ---- 2. team comparison bars: each side's SHARE, as the Stats tab draws them ---- */
+test('equal values split the comparison bars down the middle', ()=>{
+  const ctx=makeReport({},['cmpRows']);
+  deepEq(widths(ctx.cmpRows([['Goals',2,2]])),[50,50]);
+});
+
+test('a side that scored everything fills its bar, the other empties', ()=>{
+  const ctx=makeReport({},['cmpRows']);
+  deepEq(widths(ctx.cmpRows([['Goals',4,0]])),[100,0]);
+});
+
+test('a lead no longer pins the leader at max — the bars keep the ratio', ()=>{
+  const ctx=makeReport({},['cmpRows']);
+  const [h,a]=widths(ctx.cmpRows([['Total Shots',23,5]]));
+  eq(h,82.1,'23 of 28 shots');
+  eq(a,17.9);
+  ok(h<100,'the leader must not touch max');
+});
+
+test('nothing to compare (0 – 0) still splits down the middle', ()=>{
+  const ctx=makeReport({},['cmpRows']);
+  deepEq(widths(ctx.cmpRows([['Miss Shots',0,0]])),[50,50]);
+});
+
+test('percentage rows compare on their numbers, not their text', ()=>{
+  const ctx=makeReport({},['cmpRows']);
+  const [h,a]=widths(ctx.cmpRows([['Possession %','55.3%','44.7%']]));
+  eq(h,55.3); eq(a,44.7);
+});
+
+test('the printed values are untouched by the new scaling', ()=>{
+  const ctx=makeReport({},['cmpRows']);
+  const html=ctx.cmpRows([['Shooting Accuracy','39.1%','20.0%']]);
+  ok(html.includes('39.1%')&&html.includes('20.0%'));
+});
+
+/* ---- 1. timeline labels carry the player's name next to the shirt number ---- */
+const LU={
+  home:{roster:[{no:'9',name:'Bacuna'},{no:'8',name:'Room'},{no:'7',name:'Floranus'}]},
+  away:{roster:[{no:'6',name:'Thomas'}]}
+};
+const tlRows=[
+  {t:2220,half:1,team:'home',event:'goal',playerFrom:'9',grp:'g1'},
+  {t:2220,half:1,team:'home',event:'assist',playerFrom:'8',grp:'g1'},
+  {t:5400,half:2,team:'away',event:'yellow card',playerFrom:'6'},
+  {t:5500,half:2,team:'home',event:'own goal',playerFrom:'7'},
+  {t:5600,half:2,team:'home',event:'red card',playerFrom:'9'}
+];
+const timelineFns=['tlWho','timelineEvents'];
+const withNames=()=>makeReport({rows:tlRows,lineups:LU},timelineFns,grabRC('tlNames'))
+  .timelineEvents().map(e=>e.html);
+
+test('a goal names the scorer and the assist, both with their shirt numbers', ()=>{
+  const html=withNames()[0];
+  ok(html.includes('Goal #9 Bacuna'),'scorer: '+html);
+  ok(html.includes('A #8 Room'),'assist: '+html);
+});
+
+test('own goals, yellow cards and red cards name the player too', ()=>{
+  const [,yc,og,rc]=withNames();
+  ok(yc.includes('Yellow Card #6 Thomas'),yc);
+  ok(og.includes('Own Goal #7 Floranus'),og);
+  ok(rc.includes('Red Card #9 Bacuna'),rc);
+});
+
+test('a shirt with no registered name stays a bare number, not "Player 9"', ()=>{
+  const html=makeReport({rows:tlRows,lineups:{home:{roster:[]},away:{roster:[]}}},
+    timelineFns,grabRC('tlNames')).timelineEvents().map(e=>e.html);
+  ok(/^Goal #9\s*(<|$)/.test(html[0]),'no name appended: '+html[0]);
+  ok(html[0].includes('(A #8)'),'the assist stays a bare number too: '+html[0]);
+  notOk(html.join(' ').includes('Player 9'),'the placeholder never reaches the timeline');
+});
+
+test('a 2nd yellow reads as one sending-off, with the name', ()=>{
+  const rows=[{t:1000,half:1,team:'home',event:'yellow card',playerFrom:'9'},
+              {t:2000,half:1,team:'home',event:'yellow card',playerFrom:'9'},
+              {t:2000,half:1,team:'home',event:'red card',playerFrom:'9'}];
+  const html=makeReport({rows,lineups:LU},timelineFns,grabRC('tlNames'))
+    .timelineEvents().map(e=>e.html);
+  eq(html.length,2,'the explicit red is still folded into the 2nd yellow');
+  ok(html[1].includes('2nd Yellow → Red #9 Bacuna'),html[1]);
+});
+
+/* ---- 3 + 4. located-action maps, shared by the defensive pages and the new one ---- */
+const mapFns=['actionMapsPage'];
+const at=(team,event,x,y,no,half)=>({team,event,playerFrom:no,half:half||1,pXY:{x,y}});
+
+test('the take-on / step-in page puts all three event types on one map', ()=>{
+  const rows=[at('home','take-on succes',60,40,'7'),at('home','take-on fail',70,30,'7'),
+              at('home','step in',50,50,'10'),at('away','take-on succes',40,60,'14')];
+  const ctx=makeReport({rows,lineups:LU},mapFns,grabRC('TAKEON_CAT')+'\n'+grabRC('takeOnMapsPage'));
+  const html=ctx.exp('takeOnMapsPage')();
+  ok(html.includes('Distribution — Take-ons'),'section title');
+  ['#39d98a','#f7506b','#2f81f7'].forEach(c=>ok(html.includes(c),'colour '+c+' is drawn'));
+  ok(html.includes('Take-on success')&&html.includes('Take-on fail')&&html.includes('Step-in'),'legend');
+});
+
+test('a three-part category ranks on Total only — no success rate to speak of', ()=>{
+  const rows=[at('home','take-on succes',60,40,'7'),at('home','step in',50,50,'7')];
+  const ctx=makeReport({rows,lineups:LU},mapFns,grabRC('TAKEON_CAT')+'\n'+grabRC('takeOnMapsPage'));
+  const html=ctx.exp('takeOnMapsPage')();
+  notOk(html.includes('Success Rate'),'no Succ. columns for a mixed category');
+  ok(html.includes('7.&nbsp;Floranus'),'the ranking names the player');
+});
+
+test('a won/lost category still ranks with Succ. and Success Rate', ()=>{
+  const cat={label:'Tackles',parts:[['tackle success','Won','#39d98a'],['tackle fail','Lost','#f7506b']]};
+  const rows=[at('home','tackle success',60,40,'7'),at('home','tackle fail',62,42,'7')];
+  const ctx=makeReport({rows,lineups:LU},mapFns);
+  const html=ctx.actionMapsPage(cat,'Defensive — Tackles');
+  ok(html.includes('Success Rate'));
+  ok(html.includes('50%'),'1 of 2 tackles won');
+});
+
+test('a category nobody located is skipped instead of printing an empty page', ()=>{
+  const ctx=makeReport({rows:[{team:'home',event:'take-on succes',playerFrom:'7'}],lineups:LU},mapFns,
+    grabRC('TAKEON_CAT')+'\n'+grabRC('takeOnMapsPage'));
+  eq(ctx.exp('takeOnMapsPage')(),null,'an event with no pitch dot cannot be mapped');
+});
+
+test('the maps find their events whatever case the tagger typed', ()=>{
+  const cat={label:'Take-on Concern',parts:[['take-on concern','Take-on Concern','#ff8a3d']]};
+  const ctx=makeReport({rows:[at('home','Take-On Concern',60,40,'7')],lineups:LU},mapFns);
+  const html=ctx.actionMapsPage(cat,'Defensive — Take-on Concern');
+  ok(html,'the page is built');
+  ok(html.includes('#ff8a3d'),'the dot is drawn');
+});
+
+test('every Stats-tab defensive category, take-on concern included, gets a report page', ()=>{
+  const DEF_CATS=statsDefCats();
+  ok(DEF_CATS.takeOnConcern,'the dropdown gained the category');
+  eq(DEF_CATS.takeOnConcern.parts[0][0],'take-on concern');
+  const rows=Object.values(DEF_CATS).map((c,i)=>at('home',c.parts[0][0],50+i,50,'7'));
+  const ctx=makeReport({rows,lineups:LU,DEF_CATS},mapFns,grabR('defCategoryPages'));
+  const pages=ctx.defCategoryPages();
+  eq(pages.length,Object.keys(DEF_CATS).length,'one page per category');
+  ok(pages.some(p=>p.includes('Defensive — Take-on Concern')),'including the new one');
+});
+// DEF_CATS lives in the Stats page; lift it out so the two stay in step
+function statsDefCats(){
+  const src=fs.readFileSync(path.join(__dirname,'..','Stats','index.html'),'utf8');
+  const ctx={};vm.createContext(ctx);
+  vm.runInContext(grabConst('DEF_CATS',src,'Stats/index.html')+'\n;globalThis.d=DEF_CATS;',ctx);
+  return ctx.d;
+}
+
+/* ---- 3. the counter behind the new column ---- */
+const concern=n=>{const r=[];for(let i=0;i<n;i++)r.push({team:'home',event:'take-on concern',playerFrom:'7'});return r;};
+
+test('a take-on concern counts as its own stat AND as one of the take-ons', ()=>{
+  const P=S.computeStats(concern(3).concat([{team:'home',event:'take-on succes',playerFrom:'7'}]),'home');
+  eq(P['7'].takeOnConcerns,3);
+  eq(P['7'].takeOns,4,'Distribution still sees all four take-ons');
+  eq(P['7'].takeOnsWon,1,'a concern is not a win');
+});
+
+test('the new column keeps the stat table, its groups and the export in step', ()=>{
+  eq(S.STAT_HEADERS.length,S.STAT_GROUPS.reduce((n,g)=>n+g[1],0),'group spans cover the headers');
+  eq(S.statRow('7',S.newStat()).length,S.STAT_HEADERS.length,'one cell per header');
+  const i=S.STAT_HEADERS.indexOf('Take-on Concerns');
+  ok(i>0,'the header exists');
+  const s=S.newStat(); s.takeOnConcerns=5;
+  eq(S.statRow('7',s)[i],5,'the cell lines up with its header');
+});
+
+test('the team comparison lists take-on concerns under Defensive', ()=>{
+  const def=S.STAT_GROUPS&&S.TEAM_SECTIONS.find(sec=>sec[0]==='Defensive Stats');
+  ok(def,'the Defensive section exists');
+  const row=def[1].find(r=>r[0]==='Take-on Concerns');
+  ok(row,'the row exists');
+  const s=S.newStat(); s.takeOnConcerns=4;
+  eq(row[1](s,S.newStat()),4);
+});
+
+/* ---- 5. radar normalisation ---- */
+const MAX=+/=\s*([\d.]+)/.exec(grabRC('RADAR_MAX'))[1];
+const MIN=+/=\s*([\d.]+)/.exec(grabRC('RADAR_MIN'))[1];
+const radarSrc=()=>grabRC('RADAR_MAX')+'\n'+grabRC('RADAR_MIN')+'\n'+grabR('radarPage');
+// every plotted vertex as a distance from the centre, as a fraction of the outer radius
+function radarFracs(rows){
+  const svg=makeReport({rows},[],radarSrc()).radarPage();
+  const cx=347, cy=290, R=185;
+  return [...svg.matchAll(/<circle cx="([\d.]+)" cy="([\d.]+)" r="4"/g)]
+    .map(m=>Math.hypot(+m[1]-cx,+m[2]-cy)/R);
+}
+const defRows=(team,event,n)=>{const r=[];for(let i=0;i<n;i++)r.push({team,event,playerFrom:'7'});return r;};
+
+test('the radar leader stops short of the outer ring', ()=>{
+  ok(MAX<1,'RADAR_MAX leaves headroom');
+  const fr=radarFracs(defRows('home','recovery',68).concat(defRows('away','recovery',59)));
+  const top=Math.max(...fr);
+  ok(Math.abs(top-MAX)<0.01,'the leading axis sits at RADAR_MAX, got '+top.toFixed(3));
+  ok(top<0.999,'and never touches the grid');
+});
+
+test('the shape still keeps the ratio between the two teams', ()=>{
+  // only the recoveries axis is fed, so the two vertices above the floor are its own
+  const fr=radarFracs(defRows('home','recovery',100).concat(defRows('away','recovery',50)))
+    .filter(f=>f>MIN+0.005).sort((x,y)=>x-y);
+  eq(fr.length,2,'one vertex per team on the axis that has data');
+  ok(Math.abs(fr[1]-MAX)<0.01,'leader at RADAR_MAX, got '+fr[1].toFixed(3));
+  ok(Math.abs(fr[0]/fr[1]-0.5)<0.02,'half the recoveries -> half the reach, got '+(fr[0]/fr[1]).toFixed(3));
+});
+
+test('an axis neither team touched collapses to the floor, not the centre', ()=>{
+  const fr=radarFracs([]);
+  ok(fr.length,'dots are still drawn');
+  ok(fr.every(f=>Math.abs(f-MIN)<0.005),'every axis sits on RADAR_MIN');
+});
