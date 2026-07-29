@@ -228,16 +228,15 @@ function teamPeriods(team){
 }
 
 /* ================= PAGE 1 — header + match timeline ================= */
+// Just the teams and the score. The shape of each side is the subject of its own
+// "Lineups & Formation" page, so the formation summary that used to sit under the
+// score is gone; the score block carries the spacing it used to add.
 function headerBlock(){
-  const fH=formationOf((lineups.home||{}).xi,(lineups.home||{}).dir||'lr');
-  const fA=formationOf((lineups.away||{}).xi,(lineups.away||{}).dir||'rl');
   return `<div style="text-align:center;font-size:12px;color:${C.mut};letter-spacing:0.4px;margin:4px 0 24px">Performance Analysis · Full Match Report</div>`
-    +`<div style="display:flex;align-items:center;justify-content:center;gap:24px;margin-bottom:12px">`
+    +`<div style="display:flex;align-items:center;justify-content:center;gap:24px;margin-bottom:30px">`
     +`<span style="flex:1;text-align:right;font-size:23px;font-weight:800;color:${C.home}">${esc(meta.home)}</span>`
     +`<span style="flex:none;font-size:42px;font-weight:800;color:${C.ink}">${teamGoals('home')} <span style="color:${C.grey};font-weight:400">–</span> ${teamGoals('away')}</span>`
-    +`<span style="flex:1;text-align:left;font-size:23px;font-weight:800;color:${C.away}">${esc(meta.away)}</span></div>`
-    +`<div style="text-align:center;font-size:11.5px;color:${C.mut};margin-bottom:18px">`
-    +`Home (Blue)${fH?' '+fH:''} · Away (Amber)${fA?' '+fA:''}</div>`;
+    +`<span style="flex:1;text-align:left;font-size:23px;font-weight:800;color:${C.away}">${esc(meta.away)}</span></div>`;
 }
 /* "#9 Bacuna" — the shirt number always, plus the registered name when Player lists has
    one for it. playerLabel() would fall back to "Player 9", which only repeats the number,
@@ -271,8 +270,9 @@ function timelineEvents(){
      who WON the spot-kick, and that is tagged at the foul ("7 #foul won #assist") — often a
      minute or more before the kick is taken, well outside the 45s window, so a penalty goal
      came out with no assist at all. For one, find the "foul won" that produced it and take
-     the assist tagged in the same entry — or the fouled player himself when the tagger left
-     the #assist off, since winning the penalty IS the assist. */
+     the assist tagged alongside it.
+     An assist is only ever one the tagger entered: a bare "foul won" with no #assist on it
+     is NOT turned into one, however the penalty ends up. */
   const foulsWon=sorted.filter(r=>evKey(r.event)==='foul won');
   const PEN_ASSIST_BACK=180;   // how far back the foul that won the spot-kick may sit
   const penAssist=r=>{
@@ -281,7 +281,7 @@ function timelineEvents(){
     if(!fw)return null;
     return assists.find(x=>x.team===fw.team&&x.grp!=null&&x.grp===fw.grp)
       ||assists.find(x=>x.team===fw.team&&Math.abs(x.t-fw.t)<=3)
-      ||fw;                    // no #assist tagged -> the player who won the penalty
+      ||null;
   };
   sorted.forEach(r=>{
     const sec=matchTime(r.t), team=r.team, half=eventHalf(r), who=tlWho(team,r.playerFrom);

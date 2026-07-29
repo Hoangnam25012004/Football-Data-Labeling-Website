@@ -26,6 +26,10 @@ function makeReport(opts,names,src){
     pitchFootball:()=>'', dirArrowSVG:()=>'', hPitchSVG:(inner)=>`<svg>${inner||''}</svg>`,
     normXY:()=>r=>({a:r.pXY,b:r.rXY}), attackDir:()=>'right',
     DEF_CATS:opts.DEF_CATS||{}};
+  // a Stats-page global the report reads: own goals count to the other side
+  ctx.teamGoals=team=>{const opp=team==='home'?'away':'home';
+    return ctx.rows.filter(r=>r.team===team&&r.event==='goal').length
+         + ctx.rows.filter(r=>r.team===opp&&/^own[ -]goal$/.test(r.event)).length;};
   vm.createContext(ctx);
   const consts=['C','TC','TRGB','TN','secTitle','insight','legend','pc0','frac','dotv','mmss'];
   vm.runInContext(consts.map(grabRC).join('\n')
@@ -74,6 +78,22 @@ test('the printed values are untouched by the new scaling', ()=>{
   const ctx=makeReport({},['cmpRows']);
   const html=ctx.cmpRows([['Shooting Accuracy','39.1%','20.0%']]);
   ok(html.includes('39.1%')&&html.includes('20.0%'));
+});
+
+/* ---- the report header: teams and score only ---- */
+test('the header prints the teams and the score, and no formation summary', ()=>{
+  const rows=[{t:100,half:1,team:'home',event:'goal',playerFrom:'9'},
+              {t:200,half:1,team:'away',event:'goal',playerFrom:'6'},
+              {t:300,half:2,team:'away',event:'goal',playerFrom:'6'}];
+  const lineups={home:{roster:[],xi:[{no:'1',x:92,y:50,pos:'GK'},{no:'2',x:70,y:20},{no:'3',x:70,y:50},
+                                     {no:'4',x:70,y:80},{no:'5',x:40,y:50}],dir:'lr'},
+                 away:{roster:[],xi:[],dir:'rl'}};
+  const ctx=makeReport({rows,lineups,home:'Saint Lucia',away:'Aruba'},['headerBlock']);
+  const text=ctx.headerBlock().replace(/<[^>]*>/g,'');
+  ok(text.includes('Saint Lucia')&&text.includes('Aruba'),'both teams: '+text);
+  ok(text.includes('1 – 2'),'the score: '+text);
+  notOk(/Home \(Blue\)|Away \(Amber\)/.test(text),'the formation line is gone: '+text);
+  notOk(/\d-\d/.test(text),'no formation string left: '+text);
 });
 
 /* ---- 1. timeline labels carry the player's name next to the shirt number ---- */
@@ -135,9 +155,12 @@ test('a scored penalty credits the player who won it, however late the kick is t
   ok(html.includes('A #7 Rua'),'the fouled player gets the assist: '+html);
 });
 
-test('winning the penalty IS the assist, even with no #assist tagged', ()=>{
+test('an assist is only ever one the tagger entered', ()=>{
+  // a bare "foul won" with no #assist on it is never turned into one
   const rows=penRows(98.23).filter(r=>r.event!=='assist');
-  ok(penGoalHtml(rows).includes('A #7 Rua'),'the foul won alone is enough');
+  const html=penGoalHtml(rows);
+  ok(html.includes('Penalty'),'still a penalty: '+html);
+  notOk(html.includes('A #'),'no assist invented from the foul won: '+html);
 });
 
 test('a foul won far too early is not turned into a penalty assist', ()=>{
