@@ -113,6 +113,63 @@ test('a shirt with no registered name stays a bare number, not "Player 9"', ()=>
   notOk(html.join(' ').includes('Player 9'),'the placeholder never reaches the timeline');
 });
 
+/* A converted penalty is credited to whoever won it. The "foul won"/"assist" pair is
+   tagged at the foul, a minute or more before the kick — the old ±45s window around the
+   goal never reached it, so the penalty goal printed with no assist at all. */
+const penRows=(gap,extra)=>[
+  {t:2429.23,half:1,team:'away',event:'foul won',playerFrom:'7',grp:'f1'},
+  {t:2429.25,half:1,team:'away',event:'assist',playerFrom:'7',grp:'f1'},
+  {t:2429.29,half:1,team:'home',event:'foul',playerFrom:'14',grp:'f2'},
+  {t:2429.23+gap,half:1,team:'away',event:'penalty kick',playerFrom:'20',grp:'g1'},
+  {t:2429.23+gap,half:1,team:'away',event:'goal',playerFrom:'20',grp:'g1'},
+  ...(extra||[])];
+const AWAY_LU={home:{roster:[{no:'14',name:'Elva'}]},
+  away:{roster:[{no:'7',name:'Rua'},{no:'20',name:'Marselia'},{no:'21',name:'Perret Gentil'}]}};
+const penGoalHtml=rows=>makeReport({rows,lineups:AWAY_LU},timelineFns,grabRC('tlNames'))
+  .timelineEvents().find(e=>e.kind==='goal').html;
+
+test('a scored penalty credits the player who won it, however late the kick is taken', ()=>{
+  const html=penGoalHtml(penRows(98.23));   // the reported case: foul 40:29, kick 42:07
+  ok(html.includes('Goal #20 Marselia'),html);
+  ok(html.includes('Penalty'),'still flagged as a penalty');
+  ok(html.includes('A #7 Rua'),'the fouled player gets the assist: '+html);
+});
+
+test('winning the penalty IS the assist, even with no #assist tagged', ()=>{
+  const rows=penRows(98.23).filter(r=>r.event!=='assist');
+  ok(penGoalHtml(rows).includes('A #7 Rua'),'the foul won alone is enough');
+});
+
+test('a foul won far too early is not turned into a penalty assist', ()=>{
+  ok(!penGoalHtml(penRows(600)).includes('A #'),'10 minutes earlier is a different phase');
+});
+
+test('the opponent who committed the foul is never credited', ()=>{
+  const html=penGoalHtml(penRows(98.23));
+  notOk(html.includes('#14'),'no.14 conceded the penalty: '+html);
+});
+
+test('the penalty taker cannot assist himself', ()=>{
+  const rows=[{t:1000,half:1,team:'away',event:'penalty kick',playerFrom:'20',grp:'g1'},
+              {t:1000,half:1,team:'away',event:'assist',playerFrom:'20',grp:'g1'},
+              {t:1000,half:1,team:'away',event:'goal',playerFrom:'20',grp:'g1'}];
+  const html=penGoalHtml(rows);
+  ok(html.includes('Penalty'));
+  notOk(html.includes('A #20'),'a self-assist is dropped: '+html);
+});
+
+test('an open-play goal still takes the assist from its own chain', ()=>{
+  const rows=[{t:1260,half:1,team:'away',event:'assist',playerFrom:'21',grp:'g0'},
+              {t:1260,half:1,team:'away',event:'goal',playerFrom:'8',grp:'g0'},
+              {t:1100,half:1,team:'away',event:'foul won',playerFrom:'7',grp:'f9'}];
+  const html=makeReport({rows,lineups:{home:{roster:[]},
+      away:{roster:[{no:'8',name:'Bennett'},{no:'21',name:'Perret Gentil'}]}}},
+    timelineFns,grabRC('tlNames')).timelineEvents()[0].html;
+  ok(html.includes('Goal #8 Bennett'),html);
+  ok(html.includes('A #21 Perret Gentil'),html);
+  notOk(html.includes('Penalty'),'not a penalty, and no foul-won credit: '+html);
+});
+
 test('a 2nd yellow reads as one sending-off, with the name', ()=>{
   const rows=[{t:1000,half:1,team:'home',event:'yellow card',playerFrom:'9'},
               {t:2000,half:1,team:'home',event:'yellow card',playerFrom:'9'},
@@ -124,25 +181,72 @@ test('a 2nd yellow reads as one sending-off, with the name', ()=>{
 });
 
 /* ---- 3 + 4. located-action maps, shared by the defensive pages and the new one ---- */
-const mapFns=['actionMapsPage'];
+const mapFns=['rankTable','actionMapsPage'];
+const takeOnSrc=()=>grabRC('TAKEON_CAT')+'\n'+grabRC('TAKEON_RANKS')+'\n'+grabRC('takeOnMapsPage');
 const at=(team,event,x,y,no,half)=>({team,event,playerFrom:no,half:half||1,pXY:{x,y}});
+// the ranking tables under one team's map, as {caption, header, rows[]}
+function tables(html,team){
+  const side=html.split('<div style="flex:1;min-width:0">')[team==='home'?1:2]||'';
+  return side.split('<table class="rpt"').slice(1).map((t,i,all)=>{
+    const before=side.split('<table class="rpt"')[i];
+    const cap=(/margin:9px 0 2px">([^<]*)/.exec(before)||[])[1]||'';
+    return {cap,
+      cols:[...t.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map(m=>m[1]),
+      rows:[...t.split('<tbody>')[1].matchAll(/<tr>([\s\S]*?)<\/tr>/g)]
+        .map(m=>[...m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)]
+          .map(c=>c[1].replace(/&nbsp;/g,' ').replace(/<[^>]*>/g,'').trim()))};
+  });
+}
 
 test('the take-on / step-in page puts all three event types on one map', ()=>{
   const rows=[at('home','take-on succes',60,40,'7'),at('home','take-on fail',70,30,'7'),
               at('home','step in',50,50,'10'),at('away','take-on succes',40,60,'14')];
-  const ctx=makeReport({rows,lineups:LU},mapFns,grabRC('TAKEON_CAT')+'\n'+grabRC('takeOnMapsPage'));
+  const ctx=makeReport({rows,lineups:LU},mapFns,takeOnSrc());
   const html=ctx.exp('takeOnMapsPage')();
   ok(html.includes('Distribution — Take-ons'),'section title');
   ['#39d98a','#f7506b','#2f81f7'].forEach(c=>ok(html.includes(c),'colour '+c+' is drawn'));
   ok(html.includes('Take-on success')&&html.includes('Take-on fail')&&html.includes('Step-in'),'legend');
 });
 
-test('a three-part category ranks on Total only — no success rate to speak of', ()=>{
-  const rows=[at('home','take-on succes',60,40,'7'),at('home','step in',50,50,'7')];
-  const ctx=makeReport({rows,lineups:LU},mapFns,grabRC('TAKEON_CAT')+'\n'+grabRC('takeOnMapsPage'));
-  const html=ctx.exp('takeOnMapsPage')();
-  notOk(html.includes('Success Rate'),'no Succ. columns for a mixed category');
-  ok(html.includes('7.&nbsp;Floranus'),'the ranking names the player');
+test('take-ons and step-ins are ranked in two separate tables', ()=>{
+  const rows=[at('home','take-on succes',60,40,'7'),at('home','step in',50,50,'10')];
+  const ctx=makeReport({rows,lineups:LU},mapFns,takeOnSrc());
+  const t=tables(ctx.exp('takeOnMapsPage')(),'home');
+  eq(t.length,2,'one table per action');
+  eq(t[0].cap,'Take-ons');
+  eq(t[1].cap,'Step-ins');
+});
+
+test('the take-on ranking is ordered on success / attempted, not on volume', ()=>{
+  // 10: 8 of 10 (80%) · 7: 3 of 3 (100%) · 9: 1 of 4 (25%)
+  const rows=[];
+  const add=(no,ok_,n)=>{for(let i=0;i<n;i++)rows.push(at('home',i<ok_?'take-on succes':'take-on fail',60,40,no));};
+  add('10',8,10); add('7',3,3); add('9',1,4);
+  const ctx=makeReport({rows,lineups:LU},mapFns,takeOnSrc());
+  const t=tables(ctx.exp('takeOnMapsPage')(),'home')[0];
+  deepEq(t.cols,['Rank','Player','Total','Succ.','Success Rate']);
+  deepEq(t.rows.map(r=>[r[1],r[2],r[3],r[4]]),
+    [['7. Floranus','3','3','100%'],['10. Player 10','10','8','80%'],['9. Bacuna','4','1','25%']],
+    'best rate first, even on the fewest attempts');
+});
+
+test('the take-on rate ignores step-ins and take-on concerns', ()=>{
+  const rows=[at('home','take-on succes',60,40,'7'),at('home','take-on fail',61,41,'7'),
+              at('home','step in',50,50,'7'),at('home','take-on concern',52,52,'7')];
+  const ctx=makeReport({rows,lineups:LU},mapFns,takeOnSrc());
+  const [to,si]=tables(ctx.exp('takeOnMapsPage')(),'home');
+  deepEq(to.rows[0].slice(1),['7. Floranus','2','1','50%'],'1 of 2 take-ons — the other two do not count');
+  deepEq(si.rows[0].slice(1),['7. Floranus','1'],'step-ins counted on their own, Total only');
+  deepEq(si.cols,['Rank','Player','Total'],'no success rate for a step-in');
+});
+
+test('a side with no take-ons still prints both tables, dashed', ()=>{
+  const rows=[at('away','take-on succes',40,60,'14')];
+  const ctx=makeReport({rows,lineups:LU},mapFns,takeOnSrc());
+  const t=tables(ctx.exp('takeOnMapsPage')(),'home');
+  eq(t.length,2);
+  eq(t[0].rows.length,5,'five placeholder rows');
+  deepEq(t[0].rows[0],['1','–','–','–','–']);
 });
 
 test('a won/lost category still ranks with Succ. and Success Rate', ()=>{
@@ -155,8 +259,8 @@ test('a won/lost category still ranks with Succ. and Success Rate', ()=>{
 });
 
 test('a category nobody located is skipped instead of printing an empty page', ()=>{
-  const ctx=makeReport({rows:[{team:'home',event:'take-on succes',playerFrom:'7'}],lineups:LU},mapFns,
-    grabRC('TAKEON_CAT')+'\n'+grabRC('takeOnMapsPage'));
+  const ctx=makeReport({rows:[{team:'home',event:'take-on succes',playerFrom:'7'}],lineups:LU},
+    mapFns,takeOnSrc());
   eq(ctx.exp('takeOnMapsPage')(),null,'an event with no pitch dot cannot be mapped');
 });
 

@@ -265,16 +265,39 @@ function timelineEvents(){
       &&Math.abs(p.t-r.t)<=60);
     if(pen){mergedPens.add(pen);penGoals.add(r);}
   });
+  /* Who the timeline credits with the assist for a goal, as a shirt number.
+     Normally the assist tagged in the goal's own chain entry, else the nearest one within
+     45s. A converted penalty is different: under the Laws the assist belongs to the player
+     who WON the spot-kick, and that is tagged at the foul ("7 #foul won #assist") — often a
+     minute or more before the kick is taken, well outside the 45s window, so a penalty goal
+     came out with no assist at all. For one, find the "foul won" that produced it and take
+     the assist tagged in the same entry — or the fouled player himself when the tagger left
+     the #assist off, since winning the penalty IS the assist. */
+  const foulsWon=sorted.filter(r=>evKey(r.event)==='foul won');
+  const PEN_ASSIST_BACK=180;   // how far back the foul that won the spot-kick may sit
+  const penAssist=r=>{
+    const fw=foulsWon.filter(x=>x.team===r.team&&x.t<=r.t&&r.t-x.t<=PEN_ASSIST_BACK)
+      .sort((x,y)=>y.t-x.t)[0];
+    if(!fw)return null;
+    return assists.find(x=>x.team===fw.team&&x.grp!=null&&x.grp===fw.grp)
+      ||assists.find(x=>x.team===fw.team&&Math.abs(x.t-fw.t)<=3)
+      ||fw;                    // no #assist tagged -> the player who won the penalty
+  };
   sorted.forEach(r=>{
     const sec=matchTime(r.t), team=r.team, half=eventHalf(r), who=tlWho(team,r.playerFrom);
     const push=(kind,html)=>evs.push({sec,team,kind,half,html});
     if(r.event==='goal'){
+      const isPen=penGoals.has(r);
       let as=assists.find(x=>x.team===team&&x.grp!=null&&x.grp===r.grp);
+      if(!as&&isPen)as=penAssist(r);
       if(!as)as=assists.filter(x=>x.team===team&&Math.abs(x.t-r.t)<=45)
         .sort((x,y)=>Math.abs(x.t-r.t)-Math.abs(y.t-r.t))[0];
+      // the taker cannot assist himself — a penalty tagged "20 #penalty kick #assist #goal"
+      // would otherwise read "Goal #20 (Penalty · A #20)"
+      if(as&&String(as.playerFrom||'').trim()===String(r.playerFrom||'').trim())as=null;
       const an=as?tlWho(team,as.playerFrom):'';
       const tags=[];
-      if(penGoals.has(r))tags.push('Penalty');
+      if(isPen)tags.push('Penalty');
       if(an)tags.push('A '+an);
       push('goal',`Goal ${who}${tags.length?` <span style="color:${C.mut};font-weight:600;font-size:10px">(${tags.join(' · ')})</span>`:''}`);
     }
@@ -772,51 +795,64 @@ function defInsight(){
 const defensivePage=()=>secTitle('Defensive')+legend()
   +`<div class="rp-cmphead">Defensive</div>`+cmpRows(sectionRows(2))+insight(defInsight());
 
+/* Top-5 player ranking printed under a map. `rk` describes what to count and how to order:
+     {events:[…]}            Rank · Player · Total, most events first
+     {events:[…],succ:ev}    …plus Succ. · Success Rate, `succ` naming the successful event
+     {…,by:'rate'}           ordered on that success rate instead of on the total
+     {…,label:'Take-ons'}    a caption above the table, for pages with more than one
+   Counts ALL events of the type, located on the pitch or not. Ties (identical totals AND
+   successes) share a rank shown blank, like the reference report. */
+function rankTable(team,rk){
+  const want={}; rk.events.forEach(ev=>want[evKey(ev)]=1);
+  const okEv=rk.succ?evKey(rk.succ):null, two=!!okEv;
+  const counts={};
+  rows.forEach(r=>{
+    if(r.team!==team||!want[evKey(r.event)])return;
+    const no=String(r.playerFrom||'').trim(); if(!no)return;
+    const o=counts[no]=counts[no]||{t:0,s:0}; o.t++; if(evKey(r.event)===okEv)o.s++;
+  });
+  const rate=c=>c.t?c.s/c.t:0;
+  const list=Object.entries(counts).sort((x,y)=>
+    (rk.by==='rate'?rate(y[1])-rate(x[1]):0)
+    ||y[1].t-x[1].t||y[1].s-x[1].s||(+x[0]||1e9)-(+y[0]||1e9)).slice(0,5);
+  const cap=rk.label?`<div style="font-size:10.5px;font-weight:800;color:${C.navy};margin:9px 0 2px">${rk.label}`
+    +(rk.by==='rate'?`<span style="color:${C.mut};font-weight:600"> · ranked by success rate</span>`:'')
+    +'</div>':'';
+  const header=`${cap}<table class="rpt" style="font-size:9px;margin-top:${rk.label?'0':'8px'}"><thead><tr><th>Rank</th>`
+    +`<th style="text-align:left">Player</th><th>Total</th>${two?'<th>Succ.</th><th>Success Rate</th>':''}</tr></thead>`;
+  if(!list.length){   // no data -> dashed placeholder rows, like the reference
+    let h='';
+    for(let i=1;i<=5;i++)h+=`<tr><td style="color:${C.mut}">${i}</td><td style="text-align:left;color:#c9cfd9">–</td>`
+      +`<td style="color:#c9cfd9">–</td>${two?'<td style="color:#c9cfd9">–</td><td style="color:#c9cfd9">–</td>':''}</tr>`;
+    return header+`<tbody>${h}</tbody></table>`;
+  }
+  const roster=(lineups[team]&&lineups[team].roster)||[];
+  const nameOf=no=>{const p=roster.find(q=>String(q.no)===String(no));return p&&p.name?p.name:'Player '+no;};
+  let prev=null;
+  const trs=list.map(([no,c],i)=>{
+    const tied=prev&&prev.t===c.t&&prev.s===c.s; prev=c;
+    return `<tr><td style="color:${C.mut}">${tied?'':i+1}</td>`
+      +`<td style="text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td>${c.t}</td>`
+      +(two?`<td>${c.s}</td><td>${pc0(c.s,c.t)}</td>`:'')+'</tr>';
+  }).join('');
+  return header+`<tbody>${trs}</tbody></table>`;
+}
 /* One located-action map page for a category of events: home and away pitches side by
    side (home attacks RIGHT, away mirrored LEFT), one colour per event type, marker shape
-   by half, and a top-5 ranking under each map. `cat` is a Stats-tab DEF_CATS entry —
-   {label, parts:[[event, legend, colour], …]} — so the two pages that use this stay in
-   step with the dropdown. Returns null when neither side has a located event.
-   A two-part category (won / lost) also gets Succ. + Success Rate columns, its first
-   part being the successful event; one- and three-part categories just get Total. */
-function actionMapsPage(cat,title){
+   by half, and one or more rankings under each map. `cat` is a Stats-tab DEF_CATS entry —
+   {label, parts:[[event, legend, colour], …]} — so the pages that use this stay in step
+   with the dropdown. Returns null when neither side has a located event.
+   `ranks` overrides what is tabulated (see rankTable); by default the whole category is
+   ranked as one table, with Succ. + Success Rate for a won/lost pair. */
+function actionMapsPage(cat,title,ranks){
   // keyed through evKey: the event dictionary is user-editable, so "Take-on Concern"
   // has to find the same rows as "take-on concern" (see the evKey note in shared.js)
   const col={}; cat.parts.forEach(([ev,,c])=>col[evKey(ev)]=c);
-  const two=cat.parts.length===2, okEv=two?evKey(cat.parts[0][0]):null;
+  const evs=cat.parts.map(p=>p[0]);
+  const rk=ranks||[{events:evs,succ:cat.parts.length===2?cat.parts[0][0]:null}];
   const acts=team=>rows.filter(r=>r.team===team&&col[evKey(r.event)]&&r.pXY);
   const hA=acts('home'), aA=acts('away');
   if(!hA.length&&!aA.length)return null;
-  // top-5 ranking under each map — counts ALL events of the category (located
-  // or not); ties (same totals) share a rank shown blank, like the reference
-  const top5=team=>{
-    const counts={};
-    rows.forEach(r=>{
-      if(r.team!==team||!col[evKey(r.event)])return;
-      const no=String(r.playerFrom||'').trim(); if(!no)return;
-      const o=counts[no]=counts[no]||{t:0,s:0}; o.t++; if(evKey(r.event)===okEv)o.s++;
-    });
-    const list=Object.entries(counts)
-      .sort((x,y)=>y[1].t-x[1].t||y[1].s-x[1].s||(+x[0]||1e9)-(+y[0]||1e9)).slice(0,5);
-    const header=`<table class="rpt" style="font-size:9px;margin-top:8px"><thead><tr><th>Rank</th>`
-      +`<th style="text-align:left">Player</th><th>Total</th>${two?'<th>Succ.</th><th>Success Rate</th>':''}</tr></thead>`;
-    if(!list.length){   // no data -> dashed placeholder rows, like the reference
-      let h='';
-      for(let i=1;i<=5;i++)h+=`<tr><td style="color:${C.mut}">${i}</td><td style="text-align:left;color:#c9cfd9">–</td>`
-        +`<td style="color:#c9cfd9">–</td>${two?'<td style="color:#c9cfd9">–</td><td style="color:#c9cfd9">–</td>':''}</tr>`;
-      return header+`<tbody>${h}</tbody></table>`;
-    }
-    const roster=(lineups[team]&&lineups[team].roster)||[];
-    const nameOf=no=>{const p=roster.find(q=>String(q.no)===String(no));return p&&p.name?p.name:'Player '+no;};
-    let prev=null;
-    const trs=list.map(([no,c],i)=>{
-      const tied=prev&&prev.t===c.t&&(!two||prev.s===c.s); prev=c;
-      return `<tr><td style="color:${C.mut}">${tied?'':i+1}</td>`
-        +`<td style="text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td>${c.t}</td>`
-        +(two?`<td>${c.s}</td><td>${pc0(c.s,c.t)}</td>`:'')+'</tr>';
-    }).join('');
-    return header+`<tbody>${trs}</tbody></table>`;
-  };
   // side-by-side row: home attacks RIGHT, away mirrored to attack LEFT;
   // marker shape = half (circle 1st, square 2nd), colour = the event's part;
   // a side with no data keeps the empty pitch
@@ -831,7 +867,8 @@ function actionMapsPage(cat,title){
       return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
     }).join('');
     const map=hPitchSVG(dots,flip?'left':'right');
-    return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}</div>${map}${top5(team)}</div>`;
+    return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}</div>`
+      +map+rk.map(one=>rankTable(team,one)).join('')+'</div>';
   };
   const legend=cat.parts.map(([,lbl,c])=>`<span><i style="background:${c}"></i>${lbl}</span>`).join('')
     +`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
@@ -848,13 +885,19 @@ function defCategoryPages(){
     .map(cat=>actionMapsPage(cat,`Defensive — ${cat.label}`))
     .filter(Boolean);
 }
-/* where a team took defenders on and where it stepped in — the three events share ONE
-   map per side, told apart by colour */
+/* Where a team took defenders on and where it stepped in — the three events share ONE map
+   per side, told apart by colour. They are two different actions though, so they are
+   ranked apart: take-ons on how often the player beat his man (success / attempted),
+   step-ins simply on how many. Ranking the three together compared unlike things and hid
+   who was actually winning his duels. */
 const TAKEON_CAT={label:'Take-ons & Step-ins',parts:[
   ['take-on succes','Take-on success','#39d98a'],
   ['take-on fail','Take-on fail','#f7506b'],
   ['step in','Step-in','#2f81f7']]};
-const takeOnMapsPage=()=>actionMapsPage(TAKEON_CAT,'Distribution — Take-ons &amp; Step-ins');
+const TAKEON_RANKS=[
+  {label:'Take-ons',events:['take-on succes','take-on fail'],succ:'take-on succes',by:'rate'},
+  {label:'Step-ins',events:['step in']}];
+const takeOnMapsPage=()=>actionMapsPage(TAKEON_CAT,'Distribution — Take-ons &amp; Step-ins',TAKEON_RANKS);
 
 /* Defensive profile radar — each axis normalised against the higher of the two teams,
    then scaled into RMAX so the leader stops short of the outer ring. Mapping the leader
