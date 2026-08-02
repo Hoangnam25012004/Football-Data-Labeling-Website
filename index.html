@@ -1305,11 +1305,10 @@ function openVideoWindow(){
   stage.style.position='relative';
   const overlay=d.createElement('div');
   overlay.style.cssText='position:absolute;inset:0;display:none;z-index:5;cursor:crosshair';
-  const statusHTML='<div id="pv-pstatus" style="position:absolute;top:8px;left:8px;display:flex;gap:8px;align-items:center;'+
-    'background:rgba(0,0,0,.6);color:#e6edf3;padding:5px 10px;border-radius:6px;font-size:12px">'+
-    // no caption beside the button: the bar sits over the top-left of the pitch, and a
-    // line of text that long both hid that corner and swallowed clicks meant for it
-    '<button id="pv-pclear" title="Removes the last-placed dot; press again to remove the first" style="background:#1c2330;border:1px solid #2a3240;color:#e6edf3;border-radius:5px;padding:2px 8px;cursor:pointer">Undo (Esc)</button></div>';
+  // Nothing but the pitch goes in the overlay. It used to carry a status bar over the
+  // top-left corner — a caption and an Undo button — and being a solid element on top
+  // of the overlay it hid that corner and swallowed the clicks meant for it, so a dot
+  // could not be placed there. Esc still undoes the last dot (keydown handler below).
   stage.appendChild(overlay);
   let dims=PITCH_DIMS[state.sport]||PITCH_DIMS.football;
   const SVGNS='http://www.w3.org/2000/svg';
@@ -1394,8 +1393,7 @@ function openVideoWindow(){
           +'<rect x="'+(I-G.d)+'" y="'+gy+'" width="'+G.d+'" height="'+G.w+'"/>'
           +'<rect x="'+(dims.w-I)+'" y="'+gy+'" width="'+G.d+'" height="'+G.w+'"/></g></svg>');
     }
-    overlay.innerHTML=svgHTML+statusHTML;
-    overlay.querySelector('#pv-pclear').onclick=undoLastDot;
+    overlay.innerHTML=svgHTML;
     overlay.querySelector('svg').addEventListener('click',onPitchClick);
     redraw();
   }
