@@ -29,11 +29,13 @@ Access API), serve it over `http://localhost` (e.g. `python -m http.server`) in 
 node tests/run.js
 ```
 No dependencies and no install step: the suite lifts the functions it exercises straight
-out of the `<script>` in [`index.html`](index.html) and runs them in a `vm` sandbox against
-stubs for the DOM/video/cloud, so it always tests the shipped code. Covered today: the
-substitution → formation-history flow (single/double/triple swaps in one entry, pairs typed
-back-to-front, impossible pairs, dots and 2nd-half mirroring, re-tagging, deleting, and
-substitutions tagged out of order). `tests/` is not part of the deployed site.
+out of the `<script>` in [`index.html`](index.html) (and in [`Stats/index.html`](Stats/index.html)),
+plus [`shared.js`](shared.js) whole, and runs them in a `vm` sandbox against stubs for the
+DOM/video/cloud, so it always tests the shipped code. Covered today: the substitution →
+formation-history flow (single/double/triple swaps in one entry, pairs typed back-to-front,
+impossible pairs, dots and 2nd-half mirroring, re-tagging, deleting, and substitutions tagged
+out of order); and the Stats General tab (which swaps collapse into one x2 / x3 timeline
+marker, and the bench listed under each formation). `tests/` is not part of the deployed site.
 
 ## Real-time cloud sync (Supabase)
 Tagged events can be saved to a shared Postgres database and synced live between everyone

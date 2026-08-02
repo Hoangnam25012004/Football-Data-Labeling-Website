@@ -6,7 +6,7 @@
 <title>Stats — Pitch Tagger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="../shared.css?v=10">
+<link rel="stylesheet" href="../shared.css?v=11">
 <style>
 /* fill the viewport exactly: header + page + stats-wrap as a flex column, so no
    dead band is left under the scroll area regardless of header/padding heights */
@@ -97,6 +97,19 @@ body>header{flex:none}
 .gf-nm{margin-top:1px;font-size:9px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.9);
   max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gf-arrow{position:absolute;top:6px;left:6px;font-size:10px;color:rgba(255,255,255,0.75);font-weight:700}
+/* General: the bench, listed under each side's formation */
+.gf-bench{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.gf-btitle{display:flex;align-items:baseline;gap:6px;font-size:12px;font-weight:700;color:var(--mut);margin-bottom:7px}
+.gf-bcnt{font-size:11px;font-weight:600;color:var(--mut);opacity:0.8}
+.gf-blist{display:flex;flex-wrap:wrap;gap:5px}
+.gf-sub{display:inline-flex;align-items:center;max-width:100%;padding:2px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:999px;font-size:11px;color:var(--ink)}
+.gf-sno{flex:none;width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:800;color:#fff;background:var(--home)}
+.gf-sub.away .gf-sno{background:var(--away)}
+.gf-snm{padding:0 7px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gf-snm:empty{display:none}
+.gf-bempty{font-size:11px;color:var(--mut)}
 </style>
 </head>
 <body>
@@ -180,8 +193,7 @@ function renderStats(){
   // Distribution: pass matrix on the left, volume/accuracy scatter on its right.
   let extra='';
   if(statCat==='shooting'){
-    extra=`<div class="chart-row">${shootingChartHTML(statTeam)}${shotMapHTML(statTeam)}</div>`
-      +`<div class="chart-row">${shotEventListHTML(statTeam)}</div>`;
+    extra=`<div class="chart-row">${shootingChartHTML(statTeam)}${shotMapHTML(statTeam)}</div>`;
   }else if(statCat==='distribution'){
     extra=`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}${crossMapHTML(statTeam)}</div>`
       +`<div class="chart-row">${heatMapHTML(statTeam)}</div>`
@@ -304,33 +316,6 @@ function shotMapHTML(team){
     +`<div class="shotmap-pitch">${pitch}</div><div class="shotmap-legend">${legend}</div></div>`;
 }
 function setShotHalf(h){shotHalf=h;renderStats();}
-// match-minute label for the event list: "8'", "45+3'" (stoppage capped by the half)
-function minLabel(r){
-  const sec=matchTime(r.t), half=eventHalf(r), L=+dur.halfLen||45;
-  const m=Math.floor(sec/60)+1, cap=half*L;
-  return m>cap?`${cap}+${m-cap}'`:`${m}'`;
-}
-const SHOT_LABEL={'goal':'Goal','shot on target':'On target','shot off target':'Off target',
-  'blocked shot':'Blocked','miss shot':'Missed'};
-/* ---- Shooting: Event List — every shot in time order, with the body part it was
-   taken with (reads the body-part event tagged in the same chain). ---- */
-function shotEventListHTML(team){
-  const list=shotList(rows,team);
-  if(!list.length)return `<div class="chart-card"><div class="chart-title">Event List</div>`
-    +`<div class="stats-empty">No shots yet.</div></div>`;
-  const names=squadNames(lineups,team);
-  const body=list.map(s=>{
-    const nm=playerLabel(names,s.no);
-    return `<tr title="${esc(SHOT_LABEL[s.event]||s.event)}">`
-      +`<td class="el-idx"><span class="el-dot" style="background:${shotColor(s.event)}">${s.idx}</span></td>`
-      +`<td class="el-t">${esc(minLabel(s))}</td>`
-      +`<td class="el-pl">${esc(s.no)}${nm?'. '+esc(nm):''}</td>`
-      +`<td class="el-bp">${s.bodyPart?esc(s.bodyPart):'<span class="t-mut">—</span>'}</td></tr>`;
-  }).join('');
-  return `<div class="chart-card el-card"><div class="chart-title">Event List <span class="el-cnt">${list.length}</span></div>`
-    +`<table class="el-tbl"><thead><tr><th class="el-idx"></th><th class="el-t">Time</th>`
-    +`<th class="el-pl">Player</th><th class="el-bp">Body Part</th></tr></thead><tbody>${body}</tbody></table></div>`;
-}
 /* ---- Distribution: each player a bubble at (pass accuracy %, pass volume) (image 2) ---- */
 function passScatterHTML(team){
   const P=computeStats(rows,team), fill=team==='home'?'#2f81f7':'#f7682f';
@@ -793,9 +778,32 @@ function scoreBarHTML(){
     +`<span class="sb-score">${teamGoals('home')}<i>:</i>${teamGoals('away')}</span>`
     +`<span class="sb-name away">${meta.away}</span></div>`;
 }
-/* ---- General: horizontal match-summary timeline (goals / own goals / cards only).
+/* ---- General: horizontal match-summary timeline (goals / own goals / cards / subs).
    Home events sit above the axis, away events below; stacked when they collide. */
 const SUMMARY_EVENTS={'goal':'goal','own goal':'og','own-goal':'og','yellow card':'yc','red card':'rc'};
+/* Substitution markers. Swaps made at the same moment are ONE marker badged x2 / x3
+   instead of a row of identical arrows: the pairs of a single entry ("38sub6*27sub43")
+   share a group id and always land together, and separate entries join them when they
+   fall in the same minute of the same half. Reads the event rows (playerFrom = off,
+   playerTo = on), so a substitution deleted in the events table leaves the timeline. */
+function subMarkers(){
+  const list=rows.filter(r=>r&&r.t!=null&&evKey(r.event)==='substitution'
+      &&(r.team==='home'||r.team==='away'))
+    .slice().sort((a,b)=>a.t-b.t);
+  const minuteKey=r=>r.team+'#'+eventHalf(r)+'#'+Math.floor(matchTime(r.t)/60);
+  const grpKey=new Map();   // every pair of one entry follows its FIRST pair's bucket
+  list.forEach(r=>{if(r.grp!=null&&!grpKey.has(r.grp))grpKey.set(r.grp,minuteKey(r));});
+  const byKey=new Map(), out=[];
+  list.forEach(r=>{
+    const k=(r.grp!=null&&grpKey.has(r.grp))?grpKey.get(r.grp):minuteKey(r);
+    let m=byKey.get(k);
+    if(!m){m={team:r.team,no:'',kind:'sub',sec:matchTime(r.t),half:eventHalf(r),pairs:[]};
+      byKey.set(k,m); out.push(m);}
+    m.sec=Math.min(m.sec,matchTime(r.t));   // the marker sits at the first swap of the window
+    m.pairs.push({off:String(r.playerFrom||'').trim(),on:String(r.playerTo||'').trim()});
+  });
+  return out;
+}
 function matchSummaryHTML(){
   // cards: a 2nd yellow shows as one "yellow+red" marker; the redundant explicit red
   // for that same dismissal is dropped so 61' isn't two markers (see classifyCards)
@@ -809,14 +817,17 @@ function matchSummaryHTML(){
       }
       return {...base,kind:SUMMARY_EVENTS[r.event]};
     }).filter(Boolean);
-  if(!evs.length)return `<div class="chart-card sum-card">${scoreBarHTML()}<div class="stats-empty">No goals or cards yet.</div></div>`;
+  // half first, then match seconds: first-half stoppage overlaps the opening second-half
+  // minutes, and the marks are laid out left to right in this order
+  const all=evs.concat(subMarkers()).sort((a,b)=>a.half-b.half||a.sec-b.sec);
+  if(!all.length)return `<div class="chart-card sum-card">${scoreBarHTML()}<div class="stats-empty">No goals, cards or substitutions yet.</div></div>`;
   // wide, flat viewBox keeps the card short when the SVG scales to full width
   const W=1500,H=138,mL=104,mR=30,axisY=66,hl=(+dur.halfLen||45)*60;
   // the axis uses the REAL length of each half (incl. stoppage): HT sits at the
   // half-time whistle and FT at the full-time whistle (from the Duration settings
   // when set, else stretched to the half's last event), so 45+X' events stay
   // before HT and 90+X' before FT whatever the configured minutes-per-half.
-  const maxSec=h=>Math.max(0,...evs.filter(e=>e.half===h).map(e=>e.sec));
+  const maxSec=h=>Math.max(0,...all.filter(e=>e.half===h).map(e=>e.sec));
   const H1=Math.max(hl,(dur.h2Start>0&&dur.h1End>dur.h1Start)?dur.h1End-dur.h1Start:0,maxSec(1)?maxSec(1)+30:0);
   const H2=Math.max(hl,(dur.h2Start>0&&dur.h2End>dur.h2Start)?dur.h2End-dur.h2Start:0,maxSec(2)?maxSec(2)-hl+30:0);
   const total=H1+H2;
@@ -837,8 +848,15 @@ function matchSummaryHTML(){
       +ls.map((l,i)=>`<tspan x="8" y="${y0+i*lh}">${l}</tspan>`).join('')+'</text>';};
   g+=nameText(meta.home,'var(--home)',true)+nameText(meta.away,'var(--away)',false);
   const cardRect=(col,x)=>`<rect x="${x}" y="-8" width="10" height="16" rx="2" fill="${col}" stroke="#0d1117"/>`;
+  // substitution: the player going off (red ▼) beside the one coming on (green ▲)
+  const subIcon=`<g stroke-linecap="round">`
+    +`<line x1="-5.5" y1="-7" x2="-5.5" y2="1.4" stroke="#f7506b" stroke-width="2.6"/>`
+    +`<polygon points="-5.5,8 -9.4,1.4 -1.6,1.4" fill="#f7506b"/>`
+    +`<line x1="5.5" y1="7" x2="5.5" y2="-1.4" stroke="#39d98a" stroke-width="2.6"/>`
+    +`<polygon points="5.5,-8 1.6,-1.4 9.4,-1.4" fill="#39d98a"/></g>`;
   const icon=k=>k==='goal'?'<text text-anchor="middle" font-size="17" y="6">⚽</text>'
     :k==='og'?'<circle r="10" fill="#f7506b"/><text text-anchor="middle" font-size="9" font-weight="800" fill="#fff" y="3.5">OG</text>'
+    :k==='sub'?subIcon
     :k==='y2'?cardRect('#ffd23f',-9.5)+cardRect('#e5484d',-0.5)   // 2nd yellow → red: both cards
     :cardRect(k==='yc'?'#ffd23f':'#e5484d',-5);
   // stoppage-time minutes are capped by the half: a 45:52 first-half goal is
@@ -849,13 +867,19 @@ function matchSummaryHTML(){
   // every event sits on one lane per team — home above the axis, away below;
   // near-simultaneous events of the same team are nudged right so icons never overlap
   const lastX={home:-1e9,away:-1e9};
-  const marks=evs.map(e=>{
+  const marks=all.map(e=>{
     const x=Math.max(X(pos(e)),lastX[e.team]+24), up=e.team==='home', col=up?'var(--home)':'var(--away)';
     lastX[e.team]=x;
     const y=up?axisY-26:axisY+32;
-    const noBadge=e.no?`<circle cy="${up?-24:26}" r="9.5" fill="${col}" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>`
-      +`<text text-anchor="middle" y="${up?-20.5:29.5}" font-size="10" font-weight="800" fill="#fff">${e.no}</text>`:'';
-    return `<g transform="translate(${x.toFixed(1)} ${y})">${icon(e.kind)}${noBadge}`
+    // a substitution names no single player, so its badge slot carries x2 / x3 when the
+    // moment swapped more than one; who went off for whom is spelled out on hover
+    const badge=e.kind==='sub'
+      ? (e.pairs.length>1?`<text text-anchor="middle" y="${up?-20:30}" font-size="11" font-weight="800" fill="${col}">x${e.pairs.length}</text>`:'')
+      : (e.no?`<circle cy="${up?-24:26}" r="9.5" fill="${col}" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>`
+        +`<text text-anchor="middle" y="${up?-20.5:29.5}" font-size="10" font-weight="800" fill="#fff">${e.no}</text>`:'');
+    const tip=e.kind==='sub'
+      ? `<title>${esc(minLbl(e)+' '+e.pairs.map(p=>(p.off||'?')+' ▼ '+(p.on||'?')+' ▲').join(' · '))}</title>`:'';
+    return `<g transform="translate(${x.toFixed(1)} ${y})">${tip}${icon(e.kind)}${badge}`
       +`<text text-anchor="middle" y="${up?20:-16}" font-size="10" fill="var(--mut)">${minLbl(e)}</text></g>`;
   }).join('');
   return `<div class="chart-card sum-card">${scoreBarHTML()}<div class="sum-wrap">`
@@ -870,17 +894,36 @@ function pitchSVGV(){
 }
 function formationSideHTML(team){
   const lu=(lineups&&lineups[team])||blankTeamLU('lr');
-  if(!lu.xi||!lu.xi.length)
-    return `<div class="gen-form"><div class="stats-empty">No starting lineup yet — set it in Player lists.</div></div>`;
-  const dots=lu.xi.map(p=>{
-    let x=p.x, y=p.y;
-    if((lu.dir||'lr')==='rl'){x=100-x;y=100-y;}          // normalise board coords to attacking RIGHT
-    const left=y, top=100-x;                             // then rotate 90° CCW → vertical, attacking UP
-    const pl=(lu.roster||[]).find(r=>String(r.no)===String(p.no));
-    return `<div class="gf-dot ${team}" style="left:${left.toFixed(1)}%;top:${top.toFixed(1)}%">`
-      +`<span class="gf-no">${p.no}</span><span class="gf-nm">${pl&&pl.name?pl.name:'P. '+p.no}</span></div>`;
-  }).join('');
-  return `<div class="gen-form"><div class="gf-pitch">${pitchSVGV()}${dots}<div class="gf-arrow">▲ Attacking</div></div></div>`;
+  let pitch;
+  if(!lu.xi||!lu.xi.length){
+    pitch=`<div class="stats-empty">No starting lineup yet — set it in Player lists.</div>`;
+  }else{
+    const dots=lu.xi.map(p=>{
+      let x=p.x, y=p.y;
+      if((lu.dir||'lr')==='rl'){x=100-x;y=100-y;}          // normalise board coords to attacking RIGHT
+      const left=y, top=100-x;                             // then rotate 90° CCW → vertical, attacking UP
+      const pl=(lu.roster||[]).find(r=>String(r.no)===String(p.no));
+      return `<div class="gf-dot ${team}" style="left:${left.toFixed(1)}%;top:${top.toFixed(1)}%">`
+        +`<span class="gf-no">${p.no}</span><span class="gf-nm">${pl&&pl.name?pl.name:'P. '+p.no}</span></div>`;
+    }).join('');
+    pitch=`<div class="gf-pitch">${pitchSVGV()}${dots}<div class="gf-arrow">▲ Attacking</div></div>`;
+  }
+  return `<div class="gen-form">${pitch}${benchListHTML(team)}</div>`;
+}
+/* ---- General: the named bench under each formation. This is the squad as it was
+   NAMED before kick-off (lineups[team].subs), to match the starting XI drawn above it —
+   not the live bench, which substitutions rewrite as the match goes on. ---- */
+function benchListHTML(team){
+  const lu=(lineups&&lineups[team])||null;
+  const bench=(((lu&&lu.subs)||[]).map(n=>String(n==null?'':n).trim())).filter(Boolean);
+  const names=squadNames(lineups,team);
+  const list=bench.length
+    ? bench.map(no=>`<span class="gf-sub ${team}"><span class="gf-sno">${esc(no)}</span>`
+        +`<span class="gf-snm">${esc(names[no]||'')}</span></span>`).join('')
+    : `<span class="gf-bempty">No substitutes named.</span>`;
+  return `<div class="gf-bench"><div class="gf-btitle">Substitutes`
+    +(bench.length?`<span class="gf-bcnt">${bench.length}</span>`:'')
+    +`</div><div class="gf-blist">${list}</div></div>`;
 }
 
 /* ---- exports (full workbook: events + stats + pass distribution) ---- */

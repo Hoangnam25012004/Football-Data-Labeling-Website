@@ -135,6 +135,33 @@ function loadShared(store){
   return ctx.S;
 }
 
+/* Stats/index.html is a second standalone page whose renderers live in its own inline
+   <script> (again: no build step, no modules). Same trick as loadShared: shared.js plus
+   the named functions/consts lifted out of the page, run as ONE script so their const
+   bindings can see each other, with the page state (rows / meta / lineups / duration)
+   injected as plain globals in place of the localStorage the real page reads.
+   `state` -> {rows, meta, lineups, dur}; returns the requested names plus `holder`,
+   the stand-in for #statsHolder that the render functions write into. */
+const STATS=fs.readFileSync(path.join(ROOT,'Stats','index.html'),'utf8');
+function loadStats(state,names){
+  const holder={innerHTML:''};
+  const ctx={console,document:{getElementById:()=>holder},location:{hash:''},
+    localStorage:{getItem:()=>null,setItem(){}}};
+  vm.createContext(ctx);
+  const consts=(names.consts||[]).map(n=>grabConst(n,STATS,'Stats/index.html'));
+  const funcs=(names.funcs||[]).map(n=>grabFunction(n,STATS,'Stats/index.html'));
+  vm.runInContext([SHARED,
+    'var rows='+JSON.stringify(state.rows||[])+';',
+    'var meta='+JSON.stringify(state.meta||{home:'Home',away:'Away',sport:'football'})+';',
+    'var lineups='+JSON.stringify(state.lineups||{})+';',
+    'var dur='+JSON.stringify(state.dur||{enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0})+';',
+    consts.join('\n'), funcs.join('\n'),
+    ';globalThis.P={rows,meta,lineups,dur,'
+      +(names.consts||[]).concat(names.funcs||[]).join(',')+'};'
+  ].join('\n'),ctx,{filename:'Stats/index.html-extract.js'});
+  return Object.assign({holder},ctx.P);
+}
+
 /* a localStorage stand-in that also records the ORDER of the writes — the lineups store
    and its match stamp must land in the right sequence for other tabs to read them */
 function fakeStorage(seed){
@@ -146,4 +173,5 @@ function fakeStorage(seed){
     snapshot:()=>Object.fromEntries(map)};
 }
 
-module.exports={makeApp,submit,grabFunction,grabConst,loadShared,fakeStorage,SRC,SHARED,CLOUD,EVENTS};
+module.exports={makeApp,submit,grabFunction,grabConst,loadShared,loadStats,fakeStorage,
+  SRC,SHARED,STATS,CLOUD,EVENTS};

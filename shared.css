@@ -45,20 +45,6 @@ table.stats td.pl,table.stats th.pl{text-align:left}   /* registered name next t
 table.stats tbody tr:hover td{background:#1c233066}
 .stats-empty{padding:24px;text-align:center;color:var(--mut)}
 
-/* Shooting: Event List (shot-by-shot with body part) */
-.el-card{flex:1;min-width:320px;max-width:640px}
-.el-cnt{color:var(--mut);font-weight:600;font-size:12px;margin-left:6px}
-table.el-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
-.el-tbl th{position:sticky;top:0;background:var(--panel2);color:var(--mut);font-weight:600;text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-.el-tbl td{padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.el-tbl tbody tr:hover td{background:var(--panel2)}
-.el-tbl .el-idx{width:34px;text-align:center}
-.el-tbl .el-t{width:60px;color:var(--mut);font-variant-numeric:tabular-nums}
-.el-tbl .el-pl{max-width:260px}
-.el-tbl .el-bp{width:96px;text-align:right;color:var(--ink)}
-.el-dot{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;color:#06281a;font-weight:800;font-size:11px}
-.el-tbl .t-mut{color:var(--mut)}
-
 /* stats charts (Shooting donut + Distribution scatter) */
 .chart-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
 .chart-title{font-weight:700;font-size:13px;margin-bottom:10px}
