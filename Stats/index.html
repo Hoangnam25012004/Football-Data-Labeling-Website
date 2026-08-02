@@ -724,6 +724,31 @@ function touchPoints(team){
   });
   return out;
 }
+/* Who was on the pitch during ONE half (half 0 = the whole match, i.e. everyone
+   who played). The half filter used to list the whole matchday squad either way,
+   so a player who only came on after the break sat in the FIRST-half list on 0
+   touches as if he had played it. The XI a half kicks off with is the last
+   formation snapshot taken before it (else the starting XI); everyone who came on
+   during the half then shows up in a snapshot taken inside it, and everyone who
+   went off during it was in the XI it started with — so both ends of every swap
+   made in the half are covered. */
+function squadInHalf(team,half){
+  if(!half)return squadOnPitch(lineups,team);
+  const lu=(lineups&&lineups[team])||null; if(!lu)return [];
+  const out=[], seen=new Set();
+  const add=n=>{const s=String(n==null?'':n).trim();
+    if(!s||seen.has(s))return; seen.add(s); out.push(s);};
+  const hist=((lineups&&lineups.history)||[]).filter(h=>h&&h.team===team&&h.xi)
+    .slice().sort((a,b)=>(a.t||0)-(b.t||0));
+  const before=hist.filter(h=>eventHalf({t:h.t})<half);
+  ((before.length?before[before.length-1].xi:lu.xi)||[]).forEach(p=>add(p&&p.no));
+  hist.filter(h=>eventHalf({t:h.t})===half).forEach(h=>(h.xi||[]).forEach(p=>add(p&&p.no)));
+  // a swap whose snapshot was edited away still counts (same fallback as squadOnPitch):
+  // the man who came on and the man he replaced were both on the pitch this half
+  (lu.subHistory||[]).filter(s=>s&&eventHalf({t:s.t})===half)
+    .forEach(s=>{add(s.out);add(s.in);});
+  return out;
+}
 /* Per-player heatmap (like the reference video): the pitch shows the whole
    team's heat plus a marker per player at his average position; hovering a
    marker or a row in the player list isolates that player's heatmap. */
@@ -737,10 +762,11 @@ function heatMapHTML(team){
   // no data -> keep the pitch, just no heat/markers
   const pts=touchPoints(team).filter(t=>!heatHalf||t.half===heatHalf);
   _heatBy={}; pts.forEach(t=>{const k=t.p; (_heatBy[k]=_heatBy[k]||[]).push(t);});
-  // everyone who took the pitch is listed, even with no located touch — a substitute who
-  // came on and never got on the ball used to disappear from the map entirely. He has no
-  // average position to mark, so he gets a list row with 0 and no marker.
-  squadOnPitch(lineups,team).forEach(no=>{if(!_heatBy[no])_heatBy[no]=[];});
+  // everyone who took the pitch IN THIS HALF is listed, even with no located touch — a
+  // substitute who came on and never got on the ball used to disappear from the map
+  // entirely. He has no average position to mark, so he gets a list row with 0 and no
+  // marker. A touch always counts on its own: it proves he was on, lineups or not.
+  squadInHalf(team,heatHalf).forEach(no=>{if(!_heatBy[no])_heatBy[no]=[];});
   _heatOrder=Object.keys(_heatBy).filter(p=>p!=='')
     .sort((a,b)=>{const na=+a,nb=+b;return(!isNaN(na)&&!isNaN(nb))?na-nb:a.localeCompare(b);});
   const markers=_heatOrder.filter(p=>_heatBy[p].length).map(p=>{

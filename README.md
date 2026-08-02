@@ -36,7 +36,8 @@ formation-history flow (single/double/triple swaps in one entry, pairs typed bac
 impossible pairs, dots and 2nd-half mirroring, re-tagging, deleting, and substitutions tagged
 out of order); the Stats General tab (which swaps collapse into one x2 / x3 timeline marker,
 and the bench listed under each formation); and the Stats Distribution tab (the take-ons &
-step-ins map and the row it shares with the cross map). `tests/` is not part of the deployed site.
+step-ins map, the row it shares with the cross map, and who the touch map lists per half).
+`tests/` is not part of the deployed site.
 
 ## Real-time cloud sync (Supabase)
 Tagged events can be saved to a shared Postgres database and synced live between everyone
