@@ -1307,7 +1307,9 @@ function openVideoWindow(){
   overlay.style.cssText='position:absolute;inset:0;display:none;z-index:5;cursor:crosshair';
   const statusHTML='<div id="pv-pstatus" style="position:absolute;top:8px;left:8px;display:flex;gap:8px;align-items:center;'+
     'background:rgba(0,0,0,.6);color:#e6edf3;padding:5px 10px;border-radius:6px;font-size:12px">'+
-    '<span id="pv-ptext"></span><button id="pv-pclear" title="Removes the last-placed dot; press again to remove the first" style="background:#1c2330;border:1px solid #2a3240;color:#e6edf3;border-radius:5px;padding:2px 8px;cursor:pointer">Undo (Esc)</button></div>';
+    // no caption beside the button: the bar sits over the top-left of the pitch, and a
+    // line of text that long both hid that corner and swallowed clicks meant for it
+    '<button id="pv-pclear" title="Removes the last-placed dot; press again to remove the first" style="background:#1c2330;border:1px solid #2a3240;color:#e6edf3;border-radius:5px;padding:2px 8px;cursor:pointer">Undo (Esc)</button></div>';
   stage.appendChild(overlay);
   let dims=PITCH_DIMS[state.sport]||PITCH_DIMS.football;
   const SVGNS='http://www.w3.org/2000/svg';
@@ -1365,10 +1367,6 @@ function openVideoWindow(){
       makeDotDraggable(grp,c,t,dot);
       g.appendChild(grp);
     });
-    const pt=overlay.querySelector('#pv-ptext');
-    if(pt)pt.textContent=pd.length
-      ?pd.length+' dots — 1 dot / lần chạm bóng, theo thứ tự (kéo để chỉnh, Esc xoá dot cuối)'
-      :'Click: chấm dot theo thứ tự chạm bóng (1 dot / lần chạm)';
   }
   function onPitchClick(e){
     const svg=overlay.querySelector('svg');
