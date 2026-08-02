@@ -42,12 +42,14 @@ body>header{flex:none}
 /* Distribution row 1: the pass matrix at its natural width beside the volume /
    accuracy scatter, with EQUAL heights — the row stretches both cards to the
    taller one and centres each card's content vertically; the svg caps its height
-   and letterboxes (viewBox keeps the aspect ratio), so nothing distorts. The pair
-   is centred: the maps moved to their own row below, and the width they freed
-   reads better split evenly on both sides than pooled on the right. */
+   and letterboxes (viewBox keeps the aspect ratio), so nothing distorts.
+   space-evenly, not centre: neither card can grow to fill the width the maps
+   freed when they moved to their own row, so centring the pair left the two of
+   them one 14px gap apart with ~300px of slack banked either side. Spread
+   evenly, the space before, between and after them comes out the same. */
 .scatter-card{flex:1;min-width:320px;max-width:560px}
 .cross-card{flex:1.35;min-width:400px}
-.dist-row{align-items:stretch;justify-content:center}
+.dist-row{align-items:stretch;justify-content:space-evenly}
 .dist-row .pm-col,.dist-row .chart-card{display:flex;flex-direction:column;justify-content:center}
 .dist-row .scatter-card svg{max-height:470px}
 /* Distribution row 2: the cross map (under the pass table) beside take-ons &
