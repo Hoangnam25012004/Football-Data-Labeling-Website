@@ -65,8 +65,8 @@ const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
   'scrollToRow','editPrevTeam'];
 const FUNCS=['fmt','parseTime','eventHalf','matchTime','zoneAt','eventForKey','parseChain',
   'effectiveLU','planSubGroup','swapInSnapshot','applySubGroup','subSideEffects',
-  'removeSubSideEffects','applyRedCard','redSideEffects','removeRedSideEffects',
-  'submitEntry','chainHTML','deleteRows','startEdit','startEditGroup'];
+  'removeSubSideEffects','shiftSubRowsWithPeriod','applyRedCard','redSideEffects',
+  'removeRedSideEffects','submitEntry','chainHTML','deleteRows','startEdit','startEditGroup'];
 
 /* ---- a fresh sandbox per test, so no scenario can leak into the next ---- */
 function makeApp(opts){

@@ -1894,6 +1894,43 @@ function removeSubSideEffects(rows){
   state.lineups.history=hist;
   return true;
 }
+/* Moving a formation period has to move the substitution it was born from, or the two
+   views disagree: the Formation-by-time list reads 45:00.00 while the events table still
+   says 45:00.62, and every downstream reader (the half a swap belongs to, minutes played,
+   deleting the row later) keeps believing the row's time.
+
+   A period covers ONE entry's worth of swaps — one row per pair, sharing a group id —
+   anchored on the EARLIEST of them, the way applySubGroup() anchors on Math.min of the
+   pairs' times. The whole group shifts by one delta, so that earliest row lands exactly
+   on the new time and any per-dot spacing inside the entry survives. subHistory (minutes
+   played) rides along: it is matched back to its row on time, so it has to stay in step.
+   Rows are found by the same team + ±3s rule that ties a snapshot to its rows in
+   subSideEffects; red-card periods carry no 'Substitution' label and are left alone. */
+function shiftSubRowsWithPeriod(h,oldT,newT){
+  if(!h||!h.team||oldT===newT||!/^Substitution/.test(h.label||''))return 0;
+  const isSub=r=>r&&r.event==='substitution'&&r.team===h.team;
+  const near=r=>isSub(r)&&Math.abs(r.t-oldT)<=3;
+  const hit=(state.rows||[]).filter(near);
+  if(!hit.length)return 0;
+  // pairs typed in one entry share a group id: pull in the rest of the entry even where
+  // its own dot sat further from the period start than the ±3s window reaches
+  const grps=new Set(hit.map(r=>r.grp).filter(g=>g!=null));
+  const rows=(state.rows||[]).filter(r=>near(r)||(isSub(r)&&r.grp!=null&&grps.has(r.grp)));
+  // anchored on the rows, not on oldT: a period whose time was already moved without them
+  // (the bug this fixes) then lands its earliest row exactly on the new time as well
+  const delta=newT-Math.min(...rows.map(r=>r.t));
+  rows.forEach(r=>{
+    const was=r.t;
+    r.t=Math.max(0,r.t+delta);
+    if(r.rt!=null)r.rt=Math.max(0,r.rt+delta);
+    const lu=state.lineups[r.team];
+    ((lu&&lu.subHistory)||[]).forEach(s=>{
+      if(numEq(s.out,r.playerFrom)&&numEq(s.in,r.playerTo)&&Math.abs(s.t-was)<=3)s.t=r.t;
+    });
+    window.Cloud&&window.Cloud.onLocalUpsert(r);
+  });
+  return rows.length;
+}
 /* ===== RED CARD ===== a sent-off player leaves the pitch and does NOT go to the bench,
    so the XI drops to 10 from this moment on. Like a substitution it appends a formation
    snapshot to lineups.history; unlike one it has no incoming player. Works whether the
@@ -2031,13 +2068,19 @@ function fmEditPeriodTime(h,numEl){
     if(!/^\d+(\.\d+)?$/.test(s)&&!/^\d+:\d{1,2}(\.\d+)?$/.test(s)&&!/^\d+:\d{1,2}:\d{1,2}(\.\d+)?$/.test(s)){
       toast('⚠ Invalid time — use mm:ss.cc'); renderFmModal(); return;
     }
+    const oldT=h.t;
     h.t=videoTimeFromMatch(parseTime(s));
+    // the substitution's own event rows move with it — the table and this list are two
+    // views of one moment and may not drift apart (see shiftSubRowsWithPeriod)
+    const moved=shiftSubRowsWithPeriod(h,oldT,h.t);
     state.lineups.history.sort((a,b)=>a.t-b.t);
     saveLineups();
     fmSel=fmTeamHistory().indexOf(h);        // keep this period selected after the re-sort
     fmHalf=eventHalf({t:h.t})===2?2:1;
     renderFmModal();
-    toast('Period now starts at '+fmt(matchTime(h.t))+' ✓');
+    if(moved)renderTable();                  // …and persists them (renderTable saves)
+    toast('Period now starts at '+fmt(matchTime(h.t))+' ✓'
+      +(moved?' · '+moved+' event row'+(moved>1?'s':'')+' moved with it':''));
   };
   inp.onkeydown=e=>{e.stopPropagation();     // keep typing away from global hotkeys / modal Esc-close
     if(e.key==='Enter')commit();
