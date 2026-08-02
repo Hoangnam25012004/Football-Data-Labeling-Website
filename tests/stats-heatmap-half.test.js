@@ -91,6 +91,69 @@ test('a player sent off in the 1st half does not appear in the 2nd', () => {
   eq(half(P,2).length,10,'ten men out after the break');
 });
 
+/* ================= the half-time boundary =================
+   Reported: a player brought on "at 45:00, right at the start of the 2nd half".
+   A half-time swap is tagged somewhere in the BREAK — after the first-half whistle,
+   before the restart — and the video clock there belongs to neither half. Splitting
+   on the second-half kick-off alone put that whole gap in the first half, so the
+   player who came on was listed as a first-half player and the player he replaced
+   as a second-half one: both exactly the wrong way round. */
+const BREAK={enabled:true,halfLen:45,h1Start:0,h1End:2820,h2Start:3600,h2End:6500};
+const atBreak=t=>{
+  const l={home:lu(),away:lu(),history:[period('home',XI.filter(n=>n!=='7').concat('12'),t)]};
+  l.home.subHistory=[{out:'7',in:'12',t}];
+  const P=loadStats({rows:[],dur:BREAK,lineups:l},NAMES);
+  return {h1:P.squadInHalf('home',1),h2:P.squadInHalf('home',2)};
+};
+
+test('the reported case: a swap made during the half-time break', () => {
+  const r=atBreak(2900);   // whistle 47:00, restart 60:00 -> 48:20 is the interval
+  notOk(r.h1.includes('12'),'the man who came on played no part in the 1st half');
+  ok(r.h2.includes('12'),'he played the 2nd half');
+  ok(r.h1.includes('7'),'the man he replaced played the 1st half');
+  notOk(r.h2.includes('7'),'and none of the 2nd');
+});
+
+test('anywhere in the break reads the same, right up to the restart', () => {
+  [2821,2900,3599].forEach(t=>{
+    const r=atBreak(t);
+    notOk(r.h1.includes('12'),'12 out of the 1st half at video '+t);
+    ok(r.h2.includes('12'),'12 in the 2nd at video '+t);
+    notOk(r.h2.includes('7'),'7 out of the 2nd at video '+t);
+  });
+});
+
+test('a swap on the restart whistle is a half-time swap too', () => {
+  const r=atBreak(3600);
+  notOk(r.h1.includes('12')); ok(r.h2.includes('12')); notOk(r.h2.includes('7'));
+});
+
+test('…but one second into the 2nd half, both men played it', () => {
+  const r=atBreak(3601);
+  notOk(r.h1.includes('12'),'still no part of the 1st half');
+  ok(r.h2.includes('12')&&r.h2.includes('7'),'7 was on for that second');
+});
+
+test('a genuine 1st-half swap is untouched by the break rule', () => {
+  const r=atBreak(2700);   // 45:00 played, before the 47:00 whistle
+  ok(r.h1.includes('7')&&r.h1.includes('12'),'both played the 1st half');
+  ok(r.h2.includes('12'),'the sub carries on');
+  notOk(r.h2.includes('7'),'the man he replaced does not');
+});
+
+test('a swap on the half-time whistle still counts as 1st half', () => {
+  // the whistle is the last instant of the half, the way the timeline places HT
+  ok(atBreak(2820).h1.includes('12'));
+});
+
+test('with no half-time whistle recorded there is no break to place it in', () => {
+  // h1End unset -> the only boundary known is the restart, as before
+  const noWhistle={enabled:true,halfLen:45,h1Start:0,h1End:0,h2Start:3600,h2End:6500};
+  const l={home:lu(),away:lu(),history:[period('home',XI.filter(n=>n!=='7').concat('12'),2900)]};
+  const P=loadStats({rows:[],dur:noWhistle,lineups:l},NAMES);
+  ok(P.squadInHalf('home',1).includes('12'),'nothing to distinguish it from a 1st-half swap');
+});
+
 /* ================= robustness ================= */
 test('a swap whose snapshot was edited away still counts, in its own half', () => {
   const l={home:lu(),away:lu(),history:[]};

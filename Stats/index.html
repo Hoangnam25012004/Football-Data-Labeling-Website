@@ -727,26 +727,51 @@ function touchPoints(team){
 /* Who was on the pitch during ONE half (half 0 = the whole match, i.e. everyone
    who played). The half filter used to list the whole matchday squad either way,
    so a player who only came on after the break sat in the FIRST-half list on 0
-   touches as if he had played it. The XI a half kicks off with is the last
-   formation snapshot taken before it (else the starting XI); everyone who came on
-   during the half then shows up in a snapshot taken inside it, and everyone who
-   went off during it was in the XI it started with — so both ends of every swap
-   made in the half are covered. */
+   touches as if he had played it.
+
+   A half is bounded by its KICK-OFF and its whistle on the video clock, not by
+   eventHalf(): that splits the video at the second-half kick-off alone, which
+   leaves the half-time BREAK inside the first half. A substitution made at the
+   interval — the most ordinary kind there is — therefore read as a first-half
+   change, listing the player who came on among the first-half players and the
+   player who went off among the second-half ones, when the truth is the exact
+   opposite. Anchored on kick-off, a break change is simply already in force when
+   the half starts, so both ends of it land on the right side.
+
+   The XI that walked out for the half is the last formation in force at its
+   kick-off (else the starting XI); everyone who came on while it was being played
+   shows up in a snapshot inside the half; everyone who went off during it was in
+   the XI it started with. eventHalf() is deliberately left alone — the maps, the
+   timeline and the report all classify EVENTS with it, and an event can only
+   happen while the ball is in play. */
 function squadInHalf(team,half){
   if(!half)return squadOnPitch(lineups,team);
   const lu=(lineups&&lineups[team])||null; if(!lu)return [];
   const out=[], seen=new Set();
   const add=n=>{const s=String(n==null?'':n).trim();
     if(!s||seen.has(s))return; seen.add(s); out.push(s);};
+  // With no half-time whistle recorded there is no break to place a change in, and
+  // with no second-half kick-off the video is one long half — "2nd half" then just
+  // carries the final XI, as it did before.
+  const h1s=+dur.h1Start||0, h1e=+dur.h1End||0, h2s=+dur.h2Start||0;
+  const ko  = half===1 ? h1s : (h2s>0?h2s:Infinity);
+  const end = half===1 ? (h1e>h1s?h1e:(h2s>0?h2s:Infinity)) : Infinity;
   const hist=((lineups&&lineups.history)||[]).filter(h=>h&&h.team===team&&h.xi)
-    .slice().sort((a,b)=>(a.t||0)-(b.t||0));
-  const before=hist.filter(h=>eventHalf({t:h.t})<half);
+    .slice().sort((a,b)=>(+a.t||0)-(+b.t||0));
+  const before=hist.filter(h=>(+h.t||0)<=ko);
   ((before.length?before[before.length-1].xi:lu.xi)||[]).forEach(p=>add(p&&p.no));
-  hist.filter(h=>eventHalf({t:h.t})===half).forEach(h=>(h.xi||[]).forEach(p=>add(p&&p.no)));
-  // a swap whose snapshot was edited away still counts (same fallback as squadOnPitch):
-  // the man who came on and the man he replaced were both on the pitch this half
-  (lu.subHistory||[]).filter(s=>s&&eventHalf({t:s.t})===half)
-    .forEach(s=>{add(s.out);add(s.in);});
+  hist.filter(h=>{const t=+h.t||0;return t>ko&&t<=end;})
+    .forEach(h=>(h.xi||[]).forEach(p=>add(p&&p.no)));
+  // A swap whose snapshot was edited away still counts (same fallback as
+  // squadOnPitch) — but only where no snapshot covers it, or a player the lines
+  // above correctly left out would be handed straight back. Matched to a snapshot
+  // on the same ±3s the events table uses.
+  (lu.subHistory||[]).forEach(s=>{
+    if(!s)return; const t=+s.t||0;
+    if(hist.some(h=>Math.abs((+h.t||0)-t)<=3))return;
+    if(t>ko)add(s.out);        // he was on the pitch until the swap
+    if(t<=end)add(s.in);       // and the man who replaced him, from it on
+  });
   return out;
 }
 /* Per-player heatmap (like the reference video): the pitch shows the whole
