@@ -87,12 +87,36 @@ test('every route into the squad goes through the stamp check', () => {
 });
 
 /* ================= the main tab does not offer the trip ================= */
-test('both match-bound buttons are shut until a match is open', () => {
+test('every match-bound button is shut until a match is open', () => {
   const fn=/function updateMatchGate\(\)\{[\s\S]*?\n\}/.exec(SRC)[0];
+  const list=grabConst('GATED_BTNS');
   ok(/const open=!!state\.teamIds\.matchId/.test(fn),'open means a match id, nothing looser');
-  ok(/statsBtn/.test(fn)&&/lineupBtn/.test(fn),'both buttons');
+  // stats and squads belong to a match; so do the video it is tagged against and that
+  // video's mapping onto the match clock
+  ['statsBtn','lineupBtn','videoBtn','durBtn'].forEach(id=>ok(list.includes(id),id+' is gated'));
   ok(/b\.disabled=!open/.test(fn),'disabled, so the click cannot happen at all');
   ok(/Open a match first/.test(fn),'and it says why on hover');
+  // the buttons that do not depend on a match must stay alone
+  ['eventBtn','popBtn','cloudBtn','otherBtn','signOutBtn'].forEach(id=>notOk(list.includes(id),id+' is left alone'));
+});
+
+test('the panel behind the video is a viewport, not an uploader', () => {
+  // a local file dropped over a shared match would quietly replace its video_url
+  notOk(/drop\.onclick/.test(SRC),'clicking it no longer opens the file picker');
+  notOk(/drop\.addEventListener\('drop',e=>loadFile/.test(SRC),'and a dropped file is not loaded');
+  // …but the drop is still swallowed, or the browser navigates away from the app to the file
+  ok(/\['dragover','dragenter','dragleave','drop'\][\s\S]{0,90}preventDefault/.test(SRC),
+     'every drag event is still prevented');
+  // 🎞 Video keeps its own local-file route, which is the only way in now
+  ok(/\$\('vidLocalPick'\)\.onclick=\(\)=>fileInput\.click\(\)/.test(SRC),'the modal still picks a local file');
+  ok(/fileInput\.onchange=e=>loadFile/.test(SRC),'and that route still loads it');
+});
+
+test('the placeholder says which of the two states you are in', () => {
+  const fn=/function updateMatchGate\(\)\{[\s\S]*?\n\}/.exec(SRC)[0];
+  ok(/dropHint/.test(fn)&&/Use 🎞 Video to load one/.test(fn),'points at the button when a match is open');
+  ok(/hint\.textContent=open\?/.test(fn),'and at ☁ Cloud when there is none');
+  notOk(/Click or drag &amp; drop a video/.test(SRC),'the old "drag & drop" invitation is gone');
 });
 
 test('it runs at every point the open match can change', () => {

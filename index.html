@@ -57,8 +57,8 @@
   .pz.red{background:rgba(150,40,40,.30)} .pz.green{background:rgba(64,140,66,.32)} .pz.blue{background:rgba(45,55,115,.32)} .pz.gold{background:rgba(120,100,40,.30)} .pz.none{background:transparent;border-color:transparent}
   .pz-arrow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:26px;color:rgba(255,255,255,.45);z-index:2;pointer-events:none}
   video{width:100%;height:100%;object-fit:contain;display:block}
-  .drop{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--panel2);border:2px dashed var(--line);color:var(--mut);cursor:pointer;text-align:center;flex-direction:column;gap:8px}
-  .drop.drag{border-color:var(--accent);color:var(--accent)}
+  /* not clickable: nothing is uploaded from here (see the drop handlers) */
+  .drop{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--panel2);border:2px dashed var(--line);color:var(--mut);cursor:default;text-align:center;flex-direction:column;gap:8px}
   /* thin caption bar under the video (same look as the popped-out video window) */
   .controls{display:flex;align-items:center;gap:16px;padding:3px 12px;background:#0d1117;color:var(--mut);border-top:1px solid var(--line);font-size:11px;white-space:nowrap;overflow:hidden}
   .controls b{color:var(--accent);font-variant-numeric:tabular-nums}
@@ -346,10 +346,13 @@
 <div class="layout">
   <div class="left">
     <div class="video-wrap" id="videoWrap">
+      <!-- A viewport, not an uploader. A video is chosen in 🎞 Video (shared URL, R2 upload,
+           or a local file) so every route goes through one place; this panel only says what
+           is missing. updateMatchGate() writes the line under the heading. -->
       <div class="drop" id="drop">
-        <div style="font-size:28px">⬆</div>
-        <div><b>Click or drag &amp; drop a video</b> (~20MB)</div>
-        <div style="font-size:11px">mp4 / webm / mov</div>
+        <div style="font-size:28px">🎞</div>
+        <div><b>No video loaded</b></div>
+        <div style="font-size:11px" id="dropHint"></div>
       </div>
       <!-- NO native controls: their slider keeps keyboard focus after a click (arrows
            then step ~1% of the video) and clicking the video toggles play. The app's
@@ -784,19 +787,30 @@ function setMatchTeams(homeId,awayId,matchId,code){
   refreshFormation();
   updateMatchGate();
 }
-/* Squads, events and stats all belong to ONE match, but the stores they live in are shared
-   by every match this browser has ever opened. With no match open there is nothing on those
-   pages that belongs to anything — the Stats tab used to open on the last match's squad and
-   show its formation for a match nobody had opened. Both pages now refuse that themselves;
-   this stops the trip being offered in the first place. */
+/* Everything behind these four buttons belongs to ONE match: squads, stats, the video the
+   match is tagged against, and the clock that video is mapped onto. The stores they live in
+   are shared by every match this browser has ever opened, so with none open there is nothing
+   there that belongs to anything — the Stats tab used to open on the last match's squad and
+   draw its formation for a match nobody had opened. The sub-pages refuse that themselves
+   now; this stops the trip being offered at all, and keeps a video or a duration from being
+   set against no match. */
+const GATED_BTNS=[
+  [ 'statsBtn','Player statistics'],
+  ['lineupBtn','Player lists, starting XI, subs & formation'],
+  [ 'videoBtn','Video source — local file or a shared URL (Cloudflare R2)'],
+  [   'durBtn','Map original video times to the real match timeline']
+];
 function updateMatchGate(){
   const open=!!state.teamIds.matchId;
-  [[ 'statsBtn','Player statistics'],
-   ['lineupBtn','Player lists, starting XI, subs & formation']].forEach(([id,why])=>{
+  const shut='Open a match first — ☁ Cloud → create or join one';
+  GATED_BTNS.forEach(([id,why])=>{
     const b=$(id); if(!b)return;
     b.disabled=!open;
-    b.title=open?why:'Open a match first — ☁ Cloud → create or join one';
+    b.title=open?why:shut;
   });
+  // the placeholder behind the video says the same thing, since that is where you look first
+  const hint=$('dropHint');
+  if(hint)hint.textContent=open?'Use 🎞 Video to load one — shared URL, upload, or a local file':shut;
 }
 // sub-pages (Player-Lists / Stats) carry the open match in their URL, and their
 // "← Tagging" link brings it back — so navigating never drops the match context
@@ -1122,11 +1136,12 @@ function loadVideoUrl(url){
   $('controls').style.display='flex'; $('seekRow').style.display='flex';
   setVideoSrcStatus('URL: '+url);
 }
-drop.onclick=()=>fileInput.click();
 fileInput.onchange=e=>loadFile(e.target.files[0]);
-['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));
-['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
-drop.addEventListener('drop',e=>loadFile(e.dataTransfer.files[0]));
+/* The panel behind the video neither opens the file picker nor accepts a dropped file —
+   🎞 Video is the only way in, so a shared match's video_url is never quietly bypassed by
+   a local file dropped over it. The listeners stay purely to swallow the drop: without
+   them the browser follows its default and navigates away from the app to play the file. */
+['dragover','dragenter','dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>e.preventDefault()));
 
 /* ---- Video source modal: URL (shared) · R2 upload · local file ---- */
 function openVideoModal(){
