@@ -1274,6 +1274,21 @@ function openVideoWindow(){
   try{vidWin.moveTo(0,0);vidWin.resizeTo(screen.availWidth,screen.availHeight);}catch(e){}
   const d=vidWin.document;
   d.title='PitchTagger — Video';
+  // Right-click does nothing ANYWHERE in this window. The video node carries its own
+  // blocker, but that only covers the video surface — and it is a listener that can be
+  // lost (see the rescue below), whereas this one is created fresh with every window.
+  d.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();},true);
+  /* Closing this window destroys its document, and that wipes EVERY listener on the
+     nodes inside it — including the ones the video node carries between the two windows
+     (right-click block, click-to-pause suppression, the clock and seek-bar updates).
+     Re-adopting afterwards does not bring them back: the video came home mute, which is
+     why right-clicking it showed Chrome's media menu once the window had been reopened.
+     pagehide/beforeunload fire while this document is still alive, so the node is moved
+     home first and keeps everything. vidWatch below stays as the fallback for a close
+     these never report. */
+  const bringHome=()=>{if(vidWin&&video.ownerDocument!==document)returnVideo();};
+  vidWin.addEventListener('pagehide',bringHome);
+  vidWin.addEventListener('beforeunload',bringHome);
   d.body.style.cssText='margin:0;background:#000;height:100vh;display:flex;flex-direction:column;overflow:hidden;font-family:system-ui,sans-serif';
   d.body.innerHTML='<div id="pv-stage"></div><div id="pv-bar"></div>';
   const stage=d.getElementById('pv-stage');
@@ -1437,6 +1452,9 @@ function returnVideo(){
     document.adoptNode(video); $('videoWrap').appendChild(video);
     video.style.cssText='';
   }
+  // belt and braces: if the window went away without pagehide reaching us, the node is
+  // back but mute. Stable handler references make this a no-op when it is not needed.
+  bindVideoGuards();
   document.body.classList.remove('video-popped');
   $('popBtn').textContent='⧉ Open window';
   if(vidWin&&!vidWin.closed)vidWin.close();
@@ -1447,28 +1465,37 @@ window.addEventListener('beforeunload',()=>{if(vidWin&&!vidWin.closed)vidWin.clo
 // keep keyboard focus on the entry box ONLY when docked in the main tab
 // (when popped out, focusing the main input would yank focus off the video window)
 const focusEntryIfDocked=()=>{if(video.ownerDocument===document)setTimeout(()=>$('playerInput').focus(),0);};
-video.addEventListener('click',focusEntryIfDocked);
-video.addEventListener('play',focusEntryIfDocked);
 // clicks on the video must NOT pause/resume it — Space is the pause key. The same
 // node moves into the popup window, so these listeners cover docked AND popped-out.
 // Right-click / middle-click: fully blocked (no toggle, no media menu).
-['contextmenu','auxclick'].forEach(ev=>video.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();}));
-video.addEventListener('pointerdown',e=>{if(e.button!==0){e.preventDefault();e.stopPropagation();}});
-video.addEventListener('mousedown',e=>{if(e.button!==0){e.preventDefault();e.stopPropagation();}});
+const blockEvent=e=>{e.preventDefault();e.stopPropagation();};
+const blockNonLeft=e=>{if(e.button!==0)blockEvent(e);};
 // Left-click on the video SURFACE: cancel Chrome's play/pause toggle, and if the
 // browser toggled anyway, restore the pre-click state. Clicks on the native control
 // bar (bottom strip ~60px) are left untouched so seeking/volume/fullscreen still work.
 let surfacePausedBefore=null;
 const onControlBar=e=>{const r=video.getBoundingClientRect();return e.clientY>r.bottom-60;};
-video.addEventListener('pointerdown',e=>{
-  if(e.button===0&&!onControlBar(e))surfacePausedBefore=video.paused;
-});
-video.addEventListener('click',e=>{
+const armSurfaceClick=e=>{if(e.button===0&&!onControlBar(e))surfacePausedBefore=video.paused;};
+const suppressSurfaceToggle=e=>{
   if(onControlBar(e)){surfacePausedBefore=null;return;}
   e.preventDefault();
   const want=surfacePausedBefore; surfacePausedBefore=null;
   if(want!==null)setTimeout(()=>{if(video.paused!==want){want?video.pause():video.play();}},0);
-});
+};
+/* Every handler above is a stable reference, so re-running this is a no-op while they
+   are still attached and re-attaches them when they are not. It HAS to be re-runnable:
+   destroying a document wipes every listener on the nodes inside it, and the video node
+   lives in the popup window while it is open (see the rescue in openVideoWindow). */
+function bindVideoGuards(){
+  video.addEventListener('click',focusEntryIfDocked);
+  video.addEventListener('play',focusEntryIfDocked);
+  ['contextmenu','auxclick'].forEach(ev=>video.addEventListener(ev,blockEvent));
+  video.addEventListener('pointerdown',blockNonLeft);
+  video.addEventListener('mousedown',blockNonLeft);
+  video.addEventListener('pointerdown',armSurfaceClick);
+  video.addEventListener('click',suppressSurfaceToggle);
+}
+bindVideoGuards();
 
 /* TEAM */
 function setTeam(t){state.team=t;$('segHome').className=t==='home'?'act-home':'';$('segAway').className=t==='away'?'act-away':'';
