@@ -277,9 +277,44 @@ test('the sign-in screen is in English, all of it', () => {
 
 test('so is everything the gate added to the main tab', () => {
   const html=page('index.html');
-  ok(html.includes('title="Sign out of this account"'),'the button tooltip');
+  ok(html.includes('title="Sign out of this account"'),'the sign-out tooltip');
   ok(/confirm\('Sign out of '/.test(html),'and the prompt it raises');
   notOk(/Đăng xuất|tài khoản này/.test(html),'no Vietnamese left in the sign-out control');
+});
+
+/* ================= the ▾ Other menu ================= */
+test('the account lives in ▾ Other, to the left of Event', () => {
+  const html=page('index.html');
+  const other=html.indexOf('id="otherBtn"'), event=html.indexOf('id="eventBtn"');
+  ok(other>-1,'the button is there');
+  ok(other<event,'and it comes before Event on the bar');
+  // the two things it holds, in the order asked for
+  const who=html.indexOf('id="otherWho"'), out=html.indexOf('id="signOutBtn"');
+  ok(who>-1&&out>who,'the account name first, Sign out under it');
+  ok(html.indexOf('id="otherMenu"')<who&&who<html.indexOf('</header>'),'both inside the menu, in the header');
+});
+
+test('nothing is left loose on the bar', () => {
+  const html=page('index.html');
+  notOk(/whoami/.test(html),'the old name chip is gone, with no dangling reference');
+  const bar=html.slice(html.indexOf('<header>'),html.indexOf('</header>'));
+  // Sign out may only appear inside the menu now, never as a sibling of the other buttons
+  notOk(/class="ev-btn" id="signOutBtn"/.test(bar),'and the old header button with it');
+  ok(/class="other-item" id="signOutBtn"/.test(bar),'it is a menu row instead');
+});
+
+test('the menu opens, closes, and gets out of the way', () => {
+  const src=page('index.html');
+  const menu=/---- ▾ Other[\s\S]*?\n\}\)\(\);/.exec(src)[0];
+  ok(/stopPropagation\(\)[\s\S]{0,40}setOpen\(!isOpen\(\)\)/.test(menu),
+     'its own click does not immediately close it again');
+  ok(/document\.addEventListener\('click'[\s\S]{0,90}!menu\.contains\(e\.target\)[\s\S]{0,20}setOpen\(false\)/.test(menu),
+     'a click anywhere else closes it');
+  ok(/Escape[\s\S]{0,80}setOpen\(false\)[\s\S]{0,40}\},true\)/.test(menu),
+     'Escape closes it, in the capture phase so it lands before the tagging shortcuts');
+  ok(/if\(isOpen\(\)/.test(menu)&&/e\.key==='Escape'&&isOpen\(\)/.test(menu),
+     'and both only act while it is open, so the modals keep their own Escape');
+  ok(/\$\('signOutBtn'\)\.onclick[\s\S]{0,60}setOpen\(false\)/.test(menu),'signing out shuts it too');
 });
 
 /* Every file that is actually served. The alerts, toasts, tooltips and hints across the

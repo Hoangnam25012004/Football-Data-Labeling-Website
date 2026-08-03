@@ -162,8 +162,20 @@
   /* header Event button */
   .ev-btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
   .ev-btn:hover{border-color:var(--accent);color:var(--accent)}
-  /* who is signed in (auth.js let this page load, so there is always someone) */
-  .who{font-size:11px;font-weight:700;color:var(--accent);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* ▾ Other — the account menu (auth.js let this page load, so there is always someone) */
+  .other-wrap{position:relative}
+  #otherBtn.on{border-color:var(--accent);color:var(--accent)}
+  .other-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:190px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 22px rgba(0,0,0,.55);
+    padding:4px;z-index:60;display:none}
+  .other-menu.show{display:block}
+  .other-who{padding:8px 10px;font-size:12px;font-weight:700;color:var(--accent);
+    border-bottom:1px solid var(--line);margin-bottom:4px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default}
+  .other-item{display:block;width:100%;text-align:left;background:transparent;border:0;
+    color:var(--ink);border-radius:6px;padding:8px 10px;font-size:12px;font-weight:600;
+    font-family:inherit;cursor:pointer}
+  .other-item:hover{background:#16302466;color:var(--accent)}
 
   /* Event modal */
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;z-index:200;padding:60px 16px}
@@ -301,6 +313,14 @@
 <header>
   <h1>Hoang<span>Nam</span></h1>
   <div class="meta-inputs">
+    <!-- account menu: the signed-in name and the way out, off the bar itself -->
+    <div class="other-wrap">
+      <button class="ev-btn" id="otherBtn" aria-haspopup="true" aria-expanded="false" title="Account">▾ Other</button>
+      <div class="other-menu" id="otherMenu" role="menu">
+        <div class="other-who" id="otherWho" role="menuitem" aria-disabled="true"></div>
+        <button class="other-item" id="signOutBtn" role="menuitem" title="Sign out of this account">⎋ Sign out</button>
+      </div>
+    </div>
     <button class="ev-btn" id="eventBtn" title="Manage events + hotkeys">⚙ Event</button>
     <button class="ev-btn" id="videoBtn" title="Video source — local file or a shared URL (Cloudflare R2)">🎞 Video</button>
     <button class="ev-btn" id="statsBtn" title="Player statistics">📊 Stats</button>
@@ -317,8 +337,6 @@
       <option value="futsal">🤾 Futsal</option>
       <option value="basketball">🏀 Basketball</option>
     </select>
-    <span id="whoami" class="who"></span>
-    <button class="ev-btn" id="signOutBtn" title="Sign out of this account">⎋ Sign out</button>
   </div>
 </header>
 
@@ -2806,13 +2824,31 @@ if(!/match=/i.test(location.hash)){
 if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
 renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); renderFormationMain();
 
-/* ---- the signed-in account (auth.js is the gate that let this page load) ---- */
+/* ---- ▾ Other: the account menu (auth.js is the gate that let this page load) ---- */
 (function(){
   const u=window.PTAuth&&window.PTAuth.user();
-  if(!u){$('whoami').style.display='none';$('signOutBtn').style.display='none';return;}
-  $('whoami').textContent=window.PTAuth.displayName(u);
-  $('whoami').title=u.email||'';
+  // no account = no menu; the gate normally makes this impossible, but a page opened
+  // straight off the filesystem has no session and should not show a dead button
+  if(!u){$('otherBtn').parentNode.style.display='none';return;}
+  $('otherWho').textContent=window.PTAuth.displayName(u);
+  $('otherWho').title=u.email||'';
+
+  const menu=$('otherMenu'), btn=$('otherBtn');
+  const isOpen=()=>menu.classList.contains('show');
+  function setOpen(on){
+    menu.classList.toggle('show',on);
+    btn.classList.toggle('on',on);
+    btn.setAttribute('aria-expanded',on?'true':'false');
+  }
+  btn.onclick=e=>{e.stopPropagation();setOpen(!isOpen());};
+  // click anywhere else closes it — including inside the menu's own non-actions
+  document.addEventListener('click',e=>{if(isOpen()&&!menu.contains(e.target))setOpen(false);});
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&isOpen()){e.preventDefault();e.stopPropagation();setOpen(false);btn.focus();}
+  },true);   // capture: get in before the tagging shortcuts and the modals' own Escape
+
   $('signOutBtn').onclick=()=>{
+    setOpen(false);
     // the only thing that ends a session — closing the tab or the machine never does
     if(confirm('Sign out of '+(u.email||'this account')+'?'))window.PTAuth.signOut();
   };

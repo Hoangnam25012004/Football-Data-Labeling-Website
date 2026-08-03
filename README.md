@@ -17,9 +17,9 @@ link can use it in a modern browser (Chrome/Edge recommended).
 Every page of the site is behind an account. Opening any of them without one lands on
 [`auth.html`](auth.html) — served by GitHub Pages at the extension-less **`/auth`** — which
 offers **Sign in** (email + password) and **Sign up** (full name, email, password, confirm
-password). After signing in you land on the main tagging tab, and the header shows who you
-are with a **⎋ Sign out** button. Sign-in is by email and password only; there is no
-third-party provider.
+password). After signing in you land on the main tagging tab, where **▾ Other** — the first
+button on the header bar — drops down the account you are signed in as and **⎋ Sign out**.
+Sign-in is by email and password only; there is no third-party provider.
 
 A new password must be **at least 6 characters, with one capital letter and one special
 character** — stated under the field, and checked before Supabase is asked. Signing in is
