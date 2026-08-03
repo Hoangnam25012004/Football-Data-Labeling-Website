@@ -37,7 +37,9 @@
              border-radius:999px;padding:12px 16px;font:inherit;font-size:13px;width:100%}
   .fld input::placeholder{color:#5d6b7e}
   .fld input:focus{outline:none;border-color:var(--accent);background:#20293a}
-  .fld.hide{display:none}
+  /* whichever form is not in use is display:none — it stays in the document, but a
+     password manager reads each form on its own, so the other one cannot confuse it */
+  .hide{display:none}
 
   .primary{margin-top:4px;background:var(--accent);color:#06281a;border:0;border-radius:999px;
            padding:12px 0;font:inherit;font-size:14px;font-weight:800;cursor:pointer}
@@ -46,7 +48,6 @@
 
   /* the password rules, spelled out under the field instead of only on rejection */
   .rules{margin:-2px 0 0;padding-left:14px;color:var(--mut);font-size:11px;line-height:1.5}
-  .rules.hide{display:none}
 
   .msg{margin:0;padding:10px 14px;border-radius:10px;font-size:12px;line-height:1.5;display:none;white-space:pre-line}
   .msg.show{display:block}
@@ -68,28 +69,42 @@
     <button type="button" id="tabUp" role="tab">Sign up</button>
   </div>
 
-  <!-- A real <form> with username + password and the standard autocomplete tokens: that is
-       what makes Chrome (and every other password manager) offer to save the credentials,
-       and fill them back in on the next visit. -->
-  <form id="authForm" novalidate autocomplete="on">
-    <label class="fld hide" id="fldName">
-      <span>Full name</span>
-      <input id="fullName" name="name" type="text" autocomplete="name" placeholder="Nguyen Van A">
-    </label>
+  <!-- TWO forms, not one with fields hidden by CSS. A password manager reads form.elements
+       and never looks at what is on screen, so a single form holding both a current-password
+       and a new-password field (plus a name) is read as a sign-up or change-password form —
+       and those are not offered the login you saved. Sign in is therefore a form with
+       nothing in it but username + current-password, which is unmistakable. -->
+  <form id="signInForm" novalidate autocomplete="on">
     <label class="fld">
       <span>Email</span>
-      <input id="email" name="email" type="email" autocomplete="username" placeholder="you@gmail.com" required>
+      <input id="siEmail" name="email" type="email" autocomplete="username" placeholder="you@gmail.com" required>
     </label>
     <label class="fld">
       <span>Password</span>
-      <input id="password" name="password" type="password" autocomplete="current-password" placeholder="At least 6 characters" required>
+      <input id="siPassword" name="password" type="password" autocomplete="current-password" placeholder="Your password" required>
     </label>
-    <p class="rules hide" id="pwRules">At least 6 characters, one capital letter (A–Z) and one special character (!&nbsp;?&nbsp;@&nbsp;#&nbsp;…).</p>
-    <label class="fld hide" id="fldConfirm">
+    <button class="primary" id="siSubmit" type="submit">Sign in</button>
+  </form>
+
+  <form id="signUpForm" class="hide" novalidate autocomplete="on">
+    <label class="fld">
+      <span>Full name</span>
+      <input id="suName" name="name" type="text" autocomplete="name" placeholder="Nguyen Van A">
+    </label>
+    <label class="fld">
+      <span>Email</span>
+      <input id="suEmail" name="email" type="email" autocomplete="username" placeholder="you@gmail.com" required>
+    </label>
+    <label class="fld">
+      <span>Password</span>
+      <input id="suPassword" name="new-password" type="password" autocomplete="new-password" placeholder="At least 6 characters" required>
+    </label>
+    <p class="rules">At least 6 characters, one capital letter (A–Z) and one special character (!&nbsp;?&nbsp;@&nbsp;#&nbsp;…).</p>
+    <label class="fld">
       <span>Confirm password</span>
-      <input id="confirm" name="confirm-password" type="password" autocomplete="new-password" placeholder="Type it again">
+      <input id="suConfirm" name="confirm-password" type="password" autocomplete="new-password" placeholder="Type it again">
     </label>
-    <button class="primary" id="submitBtn" type="submit">Sign in</button>
+    <button class="primary" id="suSubmit" type="submit">Create account</button>
   </form>
 
   <p class="msg" id="msg"></p>
@@ -118,8 +133,9 @@
   }
   function working(on, label) {
     busy = on;
-    $('submitBtn').disabled = on;
-    $('submitBtn').textContent = on && label ? label : (mode === 'in' ? 'Sign in' : 'Create account');
+    const btn = $(mode === 'in' ? 'siSubmit' : 'suSubmit');
+    btn.disabled = on;
+    btn.textContent = on && label ? label : (mode === 'in' ? 'Sign in' : 'Create account');
   }
   const go = () => location.replace(PTAuth.nextUrl());
 
@@ -152,22 +168,24 @@
     } catch (e) { /* declined or unsupported — the form's autocomplete tokens still apply */ }
   }
 
-  /* ---------- the switch ---------- */
+  /* ---------- the switch ----------
+     Whichever form is hidden keeps its values; carrying the email across means switching
+     tabs after a typo does not cost you the address you already typed. */
   function setMode(m) {
     mode = m;
     $('tabIn').classList.toggle('on', m === 'in');
     $('tabUp').classList.toggle('on', m === 'up');
-    $('fldName').classList.toggle('hide', m === 'in');
-    $('fldConfirm').classList.toggle('hide', m === 'in');
-    $('password').setAttribute('autocomplete', m === 'in' ? 'current-password' : 'new-password');
-    $('password').placeholder = m === 'in' ? 'Your password' : 'At least 6 characters';
-    $('pwRules').classList.toggle('hide', m === 'in');
-    $('submitBtn').textContent = m === 'in' ? 'Sign in' : 'Create account';
+    $('signInForm').classList.toggle('hide', m !== 'in');
+    $('signUpForm').classList.toggle('hide', m !== 'up');
+    const from = $(m === 'in' ? 'suEmail' : 'siEmail'), to = $(m === 'in' ? 'siEmail' : 'suEmail');
+    if (from.value && !to.value) to.value = from.value;
     $('foot').textContent = m === 'in'
       ? 'No account yet? Choose Sign up to create one.'
       : 'Already have an account? Choose Sign in.';
     say('');
-    ($(m === 'in' ? 'email' : 'fullName')).focus();
+    /* Do not steal focus on the sign-in form: Chrome fills a saved login on its own, and
+       focusing a field it has just filled can drop the fill in some versions. */
+    if (m === 'up') $('suName').focus();
   }
   $('tabIn').onclick = () => setMode('in');
   $('tabUp').onclick = () => setMode('up');
@@ -178,7 +196,8 @@
     if (/invalid login credentials/i.test(msg)) return 'Wrong email or password.';
     if (/email not confirmed/i.test(msg)) return 'This email has not been confirmed yet — open the link Supabase sent you, then sign in.';
     if (/already registered|already exists/i.test(msg)) return 'That email already has an account. Sign in instead.';
-    if (/password should be at least|password.*weak/i.test(msg)) return 'Password is too weak. ' + (pwProblem($('password').value) || 'Try a longer one.');
+    // only sign-up can provoke this, so the new-password box is the one to explain
+    if (/password should be at least|password.*weak/i.test(msg)) return 'Password is too weak. ' + (pwProblem($('suPassword').value) || 'Try a longer one.');
     if (/redirect|not allowed/i.test(msg) && /url/i.test(msg))
       return 'This address is not in the Supabase redirect allow-list.\nAdd it in Authentication → URL Configuration (see README).';
     if (/failed to fetch|networkerror|load failed/i.test(msg)) return 'Cannot reach Supabase — check your connection and try again.';
@@ -186,36 +205,51 @@
     return msg;
   }
 
-  /* ---------- submit ---------- */
-  $('authForm').addEventListener('submit', async function (e) {
+  /* ---------- sign in ---------- */
+  $('signInForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     if (busy) return;
     const c = client();
     if (!c) return say('Supabase could not be loaded — check your connection and reload the page.', 'bad');
 
-    const name = $('fullName').value.trim();
-    const email = $('email').value.trim();
-    const pw = $('password').value;
-    const pw2 = $('confirm').value;
-
+    const email = $('siEmail').value.trim();
+    const pw = $('siPassword').value;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return say('Enter a valid email address.', 'bad');
-    if (mode === 'in') {
-      if (!pw) return say('Enter your password.', 'bad');
-    } else {
-      if (!name) return say('Enter your full name.', 'bad');
-      const problem = pwProblem(pw);
-      if (problem) return say(problem, 'bad');
-      if (pw !== pw2) return say('The two passwords do not match.', 'bad');
-    }
+    if (!pw) return say('Enter your password.', 'bad');
 
-    working(true, mode === 'in' ? 'Signing in…' : 'Creating…');
+    working(true, 'Signing in…');
     say('');
     try {
-      if (mode === 'in') {
-        const { error } = await c.auth.signInWithPassword({ email: email, password: pw });
-        if (error) throw error;
-        return land(email, pw, name);
-      }
+      const { error } = await c.auth.signInWithPassword({ email: email, password: pw });
+      if (error) throw error;
+      return land(email, pw, '');
+    } catch (err) {
+      working(false);
+      say(explain(err), 'bad');
+    }
+  });
+
+  /* ---------- sign up ---------- */
+  $('signUpForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if (busy) return;
+    const c = client();
+    if (!c) return say('Supabase could not be loaded — check your connection and reload the page.', 'bad');
+
+    const name = $('suName').value.trim();
+    const email = $('suEmail').value.trim();
+    const pw = $('suPassword').value;
+    const pw2 = $('suConfirm').value;
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return say('Enter a valid email address.', 'bad');
+    if (!name) return say('Enter your full name.', 'bad');
+    const problem = pwProblem(pw);
+    if (problem) return say(problem, 'bad');
+    if (pw !== pw2) return say('The two passwords do not match.', 'bad');
+
+    working(true, 'Creating…');
+    say('');
+    try {
       const { data, error } = await c.auth.signUp({
         email: email, password: pw,
         options: { data: { full_name: name }, emailRedirectTo: PTAuth.authUrl() }
@@ -223,12 +257,14 @@
       if (error) throw error;
       /* No session back means the project asks new accounts to confirm their email first
          (Supabase's default). The account exists — it just cannot be used until then, so
-         offer to save the password now: it is the one they will sign in with afterwards. */
+         offer to save the password now: it is the one they will sign in with afterwards,
+         and carry it into the sign-in form so it is waiting for them. */
       if (!data.session) {
         await remember(email, pw, name);
         working(false);
         setMode('in');
-        $('email').value = email;
+        $('siEmail').value = email;
+        $('siPassword').value = pw;
         return say('Account created for ' + email + '.\nOpen the confirmation link Supabase just emailed you, then sign in here.', 'ok');
       }
       return land(email, pw, name);
@@ -272,7 +308,9 @@
       const p = new URLSearchParams((location.hash || '').replace(/^#/, '') || location.search);
       say(explain({ message: p.get('error_description') || p.get('error') || 'That link is no longer valid.' }), 'bad');
     }
-    $('email').focus();
+    /* Deliberately no focus() here: Chrome fills a saved login as the page settles, and
+       grabbing focus mid-fill can throw the fill away. An empty form is one click from
+       being typed into anyway. */
   })();
 })();
 </script>

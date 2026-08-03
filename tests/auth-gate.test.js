@@ -198,9 +198,17 @@ test('every page of the site is gated', () => {
 
 test('the sign-in screen ships, and asks for the fields it should', () => {
   const html=page('auth.html');
-  ['fullName','email','password','confirm'].forEach(id=>ok(html.includes('id="'+id+'"'),id+' field'));
+  ['siEmail','siPassword','suName','suEmail','suPassword','suConfirm']
+    .forEach(id=>ok(html.includes('id="'+id+'"'),id+' field'));
   ok(/signInWithPassword/.test(html),'email + password sign-in');
   ok(/signUp\(/.test(html)&&/full_name/.test(html),'sign-up stores the full name on the account');
+});
+
+test('no handler reaches for a field that no longer exists', () => {
+  const html=page('auth.html');
+  // splitting the form renamed every input; a missed $('password') would throw on submit
+  ['email','password','confirm','fullName','submitBtn','authForm','pwRules','fldName','fldConfirm']
+    .forEach(id=>notOk(new RegExp("\\$\\('"+id+"'\\)").test(html),"nothing still calls $('"+id+"')"));
 });
 
 test('Google sign-in is gone, and takes every reference with it', () => {
@@ -237,13 +245,32 @@ test('everything missing is said at once, not one round at a time', () => {
     +'one special character (! ? @ # …).');
 });
 
+const handler=id=>new RegExp("\\$\\('"+id+"'\\)\\.addEventListener\\('submit'[\\s\\S]*?\\n  \\}\\);").exec(AUTH_HTML)[0];
+
 test('signing in is not held to the rule — an older account must still get in', () => {
-  // the check belongs to the sign-up branch; sign-in only refuses an empty box
-  const submit=/addEventListener\('submit'[\s\S]*?\n  \}\);/.exec(AUTH_HTML)[0];
-  const signInBranch=/if \(mode === 'in'\) \{([\s\S]*?)\} else \{/.exec(submit)[1];
-  notOk(/pwProblem/.test(signInBranch),'no strength check when signing in');
-  ok(/!pw\b/.test(signInBranch),'just "type something"');
-  ok(/pwProblem/.test(submit),'while sign-up does run it');
+  const signIn=handler('signInForm');
+  notOk(/pwProblem/.test(signIn),'no strength check when signing in');
+  ok(/!pw\b/.test(signIn),'just "type something"');
+  ok(/pwProblem/.test(handler('signUpForm')),'while sign-up does run it');
+});
+
+// what each handler READS is everything up to the point it starts talking to Supabase
+const readsOf=id=>handler(id).split('working(true')[0];
+
+test('each form reads its own fields, and only its own', () => {
+  const signIn=readsOf('signInForm'), signUp=readsOf('signUpForm');
+  ['suName','suPassword','suConfirm','suEmail'].forEach(id=>notOk(signIn.includes(id),'sign-in ignores '+id));
+  ['siEmail','siPassword'].forEach(id=>notOk(signUp.includes(id),'sign-up ignores '+id));
+  ok(/siEmail[\s\S]{0,120}siPassword/.test(signIn),'sign-in takes the pair it owns');
+  ok(/suName[\s\S]{0,200}suEmail[\s\S]{0,200}suPassword[\s\S]{0,200}suConfirm/.test(signUp),'sign-up takes all four');
+});
+
+test('a new account is handed to the sign-in form ready to go', () => {
+  // confirmation is on, so sign-up ends on the sign-in tab — with both boxes already filled
+  const signUp=handler('signUpForm');
+  ok(/setMode\('in'\)/.test(signUp),'switches tab');
+  ok(/\$\('siEmail'\)\.value = email/.test(signUp)&&/\$\('siPassword'\)\.value = pw/.test(signUp),
+     'and carries the pair over, so nothing is retyped');
 });
 
 /* ================= staying signed in, and the browser keeping the password ================= */
@@ -256,15 +283,37 @@ test('a session already past its access-token expiry still opens the gate', () =
   eq(PTAuth.user().email,'dnam2501@gmail.com');
 });
 
-test('the form is one a password manager can read, and it asks outright as well', () => {
+/* The sign-in form must look like nothing but a sign-in form. A password manager reads
+   form.elements and ignores CSS, so when the two lived in ONE form the new-password and
+   confirm boxes were in it whether or not they were on screen — and Chrome reads a form
+   holding both a current-password and a new-password as a sign-up or change-password
+   form, which it does not fill a saved login into. That is why they are split. */
+const formOf=id=>new RegExp('<form id="'+id+'"[\\s\\S]*?</form>').exec(page('auth.html'))[0];
+
+test('the sign-in form holds a username and a password, and nothing else', () => {
+  const f=formOf('signInForm');
+  ok(/id="siEmail"[^>]*autocomplete="username"/.test(f),'username field marked as such');
+  ok(/id="siPassword"[^>]*autocomplete="current-password"/.test(f),'and the password field');
+  eq((f.match(/<input/g)||[]).length,2,'exactly two inputs');
+  notOk(/new-password/.test(f),'no new-password in it — that is what made Chrome misread it');
+  notOk(/autocomplete="name"/.test(f),'and no name field either');
+});
+
+test('the sign-up form asks for all four, and never offers the old password', () => {
+  const f=formOf('signUpForm');
+  eq((f.match(/<input/g)||[]).length,4,'name, email, password, confirm');
+  eq((f.match(/autocomplete="new-password"/g)||[]).length,2,'both password boxes are new-password');
+  notOk(/current-password/.test(f),'never the saved one');
+  ok(/id="suEmail"[^>]*autocomplete="username"/.test(f),'so the manager knows what to file it under');
+});
+
+test('and the browser is asked outright as well', () => {
   const html=page('auth.html');
-  ok(/id="email"[^>]*autocomplete="username"/.test(html),'username field marked as such');
-  ok(/id="password"[^>]*autocomplete="current-password"/.test(html),'and the password field');
-  ok(/autocomplete="new-password"/.test(html),'a new password is not offered the old one');
   ok(/name="email"/.test(html)&&/name="password"/.test(html),'named too, for older heuristics');
   ok(/navigator\.credentials\.store/.test(html)&&/PasswordCredential/.test(html),
      'Chrome is asked to save rather than left to guess from the redirect');
   ok(/await remember\(/.test(html),'and it is awaited, so the prompt is up before we navigate');
+  notOk(/\$\('siEmail'\)\.focus\(\)/.test(html),'nothing grabs focus mid-autofill');
 });
 
 /* ================= the site speaks English ================= */

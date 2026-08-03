@@ -33,13 +33,17 @@ you out either: the gate does not look at expiry, and the client renews it on lo
 **⎋ Sign out** ends a session, and it ends it in every open tab at once. Signing out leaves
 all tagged data (events, lineups, match meta) untouched.
 
-**The browser keeps your password, not us.** The form is a real `<form>` carrying the
-standard `username` / `current-password` / `new-password` autocomplete tokens, and on a
-successful sign-in or sign-up the page calls `navigator.credentials.store()` outright — so
-Chrome and Edge raise their own *"Save password?"* prompt there and then instead of guessing
-from the redirect that follows. After signing out, their password manager fills the form
-back in. Firefox and Safari have no such API and fall back to the form's tokens, which they
-read the same way. Nothing about this touches our storage: the site never keeps a password.
+**The browser keeps your password, not us.** Sign in and sign up are **two separate
+`<form>` elements**, and that is load-bearing rather than cosmetic: a password manager walks
+`form.elements` and never looks at what is on screen, so while both lived in one form the
+new-password and confirm boxes were part of it even while hidden — and a form holding a
+`current-password` *and* a `new-password` reads as a sign-up or change-password form, which
+Chrome will not fill a saved login into. Split, the sign-in form contains a `username` and a
+`current-password` and nothing else, which is unmistakable. On success the page also calls
+`navigator.credentials.store()` outright, so Chrome and Edge raise their *"Save password?"*
+prompt there and then rather than inferring it from the redirect that follows; Firefox and
+Safari have no such API and fall back to the tokens, which they read the same way. Nothing
+here touches our storage — the site never keeps a password.
 
 The accounts live in **Supabase Auth**, the project the app already syncs to, so there is
 still no backend of our own. [`auth.js`](auth.js) is the gate: every page loads it, and it
