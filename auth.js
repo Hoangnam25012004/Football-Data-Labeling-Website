@@ -108,9 +108,27 @@ window.PTAuth = (function () {
   }
   const isAuthPath = p => /(^|\/)auth(\.html)?$/.test(p);
 
+  /* ---------- a confirmation link that landed on the wrong page ----------
+     Supabase only honours the `emailRedirectTo` we send if it is in the project's Redirect
+     URLs; otherwise it silently falls back to the Site URL, and the confirmation lands on
+     the app instead of the auth page — carrying the tokens it just issued in the hash
+     (or `?code=` under PKCE). The gate would bounce that to the auth page as a plain
+     "please sign in" and throw the tokens away, wasting a confirmation that worked. So
+     hand them over instead: auth.html's client reads them there and finishes the job.
+     `#match=…`, the only hash the app itself uses, matches none of this. */
+  const CALLBACK_HASH = /[#&](access_token|refresh_token|error_code|error_description)=/;
+  const CALLBACK_QUERY = /[?&]code=/;
+  function authCallback() {
+    if (CALLBACK_HASH.test(location.hash || '')) return location.hash;
+    if (CALLBACK_QUERY.test(location.search || '')) return location.search;
+    return '';
+  }
+
   /* ---------- the gate ---------- */
   function requireLogin() {
     if (user()) { watchSignOut(); return true; }
+    const callback = authCallback();
+    if (callback) { location.replace(AUTH_URL + callback); return false; }
     const from = here();
     location.replace(AUTH_URL + (from ? '?next=' + encodeURIComponent(from) : ''));
     return false;

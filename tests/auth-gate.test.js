@@ -46,8 +46,8 @@ function load(page,store,src){
     console,atob,TextDecoder,URL,URLSearchParams,
     localStorage:fakeLS(store),
     document:{currentScript:{src:new URL((src||'auth.js')+'?v=1',url.href).href}},
-    location:{href:url.href,pathname:url.pathname,search:url.search,hostname:url.hostname,
-              origin:url.origin,replace(u){nav.replaced=u;}},
+    location:{href:url.href,pathname:url.pathname,search:url.search,hash:url.hash,
+              hostname:url.hostname,origin:url.origin,replace(u){nav.replaced=u;}},
     window:{addEventListener(t,fn){(nav.events[t]=nav.events[t]||[]).push(fn);}}
   };
   ctx.window.location=ctx.location;
@@ -134,6 +134,26 @@ test('nextUrl sends you back there, and to the app when there is nothing to go b
   eq(at('?next=%23match%3D12345'),LIVE+'#match=12345','back to the match');
   eq(at('?next=Stats%2F'),LIVE+'Stats/','back to the sub-page');
   eq(at(''),LIVE,'no next: the main tab');
+});
+
+/* ================= a confirmation link that landed on the wrong page ================= */
+test('tokens that land on the app are carried to the auth page, not thrown away', () => {
+  // what happens when Supabase falls back to the Site URL because emailRedirectTo was
+  // not in the project's Redirect URLs: the confirmation worked, and its tokens must not
+  // be lost to a plain "please sign in" bounce
+  const hash='#access_token=eyJhbG.fake.jwt&refresh_token=r1&token_type=bearer&type=signup';
+  eq(load(LIVE+hash,{}).nav.replaced,LIVE+'auth'+hash,'handed over whole, hash intact');
+  eq(load(LIVE+'?code=pkce-abc123',{}).nav.replaced,LIVE+'auth?code=pkce-abc123','PKCE too');
+});
+
+test('an expired confirmation link carries its reason across as well', () => {
+  const hash='#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid';
+  eq(load(LIVE+hash,{}).nav.replaced,LIVE+'auth'+hash,'so the auth page can say what went wrong');
+});
+
+test('the app’s own #match= link is not mistaken for one', () => {
+  eq(load(LIVE+'#match=12345',{}).nav.replaced,LIVE+'auth?next=%23match%3D12345',
+     'still the ordinary "come back here after signing in" path');
 });
 
 test('nextUrl refuses to be an open redirect', () => {

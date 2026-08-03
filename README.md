@@ -54,11 +54,21 @@ policy is `to authenticated`) — see [`supabase/migrations/`](supabase/migratio
 ### Supabase setup for accounts
 Email + password works as soon as the project exists. The rest is dashboard-only:
 
-1. **Authentication → URL Configuration**
+1. **Authentication → URL Configuration** — the one that actually bites.
    - *Site URL:* `https://hoangnam25012004.github.io/Football-Data-Labeling-Website/`
    - *Redirect URLs:* add `https://hoangnam25012004.github.io/Football-Data-Labeling-Website/**`
-     (and `http://localhost:8765/**` if you develop locally). Confirmation links come back
-     here — without this they land on the wrong site.
+     (and `http://localhost:8765/**` if you develop locally).
+
+   Sign-up sends `emailRedirectTo` pointing at `/auth`, but **Supabase honours it only if it
+   matches Redirect URLs** — otherwise it silently falls back to the Site URL. Leave Site URL
+   at its factory default and the confirmation email lands the user on
+   `http://localhost:3000/#access_token=…`: *This site can't be reached*, on a confirmation
+   that actually succeeded. Nothing in this repo ever mentions `localhost:3000`; if you see
+   it, these two fields are why.
+
+   [`auth.js`](auth.js) softens the blow — tokens that land on the app instead of `/auth` are
+   handed over to it rather than dropped — but the fields still need to be right, or every
+   confirmation link goes to whatever the Site URL says.
 2. **Confirmation emails.** The project currently has *Confirm email* **on**, so a new
    account cannot be used until the emailed link is clicked, and the sign-up screen says so.
    For instant access turn it off in **Authentication → Providers → Email**. (Supabase's
