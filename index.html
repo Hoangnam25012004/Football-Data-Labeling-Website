@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pitch Tagger — Sports Event Labeler</title>
+<!-- The sign-in gate. First in the head on purpose: a visitor with no account is sent to
+     auth.html before the rest of the page (or its CDN scripts) is even fetched. -->
+<script src="auth.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -159,6 +162,8 @@
   /* header Event button */
   .ev-btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
   .ev-btn:hover{border-color:var(--accent);color:var(--accent)}
+  /* who is signed in (auth.js let this page load, so there is always someone) */
+  .who{font-size:11px;font-weight:700;color:var(--accent);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
   /* Event modal */
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;z-index:200;padding:60px 16px}
@@ -312,6 +317,8 @@
       <option value="futsal">🤾 Futsal</option>
       <option value="basketball">🏀 Basketball</option>
     </select>
+    <span id="whoami" class="who"></span>
+    <button class="ev-btn" id="signOutBtn" title="Đăng xuất khỏi tài khoản này">⎋ Sign out</button>
   </div>
 </header>
 
@@ -2797,6 +2804,17 @@ if(!/match=/i.test(location.hash)){
 
 if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
 renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); renderFormationMain();
+
+/* ---- the signed-in account (auth.js is the gate that let this page load) ---- */
+(function(){
+  const u=window.PTAuth&&window.PTAuth.user();
+  if(!u){$('whoami').style.display='none';$('signOutBtn').style.display='none';return;}
+  $('whoami').textContent=window.PTAuth.displayName(u);
+  $('whoami').title=u.email||'';
+  $('signOutBtn').onclick=()=>{
+    if(confirm('Đăng xuất khỏi '+(u.email||'tài khoản này')+'?'))window.PTAuth.signOut();
+  };
+})();
 
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};

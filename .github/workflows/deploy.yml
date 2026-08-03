@@ -35,6 +35,10 @@ jobs:
           cp index.html _site/index.html
           cp cloud-sync.js _site/cloud-sync.js
           cp pitchtagger_events.json _site/pitchtagger_events.json || true
+          # sign-in gate: auth.js guards every page, auth.html is the sign-in/sign-up
+          # screen. Pages serves auth.html at the extension-less /auth.
+          cp auth.js _site/auth.js
+          cp auth.html _site/auth.html
           # shared assets used by the standalone sub-pages
           cp shared.css _site/shared.css
           cp shared.js _site/shared.js

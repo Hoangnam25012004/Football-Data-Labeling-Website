@@ -6,10 +6,50 @@ matrices, half-by-half timelines, and XLSX/CSV export.
 
 **Live site:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/
 
+**Sign in:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/auth
+
 ## How it runs
 The whole app is the static file [`index.html`](index.html) — no backend required.
 It is hosted for free on **GitHub Pages** and served over HTTPS, so anyone with the
 link can use it in a modern browser (Chrome/Edge recommended).
+
+## Accounts (sign in / sign up)
+Every page of the site is behind an account. Opening any of them without one lands on
+[`auth.html`](auth.html) — served by GitHub Pages at the extension-less **`/auth`** —
+which offers **Sign in** (email + password), **Sign up** (full name, email, password,
+confirm password) and **Continue with Google**. After signing in you land on the main
+tagging tab, and the header shows who you are with a **⎋ Sign out** button.
+
+The accounts live in **Supabase Auth**, the project the app already syncs to, so there is
+still no backend of our own. [`auth.js`](auth.js) is the gate: every page loads it, and it
+decides — synchronously, from the session supabase-js keeps in `localStorage` — whether to
+show the page or replace it with the sign-in screen. The page you were turned away from is
+remembered, so a shared `…/#match=12345` link still opens that match once you are in.
+
+It is a UX gate, not a security boundary: the site is static, so the files are public
+either way. What actually protects the data is Supabase **Row-Level Security** (every
+policy is `to authenticated`) — see [`supabase/migrations/`](supabase/migrations/).
+
+### Supabase setup for accounts
+Email + password works as soon as the project exists. The rest is dashboard-only:
+
+1. **Authentication → URL Configuration**
+   - *Site URL:* `https://hoangnam25012004.github.io/Football-Data-Labeling-Website/`
+   - *Redirect URLs:* add `https://hoangnam25012004.github.io/Football-Data-Labeling-Website/**`
+     (and `http://localhost:8765/**` if you develop locally). Confirmation links and the
+     return trip from Google both come back here — without this they land on the wrong site.
+2. **Confirmation emails.** The project currently has *Confirm email* **on**, so a new
+   account cannot be used until the emailed link is clicked, and the sign-up screen says so.
+   For instant access turn it off in **Authentication → Providers → Email**. (Supabase's
+   built-in mailer is rate-limited to a handful of messages per hour — set up SMTP before
+   inviting a squad's worth of people.)
+3. **Google.** Not enabled yet: the button explains that instead of failing. To turn it on,
+   create an OAuth client in the Google Cloud console with
+   `https://<project-ref>.supabase.co/auth/v1/callback` as the authorised redirect URI, then
+   paste its Client ID + Secret into **Authentication → Providers → Google**.
+
+Anonymous sign-in stays enabled — [`cloud-sync.js`](cloud-sync.js) falls back to it only
+when there is no account session, and an anonymous session never opens the gate.
 
 ## Deployment (CI/CD)
 Every push to the `main` branch triggers the workflow in
@@ -23,6 +63,8 @@ In the repository: **Settings → Pages → Build and deployment → Source: Git
 ## Local development
 Just open `index.html` in your browser. For the "auto-save to file" feature (File System
 Access API), serve it over `http://localhost` (e.g. `python -m http.server`) in Chrome/Edge.
+The sign-in gate works the same locally, except that only GitHub Pages resolves the pretty
+`/auth`, so off the live site it opens `auth.html` by name.
 
 ## Tests
 ```bash
@@ -35,8 +77,11 @@ DOM/video/cloud, so it always tests the shipped code. Covered today: the substit
 formation-history flow (single/double/triple swaps in one entry, pairs typed back-to-front,
 impossible pairs, dots and 2nd-half mirroring, re-tagging, deleting, and substitutions tagged
 out of order); the Stats General tab (which swaps collapse into one x2 / x3 timeline marker,
-and the bench listed under each formation); and the Stats Distribution tab (the take-ons &
-step-ins map, the row it shares with the cross map, and who the touch map lists per half).
+and the bench listed under each formation); the Stats Distribution tab (the take-ons &
+step-ins map, the row it shares with the cross map, and who the touch map lists per half);
+and the sign-in gate in [`auth.js`](auth.js) (who gets in, an anonymous session never
+counting as an account, the page you were turned away from coming back, and `next` refusing
+to be an open redirect).
 `tests/` is not part of the deployed site.
 
 ## Real-time cloud sync (Supabase)

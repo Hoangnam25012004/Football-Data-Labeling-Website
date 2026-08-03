@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in — Pitch Tagger</title>
+<meta name="robots" content="noindex">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js?v=1"></script>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3240;
+    --ink:#e6edf3; --mut:#8b97a7; --accent:#39d98a; --danger:#f7506b; --warn:#f7b32f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+       font-family:"Segoe UI",system-ui,sans-serif;font-size:13px;color:var(--ink);
+       /* a faint pitch-green glow behind the card, so the page still reads as the app */
+       background:radial-gradient(900px 520px at 50% -10%,#12301f 0%,var(--bg) 62%)}
+  .auth{width:100%;max-width:390px;display:flex;flex-direction:column;align-items:stretch;gap:14px}
+
+  .brand{font-size:34px;font-weight:800;letter-spacing:.5px;margin:0;text-align:center;line-height:1.1}
+  .brand span{color:var(--accent)}
+  .tag{margin:0 0 6px;text-align:center;color:var(--mut);font-size:12px;letter-spacing:2.2px;text-transform:uppercase}
+
+  /* Sign in / Sign up switch */
+  .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
+  .tabs button{flex:1;background:transparent;border:0;color:var(--mut);font:inherit;font-weight:700;
+               padding:9px 0;border-radius:999px;cursor:pointer}
+  .tabs button.on{background:var(--accent);color:#06281a}
+  .tabs button:not(.on):hover{color:var(--ink)}
+
+  form{display:flex;flex-direction:column;gap:10px;margin:0}
+  .fld{display:flex;flex-direction:column;gap:5px}
+  .fld>span{font-size:11px;font-weight:700;color:var(--mut);letter-spacing:.4px;padding-left:14px}
+  .fld input{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+             border-radius:999px;padding:12px 16px;font:inherit;font-size:13px;width:100%}
+  .fld input::placeholder{color:#5d6b7e}
+  .fld input:focus{outline:none;border-color:var(--accent);background:#20293a}
+  .fld.hide{display:none}
+
+  .primary{margin-top:4px;background:var(--accent);color:#06281a;border:0;border-radius:999px;
+           padding:12px 0;font:inherit;font-size:14px;font-weight:800;cursor:pointer}
+  .primary:hover{filter:brightness(1.08)}
+  .primary[disabled]{opacity:.6;cursor:progress}
+
+  .or{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:11px}
+  .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  .google{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+          background:#fff;color:#1f1f1f;border:0;border-radius:999px;padding:11px 0;
+          font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  .google:hover{filter:brightness(.94)}
+  .google[disabled]{opacity:.6;cursor:progress}
+  .google svg{width:17px;height:17px;flex:none}
+
+  .msg{margin:0;padding:10px 14px;border-radius:10px;font-size:12px;line-height:1.5;display:none;white-space:pre-line}
+  .msg.show{display:block}
+  .msg.bad{background:#2a1620;border:1px solid var(--danger);color:#ffc3ce}
+  .msg.ok{background:#12281d;border:1px solid var(--accent);color:#bff0d6}
+  .msg.info{background:var(--panel);border:1px solid var(--line);color:var(--mut)}
+
+  .foot{margin:0;text-align:center;color:var(--mut);font-size:11px;line-height:1.6}
+  .foot b{color:#b9c4d2;font-weight:600}
+</style>
+</head>
+<body>
+<main class="auth">
+  <h1 class="brand">Hoang<span>Nam</span></h1>
+  <p class="tag">Football Data Labeling</p>
+
+  <div class="tabs" role="tablist">
+    <button type="button" id="tabIn" class="on" role="tab">Sign in</button>
+    <button type="button" id="tabUp" role="tab">Sign up</button>
+  </div>
+
+  <form id="authForm" novalidate autocomplete="on">
+    <label class="fld hide" id="fldName">
+      <span>Full name</span>
+      <input id="fullName" type="text" autocomplete="name" placeholder="Nguyen Van A">
+    </label>
+    <label class="fld">
+      <span>Email</span>
+      <input id="email" type="email" autocomplete="email" placeholder="you@gmail.com" required>
+    </label>
+    <label class="fld">
+      <span>Password</span>
+      <input id="password" type="password" autocomplete="current-password" placeholder="At least 6 characters" required>
+    </label>
+    <label class="fld hide" id="fldConfirm">
+      <span>Confirm password</span>
+      <input id="confirm" type="password" autocomplete="new-password" placeholder="Type it again">
+    </label>
+    <button class="primary" id="submitBtn" type="submit">Sign in</button>
+  </form>
+
+  <div class="or"><span>or</span></div>
+
+  <button type="button" class="google" id="googleBtn">
+    <svg viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+    </svg>
+    Continue with Google
+  </button>
+
+  <p class="msg" id="msg"></p>
+  <p class="foot" id="foot">Bạn cần đăng nhập hoặc đăng ký để vào website.</p>
+</main>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const cfg = PTAuth.config();
+  let sb = null, mode = 'in', busy = false;
+
+  /* The one real Supabase client on this site: it signs in, and it persists the session
+     under the default key (sb-<project-ref>-auth-token) — the very entry the gate in
+     auth.js reads on every other page, and the one cloud-sync.js finds already there,
+     so it never falls back to an anonymous sign-in. */
+  function client() {
+    if (!sb && window.supabase) sb = window.supabase.createClient(cfg.url, cfg.key);
+    return sb;
+  }
+
+  function say(text, kind) {
+    const m = $('msg');
+    m.textContent = text || '';
+    m.className = 'msg' + (text ? ' show ' + (kind || 'info') : '');
+  }
+  function working(on, label) {
+    busy = on;
+    $('submitBtn').disabled = on; $('googleBtn').disabled = on;
+    $('submitBtn').textContent = on && label ? label : (mode === 'in' ? 'Sign in' : 'Create account');
+  }
+  const go = () => location.replace(PTAuth.nextUrl());
+
+  /* ---------- the switch ---------- */
+  function setMode(m) {
+    mode = m;
+    $('tabIn').classList.toggle('on', m === 'in');
+    $('tabUp').classList.toggle('on', m === 'up');
+    $('fldName').classList.toggle('hide', m === 'in');
+    $('fldConfirm').classList.toggle('hide', m === 'in');
+    $('password').setAttribute('autocomplete', m === 'in' ? 'current-password' : 'new-password');
+    $('submitBtn').textContent = m === 'in' ? 'Sign in' : 'Create account';
+    $('foot').textContent = m === 'in'
+      ? 'Chưa có tài khoản? Chọn Sign up để tạo mới.'
+      : 'Đã có tài khoản? Chọn Sign in để đăng nhập.';
+    say('');
+    ($(m === 'in' ? 'email' : 'fullName')).focus();
+  }
+  $('tabIn').onclick = () => setMode('in');
+  $('tabUp').onclick = () => setMode('up');
+
+  /* ---------- what Supabase says, in plain words ---------- */
+  function explain(err) {
+    const msg = (err && err.message) || String(err || 'Something went wrong.');
+    if (/invalid login credentials/i.test(msg)) return 'Wrong email or password.';
+    if (/email not confirmed/i.test(msg)) return 'This email has not been confirmed yet — open the link Supabase sent you, then sign in.';
+    if (/already registered|already exists/i.test(msg)) return 'That email already has an account. Sign in instead.';
+    if (/password should be at least/i.test(msg)) return 'Password is too short — use at least 6 characters.';
+    if (/unsupported provider|provider is not enabled/i.test(msg))
+      return 'Google sign-in is not enabled on this Supabase project yet.\nEnable it in Authentication → Providers → Google (see README).';
+    if (/redirect|not allowed/i.test(msg) && /url/i.test(msg))
+      return 'This address is not in the Supabase redirect allow-list.\nAdd it in Authentication → URL Configuration (see README).';
+    if (/failed to fetch|networkerror|load failed/i.test(msg)) return 'Cannot reach Supabase — check your connection and try again.';
+    if (/rate limit|too many/i.test(msg)) return 'Too many attempts. Wait a minute and try again.';
+    return msg;
+  }
+
+  /* ---------- submit ---------- */
+  $('authForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if (busy) return;
+    const c = client();
+    if (!c) return say('Supabase could not be loaded — check your connection and reload the page.', 'bad');
+
+    const name = $('fullName').value.trim();
+    const email = $('email').value.trim();
+    const pw = $('password').value;
+    const pw2 = $('confirm').value;
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return say('Enter a valid email address.', 'bad');
+    if (pw.length < 6) return say('Password must be at least 6 characters.', 'bad');
+    if (mode === 'up') {
+      if (!name) return say('Enter your full name.', 'bad');
+      if (pw !== pw2) return say('The two passwords do not match.', 'bad');
+    }
+
+    working(true, mode === 'in' ? 'Signing in…' : 'Creating…');
+    say('');
+    try {
+      if (mode === 'in') {
+        const { error } = await c.auth.signInWithPassword({ email: email, password: pw });
+        if (error) throw error;
+        return land();
+      }
+      const { data, error } = await c.auth.signUp({
+        email: email, password: pw,
+        options: { data: { full_name: name }, emailRedirectTo: PTAuth.authUrl() }
+      });
+      if (error) throw error;
+      /* No session back means the project asks new accounts to confirm their email first
+         (Supabase's default). The account exists — it just cannot be used until then. */
+      if (!data.session) {
+        working(false);
+        setMode('in');
+        $('email').value = email;
+        return say('Account created for ' + email + '.\nOpen the confirmation link Supabase just emailed you, then sign in here.', 'ok');
+      }
+      return land();
+    } catch (err) {
+      working(false);
+      say(explain(err), 'bad');
+    }
+  });
+
+  /* The gate on the app pages reads the session out of localStorage, so only forward once
+     it is actually readable there — otherwise the two would bounce the user back and forth. */
+  function land() {
+    if (PTAuth.user()) return go();
+    working(false);
+    say('Signed in, but this browser is not keeping the session.\nAllow cookies / site data for this site (private windows block it) and try again.', 'bad');
+  }
+
+  /* ---------- Google ----------
+     signInWithOAuth only builds a URL and sends the browser to it, so a project that has
+     not turned Google on yet answers AFTER we have gone — leaving the visitor staring at
+     a raw {"code":400,"msg":"Unsupported provider…"} page with no way back. Ask first:
+     that 400 comes back with CORS headers and is readable, while an enabled provider
+     answers with a redirect to accounts.google.com that CORS makes this fetch throw on.
+     So only a readable "not enabled" stops us — anything else (including being offline)
+     goes ahead exactly as before. */
+  async function providerEnabled(url) {
+    try {
+      const r = await fetch(url, { headers: { accept: 'application/json' } });
+      const body = await r.text();
+      if (!r.ok && /provider is not enabled|unsupported provider/i.test(body)) return false;
+    } catch (e) {}
+    return true;
+  }
+  $('googleBtn').onclick = async function () {
+    if (busy) return;
+    const c = client();
+    if (!c) return say('Supabase could not be loaded — check your connection and reload the page.', 'bad');
+    working(true, 'Redirecting…');
+    say('');
+    try {
+      /* Come back to this page — with ?next= intact — so the session is stored here and the
+         redirect leftovers never reach the app's own #match= hash. */
+      const back = location.origin + location.pathname + location.search;
+      const { data, error } = await c.auth.signInWithOAuth({
+        provider: 'google', options: { redirectTo: back, skipBrowserRedirect: true }
+      });
+      if (error) throw error;
+      if (!await providerEnabled(data.url)) throw { message: 'Unsupported provider: provider is not enabled' };
+      location.assign(data.url);
+    } catch (err) {
+      working(false);
+      say(explain(err), 'bad');
+    }
+  };
+
+  /* ---------- on load ---------- */
+  (async function boot() {
+    setMode('in');
+    const c = client();
+    if (!c) return say('Supabase could not be loaded — check your connection and reload the page.', 'bad');
+
+    /* getSession() waits for the client to finish reading the URL, which is how a return
+       trip from Google (tokens in the hash / ?code=) becomes a stored session. */
+    let session = null;
+    try { ({ data: { session } } = await c.auth.getSession()); } catch (e) {}
+
+    if (session && session.user && !session.user.is_anonymous) return land();
+    /* An anonymous session is what cloud-sync.js makes on its own to reach the database.
+       It is not an account, and leaving it behind would only confuse the next sign-in. */
+    if (session) { try { await c.auth.signOut(); } catch (e) {} }
+
+    if (/error_description=|[?&]error=/.test(location.hash + location.search)) {
+      const p = new URLSearchParams((location.hash || '').replace(/^#/, '') || location.search);
+      say(explain({ message: p.get('error_description') || p.get('error') || 'Sign-in was cancelled.' }), 'bad');
+    }
+    $('email').focus();
+  })();
+})();
+</script>
+</body>
+</html>
