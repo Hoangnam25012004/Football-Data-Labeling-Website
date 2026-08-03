@@ -162,6 +162,9 @@
   /* header Event button */
   .ev-btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
   .ev-btn:hover{border-color:var(--accent);color:var(--accent)}
+  /* Stats / Player lists with no match open — nothing there would belong to anything */
+  .ev-btn:disabled{opacity:.4;cursor:not-allowed}
+  .ev-btn:disabled:hover{border-color:var(--line);color:var(--ink)}
   /* ▾ Other — the account menu (auth.js let this page load, so there is always someone) */
   .other-wrap{position:relative}
   #otherBtn.on{border-color:var(--accent);color:var(--accent)}
@@ -779,6 +782,21 @@ function setMatchTeams(homeId,awayId,matchId,code){
   state.teamIds={home:homeId||null,away:awayId||null,matchId:matchId||null,code:code||null};
   saveMeta();   // Player-Lists reads the ids from the meta store to load the DB roster
   refreshFormation();
+  updateMatchGate();
+}
+/* Squads, events and stats all belong to ONE match, but the stores they live in are shared
+   by every match this browser has ever opened. With no match open there is nothing on those
+   pages that belongs to anything — the Stats tab used to open on the last match's squad and
+   show its formation for a match nobody had opened. Both pages now refuse that themselves;
+   this stops the trip being offered in the first place. */
+function updateMatchGate(){
+  const open=!!state.teamIds.matchId;
+  [[ 'statsBtn','Player statistics'],
+   ['lineupBtn','Player lists, starting XI, subs & formation']].forEach(([id,why])=>{
+    const b=$(id); if(!b)return;
+    b.disabled=!open;
+    b.title=open?why:'Open a match first — ☁ Cloud → create or join one';
+  });
 }
 // sub-pages (Player-Lists / Stats) carry the open match in their URL, and their
 // "← Tagging" link brings it back — so navigating never drops the match context
@@ -2823,6 +2841,7 @@ if(!/match=/i.test(location.hash)){
 
 if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
 renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); renderFormationMain();
+updateMatchGate();   // opening with no #match= link means the two match-bound tabs stay shut
 
 /* ---- ▾ Other: the account menu (auth.js is the gate that let this page load) ---- */
 (function(){

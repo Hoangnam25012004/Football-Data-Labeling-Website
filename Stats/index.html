@@ -146,12 +146,24 @@ body>header{flex:none}
   </div>
 </header>
 <div class="page">
+  <!-- events and squads belong to a match — without one open there is nothing to report on -->
+  <div id="noMatchMsg" style="display:none;padding:48px 20px;text-align:center;color:var(--mut);font-size:13px;line-height:1.8">
+    <div style="font-size:28px">📊</div>
+    <b style="color:var(--ink)">No match is open</b><br>
+    Stats belong to a match. Go back to the tagging tab, open <b>☁ Cloud</b>
+    to create or join a match, then reopen this page.
+  </div>
   <div class="stats-wrap"><div id="statsHolder"></div></div>
 </div>
 
 <script src="../shared.js?v=14"></script>
 <script>
-let rows=loadRows(), meta=loadMeta(), lineups=loadLineups(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles', othCat='fouls';
+/* The lineup store is shared by every tab and by every match this browser has ever opened,
+   so a stored squad is only ours if its stamp names the match that is actually open. Taking
+   it unconditionally is what put a previous match's formation on this page when no match had
+   been opened at all. Player-Lists has always checked; this page did not. */
+const ourLineups=()=>lineupsAreFor(loadMeta().matchId)?loadLineups():blankLineups();
+let rows=loadRows(), meta=loadMeta(), lineups=ourLineups(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles', othCat='fouls';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
 let pdWin=0;      // pass-network map: index into the 15-minute time windows
 
@@ -181,6 +193,15 @@ const STAT_CATS={
 };
 
 function renderStats(){
+  /* No open match -> the notice, not the last match's leftovers. The stores are shared by
+     every match this browser has opened, so with none open there is nothing here that can
+     be said to belong to anything. A #match= link loads over the cloud and sets meta.matchId
+     before it re-renders, so that route lights the page up on its own. */
+  const open=!!meta.matchId;
+  $('noMatchMsg').style.display=open?'none':'block';
+  document.querySelector('.stats-wrap').style.display=open?'':'none';
+  $('catToggle').style.display='none';
+  if(!open)return;
   $('statGenBtn').className=statTeam==='general'?'act-gen':'';
   $('statHomeBtn').className=statTeam==='home'?'act-home':'';
   $('statAwayBtn').className=statTeam==='away'?'act-away':'';
@@ -1132,11 +1153,12 @@ document.querySelectorAll('#catToggle button').forEach(b=>b.onclick=()=>{statCat
 window.addEventListener('storage',e=>{
   if(cloudMode)return;
   if(e.key===PT_KEYS.rows){rows=loadRows();renderStats();}
-  else if(e.key===PT_KEYS.meta){meta=loadMeta();renderStats();}
+  // the match itself can change under us — the squad on screen has to change with it
+  else if(e.key===PT_KEYS.meta){meta=loadMeta();lineups=ourLineups();renderStats();}
   else if(e.key===PT_KEYS.duration){dur=loadJSON(PT_KEYS.duration,dur);renderStats();}
   // lineups feed the General formation AND the per-player tables / heatmap squad, so
   // a lineup edit in the main tab has to re-render whatever is on screen
-  else if(e.key===PT_KEYS.lineups){lineups=loadLineups();renderStats();}
+  else if(e.key===PT_KEYS.lineups||e.key===PT_KEYS.lineupsMatch){lineups=ourLineups();renderStats();}
 });
 
 renderStats();

@@ -126,10 +126,13 @@ impossible pairs, dots and 2nd-half mirroring, re-tagging, deleting, and substit
 out of order); the Stats General tab (which swaps collapse into one x2 / x3 timeline marker,
 and the bench listed under each formation); the Stats Distribution tab (the take-ons &
 step-ins map, the row it shares with the cross map, and who the touch map lists per half);
-and the sign-in gate in [`auth.js`](auth.js) (who gets in, an anonymous session never
-counting as an account, a session past its expiry still getting in, the page you were turned
-away from coming back, `next` refusing to be an open redirect, the password rules, and the
-sign-in screen carrying what a password manager needs).
+the sign-in gate in [`auth.js`](auth.js) (who gets in, an anonymous session never counting
+as an account, a session past its expiry still getting in, the page you were turned away
+from coming back, `next` refusing to be an open redirect, the password rules, and the
+sign-in screen carrying what a password manager needs); and what Stats and Player lists do
+with no match open — the stores they read are shared by every match this browser has ever
+opened, so a stored squad counts only when its stamp names the match that is open, and the
+main tab keeps both buttons disabled until there is one.
 `tests/` is not part of the deployed site.
 
 ## Real-time cloud sync (Supabase)
