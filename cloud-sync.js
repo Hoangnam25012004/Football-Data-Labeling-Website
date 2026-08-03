@@ -53,7 +53,13 @@ const CONFIG = {
     };
   }
 
-  function status(txt, ok) { const el = $('cloudStatus'); if (el) { el.textContent = txt; el.className = 'mini' + (ok ? ' on' : ''); } }
+  // shown in both places the connection matters: ☁ Cloud, which owns it, and ⚽ Match,
+  // whose controls stay hidden until it is up — otherwise that modal looks simply broken
+  function status(txt, ok) {
+    ['cloudStatus', 'matchHubStatus'].forEach(id => {
+      const el = $(id); if (el) { el.textContent = txt; el.className = 'mini' + (ok ? ' on' : ''); }
+    });
+  }
 
   /* ---------- connect + auth ---------- */
   async function connect(silent) {
@@ -399,10 +405,13 @@ const CONFIG = {
     if (!$('cloudBtn')) return;
     const c = cfg();
     if ($('cloudUrl')) { $('cloudUrl').value = c.url || CONFIG.url || ''; $('cloudKey').value = c.key || CONFIG.anonKey || ''; }
-    $('cloudBtn').onclick = () => $('cloudModal').classList.add('show');
+    // ☁ Cloud (in ▾ Other) is the connection; ⚽ Match is what you do with it. Two modals,
+    // one set of controls — every id below is where it always was, just split across them.
     $('cloudClose').onclick = () => $('cloudModal').classList.remove('show');
     $('cloudModal').addEventListener('click', (e) => { if (e.target === $('cloudModal')) $('cloudModal').classList.remove('show'); });
     $('cloudConnect').onclick = () => connect();
+    if ($('matchHubClose')) $('matchHubClose').onclick = () => $('matchHub').classList.remove('show');
+    if ($('matchHub')) $('matchHub').addEventListener('click', (e) => { if (e.target === $('matchHub')) $('matchHub').classList.remove('show'); });
     // "＋ New match" opens the create-match dialog (teams from the database)
     $('cloudCreate').onclick = async () => {
       if (!connected && !(await connect())) return;
@@ -426,7 +435,9 @@ const CONFIG = {
     };
     if ($('cloudMatchId')) ['input', 'focus', 'keyup'].forEach(ev =>
       $('cloudMatchId').addEventListener(ev, previewMatchId));
-    $('cloudBtn').onclick = () => { $('cloudModal').classList.add('show'); previewMatchId(); };
+    $('cloudBtn').onclick = () => $('cloudModal').classList.add('show');
+    // the preview card is refreshed on open, in case a code is already in the box
+    if ($('matchBtn')) $('matchBtn').onclick = () => { $('matchHub').classList.add('show'); previewMatchId(); };
     // auto-connect on load when credentials are saved/configured, so the shared event
     // dictionary syncs without clicking Connect; also auto-join a #match=<code> link.
     if (c.url || CONFIG.url) (async () => {
