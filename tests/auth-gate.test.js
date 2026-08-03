@@ -14,7 +14,8 @@
    The rest is the reason the redirect carries the page it turned away: opening a shared
    "…/#match=12345" link signed out must still land on that match afterwards. */
 const fs=require('fs'), path=require('path'), vm=require('vm');
-const {test,eq,ok,notOk,deepEq}=require('./tiny-test');
+const {test,eq,ok,notOk}=require('./tiny-test');
+const {grabConst,grabFunction}=require('./harness');
 
 const ROOT=path.join(__dirname,'..');
 const AUTH_JS=fs.readFileSync(path.join(ROOT,'auth.js'),'utf8');
@@ -180,7 +181,85 @@ test('the sign-in screen ships, and asks for the fields it should', () => {
   ['fullName','email','password','confirm'].forEach(id=>ok(html.includes('id="'+id+'"'),id+' field'));
   ok(/signInWithPassword/.test(html),'email + password sign-in');
   ok(/signUp\(/.test(html)&&/full_name/.test(html),'sign-up stores the full name on the account');
-  ok(/signInWithOAuth[\s\S]{0,80}google/.test(html),'and Google');
+});
+
+test('Google sign-in is gone, and takes every reference with it', () => {
+  const html=page('auth.html');
+  notOk(/signInWithOAuth|provider/i.test(html),'no OAuth call left behind');
+  // the one that bites: working() touched $('googleBtn') on EVERY submit, so a leftover
+  // reference to a button that no longer exists would kill Sign in and Create account
+  notOk(/googleBtn/.test(html),'nothing still reaches for the button');
+  notOk(/\.google\b|accounts\.google/.test(html),'and its styling and logo are gone too');
+});
+
+/* ================= what a new password has to be ================= */
+const AUTH_HTML=page('auth.html');
+const pwCtx={};
+vm.createContext(pwCtx);
+vm.runInContext([grabConst('PW_RULES',AUTH_HTML,'auth.html'),
+                 grabFunction('pwProblem',AUTH_HTML,'auth.html'),
+                 ';globalThis.pwProblem=pwProblem;'].join('\n'),pwCtx,{filename:'auth.html-pw.js'});
+const pwProblem=pwCtx.pwProblem;
+
+test('a new password needs 6 characters, a capital and a special character', () => {
+  eq(pwProblem('Abcde!'),null,'exactly six, with both — the shortest thing that passes');
+  eq(pwProblem('Str0ng!Pass'),null,'a longer one too');
+  eq(pwProblem('Abc1!'),'Password needs at least 6 characters.','five is one short');
+  eq(pwProblem('abcdef!'),'Password needs one capital letter (A–Z).','no capital');
+  eq(pwProblem('Abcdefg'),'Password needs one special character (! ? @ # …).','letters and digits only');
+  eq(pwProblem('Abcdef1'),'Password needs one special character (! ? @ # …).','a digit is not a special character');
+});
+
+test('everything missing is said at once, not one round at a time', () => {
+  eq(pwProblem('abc'),'Password needs at least 6 characters, one capital letter (A–Z), '
+    +'one special character (! ? @ # …).');
+  eq(pwProblem(''),'Password needs at least 6 characters, one capital letter (A–Z), '
+    +'one special character (! ? @ # …).');
+});
+
+test('signing in is not held to the rule — an older account must still get in', () => {
+  // the check belongs to the sign-up branch; sign-in only refuses an empty box
+  const submit=/addEventListener\('submit'[\s\S]*?\n  \}\);/.exec(AUTH_HTML)[0];
+  const signInBranch=/if \(mode === 'in'\) \{([\s\S]*?)\} else \{/.exec(submit)[1];
+  notOk(/pwProblem/.test(signInBranch),'no strength check when signing in');
+  ok(/!pw\b/.test(signInBranch),'just "type something"');
+  ok(/pwProblem/.test(submit),'while sign-up does run it');
+});
+
+/* ================= staying signed in, and the browser keeping the password ================= */
+test('a session already past its access-token expiry still opens the gate', () => {
+  // the refresh token outlives it, and cloud-sync.js renews on load — turning the machine
+  // off for a week must not log anyone out. Only signing out ends a session.
+  const stale=session(account,{expires_at:Math.floor(Date.now()/1000)-99999});
+  const {nav,PTAuth}=load(LIVE,{[tokenKey]:stale});
+  eq(nav.replaced,null,'let straight in');
+  eq(PTAuth.user().email,'dnam2501@gmail.com');
+});
+
+test('the form is one a password manager can read, and it asks outright as well', () => {
+  const html=page('auth.html');
+  ok(/id="email"[^>]*autocomplete="username"/.test(html),'username field marked as such');
+  ok(/id="password"[^>]*autocomplete="current-password"/.test(html),'and the password field');
+  ok(/autocomplete="new-password"/.test(html),'a new password is not offered the old one');
+  ok(/name="email"/.test(html)&&/name="password"/.test(html),'named too, for older heuristics');
+  ok(/navigator\.credentials\.store/.test(html)&&/PasswordCredential/.test(html),
+     'Chrome is asked to save rather than left to guess from the redirect');
+  ok(/await remember\(/.test(html),'and it is awaited, so the prompt is up before we navigate');
+});
+
+/* ================= the site speaks English ================= */
+const VIETNAMESE=/[ăâđêôơưĂÂĐÊÔƠƯàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụỳýỷỹỵ]/;
+
+test('the sign-in screen is in English, all of it', () => {
+  const html=page('auth.html');
+  notOk(VIETNAMESE.test(html),'no Vietnamese left, in the page or its comments');
+});
+
+test('so is everything the gate added to the main tab', () => {
+  const html=page('index.html');
+  ok(html.includes('title="Sign out of this account"'),'the button tooltip');
+  ok(/confirm\('Sign out of '/.test(html),'and the prompt it raises');
+  notOk(/Đăng xuất|tài khoản này/.test(html),'no Vietnamese left in the sign-out control');
 });
 
 test('the new files are staged for GitHub Pages', () => {

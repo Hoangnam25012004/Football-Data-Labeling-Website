@@ -318,7 +318,7 @@
       <option value="basketball">🏀 Basketball</option>
     </select>
     <span id="whoami" class="who"></span>
-    <button class="ev-btn" id="signOutBtn" title="Đăng xuất khỏi tài khoản này">⎋ Sign out</button>
+    <button class="ev-btn" id="signOutBtn" title="Sign out of this account">⎋ Sign out</button>
   </div>
 </header>
 
@@ -2812,7 +2812,8 @@ renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTabl
   $('whoami').textContent=window.PTAuth.displayName(u);
   $('whoami').title=u.email||'';
   $('signOutBtn').onclick=()=>{
-    if(confirm('Đăng xuất khỏi '+(u.email||'tài khoản này')+'?'))window.PTAuth.signOut();
+    // the only thing that ends a session — closing the tab or the machine never does
+    if(confirm('Sign out of '+(u.email||'this account')+'?'))window.PTAuth.signOut();
   };
 })();
 

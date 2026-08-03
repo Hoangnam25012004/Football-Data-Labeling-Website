@@ -44,15 +44,9 @@
   .primary:hover{filter:brightness(1.08)}
   .primary[disabled]{opacity:.6;cursor:progress}
 
-  .or{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:11px}
-  .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
-
-  .google{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
-          background:#fff;color:#1f1f1f;border:0;border-radius:999px;padding:11px 0;
-          font:inherit;font-size:13px;font-weight:700;cursor:pointer}
-  .google:hover{filter:brightness(.94)}
-  .google[disabled]{opacity:.6;cursor:progress}
-  .google svg{width:17px;height:17px;flex:none}
+  /* the password rules, spelled out under the field instead of only on rejection */
+  .rules{margin:-2px 0 0;padding-left:14px;color:var(--mut);font-size:11px;line-height:1.5}
+  .rules.hide{display:none}
 
   .msg{margin:0;padding:10px 14px;border-radius:10px;font-size:12px;line-height:1.5;display:none;white-space:pre-line}
   .msg.show{display:block}
@@ -74,40 +68,32 @@
     <button type="button" id="tabUp" role="tab">Sign up</button>
   </div>
 
+  <!-- A real <form> with username + password and the standard autocomplete tokens: that is
+       what makes Chrome (and every other password manager) offer to save the credentials,
+       and fill them back in on the next visit. -->
   <form id="authForm" novalidate autocomplete="on">
     <label class="fld hide" id="fldName">
       <span>Full name</span>
-      <input id="fullName" type="text" autocomplete="name" placeholder="Nguyen Van A">
+      <input id="fullName" name="name" type="text" autocomplete="name" placeholder="Nguyen Van A">
     </label>
     <label class="fld">
       <span>Email</span>
-      <input id="email" type="email" autocomplete="email" placeholder="you@gmail.com" required>
+      <input id="email" name="email" type="email" autocomplete="username" placeholder="you@gmail.com" required>
     </label>
     <label class="fld">
       <span>Password</span>
-      <input id="password" type="password" autocomplete="current-password" placeholder="At least 6 characters" required>
+      <input id="password" name="password" type="password" autocomplete="current-password" placeholder="At least 6 characters" required>
     </label>
+    <p class="rules hide" id="pwRules">At least 6 characters, one capital letter (A–Z) and one special character (!&nbsp;?&nbsp;@&nbsp;#&nbsp;…).</p>
     <label class="fld hide" id="fldConfirm">
       <span>Confirm password</span>
-      <input id="confirm" type="password" autocomplete="new-password" placeholder="Type it again">
+      <input id="confirm" name="confirm-password" type="password" autocomplete="new-password" placeholder="Type it again">
     </label>
     <button class="primary" id="submitBtn" type="submit">Sign in</button>
   </form>
 
-  <div class="or"><span>or</span></div>
-
-  <button type="button" class="google" id="googleBtn">
-    <svg viewBox="0 0 48 48" aria-hidden="true">
-      <path fill="#EA4335" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-    </svg>
-    Continue with Google
-  </button>
-
   <p class="msg" id="msg"></p>
-  <p class="foot" id="foot">Bạn cần đăng nhập hoặc đăng ký để vào website.</p>
+  <p class="foot" id="foot">Sign in, or create an account, to open the site.</p>
 </main>
 
 <script>
@@ -132,10 +118,39 @@
   }
   function working(on, label) {
     busy = on;
-    $('submitBtn').disabled = on; $('googleBtn').disabled = on;
+    $('submitBtn').disabled = on;
     $('submitBtn').textContent = on && label ? label : (mode === 'in' ? 'Sign in' : 'Create account');
   }
   const go = () => location.replace(PTAuth.nextUrl());
+
+  /* ---------- what a new password has to be ----------
+     Checked here so the rule is stated before Supabase is asked; Supabase's own minimum
+     is looser, so nothing it accepts is rejected later. Sign-in is NOT held to this — an
+     account made before the rule tightened must still be able to get in. */
+  const PW_RULES = [
+    [pw => pw.length >= 6,        'at least 6 characters'],
+    [pw => /[A-Z]/.test(pw),      'one capital letter (A–Z)'],
+    [pw => /[^A-Za-z0-9]/.test(pw), 'one special character (! ? @ # …)']
+  ];
+  function pwProblem(pw) {
+    const missing = PW_RULES.filter(r => !r[0](pw)).map(r => r[1]);
+    return missing.length ? 'Password needs ' + missing.join(', ') + '.' : null;
+  }
+
+  /* ---------- let the browser keep the credentials ----------
+     The form already carries username/current-password/new-password, which is what
+     password managers read. This asks outright as well, so Chrome and Edge raise their
+     "Save password?" prompt on the spot rather than guessing from the navigation that
+     follows — and after signing out the fields come back filled in. Browsers without the
+     API (Firefox, Safari) ignore it and fall back to the form, which still works. */
+  async function remember(email, pw, name) {
+    try {
+      if (window.PasswordCredential && navigator.credentials && navigator.credentials.store)
+        await navigator.credentials.store(new window.PasswordCredential({
+          id: email, password: pw, name: name || email
+        }));
+    } catch (e) { /* declined or unsupported — the form's autocomplete tokens still apply */ }
+  }
 
   /* ---------- the switch ---------- */
   function setMode(m) {
@@ -145,10 +160,12 @@
     $('fldName').classList.toggle('hide', m === 'in');
     $('fldConfirm').classList.toggle('hide', m === 'in');
     $('password').setAttribute('autocomplete', m === 'in' ? 'current-password' : 'new-password');
+    $('password').placeholder = m === 'in' ? 'Your password' : 'At least 6 characters';
+    $('pwRules').classList.toggle('hide', m === 'in');
     $('submitBtn').textContent = m === 'in' ? 'Sign in' : 'Create account';
     $('foot').textContent = m === 'in'
-      ? 'Chưa có tài khoản? Chọn Sign up để tạo mới.'
-      : 'Đã có tài khoản? Chọn Sign in để đăng nhập.';
+      ? 'No account yet? Choose Sign up to create one.'
+      : 'Already have an account? Choose Sign in.';
     say('');
     ($(m === 'in' ? 'email' : 'fullName')).focus();
   }
@@ -161,9 +178,7 @@
     if (/invalid login credentials/i.test(msg)) return 'Wrong email or password.';
     if (/email not confirmed/i.test(msg)) return 'This email has not been confirmed yet — open the link Supabase sent you, then sign in.';
     if (/already registered|already exists/i.test(msg)) return 'That email already has an account. Sign in instead.';
-    if (/password should be at least/i.test(msg)) return 'Password is too short — use at least 6 characters.';
-    if (/unsupported provider|provider is not enabled/i.test(msg))
-      return 'Google sign-in is not enabled on this Supabase project yet.\nEnable it in Authentication → Providers → Google (see README).';
+    if (/password should be at least|password.*weak/i.test(msg)) return 'Password is too weak. ' + (pwProblem($('password').value) || 'Try a longer one.');
     if (/redirect|not allowed/i.test(msg) && /url/i.test(msg))
       return 'This address is not in the Supabase redirect allow-list.\nAdd it in Authentication → URL Configuration (see README).';
     if (/failed to fetch|networkerror|load failed/i.test(msg)) return 'Cannot reach Supabase — check your connection and try again.';
@@ -184,9 +199,12 @@
     const pw2 = $('confirm').value;
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return say('Enter a valid email address.', 'bad');
-    if (pw.length < 6) return say('Password must be at least 6 characters.', 'bad');
-    if (mode === 'up') {
+    if (mode === 'in') {
+      if (!pw) return say('Enter your password.', 'bad');
+    } else {
       if (!name) return say('Enter your full name.', 'bad');
+      const problem = pwProblem(pw);
+      if (problem) return say(problem, 'bad');
       if (pw !== pw2) return say('The two passwords do not match.', 'bad');
     }
 
@@ -196,7 +214,7 @@
       if (mode === 'in') {
         const { error } = await c.auth.signInWithPassword({ email: email, password: pw });
         if (error) throw error;
-        return land();
+        return land(email, pw, name);
       }
       const { data, error } = await c.auth.signUp({
         email: email, password: pw,
@@ -204,14 +222,16 @@
       });
       if (error) throw error;
       /* No session back means the project asks new accounts to confirm their email first
-         (Supabase's default). The account exists — it just cannot be used until then. */
+         (Supabase's default). The account exists — it just cannot be used until then, so
+         offer to save the password now: it is the one they will sign in with afterwards. */
       if (!data.session) {
+        await remember(email, pw, name);
         working(false);
         setMode('in');
         $('email').value = email;
         return say('Account created for ' + email + '.\nOpen the confirmation link Supabase just emailed you, then sign in here.', 'ok');
       }
-      return land();
+      return land(email, pw, name);
     } catch (err) {
       working(false);
       say(explain(err), 'bad');
@@ -219,50 +239,14 @@
   });
 
   /* The gate on the app pages reads the session out of localStorage, so only forward once
-     it is actually readable there — otherwise the two would bounce the user back and forth. */
-  function land() {
+     it is actually readable there — otherwise the two would bounce the user back and forth.
+     The save prompt goes up before the redirect, while this page still owns the form. */
+  async function land(email, pw, name) {
+    if (email) await remember(email, pw, name);
     if (PTAuth.user()) return go();
     working(false);
     say('Signed in, but this browser is not keeping the session.\nAllow cookies / site data for this site (private windows block it) and try again.', 'bad');
   }
-
-  /* ---------- Google ----------
-     signInWithOAuth only builds a URL and sends the browser to it, so a project that has
-     not turned Google on yet answers AFTER we have gone — leaving the visitor staring at
-     a raw {"code":400,"msg":"Unsupported provider…"} page with no way back. Ask first:
-     that 400 comes back with CORS headers and is readable, while an enabled provider
-     answers with a redirect to accounts.google.com that CORS makes this fetch throw on.
-     So only a readable "not enabled" stops us — anything else (including being offline)
-     goes ahead exactly as before. */
-  async function providerEnabled(url) {
-    try {
-      const r = await fetch(url, { headers: { accept: 'application/json' } });
-      const body = await r.text();
-      if (!r.ok && /provider is not enabled|unsupported provider/i.test(body)) return false;
-    } catch (e) {}
-    return true;
-  }
-  $('googleBtn').onclick = async function () {
-    if (busy) return;
-    const c = client();
-    if (!c) return say('Supabase could not be loaded — check your connection and reload the page.', 'bad');
-    working(true, 'Redirecting…');
-    say('');
-    try {
-      /* Come back to this page — with ?next= intact — so the session is stored here and the
-         redirect leftovers never reach the app's own #match= hash. */
-      const back = location.origin + location.pathname + location.search;
-      const { data, error } = await c.auth.signInWithOAuth({
-        provider: 'google', options: { redirectTo: back, skipBrowserRedirect: true }
-      });
-      if (error) throw error;
-      if (!await providerEnabled(data.url)) throw { message: 'Unsupported provider: provider is not enabled' };
-      location.assign(data.url);
-    } catch (err) {
-      working(false);
-      say(explain(err), 'bad');
-    }
-  };
 
   /* ---------- on load ---------- */
   (async function boot() {
@@ -270,8 +254,10 @@
     const c = client();
     if (!c) return say('Supabase could not be loaded — check your connection and reload the page.', 'bad');
 
-    /* getSession() waits for the client to finish reading the URL, which is how a return
-       trip from Google (tokens in the hash / ?code=) becomes a stored session. */
+    /* getSession() waits for the client to finish reading the URL, which is how the return
+       trip from a confirmation link (tokens in the hash / ?code=) becomes a stored session.
+       It also finds the session kept from last time: a signed-in browser never sees this
+       screen again — closing the tab, or the machine, changes nothing. Only Sign out does. */
     let session = null;
     try { ({ data: { session } } = await c.auth.getSession()); } catch (e) {}
 
@@ -280,9 +266,11 @@
        It is not an account, and leaving it behind would only confuse the next sign-in. */
     if (session) { try { await c.auth.signOut(); } catch (e) {} }
 
+    /* A confirmation link that has expired or been used already comes back here with the
+       reason on the URL — without this the visitor would just see a blank sign-in form. */
     if (/error_description=|[?&]error=/.test(location.hash + location.search)) {
       const p = new URLSearchParams((location.hash || '').replace(/^#/, '') || location.search);
-      say(explain({ message: p.get('error_description') || p.get('error') || 'Sign-in was cancelled.' }), 'bad');
+      say(explain({ message: p.get('error_description') || p.get('error') || 'That link is no longer valid.' }), 'bad');
     }
     $('email').focus();
   })();

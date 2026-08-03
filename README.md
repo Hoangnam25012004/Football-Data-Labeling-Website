@@ -15,10 +15,31 @@ link can use it in a modern browser (Chrome/Edge recommended).
 
 ## Accounts (sign in / sign up)
 Every page of the site is behind an account. Opening any of them without one lands on
-[`auth.html`](auth.html) — served by GitHub Pages at the extension-less **`/auth`** —
-which offers **Sign in** (email + password), **Sign up** (full name, email, password,
-confirm password) and **Continue with Google**. After signing in you land on the main
-tagging tab, and the header shows who you are with a **⎋ Sign out** button.
+[`auth.html`](auth.html) — served by GitHub Pages at the extension-less **`/auth`** — which
+offers **Sign in** (email + password) and **Sign up** (full name, email, password, confirm
+password). After signing in you land on the main tagging tab, and the header shows who you
+are with a **⎋ Sign out** button. Sign-in is by email and password only; there is no
+third-party provider.
+
+A new password must be **at least 6 characters, with one capital letter and one special
+character** — stated under the field, and checked before Supabase is asked. Signing in is
+deliberately *not* held to that rule, so an account made before it tightened can still get
+in.
+
+**You stay signed in.** The session lives in `localStorage`, so closing the tab, quitting
+the browser or turning the machine off changes nothing — the next visit goes straight to
+the tagging tab without showing the sign-in screen. The access token expiring does not log
+you out either: the gate does not look at expiry, and the client renews it on load. Only
+**⎋ Sign out** ends a session, and it ends it in every open tab at once. Signing out leaves
+all tagged data (events, lineups, match meta) untouched.
+
+**The browser keeps your password, not us.** The form is a real `<form>` carrying the
+standard `username` / `current-password` / `new-password` autocomplete tokens, and on a
+successful sign-in or sign-up the page calls `navigator.credentials.store()` outright — so
+Chrome and Edge raise their own *"Save password?"* prompt there and then instead of guessing
+from the redirect that follows. After signing out, their password manager fills the form
+back in. Firefox and Safari have no such API and fall back to the form's tokens, which they
+read the same way. Nothing about this touches our storage: the site never keeps a password.
 
 The accounts live in **Supabase Auth**, the project the app already syncs to, so there is
 still no backend of our own. [`auth.js`](auth.js) is the gate: every page loads it, and it
@@ -36,17 +57,16 @@ Email + password works as soon as the project exists. The rest is dashboard-only
 1. **Authentication → URL Configuration**
    - *Site URL:* `https://hoangnam25012004.github.io/Football-Data-Labeling-Website/`
    - *Redirect URLs:* add `https://hoangnam25012004.github.io/Football-Data-Labeling-Website/**`
-     (and `http://localhost:8765/**` if you develop locally). Confirmation links and the
-     return trip from Google both come back here — without this they land on the wrong site.
+     (and `http://localhost:8765/**` if you develop locally). Confirmation links come back
+     here — without this they land on the wrong site.
 2. **Confirmation emails.** The project currently has *Confirm email* **on**, so a new
    account cannot be used until the emailed link is clicked, and the sign-up screen says so.
    For instant access turn it off in **Authentication → Providers → Email**. (Supabase's
    built-in mailer is rate-limited to a handful of messages per hour — set up SMTP before
    inviting a squad's worth of people.)
-3. **Google.** Not enabled yet: the button explains that instead of failing. To turn it on,
-   create an OAuth client in the Google Cloud console with
-   `https://<project-ref>.supabase.co/auth/v1/callback` as the authorised redirect URI, then
-   paste its Client ID + Secret into **Authentication → Providers → Google**.
+3. **Session length.** *Authentication → Sessions* is left at Supabase's default — no
+   inactivity timeout and no time-box — which is what keeps people signed in until they
+   choose to sign out. Setting either of those would start expiring sessions on its own.
 
 Anonymous sign-in stays enabled — [`cloud-sync.js`](cloud-sync.js) falls back to it only
 when there is no account session, and an anonymous session never opens the gate.
@@ -80,8 +100,9 @@ out of order); the Stats General tab (which swaps collapse into one x2 / x3 time
 and the bench listed under each formation); the Stats Distribution tab (the take-ons &
 step-ins map, the row it shares with the cross map, and who the touch map lists per half);
 and the sign-in gate in [`auth.js`](auth.js) (who gets in, an anonymous session never
-counting as an account, the page you were turned away from coming back, and `next` refusing
-to be an open redirect).
+counting as an account, a session past its expiry still getting in, the page you were turned
+away from coming back, `next` refusing to be an open redirect, the password rules, and the
+sign-in screen carrying what a password manager needs).
 `tests/` is not part of the deployed site.
 
 ## Real-time cloud sync (Supabase)
