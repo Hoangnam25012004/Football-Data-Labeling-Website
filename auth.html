@@ -154,19 +154,35 @@
   }
 
   /* ---------- let the browser keep the credentials ----------
-     The form already carries username/current-password/new-password, which is what
-     password managers read. This asks outright as well, so Chrome and Edge raise their
-     "Save password?" prompt on the spot rather than guessing from the navigation that
-     follows — and after signing out the fields come back filled in. Browsers without the
-     API (Firefox, Safari) ignore it and fall back to the form, which still works. */
+     A browser decides whether to offer to save from what it sees between a login form
+     being submitted and the page going away. Measured, that gap here was 22ms: the login
+     succeeded and we were already gone, so no prompt ever appeared and nothing was ever
+     saved. Everything below buys the browser that moment.
+
+     Two routes, because neither is reliable alone. credentials.store() asks outright,
+     which Chrome and Edge answer with their own "Save password?" bubble — but it is
+     absent or refused in some builds (this very page logs NotSupportedError in a
+     stripped-down Chromium). The fallback is the form itself: a login form left standing
+     in the DOM with its values, followed by a navigation to a page that has no login
+     form, is what every password manager reads as "that worked". Both need us to wait. */
+  const SETTLE_MS = 1200;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
   async function remember(email, pw, name) {
     try {
       if (window.PasswordCredential && navigator.credentials && navigator.credentials.store)
         await navigator.credentials.store(new window.PasswordCredential({
           id: email, password: pw, name: name || email
         }));
-    } catch (e) { /* declined or unsupported — the form's autocomplete tokens still apply */ }
+    } catch (e) { /* absent or declined — the form left standing is the fallback */ }
   }
+
+  /* The email address only, and never the password: a password we stored would sit in
+     localStorage in the clear, readable by any script on this origin. Keeping it is the
+     browser's job. This just means the address is already there after a sign-out. */
+  const LAST_EMAIL = 'pitchtagger.auth.email';
+  const rememberEmail = e => { try { localStorage.setItem(LAST_EMAIL, e); } catch (x) {} };
+  const lastEmail = () => { try { return localStorage.getItem(LAST_EMAIL) || ''; } catch (x) { return ''; } };
 
   /* ---------- the switch ----------
      Whichever form is hidden keeps its values; carrying the email across means switching
@@ -260,6 +276,7 @@
          offer to save the password now: it is the one they will sign in with afterwards,
          and carry it into the sign-in form so it is waiting for them. */
       if (!data.session) {
+        rememberEmail(email);
         await remember(email, pw, name);
         working(false);
         setMode('in');
@@ -275,13 +292,19 @@
   });
 
   /* The gate on the app pages reads the session out of localStorage, so only forward once
-     it is actually readable there — otherwise the two would bounce the user back and forth.
-     The save prompt goes up before the redirect, while this page still owns the form. */
+     it is actually readable there — otherwise the two would bounce the user back and forth. */
   async function land(email, pw, name) {
-    if (email) await remember(email, pw, name);
-    if (PTAuth.user()) return go();
-    working(false);
-    say('Signed in, but this browser is not keeping the session.\nAllow cookies / site data for this site (private windows block it) and try again.', 'bad');
+    if (email) { rememberEmail(email); await remember(email, pw, name); }
+    if (!PTAuth.user()) {
+      working(false);
+      return say('Signed in, but this browser is not keeping the session.\nAllow cookies / site data for this site (private windows block it) and try again.', 'bad');
+    }
+    /* Only after someone actually filled the form — arriving with a session already in
+       hand has nothing to save, and should not be made to wait. The form is deliberately
+       left standing, values and all, for as long as this takes: clearing it or navigating
+       straight away is exactly what stopped the browser offering to save. */
+    if (email) { working(false); say('Signed in ✓ — opening the app…', 'ok'); await wait(SETTLE_MS); }
+    go();
   }
 
   /* ---------- on load ---------- */
@@ -309,8 +332,14 @@
       say(explain({ message: p.get('error_description') || p.get('error') || 'That link is no longer valid.' }), 'bad');
     }
     /* Deliberately no focus() here: Chrome fills a saved login as the page settles, and
-       grabbing focus mid-fill can throw the fill away. An empty form is one click from
-       being typed into anyway. */
+       grabbing focus mid-fill can throw the fill away.
+
+       Same reason this waits and then checks the box is still empty — the browser's own
+       fill always wins, and this only steps in when there was none, so the address is at
+       least already there after a sign-out. */
+    await wait(600);
+    const box = $('siEmail');
+    if (!box.value && document.activeElement !== box) box.value = lastEmail();
   })();
 })();
 </script>

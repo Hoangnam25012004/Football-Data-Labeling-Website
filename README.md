@@ -45,6 +45,19 @@ prompt there and then rather than inferring it from the redirect that follows; F
 Safari have no such API and fall back to the tokens, which they read the same way. Nothing
 here touches our storage — the site never keeps a password.
 
+The other half is timing, and it is the part that actually bit. A browser decides whether
+to offer to save from what it sees between the form being submitted and the page going
+away; measured on the real page that gap was **22ms**, so no prompt ever appeared and
+nothing was ever saved. A successful sign-in now says *Signed in ✓* and holds the page for
+`SETTLE_MS` before leaving, with the form still standing and its values intact — the state
+every password manager reads as a login that worked. Arriving with a session already in
+hand skips the wait; a wrong password never reaches it.
+
+Belt and braces, the **email address** (never the password) is kept in `localStorage` and
+put back on the sign-in form after a sign-out — but only if the browser did not fill the
+form itself, so its own autofill always wins. A password in `localStorage` would be
+readable by any script on the origin, which is why keeping one stays the browser's job.
+
 The accounts live in **Supabase Auth**, the project the app already syncs to, so there is
 still no backend of our own. [`auth.js`](auth.js) is the gate: every page loads it, and it
 decides — synchronously, from the session supabase-js keeps in `localStorage` — whether to

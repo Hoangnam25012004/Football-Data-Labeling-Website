@@ -316,6 +316,40 @@ test('and the browser is asked outright as well', () => {
   notOk(/\$\('siEmail'\)\.focus\(\)/.test(html),'nothing grabs focus mid-autofill');
 });
 
+/* Measured on the real page: submit -> Supabase replied -> gone, in 22ms. A browser decides
+   whether to offer to save from what happens between the submit and the page going away,
+   and 22ms is not a chance. This is the fix, so it must not quietly regress. */
+const landFn=/async function land\([\s\S]*?\n  \}/.exec(AUTH_HTML)[0];
+
+test('a successful sign-in holds the page open before leaving', () => {
+  const settle=/const SETTLE_MS = (\d+)/.exec(AUTH_HTML);
+  ok(settle,'there is a settle delay at all');
+  ok(+settle[1]>=800,'and it is long enough to be a chance, not a formality — got '+settle[1]+'ms');
+  ok(/await wait\(SETTLE_MS\)[\s\S]{0,40}go\(\)/.test(landFn),'it is waited out before navigating');
+});
+
+test('the form is still standing, filled, while that happens', () => {
+  // clearing the boxes or tearing the form down is exactly what stops a manager saving
+  notOk(/\$\('siPassword'\)\.value = ''/.test(AUTH_HTML),'the password box is never blanked');
+  notOk(/signInForm[\s\S]{0,40}remove\(\)/.test(AUTH_HTML),'and the form is never removed');
+});
+
+test('arriving already signed in is not made to wait', () => {
+  ok(/if \(email\) \{ working\(false\); say\([\s\S]{0,60}await wait\(SETTLE_MS\)/.test(landFn),
+     'the delay is behind the "someone actually typed" check');
+  ok(/land\(\)/.test(AUTH_HTML),'boot calls it with no email, so it goes straight through');
+});
+
+test('the email comes back on its own, and the password never does', () => {
+  const html=page('auth.html');
+  ok(/localStorage\.setItem\(LAST_EMAIL/.test(html),'the address is kept');
+  ok(/!box\.value && document\.activeElement !== box/.test(html),
+     'but only filled in when the browser did not, and not under the cursor');
+  // a password in localStorage is readable by any script on the origin — never ours to keep
+  notOk(/setItem\([^)]*pw\b/.test(html),'the password is never written to storage');
+  notOk(/LAST_EMAIL[\s\S]{0,80}password/i.test(html),'nor smuggled in beside the address');
+});
+
 /* ================= the site speaks English ================= */
 const VIETNAMESE=/[ăâđêôơưĂÂĐÊÔƠƯàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụỳýỷỹỵ]/;
 
