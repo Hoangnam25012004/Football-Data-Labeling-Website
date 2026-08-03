@@ -308,9 +308,9 @@
     <button class="ev-btn" id="durBtn" title="Map original video times to the real match timeline">⏱ Duration</button>
     <button class="ev-btn" id="cloudBtn" title="Real-time cloud sync — share a match with others">☁ Cloud</button>
     <button class="ev-btn" id="lineupBtn" title="Player lists, starting XI, subs & formation">👥 Player lists</button>
-    <div id="homeName" class="team-name" title="Tên đội lấy từ database (bảng teams) — tạo/chọn đội khi tạo trận, không sửa tại đây">Home</div>
+    <div id="homeName" class="team-name" title="Team name comes from the database (teams table) — pick or create the teams when you create the match; it cannot be edited here">Home</div>
     <span class="score" id="scoreBoard" title="Goals — auto-counted from tagged events"><b class="sc-h">0</b><span class="sc-dash">-</span><b class="sc-a">0</b></span>
-    <div id="awayName" class="team-name" title="Tên đội lấy từ database (bảng teams) — tạo/chọn đội khi tạo trận, không sửa tại đây">Away</div>
+    <div id="awayName" class="team-name" title="Team name comes from the database (teams table) — pick or create the teams when you create the match; it cannot be edited here">Away</div>
     <select id="sportSel" class="txt" style="width:auto">
       <option value="football">⚽ Football (11)</option>
       <option value="football7">⚽ Football (7)</option>
@@ -337,9 +337,9 @@
     </div>
     <input type="file" id="fileInput" accept="video/*" style="display:none">
     <div class="controls" id="controls" style="display:none">
-      <span>Tốc độ phát <b id="ctlRate">1.0</b> <span class="dim">(+ / − : ±0.1)</span></span>
+      <span>Speed <b id="ctlRate">1.0</b> <span class="dim">(+ / − : ±0.1)</span></span>
       <span><span id="ctlPP">▶</span> <span class="tcode" id="tcode">00:00.00</span></span>
-      <span class="ctl-hints">Space ⏯ · ←/→ ±2s · . / ±0.2s · Tab đổi đội · Giữ Shift: sân · Esc xoá dot</span>
+      <span class="ctl-hints">Space ⏯ · ←/→ ±2s · . / ±0.2s · Tab switch team · Hold Shift: pitch · Esc clear dot</span>
     </div>
     <div id="formationPanel">
       <div id="fmSubs"></div>
@@ -477,9 +477,9 @@
       <div id="cloudConnected" style="display:none;margin-top:14px">
         <div style="border-top:1px solid var(--line);padding-top:12px">
           <div class="ev-backup">
-            <button id="cloudCreate" title="Tạo trận đấu mới — chọn 2 đội từ database">＋ Tạo trận đấu mới</button>
+            <button id="cloudCreate" title="New match — pick both teams from the database">＋ New match</button>
           </div>
-          <label class="fld" style="margin-top:10px"><span>Match ID <span class="mini">— nhập code 5 số để xem thông tin trận</span></span></label>
+          <label class="fld" style="margin-top:10px"><span>Match ID <span class="mini">— type the 5-digit code to preview the match</span></span></label>
           <div class="addrow">
             <input class="txt" id="cloudMatchId" placeholder="e.g. 12345" inputmode="numeric" autocomplete="off">
             <button id="cloudJoin" title="join">↪</button>
@@ -488,8 +488,8 @@
         </div>
       </div>
       <div class="syntax-hint" style="margin-top:12px">
-        Một người bấm <b>Tạo trận đấu mới</b> rồi chia sẻ link (hoặc Match ID). Ai mở link sẽ thấy
-        tag của nhau theo thời gian thực. Sự kiện lưu vào Supabase (video giữ ở máy).
+        One person presses <b>＋ New match</b> and shares the link (or the Match ID). Everyone who opens
+        it sees each other's tags live. Events are stored in Supabase (the video stays on your machine).
       </div>
     </div>
   </div>
@@ -497,7 +497,7 @@
 <div class="modal-overlay" id="matchModal">
   <div class="modal">
     <div class="modal-head">
-      <b>Tạo trận đấu mới</b>
+      <b>New match</b>
       <button class="modal-close" id="matchModalClose" title="Close">×</button>
     </div>
     <div class="modal-body">
@@ -505,7 +505,7 @@
         <div class="nm-side">
           <label class="fld"><span>Home</span></label>
           <div class="nm-box">
-            <input class="txt" id="nmHome" placeholder="Nhập tên đội" autocomplete="off">
+            <input class="txt" id="nmHome" placeholder="Type a team name" autocomplete="off">
             <div class="nm-sug" id="nmHomeSug"></div>
           </div>
           <button class="nm-new" id="nmHomeNew" style="display:none">＋ New team</button>
@@ -514,18 +514,18 @@
         <div class="nm-side">
           <label class="fld"><span>Away</span></label>
           <div class="nm-box">
-            <input class="txt" id="nmAway" placeholder="Nhập tên đội" autocomplete="off">
+            <input class="txt" id="nmAway" placeholder="Type a team name" autocomplete="off">
             <div class="nm-sug" id="nmAwaySug"></div>
           </div>
           <button class="nm-new" id="nmAwayNew" style="display:none">＋ New team</button>
         </div>
       </div>
-      <label class="fld" style="margin-top:10px"><span>Ngày diễn ra trận đấu</span></label>
+      <label class="fld" style="margin-top:10px"><span>Match date</span></label>
       <input class="txt" type="date" id="nmDate">
       <button class="addbtn" id="nmCreate">Register</button>
       <div class="syntax-hint" style="margin-top:10px">
-        Gõ tên đội để tìm trong database — chọn đội từ danh sách gợi ý. Nếu <b>không có gợi ý</b>,
-        đội chưa tồn tại trong database: bấm <b>＋ New team</b> để lưu đội mới rồi mới tạo được trận.
+        Type a team name to search the database — pick the team from the suggestions. <b>No suggestions</b>
+        means the team is not in the database yet: press <b>＋ New team</b> to save it before creating the match.
       </div>
     </div>
   </div>
@@ -923,7 +923,7 @@ function renderFormationMain(){
   pit.innerHTML=pitchSVG('football');
   if(!state.teamIds.matchId){
     const el=$('fmSubs');
-    if(el)el.innerHTML='<span class="fm-sub-empty">Chưa mở trận đấu — vào ☁ Cloud để tạo hoặc join một match, đội hình sẽ hiện ở đây.</span>';
+    if(el)el.innerHTML='<span class="fm-sub-empty">No match open — use ☁ Cloud to create or join one, and the line-ups will appear here.</span>';
     return;
   }
   const flip=+($('halfSel')&&$('halfSel').value||1)===2;   // teams swap ends at half-time
@@ -1245,7 +1245,7 @@ function makeSeekBar(doc){
   lbl.textContent='00:00 / 00:00';
   const mute=doc.createElement('span');
   mute.style.cssText='flex:none;cursor:pointer;font-size:13px;line-height:1';
-  mute.textContent='🔊'; mute.title='Bật/tắt tiếng';
+  mute.textContent='🔊'; mute.title='Mute / unmute';
   mute.onclick=()=>{video.muted=!video.muted;mute.textContent=video.muted?'🔇':'🔊';};
   bar.appendChild(track);bar.appendChild(lbl);bar.appendChild(mute);
   const pct=e=>{const r=track.getBoundingClientRect();return r.width?Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)):0;};
@@ -1307,10 +1307,10 @@ function openVideoWindow(){
   const bar=d.getElementById('pv-bar');
   bar.style.cssText='display:flex;align-items:center;gap:16px;padding:3px 12px;background:#0d1117;color:#8b97a7;border-top:1px solid #2a3240;font-size:11px;white-space:nowrap;overflow:hidden;flex:none';
   bar.innerHTML=
-    '<span>Tốc độ phát <b id="pv-rate-lbl" style="color:#39d98a;font-variant-numeric:tabular-nums">1.0</b> <span style="opacity:.75">(+ / − : ±0.1)</span></span>'+
+    '<span>Speed <b id="pv-rate-lbl" style="color:#39d98a;font-variant-numeric:tabular-nums">1.0</b> <span style="opacity:.75">(+ / − : ±0.1)</span></span>'+
     '<span><span id="pv-pp" style="color:#e6edf3">▶</span> <b id="pv-tc" style="color:#39d98a;font-variant-numeric:tabular-nums">00:00.00</b></span>'+
     '<span>Entry <b id="pv-entry" style="color:#e6edf3;font-variant-numeric:tabular-nums">…</b></span>'+
-    '<span style="margin-left:auto;opacity:.85">Space ⏯ · ←/→ ±2s · . / ±0.2s · Tab đổi đội · Giữ Shift: sân · Esc xoá dot</span>';
+    '<span style="margin-left:auto;opacity:.85">Space ⏯ · ←/→ ±2s · . / ±0.2s · Tab switch team · Hold Shift: pitch · Esc clear dot</span>';
   // custom seek bar between the video and the caption bar (native controls are gone)
   const pvSeek=makeSeekBar(d);
   d.body.insertBefore(pvSeek.el,bar);
@@ -1679,7 +1679,7 @@ function submitEntry(){
   // per pair — at the position of the player COMING OFF (gives time + spot).
   const allSubs=evs.length>0&&evs.every(e=>e.name==='substitution');
   if(!allSubs&&evs.some(e=>e.name==='substitution')){
-    alert('Không trộn substitution với event khác trong một lần nhập.');return}
+    alert('Do not mix a substitution with other events in one entry.');return}
   const last=evs[evs.length-1];
   const needExtra=(!allSubs&&last&&!last.to&&TRAILING_EXTRA_DOT.has(last.name))?1:0;
   const need=touches+needExtra;
@@ -1687,10 +1687,10 @@ function submitEntry(){
   // pitch — a card's dot marks where the card was shown / the foul that earned it happened
   if(allSubs){
     if(dots.length!==0&&dots.length!==evs.length){
-      alert('Thay người: chấm '+evs.length+' dots tại vị trí cầu thủ bị thay RA (hoặc không chấm dot).');return}
+      alert('Substitution: place '+evs.length+' dot(s) where the player coming OFF was standing (or none at all).');return}
   }else if(touches>0&&dots.length!==need){
-    alert('Cần kiểm tra lại dots — cần '+need+' dots: '+touches+' lần chạm bóng'
-      +(needExtra?' + 1 dot tại thời điểm đối phương đoạt bóng':'')+'.');return}
+    alert('Check the dots — '+need+' needed: '+touches+' touch(es)'
+      +(needExtra?' + 1 dot where the opponent won the ball':'')+'.');return}
   const wasEditing=!!state.editingId||!!state.editingGroup;
   // A single-event edit that STAYS a single event updates the row in place (keeps its id).
   // Anything else while editing — a single event that becomes a chain (e.g. 1s2 -> 1s2m /
@@ -1723,7 +1723,7 @@ function submitEntry(){
     });
     subPlan=planSubGroup(state.team,pairs,Math.min(...pairs.map(s=>s.t)),subSideEffects(replacedSubs).hist);
     if(subPlan.errors.length){
-      alert('Thay người không hợp lệ — chưa ghi nhận gì:\n\n• '+subPlan.errors.join('\n• '));return}
+      alert('Invalid substitution — nothing was recorded:\n\n• '+subPlan.errors.join('\n• '));return}
     subPlan.pairs.forEach((p,k)=>{evs[k].from=p.out;evs[k].to=p.in;});
   }
   if(state.editingGroup||(state.editingId&&!editInPlace)){
@@ -1783,8 +1783,8 @@ function submitEntry(){
   redRows.forEach(r=>{if(applyRedCard(r.team,r.playerFrom,r.t))redOut.push(r.playerFrom);});
   if(redOut.length||replacedReds.length){
     saveLineups();
-    if(redOut.length)toast('🟥 No.'+redOut.join(', ')+' rời sân — đội hình còn '
-      +effectiveLU(redRows[0].team,redRows[0].t).xi.length+' người');
+    if(redOut.length)toast('🟥 No.'+redOut.join(', ')+' sent off — '
+      +effectiveLU(redRows[0].team,redRows[0].t).xi.length+' players left on');
   }
   // an edit switched the team buttons to the row's side — go back to where the user was
   if(wasEditing&&editPrevTeam){setTeam(editPrevTeam);editPrevTeam=null;}
@@ -1827,24 +1827,24 @@ function planSubGroup(team,pairs,t0,hist0){
   // no starting XI entered for this team yet: nothing to validate against and nothing
   // sensible to draw, so the events are still tagged and the formation is left alone
   if(!onPitch.length)return {pairs:[],errors:[],notices:
-    ['Chưa có đội hình xuất phát cho đội này — event đã lưu, formation giữ nguyên'],noLineup:true};
+    ['No starting XI for this team yet — the event is saved, the formation is unchanged'],noLineup:true};
   const at=fmt(matchTime(t0));
   pairs.forEach((p,k)=>{
-    const tag=pairs.length>1?('Cặp '+(k+1)+': '):'';
+    const tag=pairs.length>1?('Pair '+(k+1)+': '):'';
     const o0=String(p.out==null?'':p.out).trim(), i0=String(p.in==null?'':p.in).trim();
     let o=o0, i=i0;
-    if(!o||!i){errors.push(tag+'thiếu số áo — cú pháp là <RA>sub<VÀO>.');return}
-    if(numEq(o,i)){errors.push(tag+'No.'+o+' không thể thay cho chính mình.');return}
+    if(!o||!i){errors.push(tag+'a shirt number is missing — the syntax is <OFF>sub<ON>.');return}
+    if(numEq(o,i)){errors.push(tag+'No.'+o+' cannot be substituted for themselves.');return}
     const oOn=onPitch.includes(o), iOn=onPitch.includes(i);
-    if(!oOn&&iOn){o=i0;i=o0;notices.push('đảo chiều '+o0+'▼'+i0+'▲ → '+o+'▼'+i+'▲');}
-    else if(!oOn&&!iOn){errors.push(tag+'No.'+o+' không có trên sân lúc '+at+' (No.'+i+' cũng không) — kiểm tra lại số áo.');return}
-    else if(oOn&&iOn){errors.push(tag+'No.'+o+' và No.'+i+' đều đang trên sân lúc '+at+' — không thể thay cho nhau.');return}
+    if(!oOn&&iOn){o=i0;i=o0;notices.push('swapped round '+o0+'▼'+i0+'▲ → '+o+'▼'+i+'▲');}
+    else if(!oOn&&!iOn){errors.push(tag+'No.'+o+' was not on the pitch at '+at+' (nor was No.'+i+') — check the shirt numbers.');return}
+    else if(oOn&&iOn){errors.push(tag+'No.'+o+' and No.'+i+' were both on the pitch at '+at+' — neither can replace the other.');return}
     const dup=[o,i].find(n=>seen.has(n));
-    if(dup){errors.push(tag+'No.'+dup+' xuất hiện hai lần trong cùng một lần nhập.');return}
+    if(dup){errors.push(tag+'No.'+dup+' appears twice in the same entry.');return}
     seen.add(o); seen.add(i);
     onPitch.splice(onPitch.indexOf(o),1); onPitch.push(i);   // later pairs see the earlier ones
     if(lu.roster&&!lu.roster.some(r=>numEq(r.no,i)))
-      notices.push('No.'+i+' chưa có trong danh sách đăng ký — thêm ở Player lists');
+      notices.push('No.'+i+' is not in the registered squad — add them in Player lists');
     out.push({...p,out:o,in:i});
   });
   return {pairs:out,errors,notices};
@@ -1885,7 +1885,7 @@ function applySubGroup(team,subsArr,notices){
     (lu.subHistory=lu.subHistory||[]).push({out:String(s.out),in:String(s.in),t:s.t}); // minutes played
     done.push(s);
   });
-  if(!done.length){toast('⚠ Không ghi nhận được thay người nào — formation giữ nguyên');return false}
+  if(!done.length){toast('⚠ No substitution was recorded — the formation is unchanged');return false}
   (state.lineups.history=state.lineups.history||[]).push({
     t:t0, team, xi, subs:bench,
     label:'Substitution: '+done.map(s=>s.out+'▼ '+s.in+'▲').join(', ')});
@@ -2219,7 +2219,7 @@ function startEditGroup(grpRows){
   if(pvSyncEntry)pvSyncEntry();
   renderTable();
   if(document.hasFocus())$('playerInput').focus();
-  toast('Editing chuỗi — chỉnh & Enter (chuỗi cũ sẽ được thay bằng chuỗi mới)');
+  toast('Editing the chain — change it and press Enter (the old chain is replaced)');
 }
 function cancelEdit(){                     // leave edit mode without changing the row(s)
   if(!state.editingId&&!state.editingGroup)return;
@@ -2710,10 +2710,11 @@ function teamStatsSheet(){
   return ws;
 }
 
-/* ===================== TẠO TRẬN ĐẤU MỚI (teams từ database) =====================
-   Home/Away là ô nhập text có gợi ý từ bảng teams. Không có gợi ý = đội chưa tồn tại
-   trong database -> phải bấm ＋ New team để lưu đội trước, rồi mới tạo được trận. */
-const nmSel={home:null,away:null};        // team đã chọn {id,name} cho từng bên
+/* ===================== NEW MATCH (teams come from the database) =====================
+   Home/Away are text boxes that suggest from the teams table. No suggestion means the
+   team is not in the database yet -> ＋ New team has to save it before a match can be
+   created with it. */
+const nmSel={home:null,away:null};        // the team chosen for each side, {id,name}
 function nmTeams(){return (window.Cloud&&window.Cloud.teams)||[];}
 function nmBind(side){
   const cap=side==='home'?'Home':'Away';
@@ -2730,7 +2731,7 @@ function nmBind(side){
           sug.style.display='none';nb.style.display='none';};
         sug.appendChild(d);});
       sug.style.display='block';
-    }else nb.style.display='block';   // đội chưa có trong database
+    }else nb.style.display='block';   // the team is not in the database yet
   };
   inp.addEventListener('input',render);
   inp.addEventListener('focus',render);
@@ -2746,7 +2747,7 @@ function nmBind(side){
     const t=await window.Cloud.createTeam(name);
     nb.disabled=false;
     if(t){nmSel[side]=t;inp.value=t.name;inp.classList.add('nm-ok');nb.style.display='none';
-      toast('Đã lưu team "'+t.name+'" vào database ✓');}
+      toast('Saved team "'+t.name+'" to the database ✓');}
   };
 }
 function openMatchModal(){
@@ -2763,21 +2764,21 @@ $('matchModalClose').onclick=closeMatchModal;
 $('matchModal').addEventListener('click',e=>{if(e.target===$('matchModal'))closeMatchModal();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('matchModal').classList.contains('show')){e.preventDefault();closeMatchModal();}});
 $('nmCreate').onclick=async()=>{
-  if(!nmSel.home||!nmSel.away){alert('Chọn đội Home và Away từ danh sách gợi ý.\n(Không có gợi ý? Bấm ＋ New team để lưu đội vào database trước.)');return;}
-  if(nmSel.home.id===nmSel.away.id){alert('Home và Away phải là hai đội khác nhau.');return;}
+  if(!nmSel.home||!nmSel.away){alert('Pick the Home and Away teams from the suggestions.\n(No suggestions? Press ＋ New team to save the team to the database first.)');return;}
+  if(nmSel.home.id===nmSel.away.id){alert('Home and Away must be two different teams.');return;}
   $('nmCreate').disabled=true;
   const ok=await window.Cloud.createMatchWithTeams(nmSel.home.id,nmSel.away.id,$('nmDate').value||null);
   $('nmCreate').disabled=false;
-  if(ok){closeMatchModal();toast('Đã tạo trận đấu ✓');}
+  if(ok){closeMatchModal();toast('Match created ✓');}
 };
-/* card xem trước trận đấu khi nhập Match ID — click để mở trận */
+/* preview card shown while a Match ID is typed — click it to open that match */
 function renderMatchPreview(res){
   const box=$('matchPreview'); if(!box)return;
   if(!res){box.style.display='none';box.innerHTML='';return;}
-  if(res.notFound){box.innerHTML='<div class="mp-none">Không tìm thấy trận đấu với Match ID này.</div>';box.style.display='block';return;}
+  if(res.notFound){box.innerHTML='<div class="mp-none">No match found with that Match ID.</div>';box.style.display='block';return;}
   const m=res.row, d=m.match_date||((m.created_at||'').slice(0,10));
   const disp=d?d.split('-').reverse().join('/'):'—';
-  box.innerHTML=`<div class="mp-card" title="Click để mở trận đấu này">
+  box.innerHTML=`<div class="mp-card" title="Click to open this match">
     <div class="mp-top"><span class="mp-h">${m.home_name}</span><span class="mp-score">${res.score[0]} : ${res.score[1]}</span><span class="mp-a">${m.away_name}</span></div>
     <div class="mp-sub"><span>🕐 ${disp}</span><span>Match ID: <b style="color:var(--accent)">${m.code||m.id.slice(0,8)}</b></span></div></div>`;
   box.style.display='block';
@@ -2785,7 +2786,7 @@ function renderMatchPreview(res){
   box.querySelector('.mp-card').onclick=()=>{
     box.style.display='none';
     $('cloudModal').classList.remove('show');
-    toast('Đang mở trận #'+(m.code||m.id.slice(0,8))+'…');
+    toast('Opening match #'+(m.code||m.id.slice(0,8))+'…');
     window.Cloud.openMatch(m.code||m.id);
     $('playerInput').focus();
   };

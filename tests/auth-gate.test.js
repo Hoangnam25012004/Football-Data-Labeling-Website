@@ -262,6 +262,19 @@ test('so is everything the gate added to the main tab', () => {
   notOk(/Đăng xuất|tài khoản này/.test(html),'no Vietnamese left in the sign-out control');
 });
 
+/* Every file that is actually served. The alerts, toasts, tooltips and hints across the
+   Cloud modal, the new-match dialog and the substitution flow were Vietnamese; they are
+   English now, and this keeps them that way — including in the comments, so the next
+   person reading the source is not switching languages either. */
+test('and so is the rest of the site, file by file', () => {
+  ['index.html','cloud-sync.js','auth.html','auth.js','shared.js','shared.css',
+   'Stats/index.html','Stats/report.js','Player-Lists/index.html'].forEach(f=>{
+    const lines=page(f).split(/\r?\n/);
+    const bad=lines.map((l,i)=>VIETNAMESE.test(l)?(i+1)+': '+l.trim().slice(0,70):null).filter(Boolean);
+    eq(bad.length,0,f+' has Vietnamese left —\n      '+bad.join('\n      '));
+  });
+});
+
 test('the new files are staged for GitHub Pages', () => {
   const yml=page('.github/workflows/deploy.yml');
   // the site is assembled from an explicit list — a file left out of it is a 404, not a bug you see locally

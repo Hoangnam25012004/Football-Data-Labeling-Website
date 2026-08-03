@@ -70,7 +70,7 @@ test('reported case: second pair typed back-to-front is corrected, not dropped',
   ok(onPitch(a,t,'21'),'21 came on');
   eq(period(a,0).label,'Substitution: 7▼ 3▲, 13▼ 21▲','period label reads the right way round');
   eq(rowText(a),'7 substitution 3 | 13 substitution 21','the events table is corrected too');
-  ok(a.log.toasts.join(' ').includes('đảo chiều 21▼13▲ → 13▼21▲'),'the correction is announced');
+  ok(a.log.toasts.join(' ').includes('swapped round 21▼13▲ → 13▼21▲'),'the correction is announced');
 });
 
 test('a pair whose OUT player is not on the pitch can never inflate the XI', ()=>{
@@ -163,7 +163,7 @@ test('substitutions may not be mixed with other events', ()=>{
   const a=app(null,3000);
   submit(a,'7sub3s11');
   eq(a.state.rows.length,0);
-  ok(a.log.alerts[0].includes('Không trộn'));
+  ok(a.log.alerts[0].includes('Do not mix a substitution'));
 });
 
 /* ================= 4. three pairs / repeated windows ================= */

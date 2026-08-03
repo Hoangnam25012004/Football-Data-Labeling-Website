@@ -109,7 +109,7 @@ const CONFIG = {
     const { data: existing } = await sb.from('teams').select('id,name').ilike('name', name).maybeSingle();
     if (existing) { await loadTeams(); return existing; }
     const { data, error } = await sb.from('teams').insert({ name }).select().single();
-    if (error) { alert('Không tạo được team: ' + error.message); return null; }
+    if (error) { alert('Could not create the team: ' + error.message); return null; }
     await loadTeams();
     return data;
   }
@@ -169,11 +169,11 @@ const CONFIG = {
   // create the match for two DB team ids (verified on the DB right before insert)
   async function createMatchWithTeams(hId, aId, matchDate) {
     if (!connected && !(await connect())) return false;
-    if (!hId || !aId) { alert('Chọn đội Home và Away từ database trước.'); return false; }
-    if (hId === aId) { alert('Home và Away phải là hai đội khác nhau.'); return false; }
+    if (!hId || !aId) { alert('Pick the Home and Away teams from the database first.'); return false; }
+    if (hId === aId) { alert('Home and Away must be two different teams.'); return false; }
     const { data: teams, error: tErr } = await sb.from('teams').select('id,name').in('id', [hId, aId]);
     if (tErr || !teams || teams.length < 2) {
-      alert('Không xác thực được 2 teams trên database' + (tErr ? ': ' + tErr.message : '.'));
+      alert('Could not verify both teams in the database' + (tErr ? ': ' + tErr.message : '.'));
       await loadTeams(); return false;
     }
     const home = teams.find(t => t.id === hId), away = teams.find(t => t.id === aId);
@@ -403,7 +403,7 @@ const CONFIG = {
     $('cloudClose').onclick = () => $('cloudModal').classList.remove('show');
     $('cloudModal').addEventListener('click', (e) => { if (e.target === $('cloudModal')) $('cloudModal').classList.remove('show'); });
     $('cloudConnect').onclick = () => connect();
-    // "Tạo trận đấu mới" opens the create-match dialog (teams from the database)
+    // "＋ New match" opens the create-match dialog (teams from the database)
     $('cloudCreate').onclick = async () => {
       if (!connected && !(await connect())) return;
       await loadTeams();
