@@ -51,7 +51,7 @@
   .fm-dot .lbl{position:absolute;top:25px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600}
   /* position-zone grid (editor & display) */
   .pz{position:absolute;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:rgba(255,255,255,.55);box-sizing:border-box;border:1px solid rgba(255,255,255,.10);z-index:1;pointer-events:none}
-  .pz.red{background:rgba(150,40,40,.30)} .pz.green{background:rgba(40,95,52,.30)} .pz.blue{background:rgba(45,55,115,.32)} .pz.gold{background:rgba(120,100,40,.30)} .pz.none{background:transparent;border-color:transparent}
+  .pz.red{background:rgba(150,40,40,.30)} .pz.green{background:rgba(64,140,66,.32)} .pz.blue{background:rgba(45,55,115,.32)} .pz.gold{background:rgba(120,100,40,.30)} .pz.none{background:transparent;border-color:transparent}
   .pz-arrow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:26px;color:rgba(255,255,255,.45);z-index:2;pointer-events:none}
   video{width:100%;height:100%;object-fit:contain;display:block}
   .drop{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--panel2);border:2px dashed var(--line);color:var(--mut);cursor:pointer;text-align:center;flex-direction:column;gap:8px}
@@ -819,7 +819,7 @@ const FORMATION_GRID=[
   ['CF','CAM','CM','CDM','CB','GK'],
   ['LF','LW','LM','LWB','LB','']
 ];
-const PZ_COLORS=['red','green','green','blue','blue','gold']; // by canonical column
+const PZ_COLORS=['green','green','green','green','green','green']; // single grass-green zones
 // switching attacking direction rotates the map 180° -> flip BOTH columns and rows
 // (rows decide which flank is Right), else L/R roles invert for one direction.
 const effCol=(col,dir)=>dir==='lr'?5-col:col;
