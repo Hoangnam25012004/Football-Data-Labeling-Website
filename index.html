@@ -286,6 +286,15 @@
   .mp-score{color:var(--warn);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:14px}
   .mp-sub{display:flex;justify-content:space-between;color:var(--mut);font-size:11px;margin-top:6px}
   .mp-none{margin-top:10px;color:var(--mut);font-size:11px}
+  /* recent matches: the preview card, tightened up so five of them fit without scrolling */
+  .rc-card{margin-top:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;cursor:pointer}
+  .rc-card:hover{border-color:var(--accent)}
+  .rc-top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:700;font-size:12px}
+  .rc-top .rc-h{color:var(--home);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rc-top .rc-a{color:var(--away);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rc-vs{color:var(--mut);font-weight:600;font-size:10px;flex:none}
+  .rc-sub{display:flex;justify-content:space-between;color:var(--mut);font-size:10px;margin-top:4px}
+  .rc-sub b{color:var(--accent);font-weight:700}
   /* Duration modal */
   .dur-grid{display:flex;flex-direction:column;gap:9px}
   .dur-row{display:grid;grid-template-columns:130px 1fr auto;gap:8px;align-items:center}
@@ -529,6 +538,12 @@
           <button id="cloudJoin" title="join">↪</button>
         </div>
         <div id="matchPreview" style="display:none"></div>
+        <!-- the last five matches THIS account opened in this browser — filled by
+             renderRecentMatches() whenever ⚽ Match is opened -->
+        <div id="recentMatches" style="display:none">
+          <label class="fld" style="margin-top:12px"><span>Recent <span class="mini">— the last 5 matches you opened</span></span></label>
+          <div id="recentList"></div>
+        </div>
       </div>
       <div class="syntax-hint" style="margin-top:12px">
         One person presses <b>＋ New match</b> and shares the link (or the Match ID). Everyone who opens
@@ -2863,6 +2878,55 @@ function renderMatchPreview(res){
   };
 }
 
+/* ---- Recent matches: the last 5 THIS account opened ----
+   Kept per user id, so two people sharing a browser never see each other's list and
+   signing out does not wipe it — signing back in finds it again. It is a shortcut, not
+   a record: what is stored is only enough to draw the card and re-open the match, and
+   clicking one goes down the ordinary openMatch path, which loads everything fresh.
+   Browser-local, so it does not follow the account to another machine — that would need
+   a visits table in the database. */
+const RECENT_KEY='pitchtagger.recent.v1', RECENT_MAX=5;
+// team names are user input and land in innerHTML below (shared.js has the same helper,
+// but only the sub-pages load that file)
+const escHtml=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const recentUser=()=>{const u=window.PTAuth&&window.PTAuth.user();return u?u.id:null;};
+function recentAll(){try{const o=JSON.parse(localStorage.getItem(RECENT_KEY));return (o&&typeof o==='object')?o:{};}catch(e){return {};}}
+function recentMatches(){const uid=recentUser();if(!uid)return [];const l=recentAll()[uid];return Array.isArray(l)?l:[];}
+/* Called from cloud-sync's openMatchRow — the one place every route into a match passes
+   through (a typed code, the preview card, a #match= link, and a match just created). */
+function rememberMatch(row){
+  const uid=recentUser(); if(!uid||!row||!row.id)return;
+  const entry={id:row.id,code:row.code||null,home:row.home_name||'Home',away:row.away_name||'Away',
+    date:row.match_date||((row.created_at||'').slice(0,10))||null,at:Date.now()};
+  const all=recentAll();
+  // most recent first, and a match already in the list moves up rather than repeating
+  all[uid]=[entry].concat(recentMatches().filter(m=>m.id!==row.id)).slice(0,RECENT_MAX);
+  try{localStorage.setItem(RECENT_KEY,JSON.stringify(all));}catch(e){}
+}
+function renderRecentMatches(){
+  const box=$('recentMatches'), list=$('recentList'); if(!box||!list)return;
+  const items=recentMatches().filter(m=>m&&m.id);
+  box.style.display=items.length?'block':'none';
+  if(!items.length){list.innerHTML='';return;}
+  // team names come from user input and land in innerHTML — escaped on the way in
+  list.innerHTML=items.map(m=>{
+    const code=m.code||String(m.id).slice(0,8);
+    const disp=m.date?String(m.date).split('-').reverse().join('/'):'—';
+    return `<div class="rc-card" data-open="${escHtml(code)}" title="Click to open this match">
+      <div class="rc-top"><span class="rc-h">${escHtml(m.home)}</span><span class="rc-vs">vs</span><span class="rc-a">${escHtml(m.away)}</span></div>
+      <div class="rc-sub"><span>🕐 ${escHtml(disp)}</span><span>Match ID: <b>${escHtml(code)}</b></span></div></div>`;
+  }).join('');
+  list.querySelectorAll('.rc-card').forEach(card=>{card.onclick=()=>{
+    const code=card.dataset.open;
+    $('matchHub').classList.remove('show');
+    toast('Opening match #'+code+'…');
+    window.Cloud.openMatch(code);
+    $('playerInput').focus();
+  };});
+}
+// ⚽ Match is opened by cloud-sync's own handler; this only adds the list to it
+if($('matchBtn'))$('matchBtn').addEventListener('click',renderRecentMatches);
+
 // Opening the site WITHOUT a #match= link means no match is open -> drop the leftover
 // match link and show no formation. The STORED lineups are deliberately left alone: they
 // stay stamped with the match they belong to, so re-opening that match picks them up
@@ -2914,8 +2978,8 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
 })();
 
 // bridge for the cloud-sync module (loaded next)
-window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview};
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
 </script>
-<script src="cloud-sync.js?v=44"></script>
+<script src="cloud-sync.js?v=45"></script>
 </body>
 </html>

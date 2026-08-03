@@ -150,6 +150,12 @@ viewing the same match (video stays local — only event metadata is stored).
    `CONFIG` at the top of [`cloud-sync.js`](cloud-sync.js). The anon key is public and safe
    to commit — access is protected by Row-Level Security.
 
+**Recent matches.** Under the Match ID box, **⚽ Match** lists the last 5 matches *this
+account* opened — click one to go straight back in. It is kept in `localStorage` under the
+signed-in user's id, so two people sharing a browser never see each other's, and signing
+out does not wipe it. Being browser-local, it does not follow the account to another
+machine; that would need a visits table in the database.
+
 **Using it:**
 - Click **☁ Cloud** → Connect (enter URL + anon key if not baked into `CONFIG`).
 - **New shared match** → copy the link and send it to collaborators.

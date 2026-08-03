@@ -225,6 +225,9 @@ const CONFIG = {
   async function openMatchRow(row) {
     const switchingMatch = matchId && matchId !== row.id;   // opening a DIFFERENT match
     matchId = row.id; matchCode = row.code || '';
+    // every route into a match comes through here — a typed code, the preview card, a
+    // #match= link, and a match just created — so this is where "recently opened" is kept
+    if (PT().rememberMatch) PT().rememberMatch(row);
     if ($('cloudMatchId')) $('cloudMatchId').value = matchCode || matchId;
     setTeamInputs(row.home_name, row.away_name);   // load this match's team names
     // link this session to the match (+ its teams) so Player-Lists loads the DB roster
