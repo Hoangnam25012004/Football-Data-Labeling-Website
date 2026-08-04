@@ -389,7 +389,11 @@
       </div>
 
       <label class="fld" style="margin-top:10px"><span>Enter event</span></label>
-      <input class="txt" id="playerInput" placeholder="e.g. 1s2  ·  1s2s3s4  ·  1k*c2  ·  1xx*aa" autofocus>
+      <!-- autocomplete="off": the browser was keeping every entry ever typed here and
+           offering them back as a native dropdown on click — hundreds of shorthands like
+           "1s2", "2sub3", "v", covering the events table underneath while tagging. Nothing
+           in the app drew that list, and nothing in the app can dismiss it. -->
+      <input class="txt" id="playerInput" placeholder="e.g. 1s2  ·  1s2s3s4  ·  1k*c2  ·  1xx*aa" autocomplete="off" autofocus>
     </div>
 
     <div class="tbl-head">
