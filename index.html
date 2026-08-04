@@ -297,12 +297,18 @@
   .rc-sub b{color:var(--accent);font-weight:700}
   /* Duration modal */
   .dur-grid{display:flex;flex-direction:column;gap:9px}
-  .dur-row{display:grid;grid-template-columns:130px 1fr auto;gap:8px;align-items:center}
+  /* fourth column: the ▶ Go to button that sends the video to the time in the field.
+     The shared 520px modal is 9px short of holding it, so this one gets a little more —
+     only this one, so every other modal keeps the width it had. */
+  #durModal .modal{max-width:580px}
+  .dur-row{display:grid;grid-template-columns:130px 1fr auto auto;gap:8px;align-items:center}
   .dur-row>label{color:var(--mut);font-size:12px}
   .dur-row input.t{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 8px;font-size:13px;font-variant-numeric:tabular-nums}
   .dur-row input.t:focus{outline:none;border-color:var(--accent)}
-  .dur-now{background:var(--panel2);border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap}
-  .dur-now:hover{border-color:var(--accent);color:var(--accent)}
+  /* two classes, one look — the JS binds .dur-now and .dur-go separately, so they must
+     not share a class or each handler would pick up the other's buttons */
+  .dur-now,.dur-go{background:var(--panel2);border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap}
+  .dur-now:hover,.dur-go:hover{border-color:var(--accent);color:var(--accent)}
   .dur-sec{color:var(--accent);font-weight:700;font-size:12px;margin:6px 0 2px}
   .dur-enable{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mut)}
   /* General (team comparison) view */
@@ -473,22 +479,26 @@
           <label>Kick-off</label>
           <input class="t" id="durH1Start" placeholder="mm:ss">
           <button class="dur-now" data-now="durH1Start">⏱ Use current</button>
+          <button class="dur-go" data-go="durH1Start" title="Move the video to this time">▶ Go to</button>
         </div>
         <div class="dur-row">
           <label>Half-time whistle</label>
           <input class="t" id="durH1End" placeholder="mm:ss">
           <button class="dur-now" data-now="durH1End">⏱ Use current</button>
+          <button class="dur-go" data-go="durH1End" title="Move the video to this time">▶ Go to</button>
         </div>
         <div class="dur-sec">Half 2 (original video time)</div>
         <div class="dur-row">
           <label>2nd-half kick-off</label>
           <input class="t" id="durH2Start" placeholder="mm:ss">
           <button class="dur-now" data-now="durH2Start">⏱ Use current</button>
+          <button class="dur-go" data-go="durH2Start" title="Move the video to this time">▶ Go to</button>
         </div>
         <div class="dur-row">
           <label>Full-time whistle</label>
           <input class="t" id="durH2End" placeholder="mm:ss">
           <button class="dur-now" data-now="durH2End">⏱ Use current</button>
+          <button class="dur-go" data-go="durH2End" title="Move the video to this time">▶ Go to</button>
         </div>
       </div>
       <div class="syntax-hint" style="margin-top:12px">
@@ -2712,6 +2722,16 @@ $('durEnabled').addEventListener('change',applyDur);
   $(id).addEventListener('change',()=>{if(parseTime($(id).value)>0)$('durEnabled').checked=true;applyDur();});});
 document.querySelectorAll('.dur-now').forEach(b=>{b.onclick=()=>{
   $(b.dataset.now).value=fmt(video.src?video.currentTime:0); $('durEnabled').checked=true; applyDur();};});
+/* ▶ Go to — send the video to the time this field holds, so a boundary can be checked
+   against the footage without hunting for it on the seek bar. The reverse of ⏱ Use
+   current, and the same jump the timestamp in an events row already does.
+   An empty box means no time to go to, so nothing happens: parseTime('') is 0, which is
+   indistinguishable from a boundary genuinely set at 00:00. Clamped like seekBy, since a
+   time typed past the end of the video would otherwise be refused by the element. */
+document.querySelectorAll('.dur-go').forEach(b=>{b.onclick=()=>{
+  const raw=$(b.dataset.go).value.trim();
+  if(!raw||!video.src)return;
+  video.currentTime=Math.min(video.duration||1e9,Math.max(0,parseTime(raw)));};});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('durModal').classList.contains('show')){e.preventDefault();closeDurModal();}});
 
 $('statsBtn').onclick=()=>{saveMeta();saveRows();window.open(subPageUrl('Stats'),'pt-stats');};
