@@ -130,7 +130,7 @@ function submit(app,raw,dots){
    gate returns before they are consumed — so the second Enter needs nothing re-placed. */
 function submitShot(app,raw,dots,spot){
   submit(app,raw,dots);
-  if(spot)app.openGoalCapture('shot on target',spot);
+  if(spot)app.openGoalCapture(spot);
   app.submitEntry();
 }
 

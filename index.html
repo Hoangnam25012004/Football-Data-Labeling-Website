@@ -55,19 +55,14 @@
   .goal-stage{flex:1;min-height:0;display:none;flex-direction:column;gap:8px}
   #formationPanel.goal-on .fm-stage,#formationPanel.goal-on #fmSubs{display:none}
   #formationPanel.goal-on .goal-stage{display:flex}
-  .goal-hint{font-size:11px;color:var(--mut);text-align:center;line-height:1.5}
-  .goal-hint b{color:var(--accent)}
   .goal-box{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;container-type:size}
-  .goal-wrap{position:relative;aspect-ratio:400/260;width:min(100%, calc(100cqh * 400 / 260));cursor:crosshair}
+  .goal-wrap{position:relative;aspect-ratio:1040/460;width:min(100%, calc(100cqh * 1040 / 460));cursor:crosshair}
   .goal-wrap svg{position:absolute;inset:0;width:100%;height:100%}
   .goal-ball{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;
     background:#f6f8fa;border:2px solid #0b0f14;display:flex;align-items:center;justify-content:center;
     font-size:15px;line-height:1;cursor:grab;z-index:3;touch-action:none;
     box-shadow:0 0 0 3px rgba(57,217,138,.55),0 2px 6px rgba(0,0,0,.6)}
   .goal-ball:active{cursor:grabbing}
-  .goal-read{position:absolute;left:50%;bottom:2%;transform:translateX(-50%);z-index:3;
-    font-size:10px;font-weight:700;color:var(--accent);background:#000a;padding:2px 8px;border-radius:6px;
-    pointer-events:none;font-variant-numeric:tabular-nums}
   .fm-dot{position:absolute;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;border:2px solid #000;z-index:3}
   .fm-dot.away{background:var(--away)}
   .fm-dot .lbl{position:absolute;top:25px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600}
@@ -432,10 +427,6 @@
       <!-- the same panel becomes a goal mouth while a shot on target / goal waits for the
            spot the ball crossed the line at; .goal-on swaps which of the two is shown -->
       <div class="goal-stage" id="goalStage">
-        <div class="goal-hint">
-          <b id="goalWhat">Shot on target</b> — drag the ball to where it crossed the line,
-          then press <b>Enter</b> to save. <b>Esc</b> to go back.
-        </div>
         <div class="goal-box"><div class="goal-wrap" id="goalWrap"></div></div>
       </div>
     </div>
@@ -1174,21 +1165,47 @@ function refreshFormation(){ renderFormationMain(); }   // formation is always s
    100 = the goal line. Both are clamped to the frame — a shot ON target is by
    definition inside it — so nothing outside the posts can be recorded. */
 const GOAL_SPOT_EVENTS=new Set(['shot on target','goal']);
-const GOAL_VIEW={w:400,h:260,x:50,y:60,mw:300,mh:100};   // the mouth is 3:1, like a real goal
+/* Measured off the reference recording, at its own scale: the frame there is 539×237 with
+   8px posts, so these are the same numbers. GOAL_BACK is how far inside the mouth the back
+   of the net sits — the net is drawn in perspective, and those four insets are what make
+   the walls, roof and floor read as depth instead of as a flat grid. */
+const GOAL_VIEW={w:1040,h:460,x:258,y:171,mw:524,mh:229};
+const GOAL_BACK={l:32,r:32,t:6,b:24}, GOAL_CELLS=18, GOAL_POST=8;
+const GOAL_COL={bg:'#081e2c',net:'#3b4f5c',frame:'#ffffff',line:'#1f3341'};
 function goalSVG(){
-  const G=GOAL_VIEW, x2=G.x+G.mw, y2=G.y+G.mh;
+  const G=GOAL_VIEW, B=GOAL_BACK, N=GOAL_CELLS, T=GOAL_POST, C=GOAL_COL;
+  const mx1=G.x, my1=G.y, mx2=G.x+G.mw, my2=G.y+G.mh;          // the mouth
+  const bx1=mx1+B.l, by1=my1+B.t, bx2=mx2-B.r, by2=my2-B.b;    // the back of the net
+  const L=(a,b,t)=>a+(b-a)*t;
+  const ln=(x1,y1,x2,y2)=>'<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)
+    +'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'"/>';
   let net='';
-  for(let v=G.x+20;v<x2;v+=20)net+='<line x1="'+v+'" y1="'+G.y+'" x2="'+v+'" y2="'+y2+'"/>';
-  for(let h=G.y+20;h<y2;h+=20)net+='<line x1="'+G.x+'" y1="'+h+'" x2="'+x2+'" y2="'+h+'"/>';
+  for(let i=0;i<=N;i++){                     // the back panel: a straight grid
+    const f=i/N;
+    net+=ln(L(bx1,bx2,f),by1,L(bx1,bx2,f),by2);
+    net+=ln(bx1,L(by1,by2,f),bx2,L(by1,by2,f));
+  }
+  for(let i=0;i<=N;i++){                     // walls, roof and floor running back to it
+    const f=i/N;
+    net+=ln(mx1,L(my1,my2,f),bx1,L(by1,by2,f));
+    net+=ln(mx2,L(my1,my2,f),bx2,L(by1,by2,f));
+    net+=ln(L(mx1,mx2,f),my1,L(bx1,bx2,f),by1);
+    net+=ln(L(mx1,mx2,f),my2,L(bx1,bx2,f),by2);
+  }
+  [0.25,0.5,0.75].forEach(s=>{               // …crossed at fixed depths, so they read solid
+    const lx=L(mx1,bx1,s), rx=L(mx2,bx2,s), ty=L(my1,by1,s), by=L(my2,by2,s);
+    net+=ln(lx,ty,lx,by)+ln(rx,ty,rx,by)+ln(lx,ty,rx,ty)+ln(lx,by,rx,by);
+  });
   return '<svg viewBox="0 0 '+G.w+' '+G.h+'" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block">'
-    +'<rect x="0" y="0" width="'+G.w+'" height="'+G.h+'" fill="#0d1117"/>'
-    +'<rect x="'+G.x+'" y="'+G.y+'" width="'+G.mw+'" height="'+G.mh+'" fill="#12341f"/>'
-    +'<g stroke="#3b4652" stroke-width="1">'+net+'</g>'
-    +'<line x1="14" y1="'+y2+'" x2="'+(G.w-14)+'" y2="'+y2+'" stroke="#7d8794" stroke-width="2"/>'
-    +'<g stroke="#f6f8fa" stroke-width="7" stroke-linecap="round" fill="none">'
-    +'<line x1="'+G.x+'" y1="'+G.y+'" x2="'+G.x+'" y2="'+y2+'"/>'
-    +'<line x1="'+x2+'" y1="'+G.y+'" x2="'+x2+'" y2="'+y2+'"/>'
-    +'<line x1="'+(G.x-3.5)+'" y1="'+G.y+'" x2="'+(x2+3.5)+'" y2="'+G.y+'"/></g></svg>';
+    +'<rect x="0" y="0" width="'+G.w+'" height="'+G.h+'" fill="'+C.bg+'"/>'
+    +'<g stroke="'+C.net+'" stroke-width="1" fill="none">'+net+'</g>'
+    // the goal line, running well past the posts
+    +'<line x1="20" y1="'+my2+'" x2="'+(G.w-20)+'" y2="'+my2+'" stroke="'+C.line+'" stroke-width="3"/>'
+    // (no separate "post depth" bar: sampling the recording shows what looks like one is
+    //  just the wall netting bunching up as it converges on the post)
+    // the frame: one stroked path, so its top corners come out round like the real thing
+    +'<path d="M '+(mx1-T/2)+' '+my2+' V '+(my1-T/2)+' H '+(mx2+T/2)+' V '+my2+'" fill="none" stroke="'
+    +C.frame+'" stroke-width="'+T+'" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 }
 // mouth coordinates <-> a position inside the wrapper, both as percentages
 function goalToPct(g){const G=GOAL_VIEW;
@@ -1197,9 +1214,8 @@ function goalFromPct(px,py){const G=GOAL_VIEW, cl=v=>Math.max(0,Math.min(100,v))
   return {x:cl((px/100*G.w-G.x)/G.mw*100), y:cl((py/100*G.h-G.y)/G.mh*100)};}
 
 let goalCapture=null;   // {x,y} in mouth % while the panel is showing the goal
-function openGoalCapture(label,seed){
+function openGoalCapture(seed){
   goalCapture=seed?{x:seed.x,y:seed.y}:{x:50,y:50};   // starts in the middle of the mouth
-  const w=$('goalWhat'); if(w)w.textContent='#'+(label||'shot on target');
   const p=$('formationPanel'); if(p)p.classList.add('goal-on');
   renderGoalCapture();
   // the entry box keeps the keyboard, so the confirming Enter still reaches submitEntry
@@ -1215,10 +1231,8 @@ function renderGoalCapture(){
   const ball=document.createElement('div');
   ball.className='goal-ball'; ball.textContent='⚽';
   ball.title='Drag me to where the ball crossed the line';
-  const read=document.createElement('div'); read.className='goal-read';
   const place=()=>{const p=goalToPct(goalCapture);
-    ball.style.left=p.left+'%'; ball.style.top=p.top+'%';
-    read.textContent='x '+goalCapture.x.toFixed(1)+' · y '+goalCapture.y.toFixed(1);};
+    ball.style.left=p.left+'%'; ball.style.top=p.top+'%';};
   const at=ev=>{const r=wrap.getBoundingClientRect(); if(!r.width||!r.height)return;
     goalCapture=goalFromPct((ev.clientX-r.left)/r.width*100,(ev.clientY-r.top)/r.height*100);
     place();};
@@ -1230,7 +1244,7 @@ function renderGoalCapture(){
     ball.addEventListener('pointermove',move); ball.addEventListener('pointerup',up);
   };
   wrap.onclick=e=>at(e);          // clicking anywhere in the frame moves the ball there
-  wrap.appendChild(ball); wrap.appendChild(read);
+  wrap.appendChild(ball);
   place();
 }
 // '_blank' (not a fixed window name) so this always opens a fresh new tab instead of
@@ -2125,8 +2139,14 @@ function submitEntry(){
      entry and its dots exactly as they were, ready to try again. */
   const shot=evs.find(e=>GOAL_SPOT_EVENTS.has(e.name));
   if(shot&&!goalCapture){
-    const prev=state.editingId?(state.rows.find(r=>r.id===state.editingId)||{}).gXY:null;
-    openGoalCapture(shot.name,prev);
+    // Re-editing puts the ball back where it already is, rather than in the middle. A
+    // CHAIN is re-edited by group — ✎ on "17j*c14dd" sets editingGroup and leaves
+    // editingId null — so the spot has to be looked for across the whole group, not
+    // only on a single edited row. Missing that is why an edited shot reset itself.
+    const prev=state.editingGroup
+      ? state.rows.find(r=>r.grp===state.editingGroup&&r.gXY)
+      : (state.editingId?state.rows.find(r=>r.id===state.editingId):null);
+    openGoalCapture(prev&&prev.gXY);
     return;
   }
   const wasEditing=!!state.editingId||!!state.editingGroup;

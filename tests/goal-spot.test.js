@@ -139,15 +139,39 @@ test('the ball can be put in any corner of the mouth', () => {
 });
 
 /* ================= re-editing ================= */
-test('re-editing a shot starts the ball where it already is', () => {
+test('re-editing a single shot starts the ball where it already is', () => {
   const a=app();
   submitShot(a,'9dd',dots(1),{x:20,y:30});
-  const row=a.state.rows[0];
-  a.state.editingId=row.id;                   // ✎ Edit on that row
-  submit(a,'9dd',dots(1));                    // 1st Enter -> the goal opens, seeded
+  a.startEdit(0);                             // ✎ Edit on that row
+  a.submitEntry();                            // 1st Enter -> the goal opens, seeded
   a.submitEntry();                            // confirm without moving it
   deepEq(a.state.rows[0].gXY,{x:20,y:30},'the spot is kept, not reset to the middle');
   eq(a.state.rows.length,1,'and the row was updated in place');
+});
+
+test('re-editing a shot inside a CHAIN keeps its spot too', () => {
+  // the bug this guards: ✎ on a chain calls startEditGroup, which sets editingGroup and
+  // leaves editingId null. Seeding only from editingId sent the ball back to the middle
+  // on every chain — and a shot is nearly always the end of one ("17j*c14dd").
+  const a=app();
+  submitShot(a,'17j*c14dd',[{x:9,y:9,t:1},{x:8,y:4,t:1}],{x:70,y:15});
+  const grp=a.state.rows.find(r=>r.event==='shot on target').grp;
+  a.startEditGroup(a.state.rows.filter(r=>r.grp===grp));
+  eq(a.state.editingId,null,'a chain edit really does leave editingId unset');
+  ok(a.state.editingGroup,'…and sets the group instead');
+  a.submitEntry();                            // the goal opens, seeded from the group
+  a.submitEntry();                            // confirm without moving it
+  deepEq(a.state.rows.find(r=>r.event==='shot on target').gXY,{x:70,y:15},
+    'still where it was put, not back in the middle');
+});
+
+test('re-editing something that never had a spot starts in the middle', () => {
+  const a=app();
+  submit(a,'9f',dots(1));                     // a foul, no goal spot
+  a.startEdit(0);
+  a.$('playerInput').value='9dd';             // …turned into a shot
+  a.submitEntry(); a.submitEntry();
+  deepEq(a.state.rows[0].gXY,{x:50,y:50},'nothing to restore, so the middle');
 });
 
 /* ================= the database ================= */
@@ -224,4 +248,44 @@ test('Esc backs out of the goal before it can pop a dot', () => {
 
 test('only a shot on target and a goal ask for a spot', () => {
   deepEq([...app().k.GOAL_SPOT_EVENTS].sort(),['goal','shot on target']);
+});
+
+/* ================= the goal is drawn to the reference recording ================= */
+// measured off the video frame by frame: the frame there is 539x237 with 8px posts, on
+// #081e2c, net lines #3b4f5c, posts pure white, goal line #1f3341
+test('the frame is the size it is in the recording', () => {
+  const v=app().k.GOAL_VIEW;
+  eq(v.mw+8,532,'mouth plus both posts ≈ the 539 measured (8px posts)');
+  eq(v.mh,229,'and 229 tall, against the 230 measured');
+  ok(/GOAL_POST=8/.test(SRC),'8px posts');
+  // the panel it sits in keeps the recording's shape too
+  ok(/\.goal-wrap\{[^}]*aspect-ratio:1040\/460/.test(SRC),'the stage is 1040x460');
+});
+
+test('the colours are the ones sampled off the video', () => {
+  const c=grabConst('GOAL_COL');
+  [['bg','#081e2c'],['net','#3b4f5c'],['frame','#ffffff'],['line','#1f3341']]
+    .forEach(([k,v])=>ok(c.includes(k+":'"+v+"'"),k+' is '+v));
+  // and nothing else: sampling across a post showed no separate "depth" bar there, only
+  // the wall netting bunching up as it converges — drawing one made it differ, not match
+  eq((c.match(/#[0-9a-f]{6}/g)||[]).length,4,'four colours, no invented fifth');
+});
+
+test('the net is drawn in perspective, not as a flat grid', () => {
+  const a=app(), svg=grabFunction('goalSVG');
+  ok(/GOAL_BACK/.test(svg),'there is a back plane inset inside the mouth');
+  // walls, roof and floor all run from the mouth to that back plane
+  ['mx1,L(my1,my2,f),bx1','mx2,L(my1,my2,f),bx2','L(mx1,mx2,f),my1,L(bx1,bx2,f),by1',
+   'L(mx1,mx2,f),my2,L(bx1,bx2,f),by2'].forEach(s=>ok(svg.includes(s),'panel: '+s));
+  ok(/\[0\.25,0\.5,0\.75\]/.test(svg),'crossed at fixed depths so they read as walls');
+});
+
+test('the drawing has no text on it any more', () => {
+  const panel=SRC.slice(SRC.indexOf('<div id="formationPanel">'),SRC.indexOf('</div>\n  </div>'));
+  notOk(/goalWhat/.test(panel),'the "#shot on target — drag the ball…" line is gone');
+  notOk(/goal-hint/.test(SRC),'and its style with it');
+  notOk(/goal-read/.test(SRC),'so is the x/y readout');
+  notOk(/goalWhat/.test(SRC),'nothing still writes to either');
+  // the ball and the frame are all that is left
+  ok(/id="goalWrap"/.test(panel)&&/goal-ball/.test(SRC));
 });
