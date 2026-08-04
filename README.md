@@ -141,7 +141,9 @@ and what a stored row is allowed to carry — every event naming the player who 
 `#cross fail` keeping their trailing extra dot, and the double-click event cell refusing to
 rename a row into a ball-moving event it has no receiver for; and the formation board —
 where an unknown position parks, that a squad added at once stacks there, and that a
-position cell spaces 1 to 4 dots evenly without pushing any of them into a neighbour.
+position cell spaces 1 to 4 dots evenly without pushing any of them into a neighbour, that
+the Formation modal tidies every period of the team on screen and leaves the other alone,
+and that its copy of the arranger has not drifted from the one in `shared.js`.
 `tests/` is not part of the deployed site.
 
 ## Real-time cloud sync (Supabase)
@@ -188,6 +190,9 @@ indexes, RLS, and the realtime publication.
   for the away side. A whole squad added at once stacks on that one spot on purpose; it is
   where you sort them out from. Drag a dot into a position cell and the cell shares itself
   out evenly: one sits in the middle, two at 1/3 and 2/3, three at 1/4·1/2·3/4, and so on.
+  The main tab's **⛨ Formation** modal spaces its dots by the same rule — opening it tidies
+  that team's whole timeline, the starting XI and every substitution snapshot, so scrubbing
+  the video shows an even board at any moment. The other team waits until it is opened.
 - Every tagged event names the player who did it (`2f`, not `f`), so every stored row has
   `x,y`. A **successful** pass/cross also names the receiver (`1s2`) — that player's dot is
   what fills `rx,ry`. A **failed** one reaches nobody, so it names no receiver and takes one

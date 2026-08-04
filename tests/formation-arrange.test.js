@@ -10,8 +10,8 @@
    Everywhere else the opposite holds: the dots in a position cell share it evenly, n of
    them at (i+1)/(n+1) down the cell, so two centre backs read as a pair and four read as a
    column instead of a pile. */
-const fs=require('fs'), path=require('path');
-const {loadShared}=require('./harness');
+const fs=require('fs'), path=require('path'), vm=require('vm');
+const {loadShared,grabFunction,grabConst,SRC,SHARED}=require('./harness');
 const {test,eq,deepEq,ok,notOk}=require('./tiny-test');
 
 const S=loadShared();
@@ -156,4 +156,106 @@ test('and tidies the board on every route in', () => {
      'arranged before drawing, and persisted only when it changed something');
   // the drag handler still writes the dropped position — the arranger tidies it after
   ok(/x\.pos=zoneAt\(x\.x,x\.y,dir\)/.test(PL),'dragging still sets the position it landed in');
+});
+
+/* ================= the main tab's Formation modal ================= */
+// index.html carries its own copy of the grid (it does not load shared.js), so the modal
+// runs its own arrangeXI. The two must not drift apart.
+test('the main tab and shared.js arrange dots by exactly the same code', () => {
+  const strip=s=>s.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\/\/[^\n]*/g,'').replace(/\s+/g,' ').trim();
+  ['arrangeXI','cellAt'].forEach(name=>
+    eq(strip(grabFunction(name,SRC,'index.html')),strip(grabFunction(name,SHARED,'shared.js')),
+       name+' is the same in both files'));
+});
+
+// the modal's helpers, on a stand-in state — no DOM
+function fmApp(lineups,team){
+  const ctx={console,state:{lineups},fmTeam:team||'home'};
+  vm.createContext(ctx);
+  vm.runInContext([grabConst('FORMATION_GRID',SRC),grabConst('PZ_ROW_TOP',SRC),
+    grabConst('effCol',SRC),grabConst('effRow',SRC),
+    grabFunction('zoneAt',SRC),grabFunction('cellAt',SRC),grabFunction('arrangeXI',SRC),
+    grabFunction('fmTeamHistory',SRC),grabFunction('fmArrange',SRC)].join('\n'),ctx);
+  return ctx;
+}
+// three dots dropped untidily into the CB cell (canonical row 1, col 4)
+const cbPile=()=>[1,2,3].map(i=>({no:String(i),x:25+(i%2?1:-1),y:50+(i-2)*3}));
+const CB_TIDY=[37.5,50,62.5];
+const PILE_Y=cbPile().map(x=>x.y);            // [47,50,53] — note the middle one is 50 too,
+const untouched=xi=>deepEq(xi.map(x=>x.y),PILE_Y);   // so only the WHOLE row proves nothing moved
+
+test('opening the modal tidies the starting XI and every snapshot of that team', () => {
+  const lineups={
+    home:{dir:'lr',xi:cbPile(),subs:[],roster:[]},
+    away:{dir:'rl',xi:cbPile(),subs:[],roster:[]},
+    history:[{team:'home',t:10,xi:cbPile()},{team:'home',t:20,xi:cbPile()},
+             {team:'away',t:30,xi:cbPile()}]
+  };
+  const app=fmApp(lineups,'home');
+  ok(app.fmArrange(),'something moved');
+  deepEq(lineups.home.xi.map(x=>x.y),CB_TIDY,'the starting XI');
+  deepEq(lineups.history[0].xi.map(x=>x.y),CB_TIDY,'the first snapshot');
+  deepEq(lineups.history[1].xi.map(x=>x.y),CB_TIDY,'the second one too');
+  // the team that has not been opened is left exactly as it was
+  untouched(lineups.away.xi);         // the away XI
+  untouched(lineups.history[2].xi);   // and its snapshot
+});
+
+test('switching to the other team tidies that one', () => {
+  const lineups={
+    home:{dir:'lr',xi:cbPile(),subs:[],roster:[]},
+    away:{dir:'rl',xi:cbPile(),subs:[],roster:[]},
+    history:[{team:'away',t:30,xi:cbPile()}]
+  };
+  const app=fmApp(lineups,'away');
+  ok(app.fmArrange());
+  deepEq(lineups.away.xi.map(x=>x.y),CB_TIDY);
+  deepEq(lineups.history[0].xi.map(x=>x.y),CB_TIDY);
+  untouched(lineups.home.xi);         // home waits its turn
+});
+
+test('a tidy team reports no change — the render-time save cannot loop', () => {
+  const lineups={home:{dir:'lr',xi:cbPile(),subs:[],roster:[]},
+                 away:{dir:'rl',xi:[],subs:[],roster:[]},
+                 history:[{team:'home',t:10,xi:cbPile()}]};
+  const app=fmApp(lineups,'home');
+  ok(app.fmArrange(),'first pass tidies');
+  notOk(app.fmArrange(),'second pass has nothing to do');
+  notOk(app.fmArrange(),'and stays settled');
+});
+
+test('a team with no history, or none at all, is not a crash', () => {
+  const app=fmApp({home:{dir:'lr',xi:[],subs:[],roster:[]},
+                   away:{dir:'rl',xi:[],subs:[],roster:[]}},'home');
+  notOk(app.fmArrange(),'no history array at all');
+  const missing=fmApp({away:{dir:'rl',xi:[],subs:[],roster:[]},history:[]},'home');
+  notOk(missing.fmArrange(),'no such team');
+});
+
+test('arranging works in stored (half-1) space, so the 2nd-half view stays even', () => {
+  const lineups={home:{dir:'lr',xi:cbPile(),subs:[],roster:[]},
+                 away:{dir:'rl',xi:[],subs:[],roster:[]},history:[]};
+  fmApp(lineups,'home').fmArrange();
+  deepEq(lineups.home.xi.map(x=>x.y),CB_TIDY,'stored canonically');
+  // the modal mirrors both axes to show the 2nd half — even spacing mirrors to even
+  const shown=lineups.home.xi.map(x=>100-x.y).sort((a,b)=>a-b);
+  deepEq(shown,[37.5,50,62.5],'the 2nd-half view of this cell');
+  eq(shown[1]-shown[0],shown[2]-shown[1],'equal gaps after the flip');
+});
+
+test('the modal is wired to tidy before it draws', () => {
+  const fn=grabFunction('renderFmModal',SRC);
+  ok(/if\(fmArrange\(\)\)saveLineups\(\)/.test(fn),'arranged, and persisted only on a change');
+  ok(fn.indexOf('fmArrange()')<fn.indexOf("$('fmEditPitch')"),'before the pitch is built');
+  // the drag handler still records where a dot was dropped; the arranger tidies it after
+  ok(/x\.pos=zoneAt\(x\.x,x\.y,dir\)/.test(grabFunction('fmDrag',SRC)),
+     'dragging still sets the position it landed in');
+});
+
+test('saveLineups cannot re-enter the modal render', () => {
+  // this is what makes "persist from inside the render" safe
+  eq(grabFunction('refreshFormation',SRC).replace(/\s+/g,' ').trim(),
+     'function refreshFormation(){ renderFormationMain(); }');
+  notOk(/renderFmModal/.test(grabFunction('saveLineups',SRC)),'saveLineups does not call it');
+  notOk(/renderFmModal/.test(grabFunction('renderFormationMain',SRC)),'nor does the panel it redraws');
 });

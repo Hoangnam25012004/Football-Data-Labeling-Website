@@ -990,6 +990,38 @@ function gridHTML(dir){
   h+=`<div class="pz-arrow">${dir==='lr'?'▶':'◀'}</div>`;
   return h;
 }
+/* the cell a dot is standing in, in DISPLAY coordinates (the same split zoneAt uses) */
+function cellAt(x,y){return {row:y<25?0:(y<75?1:2),col:Math.max(0,Math.min(5,Math.floor(x/100*6)))};}
+/* Space the dots inside each POSITION cell evenly down it, so a cell holding two centre
+   backs reads as a tidy pair instead of a pile: one sits in the middle, two at 1/3 and
+   2/3, three at 1/4·1/2·3/4, four at 1/5…4/5 — n dots at (i+1)/(n+1) of the cell. They
+   keep the order they were already stacked in, and stay centred across the cell. The
+   empty square beside the keeper is deliberately skipped: that is the one place dots may
+   overlap. Returns true when something moved, so the caller can persist it.
+   Twin of the one in shared.js — this file carries its own copy of the whole grid, since
+   it does not load shared.js. Keep the two in step. */
+function arrangeXI(xi,dir){
+  const cells=new Map();
+  (xi||[]).forEach(x=>{
+    const c=cellAt(x.x,x.y);
+    if(!FORMATION_GRID[effRow(c.row,dir)][effCol(c.col,dir)])return;   // staging square
+    const k=c.row+','+c.col;
+    if(!cells.has(k))cells.set(k,[]);
+    cells.get(k).push(x);
+  });
+  let moved=false;
+  cells.forEach((list,k)=>{
+    const row=+k.split(',')[0], col=+k.split(',')[1];
+    const cx=(col+0.5)*100/6, top=PZ_ROW_TOP[row], h=PZ_ROW_H[row];
+    list.sort((a,b)=>a.y-b.y||String(a.no).localeCompare(String(b.no)));
+    list.forEach((x,i)=>{
+      const nx=cx, ny=top+h*(i+1)/(list.length+1);
+      if(Math.abs(x.x-nx)>0.01||Math.abs(x.y-ny)>0.01){x.x=nx; x.y=ny; moved=true;}
+      x.pos=zoneAt(x.x,x.y,dir);
+    });
+  });
+  return moved;
+}
 const MAX_XI={football:11,football7:7,futsal:5,basketball:5};
 let lineupTeam='home';
 function teamLU(){return state.lineups[lineupTeam];}
@@ -2311,6 +2343,19 @@ function removeRedSideEffects(rows){
 /* ===== FORMATION MODAL — view/adjust each period's formation, both teams ===== */
 let fmTeam='home', fmSel=-1, fmHalf=1;   // fmSel: -1 = starting formation, >=0 = index into history; fmHalf: viewing 1st/2nd (attacking dir flips)
 function fmTeamHistory(){return (state.lineups.history||[]).filter(h=>h.team===fmTeam);}
+/* Tidy the team on screen — the starting XI and every one of its snapshots — so opening
+   this modal settles that team's whole timeline, not only the period that happens to be
+   selected. The other team is left alone until it is opened.
+   Positions are stored in half-1 canonical orientation, the space zoneAt and fmDrag work
+   in, so the arranger runs on the team's own dir; the 2nd-half view mirrors afterwards,
+   which keeps even spacing even. */
+function fmArrange(){
+  const lu=state.lineups[fmTeam]; if(!lu)return false;
+  const dir=lu.dir||'lr';
+  let moved=arrangeXI(lu.xi,dir);
+  fmTeamHistory().forEach(h=>{if(arrangeXI(h.xi,dir))moved=true;});
+  return moved;
+}
 function fmSelected(){          // -> {xi,subs,label,t,editableHere}
   const lu=state.lineups[fmTeam], hist=fmTeamHistory();
   if(fmSel>=0&&hist[fmSel])return hist[fmSel];
@@ -2363,6 +2408,12 @@ function renderFmModal(){
   });
   // editable pitch for the selected period. Positions are stored in half-1 orientation;
   // viewing the 2nd half rotates the whole team 180° (flip both axes + attacking dir).
+  // Dots in a position cell share it evenly — the same rule as the Player lists board.
+  // Done here so every route in comes out tidy through one path: opened, dragged,
+  // a period added or removed, or a lineup arriving from the cloud. saveLineups()
+  // redraws only the read-only main-tab panel and never re-enters this function, so
+  // persisting from inside the render cannot loop, and arrangeXI settles in one pass.
+  if(fmArrange())saveLineups();
   const sel=fmSelected(), lu=state.lineups[fmTeam], pit=$('fmEditPitch');
   const dir0=lu.dir||'lr', flip=fmHalf===2;
   const gdir=flip?(dir0==='lr'?'rl':'lr'):dir0;
