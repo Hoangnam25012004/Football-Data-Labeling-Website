@@ -210,11 +210,14 @@ indexes, RLS, and the realtime publication.
   go into. Until it is run, ordinary events still sync (they never name the columns), but a
   placed shot fails to upsert.
 - Those spots are drawn on **both shooting maps** — the Stats tab's and the one in the match
-  report — as a goal mouth beside the pitch, so the pair reads as "struck from here, ended up
-  there". Markers carry the same label and colour as the pitch map next to them: the shirt
-  number in the Stats tab, the shot's number (which is its row in the Event List) in the
-  report. Only shots that were given a spot appear; off target, blocked and missed never
-  cross the line.
+  report — so each reads as "struck from here, ended up there". Markers carry the same label
+  and colour as the pitch map beside them: the shirt number in the Stats tab, the shot's
+  number (which is its row in the Event List) in the report. Only shots that were given a
+  spot appear; off target, blocked and missed never cross the line.
+- The Stats shooting map is **one vertical map for the whole match**: the pitch stood on end
+  with both halves normalised to attack up, cropped to the attacking half (and stretched back
+  if a shot came from deeper), with the goal standing on the goal line at the top of the same
+  drawing. There is no 1st/2nd toggle — a shot is a shot whichever end the team was kicking to.
 - Every tagged event names the player who did it (`2f`, not `f`), so every stored row has
   `x,y`. A **successful** pass/cross also names the receiver (`1s2`) — that player's dot is
   what fills `rx,ry`. A **failed** one reaches nobody, so it names no receiver and takes one

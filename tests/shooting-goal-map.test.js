@@ -99,22 +99,79 @@ test('no rows at all is an empty goal, not a crash', () => {
   ok(/^<svg /.test(S.goalMouthSVG(null)),'and it still draws the frame');
 });
 
-/* ================= the Stats tab ================= */
-test('the Stats shooting map draws the goal above the pitch', () => {
-  const fn=grabFunction('shotMapHTML',STATS,'Stats/index.html');
-  ok(/goalMouthSVG\(gm,/.test(fn),'the goal is drawn');
-  ok(/goalMarks\(rows,team,/.test(fn),'from the placed shots');
-  ok(/eventHalf\(r\)===shotHalf/.test(fn),'of the half being shown');
-  ok(/label:r\.playerFrom/.test(fn),'labelled with the shirt number, like the pitch dots');
-  ok(/color:kinds\[r\.event\]/.test(fn),'and coloured by outcome, like them too');
-  ok(fn.indexOf('${goal}')<fn.indexOf('shotmap-pitch'),'goal first, pitch under it');
-  // the pitch map itself is untouched
-  ok(/dirArrowSVG\(attackDir\(team,shotHalf\)\)\+dots/.test(fn),'the old dots still go on the pitch');
+/* ================= the Stats tab: one vertical map ================= */
+// shotMapHTML run for real, against the page's own helpers
+const {loadStats}=require('./harness');
+function statsMap(rows,team){
+  const p=loadStats({rows,meta:{home:'H',away:'A',sport:'football'}},
+    {funcs:['attackDir','eventHalf','shotMapHTML']});
+  return p.shotMapHTML(team||'home');
+}
+const SH=(o)=>Object.assign({team:'home',event:'shot on target',t:100,playerFrom:'9',
+  pXY:{x:85,y:50},gXY:null},o);
+
+// the pitch draws circles of its own (centre circle, penalty spots), so a shot marker is
+// matched by its radius rather than by being a circle
+const SHOTS=/<circle cx="([\d.]+)" cy="([\d.]+)" r="17"/g;
+const shotYs=html=>[...html.matchAll(SHOTS)].map(m=>+m[2]);
+
+test('both halves are on ONE map now — no toggle to miss a shot behind', () => {
+  const html=statsMap([SH({t:100}),SH({t:100,playerFrom:'7'})]);
+  notOk(/half-toggle|setShotHalf/.test(html),'the 1st/2nd buttons are gone');
+  eq(shotYs(html).length,2,'both shots drawn');
+  // the comment explaining the removal still says the word, so look for the code
+  notOk(/setShotHalf|===shotHalf|shotHalf=1/.test(STATS),'nothing in the page still tracks a shot half');
 });
 
-test('the goal card says when nothing has been placed', () => {
+test('the map stands on end, attacking up', () => {
+  const html=statsMap([SH()]);
+  ok(/viewBox="0 -[\d.]+ 680 [\d.]+"/.test(html),'a portrait viewBox, 680 wide');
+  ok(/rotate\(-90\)/.test(html),'the pitch markings turned on their side');
+  ok(/>Attacking</.test(html),'and it says which way');
+});
+
+test('a half that attacked the other way is turned around, not left mirrored', () => {
+  // attackDir works the direction out from the shots themselves, so each half needs
+  // enough of them to be unambiguous: 1st attacking right, 2nd attacking left
+  const rows=[SH({t:100,pXY:{x:85,y:50}}), SH({t:200,pXY:{x:88,y:40},playerFrom:'8'}),
+              SH({t:5000,pXY:{x:15,y:50},playerFrom:'7'}), SH({t:5100,pXY:{x:12,y:60},playerFrom:'6'})];
+  const p=loadStats({rows,meta:{home:'H',away:'A',sport:'football'},
+    dur:{enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:3000,h2End:0}},
+    {funcs:['attackDir','eventHalf','shotMapHTML']});
+  const ys=shotYs(p.shotMapHTML('home'));
+  eq(ys.length,4,'all four drawn');
+  // x=85 (1st) and x=15 (2nd) are the same distance from the goal being attacked
+  ok(Math.abs(ys[0]-ys[2])<1,'the pair at 85/15 land together: '+ys[0]+' vs '+ys[2]);
+  ok(Math.max(...ys)<300,'and all of them up near the goal, not spread across the pitch');
+});
+
+test('the goal stands on the goal line of that same svg', () => {
+  const html=statsMap([SH({gXY:{x:50,y:50}})]);
   const fn=grabFunction('shotMapHTML',STATS,'Stats/index.html');
-  ok(/gm\.length\?'Where they crossed the line':'No shot placed in the goal yet'/.test(fn));
+  ok(/goalMouthG\(\{x:GX,y:-GH,w:GW,h:GH\}/.test(fn),'its bottom edge sits at y=0, the goal line');
+  ok(/noLine:true/.test(fn),'and it does not draw a second goal line over the pitch’s own');
+  ok(/goalMarks\(rows,team,/.test(fn)&&/label:r\.playerFrom/.test(fn),
+     'markers labelled with the shirt number, like the pitch dots');
+  // one svg, so the goal and the pitch cannot drift apart
+  eq((html.match(/<svg /g)||[]).length,1,'goal and pitch share one svg');
+});
+
+test('the map is cropped to the attacking half, but never hides a shot', () => {
+  const box=html=>/viewBox="0 ([-\d.]+) 680 ([\d.]+)"/.exec(html).slice(1).map(Number);
+  // three near the goal fix the direction; the 4th is the one that has to stay visible
+  const close=[SH({pXY:{x:85,y:50}}),SH({pXY:{x:88,y:40}}),SH({pXY:{x:82,y:60}})];
+  const near=box(statsMap(close))[1];
+  const withDeep=statsMap(close.concat([SH({pXY:{x:30,y:50},playerFrom:'6'})]));
+  const [top,h]=box(withDeep);
+  ok(h>near,'a strike from deep pushes the bottom edge back: '+near+' -> '+h);
+  const deepest=Math.max(...shotYs(withDeep));
+  ok(deepest<top+h,'and it is inside the view — '+deepest.toFixed(0)+' < '+(top+h).toFixed(0));
+});
+
+test('it says so plainly when no shot has been placed in the goal', () => {
+  ok(/No shot has been placed in the goal yet/.test(statsMap([SH()])),'the note is there');
+  notOk(/No shot has been placed/.test(statsMap([SH({gXY:{x:10,y:10}})])),
+    '…and gone once one has');
 });
 
 /* ================= the match report ================= */

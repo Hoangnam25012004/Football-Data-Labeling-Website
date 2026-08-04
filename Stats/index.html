@@ -64,10 +64,10 @@ body>header{flex:none}
 .hm-flex{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
 .hm-flex>div:first-child{flex:1;min-width:340px}
 .hm-flex .shotmap-pitch{margin:2px auto 0;max-width:640px}   /* centred in its column; the legend below is centred too */
-/* the goal mouth sits above the pitch in the shooting map: same width, so a marker in the
-   goal lines up over the pitch the shot was struck from */
-.shotmap-goal{max-width:640px;margin:0 auto 6px}
-.sm-sub{color:var(--mut);font-size:10px;text-align:center;margin-top:2px}
+/* the shooting map is stood on end, so it is capped by HEIGHT rather than width — a
+   full-width portrait pitch would run off the bottom of the card */
+.shotmap-v{max-width:min(100%,520px);margin:0 auto}
+.sm-sub{color:var(--mut);font-size:10.5px;text-align:center;margin:6px auto 0;max-width:520px;line-height:1.5}
 #heatCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .hm-mark{position:absolute;width:26px;height:26px;border-radius:50%;transform:translate(-50%,-50%);
   display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;
@@ -160,14 +160,15 @@ body>header{flex:none}
   <div class="stats-wrap"><div id="statsHolder"></div></div>
 </div>
 
-<script src="../shared.js?v=16"></script>
+<script src="../shared.js?v=17"></script>
 <script>
 /* The lineup store is shared by every tab and by every match this browser has ever opened,
    so a stored squad is only ours if its stamp names the match that is actually open. Taking
    it unconditionally is what put a previous match's formation on this page when no match had
    been opened at all. Player-Lists has always checked; this page did not. */
 const ourLineups=()=>lineupsAreFor(loadMeta().matchId)?loadLineups():blankLineups();
-let rows=loadRows(), meta=loadMeta(), lineups=ourLineups(), statTeam='general', statCat='shooting', shotHalf=1, defHalf=1, defCat='tackles', othCat='fouls';
+// no shotHalf any more: the shooting map shows both halves at once, normalised to attack up
+let rows=loadRows(), meta=loadMeta(), lineups=ourLineups(), statTeam='general', statCat='shooting', defHalf=1, defCat='tackles', othCat='fouls';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
 let pdWin=0;      // pass-network map: index into the 15-minute time windows
 
@@ -330,35 +331,55 @@ function shootingChartHTML(team){
   return `<div class="chart-card donut-card">`
     +`<div class="donut-wrap"><div class="donut-svg">${svg}</div><div class="donut-legend">${legend}</div></div></div>`;
 }
-/* ---- Shooting: pitch map of where each shot was taken (uses the Player dot) ---- */
+/* ---- Shooting: ONE vertical map of where every shot was taken, and where the ones on
+   target crossed the line ----
+   The pitch is stood on end and both halves are normalised to attack UP, so the 1st and
+   2nd are one picture rather than two behind a toggle — a shot is a shot whichever end
+   the team was kicking towards. Standing it up also gives the shots the full width
+   instead of half of a landscape pitch, since nearly all of them fall in one third.
+   The goal stands on the goal line at the top of that SAME svg, so a marker inside it
+   sits directly above the spot on the pitch the shot was struck from. */
 function shotMapHTML(team){
   const kinds={'goal':'#f7b32f','shot on target':'#39d98a','shot off target':'#8b97a7','blocked shot':'#8b97a7','miss shot':'#8b97a7'};
-  // split by half — attacking direction flips between halves, so 1st/2nd are shown separately
-  const head=`<div class="chart-head"><div></div>`
-    +`<div class="half-toggle"><button class="${shotHalf===1?'on':''}" onclick="setShotHalf(1)">1st</button>`
-    +`<button class="${shotHalf===2?'on':''}" onclick="setShotHalf(2)">2nd</button></div></div>`;
-  // no data -> keep the pitch, just draw no dots
-  const shots=rows.filter(r=>r.team===team && kinds[r.event] && r.pXY && eventHalf(r)===shotHalf);
-  const d=PITCH_DIMS.football, W=d.w, H=d.h;
-  const dots=shots.map(r=>{
-    const cx=(r.pXY.x/100*W).toFixed(1), cy=(r.pXY.y/100*H).toFixed(1), col=kinds[r.event];
-    return `<g><circle cx="${cx}" cy="${cy}" r="13" fill="${col}" fill-opacity="0.9" stroke="#0d1117" stroke-width="2"/>`
-      +`<text x="${cx}" y="${(+cy+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#06281a">${r.playerFrom||''}</text></g>`;
+  const d=PITCH_DIMS.football, W=d.h, H=d.w;        // vertical: 680 wide x 1050 tall
+  // a half that attacked left is turned around, so every shot points the same way
+  const dir={1:attackDir(team,1),2:attackDir(team,2)};
+  const shots=rows.filter(r=>r.team===team&&kinds[r.event]&&r.pXY).map(r=>{
+    const flip=dir[eventHalf(r)]==='left';
+    const px=flip?100-r.pXY.x:r.pXY.x, py=flip?100-r.pXY.y:r.pXY.y;
+    return {r, vx:py/100*W, vy:(100-px)/100*H};     // attacking right -> attacking up
+  });
+  // the map is cropped to the attacking half, but never so far that it hides a shot:
+  // a strike from deep pushes the bottom edge back to fit it
+  const deepest=shots.reduce((m,s)=>Math.max(m,s.vy),0);
+  const bottom=Math.min(H,Math.max(H*0.5,deepest+70));
+  const dots=shots.map(s=>{
+    const cx=s.vx.toFixed(1), cy=s.vy.toFixed(1), col=kinds[s.r.event];
+    return `<g><circle cx="${cx}" cy="${cy}" r="17" fill="${col}" fill-opacity="0.92" stroke="#0d1117" stroke-width="2.5"/>`
+      +`<text x="${cx}" y="${(+cy+6).toFixed(1)}" text-anchor="middle" font-size="17" font-weight="800" fill="#06281a">${s.r.playerFrom||''}</text></g>`;
   }).join('');
-  const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG(attackDir(team,shotHalf))+dots+'</svg>');
-  // …and where each of those that was on target actually crossed the line. Same half, same
-  // colours, same shirt number, so a marker in the goal is the one on the pitch below it.
-  const gm=goalMarks(rows,team,r=>eventHalf(r)===shotHalf&&kinds[r.event]
+  // …and the goal itself, standing on the goal line at the top
+  const gm=goalMarks(rows,team,r=>kinds[r.event]
     ?{x:r.gXY.x,y:r.gXY.y,label:r.playerFrom||'',color:kinds[r.event]}:null);
-  const goal=`<div class="shotmap-goal">${goalMouthSVG(gm,{ink:'#06281a',ring:'#0d1117'})}`
-    +`<div class="sm-sub">${gm.length?'Where they crossed the line':'No shot placed in the goal yet'}</div></div>`;
+  const GW=W*0.54, GH=GW/3, GX=(W-GW)/2, PAD=22;
+  const goal=goalMouthG({x:GX,y:-GH,w:GW,h:GH},gm,
+    {ink:'#06281a',ring:'#0d1117',net:'#3b4f5c',frame:'#e6edf3',r:15,noLine:true});
+  const arrow=`<g opacity="0.45" stroke="#fff" fill="none" stroke-width="6">`
+    +`<line x1="${W/2}" y1="${(bottom*0.94).toFixed(0)}" x2="${W/2}" y2="${(bottom*0.82).toFixed(0)}"/>`
+    +`<polyline points="${W/2-15},${(bottom*0.85).toFixed(0)} ${W/2},${(bottom*0.82).toFixed(0)} ${W/2+15},${(bottom*0.85).toFixed(0)}"/></g>`
+    +`<text x="${W/2}" y="${(bottom*0.99).toFixed(0)}" text-anchor="middle" font-size="22" fill="#fff" opacity="0.55">Attacking</text>`;
+  const top=-(GH+PAD);
+  const pitch=`<svg viewBox="0 ${top.toFixed(1)} ${W} ${(bottom-top).toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">`
+    +`<rect x="0" y="0" width="${W}" height="${H}" fill="rgba(26,62,32,0.72)"/>`
+    +`<g transform="translate(0 ${H}) rotate(-90)"><g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(H,W,false)}</g></g>`
+    +goal+arrow+dots+`</svg>`;
+  const note=gm.length?'':`<div class="sm-sub">No shot has been placed in the goal yet — tag a shot on target or a goal and drop the ball where it crossed the line.</div>`;
   const legend=`<span class="sm-leg"><span class="leg-dot" style="background:#f7b32f"></span>Goal</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:#39d98a"></span>On target</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:#8b97a7"></span>Off / Blocked / Missed</span>`;
-  return `<div class="chart-card map-card">${head}${goal}`
-    +`<div class="shotmap-pitch">${pitch}</div><div class="shotmap-legend">${legend}</div></div>`;
+  return `<div class="chart-card map-card">`
+    +`<div class="shotmap-pitch shotmap-v">${pitch}</div>${note}<div class="shotmap-legend">${legend}</div></div>`;
 }
-function setShotHalf(h){shotHalf=h;renderStats();}
 /* ---- Distribution: each player a bubble at (pass accuracy %, pass volume) (image 2) ---- */
 function passScatterHTML(team){
   const P=computeStats(rows,team), fill=team==='home'?'#2f81f7':'#f7682f';

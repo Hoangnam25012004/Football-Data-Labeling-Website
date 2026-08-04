@@ -300,17 +300,21 @@ function goalMarks(rows,team,pick){
   return (rows||[]).filter(r=>(team==null||r.team===team)&&r.gXY&&SHOT_KINDS.has(evKey(r.event)))
     .map(pick).filter(Boolean);
 }
-function goalMouthSVG(marks,o){
+/* The mouth as a bare <g>, drawn into whatever rectangle the caller hands it. The Stats
+   map stands it on the goal line of its own vertical pitch — one SVG, so a marker in the
+   goal lines up over the pitch beneath it — while the report draws it on its own. */
+function goalMouthG(box,marks,o){
   o=o||{};
-  const G=GOAL_MAP, x2=G.x+G.mw, y2=G.y+G.mh, T=o.post||9, R=o.r||17;
+  const x1=box.x, y1=box.y, x2=box.x+box.w, y2=box.y+box.h;
+  const T=o.post||9, R=o.r==null?17:o.r;
   const net=o.net||'#2a3542', frame=o.frame||'#e6edf3', ink=o.ink||'#fff', ring=o.ring||'#0d1117';
   let grid='';
-  for(let i=1;i<16;i++){const vx=(G.x+i*G.mw/16).toFixed(1);
-    grid+='<line x1="'+vx+'" y1="'+G.y+'" x2="'+vx+'" y2="'+y2+'"/>';}
-  for(let i=1;i<8;i++){const vy=(G.y+i*G.mh/8).toFixed(1);
-    grid+='<line x1="'+G.x+'" y1="'+vy+'" x2="'+x2+'" y2="'+vy+'"/>';}
+  for(let i=1;i<16;i++){const vx=(x1+i*box.w/16).toFixed(1);
+    grid+='<line x1="'+vx+'" y1="'+y1.toFixed(1)+'" x2="'+vx+'" y2="'+y2.toFixed(1)+'"/>';}
+  for(let i=1;i<8;i++){const vy=(y1+i*box.h/8).toFixed(1);
+    grid+='<line x1="'+x1.toFixed(1)+'" y1="'+vy+'" x2="'+x2.toFixed(1)+'" y2="'+vy+'"/>';}
   const dots=(marks||[]).map(m=>{
-    const cx=G.x+m.x/100*G.mw, cy=G.y+m.y/100*G.mh;
+    const cx=x1+m.x/100*box.w, cy=y1+m.y/100*box.h;
     const shape=m.square
       ?'<rect x="'+(cx-R).toFixed(1)+'" y="'+(cy-R).toFixed(1)+'" width="'+(R*2)+'" height="'+(R*2)
         +'" rx="4" fill="'+m.color+'" stroke="'+ring+'" stroke-width="2.5"/>'
@@ -320,12 +324,19 @@ function goalMouthSVG(marks,o){
       +'" text-anchor="middle" font-size="'+Math.round(R*1.1)+'" font-weight="800" fill="'+ink+'">'
       +(m.label==null?'':m.label)+'</text></g>';
   }).join('');
+  return '<g stroke="'+net+'" stroke-width="'+(o.netW||1)+'" fill="none">'+grid+'</g>'
+    // the goal line either side of the posts — skipped when the pitch already draws one
+    +(o.noLine?'':'<line x1="'+(x1-46)+'" y1="'+y2.toFixed(1)+'" x2="'+(x2+46)+'" y2="'+y2.toFixed(1)
+      +'" stroke="'+net+'" stroke-width="2"/>')
+    +'<path d="M '+(x1-T/2).toFixed(1)+' '+y2.toFixed(1)+' V '+(y1-T/2).toFixed(1)+' H '+(x2+T/2).toFixed(1)
+    +' V '+y2.toFixed(1)+'" fill="none" stroke="'+frame+'" stroke-width="'+T
+    +'" stroke-linecap="round" stroke-linejoin="round"/>'
+    +dots;
+}
+function goalMouthSVG(marks,o){
+  const G=GOAL_MAP;
   return '<svg viewBox="0 0 '+G.w+' '+G.h+'" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">'
-    +'<g stroke="'+net+'" stroke-width="1">'+grid+'</g>'
-    +'<line x1="'+(G.x-46)+'" y1="'+y2+'" x2="'+(x2+46)+'" y2="'+y2+'" stroke="'+net+'" stroke-width="2"/>'
-    +'<path d="M '+(G.x-T/2)+' '+y2+' V '+(G.y-T/2)+' H '+(x2+T/2)+' V '+y2
-    +'" fill="none" stroke="'+frame+'" stroke-width="'+T+'" stroke-linecap="round" stroke-linejoin="round"/>'
-    +dots+'</svg>';
+    +goalMouthG({x:G.x,y:G.y,w:G.mw,h:G.mh},marks,o)+'</svg>';
 }
 
 /* ---- cards on the match timeline ----
