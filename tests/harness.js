@@ -129,6 +129,8 @@ const SHARED_EXPORTS=['esc','squadOnPitch','squadNames','playerLabel','withSquad
   'blankTeamLU','blankLineups','zoneAt','EVENT_INC','STAT_HEADERS','STAT_GROUPS',
   'TEAM_SECTIONS','numOf',
   'SHOT_KINDS','BODY_PARTS','shotBodyPart','shotList','shotColor','evKey','classifyCards',
+  'FORMATION_GRID','effCol','effRow','PZ_ROW_TOP','PZ_ROW_H','cellAt','cellCentre',
+  'BENCH_CELL','benchSpot','arrangeXI','MAX_XI',
   'PT_KEYS','loadLineups','saveLineupsLS','luStamp','lineupsAreFor','lineupsEmpty','migrateLineupStamp'];
 function loadShared(store){
   const ctx={console,document:{getElementById:()=>null},location:{hash:''},

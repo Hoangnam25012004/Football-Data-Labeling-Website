@@ -83,7 +83,7 @@
   </div>
 </div>
 
-<script src="../shared.js?v=14"></script>
+<script src="../shared.js?v=15"></script>
 <script>
 let meta=loadMeta();
 migrateLineupStamp(meta.matchId);                 // stores written before stamps existed
@@ -332,8 +332,13 @@ function askNo(name,cur){
 function addToLineup(no){
   const t=teamLU();
   if(t.xi.some(x=>sameNo(x.no,no))||t.subs.some(n=>sameNo(n,no)))return;
-  if(t.xi.length<maxXI()){const x=50,y=Math.min(90,12+t.xi.length*8);
-    t.xi.push({no,x,y,pos:zoneAt(x,y,t.dir)});}
+  if(t.xi.length<maxXI()){
+    // nothing is known about where he plays yet, so he starts on the staging square beside
+    // the keeper rather than being dealt down the middle of the pitch from LM to RM. A
+    // whole squad added at once lands on the same spot on purpose — that square is where
+    // you sort them out from.
+    const s=benchSpot(lineupTeam,t.dir);
+    t.xi.push({no,x:s.x,y:s.y,pos:zoneAt(s.x,s.y,t.dir)});}
   else t.subs.push(no);
 }
 function pick(p){                      // tick in the pool -> into the matchday squad
@@ -393,6 +398,12 @@ async function addPlayer(){
 /* ===== formation ===== */
 function renderLuPitch(){
   const t=teamLU(), pit=$('luPitch');
+  // Every dot in a position cell shares it evenly with the others. Done here so all the
+  // ways a cell's membership changes — added, dragged in or out, removed, direction
+  // switched, or arriving from the cloud — end up tidy through one path. save() never
+  // renders, so persisting the tidy-up from inside a render cannot loop; and arrangeXI
+  // reports false once everything already sits where it belongs, so this settles at once.
+  if(arrangeXI(t.xi,t.dir))save();
   pit.innerHTML=pitchSVG('football')+gridHTML(t.dir);
   t.xi.forEach(x=>{
     const p=rosterPlayer(t,x.no);

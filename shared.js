@@ -139,6 +139,52 @@ function gridHTML(dir){
   h+=`<div class="pz-arrow">${dir==='lr'?'▶':'◀'}</div>`;
   return h;
 }
+/* the cell a dot is standing in, in DISPLAY coordinates (the same split zoneAt uses) */
+function cellAt(x,y){return {row:y<25?0:(y<75?1:2),col:Math.max(0,Math.min(5,Math.floor(x/100*6)))};}
+/* Centre of one CANONICAL grid cell, as pitch percentages. FORMATION_GRID is canonical
+   (attacking left, GK right) while the grid is drawn in display coordinates, so the row
+   and column go through the same effRow/effCol the label lookup does. */
+function cellCentre(cRow,cCol,dir){
+  const row=effRow(cRow,dir), col=effCol(cCol,dir);
+  return {x:(col+0.5)*100/6, y:PZ_ROW_TOP[row]+PZ_ROW_H[row]/2};
+}
+/* Where a player joins the pitch when his position is not known yet: the empty square
+   beside the goalkeeper — the one next to LB for the home side, next to RB for the away
+   side. It is a staging square, not a position (zoneAt returns '' there), so a whole
+   squad added at once simply stacks on the same spot until the dots are dragged out. */
+const BENCH_CELL={home:[2,5],away:[0,5]};
+function benchSpot(team,dir){
+  const c=BENCH_CELL[team==='away'?'away':'home'];
+  return cellCentre(c[0],c[1],dir);
+}
+/* Space the dots inside each POSITION cell evenly down it, so a cell holding two centre
+   backs reads as a tidy pair instead of a pile: one sits in the middle, two at 1/3 and
+   2/3, three at 1/4·1/2·3/4, four at 1/5…4/5 — n dots at (i+1)/(n+1) of the cell. They
+   keep the order they were already stacked in, and stay centred across the cell.
+   The staging square is deliberately skipped: that is the one place dots may overlap.
+   Returns true when something actually moved, so the caller can persist it. */
+function arrangeXI(xi,dir){
+  const cells=new Map();
+  (xi||[]).forEach(x=>{
+    const c=cellAt(x.x,x.y);
+    if(!FORMATION_GRID[effRow(c.row,dir)][effCol(c.col,dir)])return;   // staging square
+    const k=c.row+','+c.col;
+    if(!cells.has(k))cells.set(k,[]);
+    cells.get(k).push(x);
+  });
+  let moved=false;
+  cells.forEach((list,k)=>{
+    const row=+k.split(',')[0], col=+k.split(',')[1];
+    const cx=(col+0.5)*100/6, top=PZ_ROW_TOP[row], h=PZ_ROW_H[row];
+    list.sort((a,b)=>a.y-b.y||String(a.no).localeCompare(String(b.no)));
+    list.forEach((x,i)=>{
+      const nx=cx, ny=top+h*(i+1)/(list.length+1);
+      if(Math.abs(x.x-nx)>0.01||Math.abs(x.y-ny)>0.01){x.x=nx; x.y=ny; moved=true;}
+      x.pos=zoneAt(x.x,x.y,dir);
+    });
+  });
+  return moved;
+}
 const MAX_XI={football:11,football7:7,futsal:5,basketball:5};
 
 /* ===================== PLAYER STATS ===================== */

@@ -139,7 +139,9 @@ deleted event being refused rather than half-applied, and the two tables staying
 and what a stored row is allowed to carry — every event naming the player who did it,
 `#pass success`/`#cross success` naming the receiver whose dot fills `rx,ry`, `#pass fail`/
 `#cross fail` keeping their trailing extra dot, and the double-click event cell refusing to
-rename a row into a ball-moving event it has no receiver for.
+rename a row into a ball-moving event it has no receiver for; and the formation board —
+where an unknown position parks, that a squad added at once stacks there, and that a
+position cell spaces 1 to 4 dots evenly without pushing any of them into a neighbour.
 `tests/` is not part of the deployed site.
 
 ## Real-time cloud sync (Supabase)
@@ -181,6 +183,11 @@ indexes, RLS, and the realtime publication.
   what `1qq*s2` tags. An event's own hotkey always wins, so a macro can never shadow one; a
   clashing code is shown in red. Macros are stored per browser (`pitchtagger.macros.v1`) and,
   unlike the event dictionary, are **not** shared through the cloud.
+- On the **Player lists** formation board, a player whose position isn't known yet lands on
+  the empty staging square beside the goalkeeper — next to LB for the home side, next to RB
+  for the away side. A whole squad added at once stacks on that one spot on purpose; it is
+  where you sort them out from. Drag a dot into a position cell and the cell shares itself
+  out evenly: one sits in the middle, two at 1/3 and 2/3, three at 1/4·1/2·3/4, and so on.
 - Every tagged event names the player who did it (`2f`, not `f`), so every stored row has
   `x,y`. A **successful** pass/cross also names the receiver (`1s2`) — that player's dot is
   what fills `rx,ry`. A **failed** one reaches nobody, so it names no receiver and takes one
