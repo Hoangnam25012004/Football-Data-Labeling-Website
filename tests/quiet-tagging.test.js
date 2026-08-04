@@ -34,11 +34,23 @@ test('a tag that worked says nothing', () => {
   notOk(/toast\([^)]*✓/.test(fn),'no success toast of any kind left in the entry path');
 });
 
-test('but a tag that could not be applied still speaks up', () => {
+test('a sending-off is applied without announcing itself', () => {
   const fn=grabFunction('submitEntry');
-  // these report a change you cannot see in the row you just added
-  ok(/toast\('⚠ '\+subPlan\.notices\[0\]\)/.test(fn),'a substitution with no starting XI');
-  ok(/toast\('🟥 No\.'/.test(fn),'and a sending-off, which changes how many are on the pitch');
+  notOk(/🟥/.test(fn),'no sent-off toast');
+  // …and the work it was wrapped around is still done
+  ok(/if\(redOut\.length\|\|replacedReds\.length\)saveLineups\(\)/.test(fn),
+     'the new XI is still saved');
+  ok(/applyRedCard\(r\.team,r\.playerFrom,r\.t\)/.test(fn),'the player still leaves the pitch');
+  ok(/removeRedSideEffects\(replacedReds\)/.test(fn),'and a re-tag still rolls the old one back');
+});
+
+test('a substitution that could not be applied still stops, silently', () => {
+  const fn=grabFunction('applySubGroup');
+  notOk(/toast\(/.test(fn.slice(0,fn.indexOf('state.lineups.history'))),
+        'nothing announced on the way out');
+  // the early return is the load-bearing half of that line — without it a period would be
+  // created for a swap that never happened
+  ok(/if\(!done\.length\)return false;/.test(fn),'it still reports failure to the caller');
 });
 
 /* ================= editing ================= */
@@ -55,6 +67,23 @@ test('starting an edit says nothing either', () => {
 /* ================= everything else is left alone ================= */
 test('toast() itself is untouched, and still used where it earns its place', () => {
   ok(/function toast\(/.test(SRC),'the helper is still defined');
-  ['Match created ✓','Saved team','Opening match #','No substitution was recorded']
+  // one-off actions in the Match / Cloud / Video flows, not the tagging loop
+  ['Match created ✓','Saved team','Opening match #','Uploaded to R2 ✓']
     .forEach(msg=>ok(SRC.includes(msg),'still reported: '+msg));
+});
+
+test('the tagging loop is down to two notices, both about something unseen', () => {
+  ['applyRedCard','startEdit','startEditGroup','deleteRows']
+    .forEach(name=>notOk(/toast\(/.test(grabFunction(name)),name+' is silent'));
+
+  // the tag landed but the formation could not follow it — not a confirmation
+  const entry=grabFunction('submitEntry');
+  eq((entry.match(/toast\(/g)||[]).length,1,'submitEntry keeps one');
+  ok(/toast\('⚠ '\+subPlan\.notices\[0\]\)/.test(entry),'the "no starting XI" notice');
+
+  // applySubGroup still confirms a swap it applied, and opens the formation modal with it
+  const sub=grabFunction('applySubGroup');
+  eq((sub.match(/toast\(/g)||[]).length,1,'applySubGroup keeps one');
+  ok(/toast\('Substitution '\+done\.map/.test(sub),'the one naming the swap that went through');
+  ok(/openFmModal\(team\)/.test(sub),'raised beside the modal it tells you to adjust');
 });

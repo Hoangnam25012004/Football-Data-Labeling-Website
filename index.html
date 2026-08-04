@@ -1873,11 +1873,9 @@ function submitEntry(){
   const redRows=writtenRows.filter(r=>r.event==='red card'&&r.playerFrom);
   let redOut=[];
   redRows.forEach(r=>{if(applyRedCard(r.team,r.playerFrom,r.t))redOut.push(r.playerFrom);});
-  if(redOut.length||replacedReds.length){
-    saveLineups();
-    if(redOut.length)toast('🟥 No.'+redOut.join(', ')+' sent off — '
-      +effectiveLU(redRows[0].team,redRows[0].t).xi.length+' players left on');
-  }
+  // silent: the sending-off is already visible in the row, on the formation board and in
+  // the period the snapshot below creates. saveLineups() is the work — the toast was not.
+  if(redOut.length||replacedReds.length)saveLineups();
   // an edit switched the team buttons to the row's side — go back to where the user was
   if(wasEditing&&editPrevTeam){setTeam(editPrevTeam);editPrevTeam=null;}
   state.activeEvent=evs[evs.length-1].name; renderEvents(); updateBanner();
@@ -1977,7 +1975,9 @@ function applySubGroup(team,subsArr,notices){
     (lu.subHistory=lu.subHistory||[]).push({out:String(s.out),in:String(s.in),t:s.t}); // minutes played
     done.push(s);
   });
-  if(!done.length){toast('⚠ No substitution was recorded — the formation is unchanged');return false}
+  // silent, but the `false` matters: it tells the caller nothing was applied, so no
+  // formation period is created and the events stay tagged against the old shape
+  if(!done.length)return false;
   (state.lineups.history=state.lineups.history||[]).push({
     t:t0, team, xi, subs:bench,
     label:'Substitution: '+done.map(s=>s.out+'▼ '+s.in+'▲').join(', ')});
