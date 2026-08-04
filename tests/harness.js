@@ -63,7 +63,8 @@ function grabConst(name,src,what){
 const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
   'TRANSFER_EVENTS','TRAILING_EXTRA_DOT','newId','SHOT_EVENTS','evtClass',
   'scrollToRow','editPrevTeam'];
-const FUNCS=['fmt','parseTime','eventHalf','matchTime','zoneAt','eventForKey','parseChain',
+const FUNCS=['fmt','parseTime','eventHalf','matchTime','zoneAt','eventForKey',
+  'macroForKey','expandKey','parseChain',
   'effectiveLU','planSubGroup','swapInSnapshot','applySubGroup','subSideEffects',
   'removeSubSideEffects','shiftSubRowsWithPeriod','applyRedCard','redSideEffects',
   'removeRedSideEffects','submitEntry','chainHTML','deleteRows','startEdit','startEditGroup'];
@@ -94,6 +95,8 @@ function makeApp(opts){
     alert:m=>log.alerts.push(m),
     toast:m=>log.toasts.push(m),
     curEvents:()=>EVENTS[opts.state.sport]||EVENTS.football,
+    // macros are a per-sport list on state; a scenario opts in by seeding state.macros
+    curMacros:()=>(opts.state.macros||{})[opts.state.sport]||[],
     saveLineups(){log.lineupSaves++},
     openFmModal(){log.fmModal++},
     // UI-only, irrelevant to what these tests assert

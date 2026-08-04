@@ -96,6 +96,27 @@
   #storeStatus.ok{color:var(--accent)}
   #storeStatus.bad{color:var(--warn)}
 
+  /* Macro table — a second, separate table in the Event modal. One hotkey stands for a
+     whole run of events, so "qq*s" can be typed as "qs". */
+  .sec-head{display:flex;align-items:baseline;gap:8px;margin:0 0 8px}
+  .sec-head b{font-size:12px}
+  .sec-head .mini{font-weight:400;font-size:11px;color:var(--mut)}
+  .mac-sec{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+  .mac-list{display:flex;flex-direction:column;gap:5px;max-height:230px;overflow:auto;padding-right:2px}
+  .mac-item{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+  .mac-key{width:56px;height:28px;text-align:center;background:#000;border:1px solid var(--line);border-radius:6px;font-weight:700;color:var(--accent);font-size:12px;text-transform:lowercase;padding:0 4px}
+  .mac-key:focus{outline:none;border-color:var(--accent);background:#06281a}
+  /* red, both sides, exactly like a clashing key looks in the reference tool: this code is
+     already an event hotkey or another macro's, so it would never reach the macro */
+  .mac-key.bad,.mac-key.bad:focus{border-color:var(--danger);color:var(--danger);background:#2a0e12}
+  .mac-evs{flex:1;font-size:12px;line-height:1.5;word-break:break-word}
+  .mac-evs .evt{font-weight:600}
+  .mac-evs .miss{color:var(--danger);font-weight:600}
+  .mac-x{color:var(--mut);font-weight:700;cursor:pointer;padding:0 4px}
+  .mac-x:hover{color:var(--danger)}
+  .mac-add{width:100%;margin-top:8px;background:var(--panel2);border:1px dashed var(--line);color:var(--mut);border-radius:8px;padding:8px;cursor:pointer;font-weight:700;font-size:12px}
+  .mac-add:hover{border-color:var(--accent);color:var(--accent)}
+
   .syntax-hint{font-size:11px;color:var(--mut);margin-top:5px;line-height:1.5}
   .syntax-hint code{background:#000;padding:1px 5px;border-radius:4px;color:var(--accent)}
   .active-banner{margin-top:10px;background:#16302440;border:1px solid var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--mut)}
@@ -435,15 +456,28 @@
 <div class="modal-overlay" id="evModal">
   <div class="modal">
     <div class="modal-head">
-      <b>Event types + hotkeys</b>
+      <b>Event types + Macro</b>
       <span class="mini" id="storeStatus">—</span>
       <button class="modal-close" id="evModalClose" title="Close">×</button>
     </div>
     <div class="modal-body">
+      <div class="sec-head"><b>Event types</b><span class="mini">— one hotkey, one event</span></div>
       <div class="ev-list" id="evList"></div>
       <div class="addrow">
         <input class="txt" id="newEvName" placeholder="New event name">
         <button id="addEvBtn" title="add">+</button>
+      </div>
+
+      <!-- second, separate table: a macro is ONE hotkey for a whole run of events -->
+      <div class="mac-sec">
+        <div class="sec-head"><b>Macro</b><span class="mini">— one hotkey, several events at once</span></div>
+        <div class="mac-list" id="macList"></div>
+        <button class="mac-add" id="addMacroBtn" title="Add a macro">＋ Add Macro</button>
+        <div class="syntax-hint">
+          Press <b>＋ Add Macro</b> and type the events the way you type them in the entry box —
+          <code>qq*s</code> — then give the macro its own hotkey, e.g. <code>qs</code>.
+          From then on <code>1qs2</code> tags exactly what <code>1qq*s2</code> tags.
+        </div>
       </div>
     </div>
   </div>
@@ -798,6 +832,11 @@ function loadTeamIds(){try{const m=JSON.parse(localStorage.getItem('pitchtagger.
 const state = {
   sport:'football', team:'home', activeEvent:null,
   events:loadEvents(),
+  // {football:[{key,events:[name,…]}, …]} — one key, several events. Filled in by
+  // loadMacros() further down, NOT here: MAC_STORE is a const declared below this
+  // object, so calling the loader from inside it reads the name in its temporal dead
+  // zone and throws into the loader's own catch — silently, giving no macros at all.
+  macros:{},
   duration:loadDuration(),
   pendingDots:[],              // ordered pitch dots — one per ball touch, attached to the next entry
   editingId:null,              // id of the row being re-edited (submit updates it in place)
@@ -1163,8 +1202,35 @@ function applyEventTypes(ev){
   state.events=ev;
   try{localStorage.setItem(EV_STORE,JSON.stringify(ev));}catch(e){}
   if(!curEvents().some(e=>e.name===state.activeEvent))state.activeEvent=curEvents()[0]?.name||null;
-  renderEvents(); updateBanner(); updateStoreStatus();
+  // the macro rows read the dictionary too: a re-keyed event can start clashing with a
+  // macro's code, and a deleted one leaves the macro pointing at nothing
+  renderEvents(); renderMacros(); updateBanner(); updateStoreStatus();
 }
+/* ---- macros (saved across reload, this browser only) ----
+   A macro is one hotkey standing for a run of events: "qs" -> recovery + pass success.
+   Stored by event NAME, not by the events' hotkeys, so re-binding an event's key (or
+   picking the dictionary up from the cloud) leaves every macro pointing at the same
+   events. They live in their own store — the cloud event_types table has no column for
+   them, and nothing else in the app reads this key. */
+const MAC_STORE='pitchtagger.macros.v1';
+function loadMacros(){
+  try{
+    const o=JSON.parse(localStorage.getItem(MAC_STORE)||'null');
+    if(o&&typeof o==='object'&&!Array.isArray(o)){
+      const out={};
+      SPORTS.forEach(sp=>{out[sp]=(Array.isArray(o[sp])?o[sp]:[])
+        .filter(m=>m&&Array.isArray(m.events)&&m.events.length)
+        .map(m=>({key:String(m.key||'').toLowerCase(),events:m.events.map(String)}));});
+      return out;
+    }
+  }catch(e){}
+  const empty={}; SPORTS.forEach(sp=>{empty[sp]=[]}); return empty;
+}
+function saveMacros(){
+  try{localStorage.setItem(MAC_STORE,JSON.stringify(state.macros));}catch(e){STORAGE_OK=false;}
+  updateStoreStatus();
+}
+state.macros=loadMacros();   // here, not in the state literal — see the note on state.macros
 function updateStoreStatus(){
   const el=$('storeStatus'); if(!el)return;
   const n=Object.values(state.events).reduce((a,arr)=>a+(arr?arr.length:0),0);
@@ -1638,7 +1704,7 @@ function setKey(ev,val){
   val=(val||'').trim().toLowerCase().replace(/\s+/g,'');
   // prevent duplicates: clear the same code from any other event
   if(val) curEvents().forEach(o=>{if(o!==ev&&o.key===val)o.key=''});
-  ev.key=val; saveEvents(); renderEvents(); updateBanner();
+  ev.key=val; saveEvents(); renderEvents(); renderMacros(); updateBanner();
 }
 function renderEvents(){
   const list=$('evList'); list.innerHTML='';
@@ -1662,18 +1728,92 @@ function renderEvents(){
     name.onclick=()=>setActive(ev.name);
     const x=document.createElement('div');x.className='ev-x';x.textContent='×';x.title='delete';
     x.onclick=e=>{e.stopPropagation();state.events[state.sport]=curEvents().filter(o=>o!==ev);
-      if(state.activeEvent===ev.name)state.activeEvent=curEvents()[0]?.name||null;saveEvents();renderEvents();updateBanner()};
+      if(state.activeEvent===ev.name)state.activeEvent=curEvents()[0]?.name||null;
+      saveEvents();renderEvents();renderMacros();updateBanner()};
     item.appendChild(key);item.appendChild(name);item.appendChild(x);
     list.appendChild(item);
   });
 }
 function nextFreeKey(){const used=new Set(curEvents().map(e=>e.key));return DEFAULT_KEYS.find(k=>!used.has(k))||''}
-$('addEvBtn').onclick=()=>{const n=$('newEvName').value.trim();if(!n)return;curEvents().push({name:n,key:nextFreeKey()});if(!state.activeEvent)state.activeEvent=n;$('newEvName').value='';saveEvents();renderEvents();updateBanner()};
+
+/* ---- Macro table (second table in the Event modal) ---- */
+// why a key can't work: an event hotkey of the same name always wins, and two macros
+// sharing a key are ambiguous. Both cases paint the box red, like the reference tool.
+function macroKeyProblem(m){
+  const k=m.key;
+  if(!k)return '';
+  if(curEvents().some(e=>e.key===k))return 'The event hotkey "'+k+'" already uses this code — the macro would never fire.';
+  if(curMacros().some(o=>o!==m&&o.key===k))return 'Another macro already uses "'+k+'".';
+  return '';
+}
+function setMacroKey(m,val){
+  // only the letters the entry box reads as one key: no digits (they are player numbers)
+  // and no '*' (that is the separator between keys)
+  m.key=(val||'').toLowerCase().replace(/[^a-z]/g,'');
+  saveMacros(); renderMacros();
+}
+function renderMacros(){
+  const list=$('macList'); if(!list)return;
+  list.innerHTML='';
+  if(!curMacros().length){
+    const e=document.createElement('div');
+    e.style.cssText='color:var(--mut);font-size:11px;padding:10px;text-align:center';
+    e.textContent='No macros yet. Press ＋ Add Macro to turn a run of events into one hotkey.';
+    list.appendChild(e); return;
+  }
+  curMacros().forEach(m=>{
+    const item=document.createElement('div'); item.className='mac-item';
+    const problem=macroKeyProblem(m);
+    const key=document.createElement('input');
+    key.className='mac-key'+(problem?' bad':''); key.value=m.key||''; key.maxLength=8;
+    key.placeholder='—';
+    key.title=problem||'Type the macro hotkey (e.g. qs). Press Enter to save.';
+    key.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();key.blur()}};
+    key.onchange=()=>setMacroKey(m,key.value);
+    key.onblur=()=>setMacroKey(m,key.value);
+    const evs=document.createElement('div'); evs.className='mac-evs';
+    m.events.forEach((n,i)=>{
+      const known=curEvents().some(o=>o.name===n);
+      const s=document.createElement('span');
+      s.className=known?('evt'+evtClass(n)):'miss';
+      s.textContent='#'+n;
+      if(!known)s.title='This event no longer exists — the macro can\'t fire.';
+      if(i)evs.appendChild(document.createTextNode(' '));
+      evs.appendChild(s);
+    });
+    const x=document.createElement('div'); x.className='mac-x'; x.textContent='×'; x.title='delete';
+    x.onclick=()=>{state.macros[state.sport]=curMacros().filter(o=>o!==m);saveMacros();renderMacros()};
+    item.appendChild(key); item.appendChild(evs); item.appendChild(x);
+    list.appendChild(item);
+  });
+}
+/* "+ Add Macro": ask for the events in the syntax the user already types, resolve them
+   to names, then drop in a row whose hotkey box is empty and focused — the key is typed
+   straight into the table, exactly like the tool this was modelled on. */
+function addMacro(){
+  const raw=(prompt('Macro — type the events the way you type them in the entry box, separated by *\n\ne.g.  qq*s   (recovery + pass success)')||'').trim().toLowerCase();
+  if(!raw)return;
+  if(/\d/.test(raw)){alert('A macro is events only — leave the player numbers out (e.g. qq*s, not 1qq*s2).');return}
+  const names=[];
+  for(const k of raw.replace(/\s+/g,'').split('*').filter(Boolean)){
+    for(const o of expandKey(k)){
+      if(!o.name){alert('No event is bound to hotkey "'+k+'".');return}
+      names.push(o.name);
+    }
+  }
+  if(!names.length){alert('Type at least one event hotkey, e.g. qq*s.');return}
+  curMacros().push({key:'',events:names});
+  saveMacros(); renderMacros();
+  const boxes=$('macList').querySelectorAll('.mac-key');
+  const box=boxes[boxes.length-1]; if(box){box.focus();box.scrollIntoView({block:'nearest'});}
+}
+$('addEvBtn').onclick=()=>{const n=$('newEvName').value.trim();if(!n)return;curEvents().push({name:n,key:nextFreeKey()});if(!state.activeEvent)state.activeEvent=n;$('newEvName').value='';saveEvents();renderEvents();renderMacros();updateBanner()};
 $('newEvName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('addEvBtn').click()}});
-$('sportSel').onchange=e=>{state.sport=e.target.value;state.activeEvent=curEvents()[0]?.name||null;renderEvents();updateBanner();updateScore();saveMeta();if(pvRenderPitch)pvRenderPitch();};
+$('addMacroBtn').onclick=addMacro;
+$('sportSel').onchange=e=>{state.sport=e.target.value;state.activeEvent=curEvents()[0]?.name||null;renderEvents();renderMacros();updateBanner();updateScore();saveMeta();if(pvRenderPitch)pvRenderPitch();};
 
 /* event modal (opened from the top bar button) */
-function openEvModal(){$('evModal').classList.add('show');renderEvents();updateStoreStatus();setTimeout(()=>$('newEvName').focus(),0);}
+function openEvModal(){$('evModal').classList.add('show');renderEvents();renderMacros();updateStoreStatus();setTimeout(()=>$('newEvName').focus(),0);}
 function closeEvModal(){$('evModal').classList.remove('show');$('playerInput').focus()}
 $('eventBtn').onclick=openEvModal;
 $('evModalClose').onclick=closeEvModal;
@@ -1682,6 +1822,26 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('evModal').classL
 
 /* event lookup by hotkey (supports multi-char like 'aa') */
 function eventForKey(k){const ev=curEvents().find(o=>o.key&&o.key===k);return ev?ev.name:null}
+
+/* ===== MACROS — one hotkey for a run of events =====
+   "qs" -> recovery + pass success, i.e. what "qq*s" already types. A macro is stored as
+   the list of event NAMES it stands for, so it survives an event being re-keyed. */
+function curMacros(){return state.macros[state.sport]||(state.macros[state.sport]=[])}
+function macroForKey(k){const m=curMacros().find(o=>o.key&&o.key===k);return m?m.events:null}
+/* one typed key -> the {key,name} entries it contributes to the group. An event hotkey
+   always wins, so adding a macro can never change what an existing key does; an unknown
+   key (or a macro pointing at a deleted event) comes back with name:null, which is what
+   parseChain reports as badKey. Each expanded event keeps its OWN hotkey, so the row's
+   action_code stays the event's code and double-click editing still round-trips. */
+function expandKey(k){
+  const direct=eventForKey(k);
+  if(direct)return [{key:k,name:direct}];
+  const names=macroForKey(k);
+  if(names&&names.length)
+    return names.map(n=>{const ev=curEvents().find(o=>o.name===n);
+      return ev?{key:ev.key||k,name:ev.name}:{key:k,name:null};});
+  return [{key:k,name:null}];
+}
 
 /* ===== SYNTAX — chains of events in one entry =====
    "1s2"        one pass 1->2 (classic)
@@ -1703,7 +1863,7 @@ function parseChain(raw){
   // resolve a pending key group once the next number (or the end of input) is known
   const flush=(nextNum,nextIdx)=>{
     if(!group)return;
-    const named=group.map(k=>({key:k,name:eventForKey(k)}));
+    const named=group;   // already {key,name} pairs — a macro key contributed several
     named.forEach(o=>{if(!o.name&&!badKey)badKey=o.key;});
     if(curIdx==null&&nextNum!=null){
       // keys BEFORE the first number belong to that player (e.g. "aa2" = 2 does aa)
@@ -1728,7 +1888,8 @@ function parseChain(raw){
       flush(tok,idx);
       curNum=tok; curIdx=idx;
     }else{
-      group=(group||[]).concat(tok.split('*').filter(Boolean));
+      // a key may be a macro, which stands for several events at this exact spot
+      tok.split('*').filter(Boolean).forEach(k=>{group=(group||[]).concat(expandKey(k))});
     }
   });
   flush(null,null);   // trailing keys = solo events of the last player
@@ -2969,7 +3130,7 @@ if(!/match=/i.test(location.hash)){
 }
 
 if(!state.activeEvent)state.activeEvent=curEvents()[0]?.name||null;
-renderEvents(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); renderFormationMain();
+renderEvents(); renderMacros(); setTeam('home'); updateBanner(); updateStoreStatus(); renderTable(); renderFormationMain();
 updateMatchGate();   // opening with no #match= link means the two match-bound tabs stay shut
 
 /* ---- ▾ Other: the account menu (auth.js is the gate that let this page load) ---- */
@@ -3008,7 +3169,7 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
 })();
 
 // bridge for the cloud-sync module (loaded next)
-window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, renderMacros, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
 </script>
 <script src="cloud-sync.js?v=45"></script>
 </body>

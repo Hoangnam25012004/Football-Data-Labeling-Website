@@ -132,7 +132,10 @@ from coming back, `next` refusing to be an open redirect, the password rules, an
 sign-in screen carrying what a password manager needs); and what Stats and Player lists do
 with no match open — the stores they read are shared by every match this browser has ever
 opened, so a stored squad counts only when its stamp names the match that is open, and the
-main tab keeps both buttons disabled until there is one.
+main tab keeps both buttons disabled until there is one; and the macro hotkeys (a macro
+tagging exactly what its long form tags, the ball-carrier and dot rules coming out the same,
+an event hotkey always winning over a macro that claims it, a macro left pointing at a
+deleted event being refused rather than half-applied, and the two tables staying separate).
 `tests/` is not part of the deployed site.
 
 ## Real-time cloud sync (Supabase)
@@ -168,5 +171,11 @@ indexes, RLS, and the realtime publication.
 ## Notes
 - Without cloud sync, events and the event/hotkey list stay in the browser (localStorage)
   and can be backed up to `pitchtagger_events.json`.
+- **⚙ Event** holds two tables. *Event types* is one hotkey per event. *Macro* is one hotkey
+  for a whole run of events: press **＋ Add Macro**, type the events the way you type them in
+  the entry box (`qq*s`), then give the macro its own code (`qs`) — from then on `1qs2` tags
+  what `1qq*s2` tags. An event's own hotkey always wins, so a macro can never shadow one; a
+  clashing code is shown in red. Macros are stored per browser (`pitchtagger.macros.v1`) and,
+  unlike the event dictionary, are **not** shared through the cloud.
 - Videos are never uploaded — for a scalable multi-user video pipeline use a CDN
   (Cloudflare Stream / R2) as described in the architecture plan.
