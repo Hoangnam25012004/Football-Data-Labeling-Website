@@ -103,9 +103,9 @@
   .addbtn{width:100%;margin-top:10px;background:var(--accent);color:#06281a;border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer;font-size:13px}
   .addbtn:hover{filter:brightness(1.08)}
 
-  .tbl-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
-  .tbl-head b{font-size:12px}
-  .tbl-head .count{color:var(--mut);font-size:11px}
+  /* flex-end, not space-between: the "Events N" heading that sat on the left is gone, so
+     the Formation button and the half picker keep the right-hand side to themselves */
+  .tbl-head{display:flex;align-items:center;justify-content:flex-end;padding:10px 12px;border-bottom:1px solid var(--line)}
   .exports{display:flex;gap:6px}
   .exports button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:11px;font-weight:600}
   .exports button:hover{border-color:var(--accent);color:var(--accent)}
@@ -396,8 +396,9 @@
       <input class="txt" id="playerInput" placeholder="e.g. 1s2  ·  1s2s3s4  ·  1k*c2  ·  1xx*aa" autocomplete="off" autofocus>
     </div>
 
+    <!-- no "Events N" heading: the table is plainly the events, and the running count
+         was noise on a row that is read hundreds of times a match -->
     <div class="tbl-head">
-      <div><b>Events</b> <span class="count" id="count">0</span></div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="ev-btn" id="fmBtn" title="Formations over time for both teams">⛨ Formation</button>
         <select id="halfSel" class="txt" style="width:auto">
@@ -1852,8 +1853,9 @@ function submitEntry(){
   if(pvRedraw)pvRedraw();
   $('halfSel').value=eventHalf(lastRow);
   scrollToRow=lastRow;
+  // no toast for a tag that worked: the new row appearing in the table, highlighted and
+  // scrolled to, already says so — and it said so hundreds of times a match
   renderTable();
-  toast(evs.length>1?(evs.length+' events ✓'):(evs[0].name+' ✓'));
   // substitutions -> new formation snapshot from this moment (the starting lineup
   // in Player lists stays untouched). The pairs were vetted above; re-tagging one first
   // rolls back the snapshot the old row left behind, so the fix replaces it.
@@ -2280,7 +2282,7 @@ function startEdit(idx){
   if(pvSyncEntry)pvSyncEntry();
   renderTable();                          // highlight the row being edited
   if(document.hasFocus())$('playerInput').focus();
-  toast('Editing — adjust & press Enter');
+  // no toast: the row is highlighted and its text is already in the box, waiting
 }
 /* pull a whole CHAIN back into the editor: raw syntax + every touch dot.
    Submitting replaces all the old rows of the chain with the new batch. */
@@ -2309,7 +2311,7 @@ function startEditGroup(grpRows){
   if(pvSyncEntry)pvSyncEntry();
   renderTable();
   if(document.hasFocus())$('playerInput').focus();
-  toast('Editing the chain — change it and press Enter (the old chain is replaced)');
+  // same as startEdit: the highlighted row and the filled box are the notice
 }
 function cancelEdit(){                     // leave edit mode without changing the row(s)
   if(!state.editingId&&!state.editingGroup)return;
@@ -2413,7 +2415,6 @@ function renderTable(){
     }
     tb.appendChild(tr);
   }
-  $('count').textContent=shown;
   $('emptyMsg').style.display=shown?'none':'block';
   updateScore(); saveRows();   // keep the Stats page in sync
   if(targetTr){targetTr.scrollIntoView({block:'center'});targetTr.classList.add('just-added');setTimeout(()=>targetTr.classList.remove('just-added'),700);}
