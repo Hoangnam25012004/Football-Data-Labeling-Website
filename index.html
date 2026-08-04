@@ -449,7 +449,7 @@
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
-      <div class="empty" id="emptyMsg">No events yet. Seek the video, pick a team, press an event hotkey (or click) to tag.</div>
+      <div class="empty" id="emptyMsg">No events yet. Seek the video, pick a team, then type a shirt number and an event hotkey (e.g. <b>2f</b> — a pass names the receiver too, <b>1s2</b>) to tag.</div>
     </div>
   </div>
 </div>
@@ -1855,6 +1855,11 @@ function expandKey(k){
    entry ENDS with a failed pass/cross (opponent-recovery position). */
 const TRANSFER_EVENTS=new Set(['pass success','pass fail','cross success','cross fail','substitution']);
 const TRAILING_EXTRA_DOT=new Set(['pass fail','cross fail']);
+/* A SUCCESSFUL pass/cross reaches a team-mate, so the entry has to name them — that
+   receiver's own dot is what fills rx,ry in the database. A FAILED one reaches nobody:
+   it names no receiver and takes the trailing extra dot above instead. Leaving the
+   success variants out of both sets is what let "2s" be stored with rx,ry NULL. */
+const NEEDS_RECEIVER=new Set(['pass success','cross success']);
 function parseChain(raw){
   raw=(raw||'').trim().toLowerCase();
   const tokens=raw.match(/\d+|[a-z*]+/g)||[];
@@ -1947,9 +1952,30 @@ function submitEntry(){
   const allSubs=evs.length>0&&evs.every(e=>e.name==='substitution');
   if(!allSubs&&evs.some(e=>e.name==='substitution')){
     alert('Do not mix a substitution with other events in one entry.');return}
+  /* ===== what every stored row has to carry =====
+     Checked on `evs` — the events as they will be SPLIT into rows — not on the typed
+     text, so a chain can't smuggle a half-formed one through in the middle ("1s*s2").
+     Ordered before the dot count so the structural reason wins over "Check the dots".
+     Substitutions are in neither set below, so their own rules further down still hold. */
+  const noPlayer=evs.find(e=>!e.from);
+  if(noPlayer){
+    alert('#'+noPlayer.name+' needs a shirt number — type the player who did it (e.g. 2'
+      +(noPlayer.key||'')+').');return}
+  // a successful pass/cross with nobody to receive it is the bug this rule exists for:
+  // it used to be stored with rx,ry NULL, i.e. a completed pass to nowhere
+  const noReceiver=evs.find(e=>NEEDS_RECEIVER.has(e.name)&&!e.to);
+  if(noReceiver){
+    alert('#'+noReceiver.name+' needs a receiver — type the player who got the ball (e.g. 1'
+      +(noReceiver.key||'s')+'2).');return}
   const last=evs[evs.length-1];
   const needExtra=(!allSubs&&last&&!last.to&&TRAILING_EXTRA_DOT.has(last.name))?1:0;
   const need=touches+needExtra;
+  // the extra dot exists only for the LAST event, so a receiver-less failed pass buried
+  // mid-entry could never be given one — it would land with rx,ry NULL like the above
+  const strandedFail=evs.find(e=>TRAILING_EXTRA_DOT.has(e.name)&&!e.to&&e!==last);
+  if(strandedFail){
+    alert('#'+strandedFail.name+' with no receiver has to be the last event in the entry'
+      +' — it takes the extra dot where the ball ended up.');return}
   // only substitutions are dot-free; every other event (cards included) is placed on the
   // pitch — a card's dot marks where the card was shown / the foul that earned it happened
   if(allSubs){
@@ -2626,8 +2652,15 @@ function editEventCell(td,idx){
     const key=inp.value.trim().toLowerCase();
     if(key && key!==cur){
       const name=eventForKey(key);
-      if(name){r.event=name; r.action=key;}
-      else{alert('No event is bound to hotkey "'+key+'".');}
+      // this cell swaps the NAME only — it can't invent the dots a ball-moving event is
+      // stored with, so renaming into one the row has no receiver for is refused rather
+      // than quietly writing rx,ry NULL to the database
+      if(!name){alert('No event is bound to hotkey "'+key+'".');}
+      else if(NEEDS_RECEIVER.has(name)&&(!r.rXY||!r.playerTo)){
+        alert('#'+name+' needs a receiver and a second dot — use ✎ Edit to re-tag the row.');}
+      else if(TRAILING_EXTRA_DOT.has(name)&&!r.rXY){
+        alert('#'+name+' needs the dot where the ball ended up — use ✎ Edit to re-tag the row.');}
+      else{r.event=name; r.action=key;}
     }
     renderTable(); window.Cloud&&window.Cloud.onLocalUpsert(r);};
   td.textContent=''; td.appendChild(inp); inp.focus(); inp.select();

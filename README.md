@@ -135,7 +135,11 @@ opened, so a stored squad counts only when its stamp names the match that is ope
 main tab keeps both buttons disabled until there is one; and the macro hotkeys (a macro
 tagging exactly what its long form tags, the ball-carrier and dot rules coming out the same,
 an event hotkey always winning over a macro that claims it, a macro left pointing at a
-deleted event being refused rather than half-applied, and the two tables staying separate).
+deleted event being refused rather than half-applied, and the two tables staying separate);
+and what a stored row is allowed to carry — every event naming the player who did it,
+`#pass success`/`#cross success` naming the receiver whose dot fills `rx,ry`, `#pass fail`/
+`#cross fail` keeping their trailing extra dot, and the double-click event cell refusing to
+rename a row into a ball-moving event it has no receiver for.
 `tests/` is not part of the deployed site.
 
 ## Real-time cloud sync (Supabase)
@@ -177,5 +181,9 @@ indexes, RLS, and the realtime publication.
   what `1qq*s2` tags. An event's own hotkey always wins, so a macro can never shadow one; a
   clashing code is shown in red. Macros are stored per browser (`pitchtagger.macros.v1`) and,
   unlike the event dictionary, are **not** shared through the cloud.
+- Every tagged event names the player who did it (`2f`, not `f`), so every stored row has
+  `x,y`. A **successful** pass/cross also names the receiver (`1s2`) — that player's dot is
+  what fills `rx,ry`. A **failed** one reaches nobody, so it names no receiver and takes one
+  extra dot where the ball ended up (`7ss` + 2 dots), which fills `rx,ry` instead.
 - Videos are never uploaded — for a scalable multi-user video pipeline use a CDN
   (Cloudflare Stream / R2) as described in the architecture plan.

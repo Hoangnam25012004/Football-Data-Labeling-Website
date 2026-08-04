@@ -61,7 +61,7 @@ function grabConst(name,src,what){
 
 // everything the substitution / entry flow needs, in dependency order
 const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
-  'TRANSFER_EVENTS','TRAILING_EXTRA_DOT','newId','SHOT_EVENTS','evtClass',
+  'TRANSFER_EVENTS','TRAILING_EXTRA_DOT','NEEDS_RECEIVER','newId','SHOT_EVENTS','evtClass',
   'scrollToRow','editPrevTeam'];
 const FUNCS=['fmt','parseTime','eventHalf','matchTime','zoneAt','eventForKey',
   'macroForKey','expandKey','parseChain',
