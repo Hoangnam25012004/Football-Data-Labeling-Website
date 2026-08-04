@@ -1213,7 +1213,13 @@ function dbToRow(d){
     playerFrom:d.player_from!=null?String(d.player_from):'',
     playerTo:d.player_to!=null?String(d.player_to):'',
     action:d.action_code||'', raw:a.raw||'', grp:a.grp||null, ord:a.ord??0,
-    pXY:d.x!=null?{x:d.x,y:d.y}:null, rXY:d.rx!=null?{x:d.rx,y:d.ry}:null};
+    pXY:d.x!=null?{x:d.x,y:d.y}:null, rXY:d.rx!=null?{x:d.rx,y:d.ry}:null,
+    // where the ball crossed the line, for a shot on target / goal. This page loads its
+    // events from Supabase itself rather than through cloud-sync.js, so it needs its own
+    // copy of this line — leaving it out dropped every goal spot on the way in, and the
+    // shooting map stayed empty however many were tagged. The twin in cloud-sync.js is
+    // pinned to this one by a test.
+    gXY:d.goal_x!=null?{x:d.goal_x,y:d.goal_y}:null};
 }
 (async function statsCloud(){
   const m=location.hash.match(/match=([0-9a-z-]{5,36})/i);

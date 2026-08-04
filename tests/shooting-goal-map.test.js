@@ -219,6 +219,28 @@ test('the report page puts the goal above the pitch, in the left column', () => 
   ok(/const FIRST=25, CONT=33/.test(fn),'and the row counts that fit a page are unchanged');
 });
 
+/* ================= the two row mappers must agree ================= */
+test('the Stats page maps a database row exactly as cloud-sync does', () => {
+  // There are two copies of this mapper: the main tab reads events through cloud-sync.js,
+  // while this page fetches them from Supabase itself whenever the url carries #match=.
+  // gXY was added to one and not the other, so every goal spot was dropped on the way in
+  // and the shooting map stayed empty however many had been tagged.
+  const lift=(src,what)=>{const ctx={console};vm.createContext(ctx);
+    vm.runInContext(grabFunction('dbToRow',src,what),ctx);return ctx.dbToRow;};
+  const stats=lift(STATS,'Stats/index.html');
+  const cloud=lift(fs.readFileSync(path.join(ROOT,'cloud-sync.js'),'utf8'),'cloud-sync.js');
+  const norm=o=>JSON.stringify(Object.keys(o).sort().reduce((a,k)=>(a[k]=o[k],a),{}));
+  const row={id:'e1',t_seconds:12.5,team:'home',event_name:'goal',action_code:'ddd',
+    player_from:9,player_to:null,x:80,y:40,rx:null,ry:null,goal_x:33,goal_y:66,
+    attributes:{raw:'9ddd',team_name:'H',rt:null,grp:'g1',ord:0}};
+  eq(norm(stats(row)),norm(cloud(row)),'same row in, same row out');
+  deepEq(stats(row).gXY,{x:33,y:66},'…including the goal spot');
+  // a row written before the migration has no such column, and reads as "not placed" on both
+  const old=Object.assign({},row); delete old.goal_x; delete old.goal_y;
+  eq(stats(old).gXY,null); eq(cloud(old).gXY,null);
+  eq(norm(stats(old)),norm(cloud(old)));
+});
+
 /* ================= shipped ================= */
 test('shared.js and report.js were cache-busted after being changed', () => {
   // both are edited here; without a bump returning users keep the old file and the goal
