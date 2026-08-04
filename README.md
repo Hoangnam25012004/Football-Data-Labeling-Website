@@ -147,7 +147,10 @@ and that its copy of the arranger has not drifted from the one in `shared.js`; a
 spot — that a shot on target is not written until the ball has been placed, that every other
 event still tags in one Enter, that the spot lands on the shot rows and nothing else, that a
 click outside the frame is pulled back onto it, and that an event without one never names the
-`goal_x`/`goal_y` columns (which is what keeps un-migrated databases syncing).
+`goal_x`/`goal_y` columns (which is what keeps un-migrated databases syncing); and the goal
+mouth on the shooting maps — where a marker lands for a given spot, that only placed shots
+get one, and that the report numbers a goal marker exactly as its pitch marker and its Event
+List row.
 `tests/` is not part of the deployed site.
 
 ## Real-time cloud sync (Supabase)
@@ -206,6 +209,12 @@ indexes, RLS, and the realtime publication.
   before tagging shots against a cloud match**: it adds the two columns those coordinates
   go into. Until it is run, ordinary events still sync (they never name the columns), but a
   placed shot fails to upsert.
+- Those spots are drawn on **both shooting maps** — the Stats tab's and the one in the match
+  report — as a goal mouth beside the pitch, so the pair reads as "struck from here, ended up
+  there". Markers carry the same label and colour as the pitch map next to them: the shirt
+  number in the Stats tab, the shot's number (which is its row in the Event List) in the
+  report. Only shots that were given a spot appear; off target, blocked and missed never
+  cross the line.
 - Every tagged event names the player who did it (`2f`, not `f`), so every stored row has
   `x,y`. A **successful** pass/cross also names the receiver (`1s2`) — that player's dot is
   what fills `rx,ry`. A **failed** one reaches nobody, so it names no receiver and takes one

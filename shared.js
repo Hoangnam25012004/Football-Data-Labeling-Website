@@ -286,6 +286,48 @@ function shotList(rows,team){
 const SHOT_COLOR={'goal':'#f7b32f','shot on target':'#39d98a'};
 const shotColor=e=>SHOT_COLOR[evKey(e)]||'#8b97a7';
 
+/* ---- the goal mouth, for the shooting maps ----
+   A shot on target or a goal tagged on the main tab also carries gXY: where the ball
+   crossed the line, normalised to the mouth itself (x 0 = left post → 100 = right post,
+   y 0 = crossbar → 100 = the goal line). Drawing that beside the pitch map is what turns
+   "where it was struck from" into "…and where it ended up". It needs no mirroring for
+   half or attacking direction — it is already in the goal's own frame, not the pitch's.
+
+   `marks` are {x,y,label,color,square}; `o` themes it, since the Stats tab is dark and
+   the printed report is light. */
+const GOAL_MAP={w:640,h:232,x:70,y:30,mw:500,mh:167};
+function goalMarks(rows,team,pick){
+  return (rows||[]).filter(r=>(team==null||r.team===team)&&r.gXY&&SHOT_KINDS.has(evKey(r.event)))
+    .map(pick).filter(Boolean);
+}
+function goalMouthSVG(marks,o){
+  o=o||{};
+  const G=GOAL_MAP, x2=G.x+G.mw, y2=G.y+G.mh, T=o.post||9, R=o.r||17;
+  const net=o.net||'#2a3542', frame=o.frame||'#e6edf3', ink=o.ink||'#fff', ring=o.ring||'#0d1117';
+  let grid='';
+  for(let i=1;i<16;i++){const vx=(G.x+i*G.mw/16).toFixed(1);
+    grid+='<line x1="'+vx+'" y1="'+G.y+'" x2="'+vx+'" y2="'+y2+'"/>';}
+  for(let i=1;i<8;i++){const vy=(G.y+i*G.mh/8).toFixed(1);
+    grid+='<line x1="'+G.x+'" y1="'+vy+'" x2="'+x2+'" y2="'+vy+'"/>';}
+  const dots=(marks||[]).map(m=>{
+    const cx=G.x+m.x/100*G.mw, cy=G.y+m.y/100*G.mh;
+    const shape=m.square
+      ?'<rect x="'+(cx-R).toFixed(1)+'" y="'+(cy-R).toFixed(1)+'" width="'+(R*2)+'" height="'+(R*2)
+        +'" rx="4" fill="'+m.color+'" stroke="'+ring+'" stroke-width="2.5"/>'
+      :'<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+R+'" fill="'+m.color
+        +'" stroke="'+ring+'" stroke-width="2.5"/>';
+    return '<g>'+shape+'<text x="'+cx.toFixed(1)+'" y="'+(cy+R*0.38).toFixed(1)
+      +'" text-anchor="middle" font-size="'+Math.round(R*1.1)+'" font-weight="800" fill="'+ink+'">'
+      +(m.label==null?'':m.label)+'</text></g>';
+  }).join('');
+  return '<svg viewBox="0 0 '+G.w+' '+G.h+'" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">'
+    +'<g stroke="'+net+'" stroke-width="1">'+grid+'</g>'
+    +'<line x1="'+(G.x-46)+'" y1="'+y2+'" x2="'+(x2+46)+'" y2="'+y2+'" stroke="'+net+'" stroke-width="2"/>'
+    +'<path d="M '+(G.x-T/2)+' '+y2+' V '+(G.y-T/2)+' H '+(x2+T/2)+' V '+y2
+    +'" fill="none" stroke="'+frame+'" stroke-width="'+T+'" stroke-linecap="round" stroke-linejoin="round"/>'
+    +dots+'</svg>';
+}
+
 /* ---- cards on the match timeline ----
    A player's 2nd yellow IS a sending-off and reads as "2nd Yellow → Red". When the tagger
    ALSO tags an explicit red card for that same dismissal, the two describe one event — the

@@ -107,6 +107,7 @@ table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
 .rp-sgwrap{display:flex;gap:18px;align-items:flex-start}
 .rp-sgleft{width:292px;flex:none}
 .rp-sgright{flex:1;min-width:0}
+.rp-goalmouth{margin:0 0 6px}
 .rp-sgleg{justify-content:flex-start;gap:9px;font-size:8.5px;margin-top:7px}
 .rp-sgleg i{width:8px;height:8px;margin-right:4px}
 .rp-duo{display:flex;gap:14px;margin-bottom:2px}
@@ -448,6 +449,16 @@ function shotDotsV(team){
         +`font-size="18" font-weight="800" fill="#fff">${i+1}</text></g>`;
     }).join('');
 }
+/* The same filter and order as shotDotsV, so a shot keeps ONE number across the goal
+   mouth, the pitch map and the Event List. Only the ones that were given a spot appear —
+   off target, blocked and missed never cross the line. */
+function goalMarksV(team){
+  return rows.filter(r=>r.team===team&&SHOT_KINDS.has(r.event)&&r.t!=null)
+    .sort((a,b)=>a.t-b.t)
+    .map((r,i)=>r.gXY?{x:r.gXY.x,y:r.gXY.y,label:i+1,
+      color:SHOT_MAP_COLORS[r.event]||'#aeb4bc',square:eventHalf(r)===2}:null)
+    .filter(Boolean);
+}
 function shotsAndGoalsPages(team){
   const list=shotList(rows,team), names=squadNames(lineups,team);
   const tr=s=>`<tr><td class="el-c"><span class="rp-elidx" style="background:${shotColor(s.event)}">${s.idx}</span></td>`
@@ -457,7 +468,11 @@ function shotsAndGoalsPages(team){
   const table=slice=>`<table class="rpt rpt-el"><thead><tr><th class="el-c">#</th><th class="el-c">Time</th>`
     +`<th>Player</th><th>Body Part</th></tr></thead><tbody>${slice.map(tr).join('')}</tbody></table>`;
   const title=`Shots &amp; Goals — ${esc(TN(team))}`;
+  // where the on-target ones crossed the line. Numbered and coloured exactly like the map
+  // and the Event List, so #7 in the goal is #7 on the pitch is #7 in the table.
+  const gm=goalMarksV(team);
   const left=`<div class="rp-sgleft"><div class="rp-mtitle" style="color:${TC(team)}">Shots</div>`
+    +`<div class="rp-goalmouth">${goalMouthSVG(gm,{net:'#c9cfd9',frame:'#98a0aa',ink:'#fff',ring:'#fff'})}</div>`
     +vPitchSVG(vUpArrowSVG()+shotDotsV(team))
     +`<div class="rp-mleg rp-sgleg"><span><i style="background:${C.gold}"></i>Goal</span>`
     +`<span><i style="background:${C.green}"></i>On target</span>`

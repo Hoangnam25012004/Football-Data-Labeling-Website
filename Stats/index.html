@@ -64,6 +64,10 @@ body>header{flex:none}
 .hm-flex{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
 .hm-flex>div:first-child{flex:1;min-width:340px}
 .hm-flex .shotmap-pitch{margin:2px auto 0;max-width:640px}   /* centred in its column; the legend below is centred too */
+/* the goal mouth sits above the pitch in the shooting map: same width, so a marker in the
+   goal lines up over the pitch the shot was struck from */
+.shotmap-goal{max-width:640px;margin:0 auto 6px}
+.sm-sub{color:var(--mut);font-size:10px;text-align:center;margin-top:2px}
 #heatCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .hm-mark{position:absolute;width:26px;height:26px;border-radius:50%;transform:translate(-50%,-50%);
   display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;
@@ -156,7 +160,7 @@ body>header{flex:none}
   <div class="stats-wrap"><div id="statsHolder"></div></div>
 </div>
 
-<script src="../shared.js?v=15"></script>
+<script src="../shared.js?v=16"></script>
 <script>
 /* The lineup store is shared by every tab and by every match this browser has ever opened,
    so a stored squad is only ours if its stamp names the match that is actually open. Taking
@@ -342,10 +346,16 @@ function shotMapHTML(team){
       +`<text x="${cx}" y="${(+cy+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#06281a">${r.playerFrom||''}</text></g>`;
   }).join('');
   const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG(attackDir(team,shotHalf))+dots+'</svg>');
+  // …and where each of those that was on target actually crossed the line. Same half, same
+  // colours, same shirt number, so a marker in the goal is the one on the pitch below it.
+  const gm=goalMarks(rows,team,r=>eventHalf(r)===shotHalf&&kinds[r.event]
+    ?{x:r.gXY.x,y:r.gXY.y,label:r.playerFrom||'',color:kinds[r.event]}:null);
+  const goal=`<div class="shotmap-goal">${goalMouthSVG(gm,{ink:'#06281a',ring:'#0d1117'})}`
+    +`<div class="sm-sub">${gm.length?'Where they crossed the line':'No shot placed in the goal yet'}</div></div>`;
   const legend=`<span class="sm-leg"><span class="leg-dot" style="background:#f7b32f"></span>Goal</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:#39d98a"></span>On target</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:#8b97a7"></span>Off / Blocked / Missed</span>`;
-  return `<div class="chart-card map-card">${head}`
+  return `<div class="chart-card map-card">${head}${goal}`
     +`<div class="shotmap-pitch">${pitch}</div><div class="shotmap-legend">${legend}</div></div>`;
 }
 function setShotHalf(h){shotHalf=h;renderStats();}
@@ -1237,6 +1247,6 @@ function dbToRow(d){
   }catch(e){console.warn('Stats cloud load failed — using local data:',(e&&e.message)||e);}
 })();
 </script>
-<script src="report.js?v=27"></script>
+<script src="report.js?v=28"></script>
 </body>
 </html>
