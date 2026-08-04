@@ -119,6 +119,27 @@ test('team names are escaped on the way into the card', () => {
   ok(/const escHtml=/.test(SRC),'and the helper is defined in this page — shared.js is not loaded here');
 });
 
+/* The cards are read as a stack, so "vs" has to sit in the same place on each one.
+   space-between put it wherever the names happened to end, which made it wander from card
+   to card; a 1fr auto 1fr grid gives both names an equal half and pins it to the middle. */
+test('every card puts "vs" in the same place', () => {
+  const css=/\.rc-top\{[^}]*\}/.exec(SRC)[0];
+  ok(/display:grid/.test(css),'a grid, not a flex row');
+  ok(/grid-template-columns:1fr auto 1fr/.test(css),'equal halves either side of it');
+  notOk(/justify-content:space-between/.test(css),'nothing that moves with the text length');
+  ok(/align-items:center/.test(css),'and centred against a name that wrapped');
+});
+
+test('a long team name wraps inside its half instead of being cut off', () => {
+  const names=/\.rc-top \.rc-h,\.rc-top \.rc-a\{[^}]*\}/.exec(SRC)[0];
+  ok(/white-space:normal/.test(names),'wrapping allowed');
+  ok(/overflow-wrap:break-word/.test(names)&&/word-break:break-word/.test(names),
+     'and a single long word still breaks');
+  ok(/min-width:0/.test(names),'grid items shrink rather than forcing the row wider');
+  notOk(/text-overflow:ellipsis/.test(names),'no truncation');
+  notOk(/white-space:nowrap/.test(names),'and nothing pinning it to one line');
+});
+
 test('cloud-sync.js is re-fetched, not served from cache', () => {
   const v=/cloud-sync\.js\?v=(\d+)/.exec(SRC);
   ok(+v[1]>=45,'bumped past 44, which shipped without rememberMatch — got '+v[1]);
