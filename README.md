@@ -143,7 +143,11 @@ rename a row into a ball-moving event it has no receiver for; and the formation 
 where an unknown position parks, that a squad added at once stacks there, and that a
 position cell spaces 1 to 4 dots evenly without pushing any of them into a neighbour, that
 the Formation modal tidies every period of the team on screen and leaves the other alone,
-and that its copy of the arranger has not drifted from the one in `shared.js`.
+and that its copy of the arranger has not drifted from the one in `shared.js`; and the goal
+spot — that a shot on target is not written until the ball has been placed, that every other
+event still tags in one Enter, that the spot lands on the shot rows and nothing else, that a
+click outside the frame is pulled back onto it, and that an event without one never names the
+`goal_x`/`goal_y` columns (which is what keeps un-migrated databases syncing).
 `tests/` is not part of the deployed site.
 
 ## Real-time cloud sync (Supabase)
@@ -193,6 +197,15 @@ indexes, RLS, and the realtime publication.
   The main tab's **⛨ Formation** modal spaces its dots by the same rule — opening it tidies
   that team's whole timeline, the starting XI and every substitution snapshot, so scrubbing
   the video shows an even board at any moment. The other team waits until it is opened.
+- A **#shot on target** or **#goal** is stored with the spot the ball crossed the line at.
+  Press Enter on the entry and the formation panel turns into a goal mouth: drag the ball
+  onto the spot and press Enter again to save it, or Esc to go back (the entry and its dots
+  are kept either way). The spot is normalised to the mouth — `goal_x` 0 = left post → 100 =
+  right post, `goal_y` 0 = crossbar → 100 = the goal line — and clamped to the frame.
+  **Run [`supabase/migrations/0012_event_goal_xy.sql`](supabase/migrations/0012_event_goal_xy.sql)
+  before tagging shots against a cloud match**: it adds the two columns those coordinates
+  go into. Until it is run, ordinary events still sync (they never name the columns), but a
+  placed shot fails to upsert.
 - Every tagged event names the player who did it (`2f`, not `f`), so every stored row has
   `x,y`. A **successful** pass/cross also names the receiver (`1s2`) — that player's dot is
   what fills `rx,ry`. A **failed** one reaches nobody, so it names no receiver and takes one

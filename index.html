@@ -49,6 +49,25 @@
   /* largest 105:68 box that fits the stage (works for any stage shape) */
   .fm-pitch{position:relative;aspect-ratio:105/68;width:min(100%, calc(100cqh * 105 / 68))}
   .fm-pitch svg{position:absolute;inset:0;width:100%;height:100%}
+
+  /* Goal mouth — the formation panel turns into this while a shot on target / goal is
+     waiting for the spot the ball crossed the line at, and turns straight back after. */
+  .goal-stage{flex:1;min-height:0;display:none;flex-direction:column;gap:8px}
+  #formationPanel.goal-on .fm-stage,#formationPanel.goal-on #fmSubs{display:none}
+  #formationPanel.goal-on .goal-stage{display:flex}
+  .goal-hint{font-size:11px;color:var(--mut);text-align:center;line-height:1.5}
+  .goal-hint b{color:var(--accent)}
+  .goal-box{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;container-type:size}
+  .goal-wrap{position:relative;aspect-ratio:400/260;width:min(100%, calc(100cqh * 400 / 260));cursor:crosshair}
+  .goal-wrap svg{position:absolute;inset:0;width:100%;height:100%}
+  .goal-ball{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;
+    background:#f6f8fa;border:2px solid #0b0f14;display:flex;align-items:center;justify-content:center;
+    font-size:15px;line-height:1;cursor:grab;z-index:3;touch-action:none;
+    box-shadow:0 0 0 3px rgba(57,217,138,.55),0 2px 6px rgba(0,0,0,.6)}
+  .goal-ball:active{cursor:grabbing}
+  .goal-read{position:absolute;left:50%;bottom:2%;transform:translateX(-50%);z-index:3;
+    font-size:10px;font-weight:700;color:var(--accent);background:#000a;padding:2px 8px;border-radius:6px;
+    pointer-events:none;font-variant-numeric:tabular-nums}
   .fm-dot{position:absolute;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;border:2px solid #000;z-index:3}
   .fm-dot.away{background:var(--away)}
   .fm-dot .lbl{position:absolute;top:25px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600}
@@ -410,6 +429,15 @@
     <div id="formationPanel">
       <div id="fmSubs"></div>
       <div class="fm-stage"><div class="fm-pitch" id="fmPitch"></div></div>
+      <!-- the same panel becomes a goal mouth while a shot on target / goal waits for the
+           spot the ball crossed the line at; .goal-on swaps which of the two is shown -->
+      <div class="goal-stage" id="goalStage">
+        <div class="goal-hint">
+          <b id="goalWhat">Shot on target</b> — drag the ball to where it crossed the line,
+          then press <b>Enter</b> to save. <b>Esc</b> to go back.
+        </div>
+        <div class="goal-box"><div class="goal-wrap" id="goalWrap"></div></div>
+      </div>
     </div>
   </div>
 
@@ -1139,6 +1167,72 @@ function renderFormationSubs(){
   el.innerHTML=h||'<span class="fm-sub-empty">No substitutes</span>';
 }
 function refreshFormation(){ renderFormationMain(); }   // formation is always shown on the main tab
+
+/* ===== GOAL MOUTH — where the ball crossed the line for a shot on target / goal =====
+   Stored normalised to the mouth itself, so it means the same thing whatever size the
+   panel is drawn at: goal_x 0 = left post → 100 = right post, goal_y 0 = crossbar →
+   100 = the goal line. Both are clamped to the frame — a shot ON target is by
+   definition inside it — so nothing outside the posts can be recorded. */
+const GOAL_SPOT_EVENTS=new Set(['shot on target','goal']);
+const GOAL_VIEW={w:400,h:260,x:50,y:60,mw:300,mh:100};   // the mouth is 3:1, like a real goal
+function goalSVG(){
+  const G=GOAL_VIEW, x2=G.x+G.mw, y2=G.y+G.mh;
+  let net='';
+  for(let v=G.x+20;v<x2;v+=20)net+='<line x1="'+v+'" y1="'+G.y+'" x2="'+v+'" y2="'+y2+'"/>';
+  for(let h=G.y+20;h<y2;h+=20)net+='<line x1="'+G.x+'" y1="'+h+'" x2="'+x2+'" y2="'+h+'"/>';
+  return '<svg viewBox="0 0 '+G.w+' '+G.h+'" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block">'
+    +'<rect x="0" y="0" width="'+G.w+'" height="'+G.h+'" fill="#0d1117"/>'
+    +'<rect x="'+G.x+'" y="'+G.y+'" width="'+G.mw+'" height="'+G.mh+'" fill="#12341f"/>'
+    +'<g stroke="#3b4652" stroke-width="1">'+net+'</g>'
+    +'<line x1="14" y1="'+y2+'" x2="'+(G.w-14)+'" y2="'+y2+'" stroke="#7d8794" stroke-width="2"/>'
+    +'<g stroke="#f6f8fa" stroke-width="7" stroke-linecap="round" fill="none">'
+    +'<line x1="'+G.x+'" y1="'+G.y+'" x2="'+G.x+'" y2="'+y2+'"/>'
+    +'<line x1="'+x2+'" y1="'+G.y+'" x2="'+x2+'" y2="'+y2+'"/>'
+    +'<line x1="'+(G.x-3.5)+'" y1="'+G.y+'" x2="'+(x2+3.5)+'" y2="'+G.y+'"/></g></svg>';
+}
+// mouth coordinates <-> a position inside the wrapper, both as percentages
+function goalToPct(g){const G=GOAL_VIEW;
+  return {left:(G.x+g.x/100*G.mw)/G.w*100, top:(G.y+g.y/100*G.mh)/G.h*100};}
+function goalFromPct(px,py){const G=GOAL_VIEW, cl=v=>Math.max(0,Math.min(100,v));
+  return {x:cl((px/100*G.w-G.x)/G.mw*100), y:cl((py/100*G.h-G.y)/G.mh*100)};}
+
+let goalCapture=null;   // {x,y} in mouth % while the panel is showing the goal
+function openGoalCapture(label,seed){
+  goalCapture=seed?{x:seed.x,y:seed.y}:{x:50,y:50};   // starts in the middle of the mouth
+  const w=$('goalWhat'); if(w)w.textContent='#'+(label||'shot on target');
+  const p=$('formationPanel'); if(p)p.classList.add('goal-on');
+  renderGoalCapture();
+  // the entry box keeps the keyboard, so the confirming Enter still reaches submitEntry
+  if(document.hasFocus())$('playerInput').focus();
+}
+function closeGoalCapture(){
+  goalCapture=null;
+  const p=$('formationPanel'); if(p)p.classList.remove('goal-on');
+}
+function renderGoalCapture(){
+  const wrap=$('goalWrap'); if(!wrap||!goalCapture)return;
+  wrap.innerHTML=goalSVG();
+  const ball=document.createElement('div');
+  ball.className='goal-ball'; ball.textContent='⚽';
+  ball.title='Drag me to where the ball crossed the line';
+  const read=document.createElement('div'); read.className='goal-read';
+  const place=()=>{const p=goalToPct(goalCapture);
+    ball.style.left=p.left+'%'; ball.style.top=p.top+'%';
+    read.textContent='x '+goalCapture.x.toFixed(1)+' · y '+goalCapture.y.toFixed(1);};
+  const at=ev=>{const r=wrap.getBoundingClientRect(); if(!r.width||!r.height)return;
+    goalCapture=goalFromPct((ev.clientX-r.left)/r.width*100,(ev.clientY-r.top)/r.height*100);
+    place();};
+  ball.onpointerdown=e=>{
+    e.preventDefault(); e.stopPropagation();
+    ball.setPointerCapture(e.pointerId);
+    const move=ev=>at(ev);
+    const up=()=>{ball.removeEventListener('pointermove',move);ball.removeEventListener('pointerup',up);};
+    ball.addEventListener('pointermove',move); ball.addEventListener('pointerup',up);
+  };
+  wrap.onclick=e=>at(e);          // clicking anywhere in the frame moves the ball there
+  wrap.appendChild(ball); wrap.appendChild(read);
+  place();
+}
 // '_blank' (not a fixed window name) so this always opens a fresh new tab instead of
 // re-navigating a previously-opened one (which some browsers surface as "replacing" the tab)
 // saveLineups() only when a match is open: with none, `state.lineups` is the blank
@@ -1944,6 +2038,13 @@ $('playerInput').addEventListener('keydown',e=>{
   if(e.key==='+'||e.key==='='){e.preventDefault();setPlaybackRate(video.playbackRate+0.1);return}
   if(e.key==='-'||e.key==='_'){e.preventDefault();setPlaybackRate(video.playbackRate-0.1);return}
   if(e.key==='Enter'){e.preventDefault();submitEntry();return}
+  // waiting on a goal spot: Esc backs out of the goal mouth and hands the formation back,
+  // leaving the entry text and its dots untouched so the next Enter opens it again. It is
+  // ahead of the edit-mode Esc below so it cannot also pop a dot on the way out.
+  if(e.key==='Escape'&&goalCapture){
+    e.preventDefault(); e.stopPropagation();
+    closeGoalCapture(); return;
+  }
   // while editing: Esc ALWAYS just removes one dot (never clears the entry text or exits
   // edit mode) — same behaviour whether Esc is pressed here or in the video window.
   // To leave edit mode, clear the box instead. stopPropagation so the document-level Esc
@@ -2016,6 +2117,18 @@ function submitEntry(){
   }else if(touches>0&&dots.length!==need){
     alert('Check the dots — '+need+' needed: '+touches+' touch(es)'
       +(needExtra?' + 1 dot where the opponent won the ball':'')+'.');return}
+  /* A shot on target / goal is stored with the spot the ball crossed the line at, so the
+     entry is held here until it has one: the formation panel turns into the goal mouth,
+     the ball is dragged onto the spot, and the confirming Enter comes back through here
+     with goalCapture set and writes the rows. Placed after every other check so nobody
+     positions a ball only to be told the dots were wrong. Esc closes it and leaves the
+     entry and its dots exactly as they were, ready to try again. */
+  const shot=evs.find(e=>GOAL_SPOT_EVENTS.has(e.name));
+  if(shot&&!goalCapture){
+    const prev=state.editingId?(state.rows.find(r=>r.id===state.editingId)||{}).gXY:null;
+    openGoalCapture(shot.name,prev);
+    return;
+  }
   const wasEditing=!!state.editingId||!!state.editingGroup;
   // A single-event edit that STAYS a single event updates the row in place (keeps its id).
   // Anything else while editing — a single event that becomes a chain (e.g. 1s2 -> 1s2m /
@@ -2075,7 +2188,10 @@ function submitEntry(){
       teamName:state.team==='home'?$('homeName').value:$('awayName').value,
       event:ev.name,playerFrom:ev.from,playerTo:ev.to||'',action:ev.key,raw,
       grp:grpId, ord:k,   // ord = position within the chain, so a group's rows keep their order
-      pXY:pD?{x:pD.x,y:pD.y}:null, rXY:rD?{x:rD.x,y:rD.y}:null};
+      pXY:pD?{x:pD.x,y:pD.y}:null, rXY:rD?{x:rD.x,y:rD.y}:null,
+      // one ball, one place it crossed the line: the spot goes on every shot-on-target /
+      // goal row this entry writes, and on nothing else
+      gXY:(goalCapture&&GOAL_SPOT_EVENTS.has(ev.name))?{x:goalCapture.x,y:goalCapture.y}:null};
     let row;
     if(existing){Object.assign(existing,data);row=existing;}   // edit in place — keep the same id
     else{row=Object.assign({id:newId()},data);state.rows.push(row);}
@@ -2084,6 +2200,7 @@ function submitEntry(){
   });
   state.editingId=null;
   state.pendingDots=[];              // consume the dots
+  closeGoalCapture();                // …and the goal spot, giving the formation back
   if(pvRedraw)pvRedraw();
   $('halfSel').value=eventHalf(lastRow);
   scrollToRow=lastRow;
@@ -3255,6 +3372,6 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
 // bridge for the cloud-sync module (loaded next)
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, renderMacros, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
 </script>
-<script src="cloud-sync.js?v=45"></script>
+<script src="cloud-sync.js?v=46"></script>
 </body>
 </html>

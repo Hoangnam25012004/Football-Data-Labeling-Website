@@ -28,6 +28,11 @@ const dots=n=>Array.from({length:n},(_,i)=>({x:10+i*7,y:20+i*5,t:1}));
 function tag(raw,n,active){
   const a=app(active);
   submit(a,raw,dots(n));
+  // An entry holding a shot on target / goal is kept back for its goal spot: the first
+  // Enter opens the goal mouth, the second writes the rows. These tests are about the
+  // receiver rule, so the ball is left in the middle and the entry just confirmed.
+  // Nothing written and nothing said is the gate — a refusal always raises an alert.
+  if(!a.state.rows.length&&!a.log.alerts.length)a.submitEntry();
   return {rows:a.state.rows,alert:a.log.alerts[0]||'',app:a};
 }
 

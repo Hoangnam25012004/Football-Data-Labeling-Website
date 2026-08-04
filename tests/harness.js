@@ -62,9 +62,11 @@ function grabConst(name,src,what){
 // everything the substitution / entry flow needs, in dependency order
 const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
   'TRANSFER_EVENTS','TRAILING_EXTRA_DOT','NEEDS_RECEIVER','newId','SHOT_EVENTS','evtClass',
+  'GOAL_SPOT_EVENTS','GOAL_VIEW','goalCapture',
   'scrollToRow','editPrevTeam'];
 const FUNCS=['fmt','parseTime','eventHalf','matchTime','zoneAt','eventForKey',
-  'macroForKey','expandKey','parseChain',
+  'macroForKey','expandKey','parseChain','goalToPct','goalFromPct',
+  'openGoalCapture','closeGoalCapture',
   'effectiveLU','planSubGroup','swapInSnapshot','applySubGroup','subSideEffects',
   'removeSubSideEffects','shiftSubRowsWithPeriod','applyRedCard','redSideEffects',
   'removeRedSideEffects','submitEntry','chainHTML','deleteRows','startEdit','startEditGroup'];
@@ -99,7 +101,10 @@ function makeApp(opts){
     curMacros:()=>(opts.state.macros||{})[opts.state.sport]||[],
     saveLineups(){log.lineupSaves++},
     openFmModal(){log.fmModal++},
-    // UI-only, irrelevant to what these tests assert
+    // UI-only, irrelevant to what these tests assert. renderGoalCapture is the only part
+    // of the goal mouth that touches the DOM — the gate itself (openGoalCapture setting
+    // the spot, submitEntry refusing to write until it is there) is the real code.
+    renderGoalCapture(){},
     renderTable(){},renderEvents(){},updateBanner(){},setTeam(t){opts.state.team=t},
     renderFormationMain(){},refreshFormation(){},saveRows(){},updateScore(){},
     pvRedraw:null,pvSyncEntry:null,
@@ -116,6 +121,16 @@ function makeApp(opts){
 function submit(app,raw,dots){
   app.state.pendingDots=(dots||[]).map(d=>({x:d.x,y:d.y,t:d.t==null?app.video.currentTime:d.t}));
   app.$('playerInput').value=raw;
+  app.submitEntry();
+}
+/* An entry holding a shot on target / goal is kept back for the spot the ball crossed the
+   line at: the first Enter opens the goal mouth, the ball is moved onto the spot, and the
+   second Enter writes the rows. This plays that round trip. `spot` is in mouth percentages
+   and defaults to the middle, where the ball starts. The dots survive the first pass — the
+   gate returns before they are consumed — so the second Enter needs nothing re-placed. */
+function submitShot(app,raw,dots,spot){
+  submit(app,raw,dots);
+  if(spot)app.openGoalCapture('shot on target',spot);
   app.submitEntry();
 }
 
@@ -178,5 +193,5 @@ function fakeStorage(seed){
     snapshot:()=>Object.fromEntries(map)};
 }
 
-module.exports={makeApp,submit,grabFunction,grabConst,loadShared,loadStats,fakeStorage,
+module.exports={makeApp,submit,submitShot,grabFunction,grabConst,loadShared,loadStats,fakeStorage,
   SRC,SHARED,STATS,CLOUD,EVENTS};

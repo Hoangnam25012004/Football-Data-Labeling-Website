@@ -9,7 +9,7 @@
 
    The fixture is that match: Saint Lucia, XI 1/2/4/6/7/8/11/13/14/15/17, bench 3/12/19/20/21.
 */
-const {makeApp,submit}=require('./harness');
+const {makeApp,submit,submitShot}=require('./harness');
 const {test,eq,deepEq,ok,notOk}=require('./tiny-test');
 
 /* ---------------- fixture ---------------- */
@@ -313,7 +313,8 @@ test('deleting a two-pair entry removes both pairs at once', ()=>{
 
 test('ordinary chains still tag normally', ()=>{
   const a=app(null,1000);
-  submit(a,'17j*c14dd',[{x:99,y:1,t:1000},{x:80,y:40,t:1002}]);
+  // the #shot on target at the end is held for its goal spot, so this is two Enters now
+  submitShot(a,'17j*c14dd',[{x:99,y:1,t:1000},{x:80,y:40,t:1002}]);
   eq(a.state.rows.length,3);
   deepEq(a.state.rows.map(r=>r.event),['corner-kick','cross success','shot on target']);
   eq(a.state.lineups.history.length,0,'no formation period for non-subs');

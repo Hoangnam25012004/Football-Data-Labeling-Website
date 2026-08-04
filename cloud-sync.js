@@ -30,7 +30,7 @@ const CONFIG = {
 
   /* ---------- row <-> database row mapping ---------- */
   function rowToDb(r) {
-    return {
+    const row = {
       id: r.id, match_id: matchId, team: r.team, event_name: r.event,
       action_code: r.action || null,
       player_from: toInt(r.playerFrom), player_to: toInt(r.playerTo),
@@ -39,6 +39,12 @@ const CONFIG = {
       t_seconds: r.t, half: PT().eventHalf(r),
       attributes: { raw: r.raw || '', team_name: r.teamName || '', rt: r.rt ?? null, grp: r.grp || null, ord: r.ord ?? 0 }
     };
+    // Where the ball crossed the line (shot on target / goal only — see migration 0012).
+    // Named ONLY when there is one: PostgREST rejects the whole statement when a column
+    // it does not know about is mentioned, so until that migration has been run this
+    // keeps the damage to shots instead of failing every event in the match.
+    if (r.gXY) { row.goal_x = r.gXY.x; row.goal_y = r.gXY.y; }
+    return row;
   }
   function dbToRow(d) {
     const a = d.attributes || {};
@@ -49,7 +55,9 @@ const CONFIG = {
       playerTo: d.player_to != null ? String(d.player_to) : '',
       action: d.action_code || '', raw: a.raw || '', grp: a.grp || null, ord: a.ord ?? 0,
       pXY: d.x != null ? { x: d.x, y: d.y } : null,
-      rXY: d.rx != null ? { x: d.rx, y: d.ry } : null
+      rXY: d.rx != null ? { x: d.rx, y: d.ry } : null,
+      // undefined (column not there yet) reads the same as null (never placed): no spot
+      gXY: d.goal_x != null ? { x: d.goal_x, y: d.goal_y } : null
     };
   }
 
