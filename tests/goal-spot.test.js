@@ -280,6 +280,43 @@ test('the net is drawn in perspective, not as a flat grid', () => {
   ok(/\[0\.25,0\.5,0\.75\]/.test(svg),'crossed at fixed depths so they read as walls');
 });
 
+/* ================= the ball, and the × that clears it ================= */
+test('the ball is a drawn football, not a glyph', () => {
+  const svg=app().goalBallSVG();
+  ok(/^<svg /.test(svg)&&/viewBox="0 0 32 32"/.test(svg),'an svg');
+  eq((svg.match(/<polygon/g)||[]).length,6,'the middle pentagon plus five at the rim');
+  eq((svg.match(/<line/g)||[]).length,5,'five seams out to the rim');
+  ok(/clipPath/.test(svg),'the rim pentagons are clipped by the ball');
+  ok(/#f7fafc/.test(svg),'white leather');
+  ok(/#39d98a/.test(svg),'and the green rim that keeps it off the netting');
+  // the ball itself must not be a glyph any more (⚽ still labels ⚽ Match and the sports
+  // dropdown, which is nothing to do with this)
+  const fn=grabFunction('renderGoalCapture');
+  notOk(/⚽/.test(fn),'the ball is not an emoji');
+  ok(/ball\.innerHTML=goalBallSVG\(\)/.test(fn),'it is drawn');
+});
+
+test('the × sits on the ball and puts it back in the middle', () => {
+  const fn=grabFunction('renderGoalCapture');
+  ok(/className='goal-x'/.test(fn),'the button is created');
+  ok(/ball\.appendChild\(clr\)/.test(fn),'on the ball, so it rides along with it');
+  ok(/goalCapture=\{x:50,y:50\};place\(\)/.test(fn),'clearing recentres and redraws');
+  // it must not start a drag, and must not reach the frame (which would move the ball to it)
+  ok(/clr\.onpointerdown=e=>\{e\.preventDefault\(\);e\.stopPropagation\(\);\}/.test(fn),
+     'its pointerdown is swallowed');
+  ok(/clr\.onclick=e=>\{e\.preventDefault\(\);e\.stopPropagation\(\)/.test(fn),
+     'and its click too');
+  ok(/\.goal-x\{[^}]*position:absolute/.test(SRC)&&/\.goal-x\{[^}]*top:-7px;right:-7px/.test(SRC),
+     'pinned to the ball’s top-right corner');
+});
+
+test('clearing the spot does not cancel the entry', () => {
+  // × is "put the ball back", not "give up" — Esc is what backs out
+  const fn=grabFunction('renderGoalCapture');
+  notOk(/closeGoalCapture/.test(fn),'nothing in the frame closes the capture');
+  ok(/goalCapture=\{x:50,y:50\}/.test(fn),'it only moves the ball');
+});
+
 test('the drawing has no text on it any more', () => {
   const panel=SRC.slice(SRC.indexOf('<div id="formationPanel">'),SRC.indexOf('</div>\n  </div>'));
   notOk(/goalWhat/.test(panel),'the "#shot on target — drag the ball…" line is gone');
