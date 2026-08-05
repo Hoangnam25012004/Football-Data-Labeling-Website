@@ -69,7 +69,7 @@ jobs:
           # Old confirmation emails and bookmarks still point at /auth on the
           # root. Keep a copy there so those links resolve instead of 404ing.
           cp auth.html _site/auth.html
-          cp auth.js   _site/auth.js
+          cp auth.js _site/auth.js
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

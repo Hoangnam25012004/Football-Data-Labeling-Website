@@ -9,6 +9,39 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="../shared.css?v=11">
 <style>
+/* ============================================================
+   Red-and-black theme, matching the client site.
+
+   Scoped to this page on purpose: shared.css is also loaded by
+   Player-Lists, so the tokens are re-declared here (after the link,
+   so these win) rather than edited at source. Player-Lists keeps the
+   theme it had.
+
+   Only the chrome moves. Deliberately NOT touched:
+     --home / --away  team identity, and the PDF report uses the same
+                      blue/gold pairing — screen and print must agree
+     #39d98a / #f7506b  success vs fail on duels, tackles, crosses
+     #f7b32f, #ffd23f, #e5484d  goals and cards
+   ============================================================ */
+:root{
+  --bg:#000000; --panel:#0C0A0B; --panel2:#141011; --line:#2A2325;
+  --ink:#EFEAE8; --mut:#9C8F92; --accent:#E0122B;
+}
+/* the accent is red now, so the dark-green text that used to sit on it
+   would be unreadable — active toggles carry white */
+.stats-toggle button.act-gen{color:#fff}
+.half-toggle button.on{color:#fff}
+/* row hover: the old tint was blue-grey */
+table.stats tbody tr:hover td{background:#1F171933}
+/* the six column-group bands. Still six distinguishable steps, but warm —
+   plus one teal, the same "other side" cue the client site uses. */
+table.stats .grp.g0{background:#3B1220;color:#F6CCD8}
+table.stats .grp.g1{background:#3A1C12;color:#F6D8C2}
+table.stats .grp.g2{background:#2E2412;color:#EFE3BE}
+table.stats .grp.g3{background:#2B1430;color:#E4C8EF}
+table.stats .grp.g4{background:#12262A;color:#C2E3EA}
+table.stats .grp.g5{background:#331A1A;color:#F0CACA}
+
 /* fill the viewport exactly: header + page + stats-wrap as a flex column, so no
    dead band is left under the scroll area regardless of header/padding heights */
 html,body{height:100%}
@@ -292,7 +325,7 @@ function defMapHTML(team){
   const acts=rows.filter(r=>r.team===team && col[evKey(r.event)] && r.pXY && eventHalf(r)===defHalf);
   const d=PITCH_DIMS.football, W=d.w, H=d.h;
   const dots=acts.map(r=>{const cx=(r.pXY.x/100*W).toFixed(1), cy=(r.pXY.y/100*H).toFixed(1);
-    return `<g><circle cx="${cx}" cy="${cy}" r="13" fill="${col[evKey(r.event)]}" fill-opacity="0.9" stroke="#0d1117" stroke-width="2"/>`
+    return `<g><circle cx="${cx}" cy="${cy}" r="13" fill="${col[evKey(r.event)]}" fill-opacity="0.9" stroke="#000000" stroke-width="2"/>`
       +`<text x="${cx}" y="${(+cy+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#06281a">${r.playerFrom||''}</text></g>`;}).join('');
   const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG(attackDir(team,defHalf))+dots+'</svg>');
   const legend=cat.parts.map(([,lbl,c])=>`<span class="sm-leg"><span class="leg-dot" style="background:${c}"></span>${lbl}</span>`).join('');
@@ -355,7 +388,7 @@ function shotMapHTML(team){
   const bottom=Math.min(H,Math.max(H*0.5,deepest+70));
   const dots=shots.map(s=>{
     const cx=s.vx.toFixed(1), cy=s.vy.toFixed(1), col=kinds[s.r.event];
-    return `<g><circle cx="${cx}" cy="${cy}" r="17" fill="${col}" fill-opacity="0.92" stroke="#0d1117" stroke-width="2.5"/>`
+    return `<g><circle cx="${cx}" cy="${cy}" r="17" fill="${col}" fill-opacity="0.92" stroke="#000000" stroke-width="2.5"/>`
       +`<text x="${cx}" y="${(+cy+6).toFixed(1)}" text-anchor="middle" font-size="17" font-weight="800" fill="#06281a">${s.r.playerFrom||''}</text></g>`;
   }).join('');
   // …and the goal itself, standing on the goal line at the top
@@ -368,7 +401,7 @@ function shotMapHTML(team){
   // width the map is normally drawn at, and scales with it below that.
   const CM=49, GOAL_GAP=1*CM;
   const goal=goalMouthG({x:GX,y:-GH-GOAL_GAP,w:GW,h:GH},gm,
-    {ink:'#06281a',ring:'#0d1117',net:'#3b4f5c',frame:'#e6edf3',r:15,noLine:true});
+    {ink:'#06281a',ring:'#000000',net:'#3b4f5c',frame:'#e6edf3',r:15,noLine:true});
   const arrow=`<g opacity="0.45" stroke="#fff" fill="none" stroke-width="6">`
     +`<line x1="${W/2}" y1="${(bottom*0.94).toFixed(0)}" x2="${W/2}" y2="${(bottom*0.82).toFixed(0)}"/>`
     +`<polyline points="${W/2-15},${(bottom*0.85).toFixed(0)} ${W/2},${(bottom*0.82).toFixed(0)} ${W/2+15},${(bottom*0.85).toFixed(0)}"/></g>`
@@ -419,7 +452,7 @@ function passScatterHTML(team){
     if(!moved)break;
   }
   const bubbles=pts.map(p=>
-    `<g><circle cx="${p.cx.toFixed(1)}" cy="${p.cy.toFixed(1)}" r="${p.rr.toFixed(1)}" fill="${fill}" fill-opacity="0.92" stroke="#0d1117" stroke-width="1.5"/>`
+    `<g><circle cx="${p.cx.toFixed(1)}" cy="${p.cy.toFixed(1)}" r="${p.rr.toFixed(1)}" fill="${fill}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/>`
     +`<text x="${p.cx.toFixed(1)}" y="${(p.cy+3.5).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${p.no}</text></g>`).join('');
   // no pixel cap on the svg: it fills the card (whose own max-width sets the size),
   // so the scatter shares the row evenly with the pass matrix instead of sitting
@@ -453,7 +486,7 @@ function crossMapHTML(team){
   [1,2].forEach(i=>over+=`<line x1="${PW+18}" y1="${mT+i*PH/3}" x2="${W-18}" y2="${mT+i*PH/3}" stroke="var(--line)" stroke-width="2"/>`);
   const seg=cr.map(c=>{
     const col=c.ok?'#39d98a':'#f7506b';
-    let s=`<circle cx="${c.a.x.toFixed(1)}" cy="${c.a.y.toFixed(1)}" r="8" fill="${col}" fill-opacity="0.9" stroke="#0d1117" stroke-width="1.5"/>`;
+    let s=`<circle cx="${c.a.x.toFixed(1)}" cy="${c.a.y.toFixed(1)}" r="8" fill="${col}" fill-opacity="0.9" stroke="#000000" stroke-width="1.5"/>`;
     if(c.b)s+=`<line x1="${c.a.x.toFixed(1)}" y1="${c.a.y.toFixed(1)}" x2="${c.b.x.toFixed(1)}" y2="${c.b.y.toFixed(1)}"`
       +` stroke="${col}" stroke-width="3.5" stroke-dasharray="9 8" marker-end="url(#${c.ok?'cmOk':'cmNo'})" opacity="0.9"/>`;
     return s;
@@ -504,8 +537,8 @@ function takeOnMapHTML(team){
   [1,2].forEach(i=>over+=`<line x1="${PW+18}" y1="${mT+i*PH/3}" x2="${W-18}" y2="${mT+i*PH/3}" stroke="var(--line)" stroke-width="2"/>`);
   const dots=fl.map(f=>{
     const shape=f.half===1
-      ?`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${f.col}" fill-opacity="0.92" stroke="#0d1117" stroke-width="1.5"/>`
-      :`<rect x="${(f.x-11).toFixed(1)}" y="${(f.y-11).toFixed(1)}" width="22" height="22" rx="3" fill="${f.col}" fill-opacity="0.92" stroke="#0d1117" stroke-width="1.5"/>`;
+      ?`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${f.col}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/>`
+      :`<rect x="${(f.x-11).toFixed(1)}" y="${(f.y-11).toFixed(1)}" width="22" height="22" rx="3" fill="${f.col}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/>`;
     return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(f.no)}</text></g>`;
   }).join('');
   const pitch=`<g transform="translate(0 ${mT})"><rect width="${PW}" height="${PH}" fill="rgba(26,62,32,0.72)"/>`
@@ -561,7 +594,7 @@ function foulMapHTML(team){
   const defs='<defs><pattern id="dngPat" width="26" height="26" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">'
     +'<rect width="26" height="26" fill="rgba(247,80,107,0.10)"/><rect width="13" height="26" fill="rgba(247,80,107,0.26)"/></pattern></defs>';
   const dots=fl.map(f=>{
-    const ring=f.card?`stroke="${f.card==='red card'?'#e5484d':'#ffd23f'}" stroke-width="5"`:'stroke="#0d1117" stroke-width="1.5"';
+    const ring=f.card?`stroke="${f.card==='red card'?'#e5484d':'#ffd23f'}" stroke-width="5"`:'stroke="#000000" stroke-width="1.5"';
     const shape=f.half===1
       ?`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${fill}" fill-opacity="0.92" ${ring}/>`
       :`<rect x="${(f.x-11).toFixed(1)}" y="${(f.y-11).toFixed(1)}" width="22" height="22" rx="3" fill="${fill}" fill-opacity="0.92" ${ring}/>`;
@@ -605,8 +638,8 @@ function plainEventMapHTML(team,eventName){
   [1,2].forEach(i=>over+=`<line x1="${PW+18}" y1="${mT+i*PH/3}" x2="${W-18}" y2="${mT+i*PH/3}" stroke="var(--line)" stroke-width="2"/>`);
   const dots=fl.map(f=>{
     const shape=f.half===1
-      ?`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${fill}" fill-opacity="0.92" stroke="#0d1117" stroke-width="1.5"/>`
-      :`<rect x="${(f.x-11).toFixed(1)}" y="${(f.y-11).toFixed(1)}" width="22" height="22" rx="3" fill="${fill}" fill-opacity="0.92" stroke="#0d1117" stroke-width="1.5"/>`;
+      ?`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${fill}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/>`
+      :`<rect x="${(f.x-11).toFixed(1)}" y="${(f.y-11).toFixed(1)}" width="22" height="22" rx="3" fill="${fill}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/>`;
     return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${f.no}</text></g>`;
   }).join('');
   const pitch=`<g transform="translate(0 ${mT})"><rect width="${PW}" height="${PH}" fill="rgba(26,62,32,0.72)"/>`
@@ -1019,7 +1052,7 @@ function matchSummaryHTML(){
     return `<text x="8" font-size="11" font-weight="700" fill="${col}">`
       +ls.map((l,i)=>`<tspan x="8" y="${y0+i*lh}">${l}</tspan>`).join('')+'</text>';};
   g+=nameText(meta.home,'var(--home)',true)+nameText(meta.away,'var(--away)',false);
-  const cardRect=(col,x)=>`<rect x="${x}" y="-8" width="10" height="16" rx="2" fill="${col}" stroke="#0d1117"/>`;
+  const cardRect=(col,x)=>`<rect x="${x}" y="-8" width="10" height="16" rx="2" fill="${col}" stroke="#000000"/>`;
   // substitution: the player going off (red ▼) beside the one coming on (green ▲)
   const subIcon=`<g stroke-linecap="round">`
     +`<line x1="-5.5" y1="-7" x2="-5.5" y2="1.4" stroke="#f7506b" stroke-width="2.6"/>`
