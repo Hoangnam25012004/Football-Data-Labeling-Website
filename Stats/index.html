@@ -364,9 +364,9 @@ function shotMapHTML(team){
   const GW=W*0.54, GH=GW/3, GX=(W-GW)/2, PAD=22;
   // The goal stands clear of the pitch rather than on the goal line. The map is capped at
   // 520 css px across a 680-unit viewBox, so one unit is 520/680 px and a centimetre
-  // (37.8 px at 96dpi) is a little over 49 of them — GOAL_GAP is therefore ~2cm at the
+  // (37.8 px at 96dpi) is a little over 49 of them — GOAL_GAP is therefore ~1cm at the
   // width the map is normally drawn at, and scales with it below that.
-  const CM=49, GOAL_GAP=2*CM;
+  const CM=49, GOAL_GAP=1*CM;
   const goal=goalMouthG({x:GX,y:-GH-GOAL_GAP,w:GW,h:GH},gm,
     {ink:'#06281a',ring:'#0d1117',net:'#3b4f5c',frame:'#e6edf3',r:15,noLine:true});
   const arrow=`<g opacity="0.45" stroke="#fff" fill="none" stroke-width="6">`

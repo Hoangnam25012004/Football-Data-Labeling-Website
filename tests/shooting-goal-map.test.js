@@ -153,7 +153,7 @@ test('the goal stands clear of the pitch, in that same svg', () => {
   const bottom=+/<path d="M [-\d.]+ ([-\d.]+) V/.exec(html)[1];
   ok(bottom<0,'above the pitch surface rather than on it — y='+bottom);
   // 520 css px across a 680-unit viewBox puts a centimetre at a little over 49 units
-  ok(Math.abs(-bottom-98)<3,'by about 2cm at full width — '+(-bottom).toFixed(0)+' units');
+  ok(Math.abs(-bottom-49)<3,'by about 1cm at full width — '+(-bottom).toFixed(0)+' units');
   const top=+/viewBox="0 ([-\d.]+)/.exec(html)[1];
   ok(top<bottom,'and the view still reaches above the crossbar');
   ok(/noLine:true/.test(fn),'it draws no goal line of its own now that it is off the pitch');
