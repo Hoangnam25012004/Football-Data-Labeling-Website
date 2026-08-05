@@ -362,13 +362,18 @@ function shotMapHTML(team){
   const gm=goalMarks(rows,team,r=>kinds[r.event]
     ?{x:r.gXY.x,y:r.gXY.y,label:r.playerFrom||'',color:kinds[r.event]}:null);
   const GW=W*0.54, GH=GW/3, GX=(W-GW)/2, PAD=22;
-  const goal=goalMouthG({x:GX,y:-GH,w:GW,h:GH},gm,
+  // The goal stands clear of the pitch rather than on the goal line. The map is capped at
+  // 520 css px across a 680-unit viewBox, so one unit is 520/680 px and a centimetre
+  // (37.8 px at 96dpi) is a little over 49 of them — GOAL_GAP is therefore ~2cm at the
+  // width the map is normally drawn at, and scales with it below that.
+  const CM=49, GOAL_GAP=2*CM;
+  const goal=goalMouthG({x:GX,y:-GH-GOAL_GAP,w:GW,h:GH},gm,
     {ink:'#06281a',ring:'#0d1117',net:'#3b4f5c',frame:'#e6edf3',r:15,noLine:true});
   const arrow=`<g opacity="0.45" stroke="#fff" fill="none" stroke-width="6">`
     +`<line x1="${W/2}" y1="${(bottom*0.94).toFixed(0)}" x2="${W/2}" y2="${(bottom*0.82).toFixed(0)}"/>`
     +`<polyline points="${W/2-15},${(bottom*0.85).toFixed(0)} ${W/2},${(bottom*0.82).toFixed(0)} ${W/2+15},${(bottom*0.85).toFixed(0)}"/></g>`
     +`<text x="${W/2}" y="${(bottom*0.99).toFixed(0)}" text-anchor="middle" font-size="22" fill="#fff" opacity="0.55">Attacking</text>`;
-  const top=-(GH+PAD);
+  const top=-(GH+GOAL_GAP+PAD);
   const pitch=`<svg viewBox="0 ${top.toFixed(1)} ${W} ${(bottom-top).toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">`
     +`<rect x="0" y="0" width="${W}" height="${H}" fill="rgba(26,62,32,0.72)"/>`
     +`<g transform="translate(0 ${H}) rotate(-90)"><g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(H,W,false)}</g></g>`

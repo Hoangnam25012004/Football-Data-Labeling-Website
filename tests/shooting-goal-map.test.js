@@ -145,11 +145,18 @@ test('a half that attacked the other way is turned around, not left mirrored', (
   ok(Math.max(...ys)<300,'and all of them up near the goal, not spread across the pitch');
 });
 
-test('the goal stands on the goal line of that same svg', () => {
+test('the goal stands clear of the pitch, in that same svg', () => {
   const html=statsMap([SH({gXY:{x:50,y:50}})]);
   const fn=grabFunction('shotMapHTML',STATS,'Stats/index.html');
-  ok(/goalMouthG\(\{x:GX,y:-GH,w:GW,h:GH\}/.test(fn),'its bottom edge sits at y=0, the goal line');
-  ok(/noLine:true/.test(fn),'and it does not draw a second goal line over the pitch’s own');
+  // the frame is one path that starts at the mouth's bottom edge; the pitch's own top
+  // edge — the goal line — is y=0, so the goal floating above it means a negative y
+  const bottom=+/<path d="M [-\d.]+ ([-\d.]+) V/.exec(html)[1];
+  ok(bottom<0,'above the pitch surface rather than on it — y='+bottom);
+  // 520 css px across a 680-unit viewBox puts a centimetre at a little over 49 units
+  ok(Math.abs(-bottom-98)<3,'by about 2cm at full width — '+(-bottom).toFixed(0)+' units');
+  const top=+/viewBox="0 ([-\d.]+)/.exec(html)[1];
+  ok(top<bottom,'and the view still reaches above the crossbar');
+  ok(/noLine:true/.test(fn),'it draws no goal line of its own now that it is off the pitch');
   ok(/goalMarks\(rows,team,/.test(fn)&&/label:r\.playerFrom/.test(fn),
      'markers labelled with the shirt number, like the pitch dots');
   // one svg, so the goal and the pitch cannot drift apart
