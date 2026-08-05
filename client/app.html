@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Channel — HoangNam Analytics</title>
+<meta name="description" content="Match data, reports and players for your club.">
+<link rel="stylesheet" href="assets/site.css?v=1">
+<link rel="stylesheet" href="assets/app.css?v=1">
+</head>
+<body class="app">
+
+<header class="app-top">
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="1.6"><path d="M1 11.5 L5 3 L9 8 L13 2.5"/></svg>
+    </span>
+    <span class="brand-name">Hoang<em>Nam</em></span>
+  </a>
+  <span class="divider" aria-hidden="true"></span>
+
+  <span class="chan-wrap" id="chanWrap">
+    <button class="chan" id="chanBtn" aria-haspopup="true" aria-expanded="false">
+      <span class="crest" id="chanCrest">···</span>
+      <span id="chanName">Loading</span>
+      <span class="caret" aria-hidden="true">▼</span>
+    </button>
+    <div class="chan-menu" id="chanMenu" role="menu"></div>
+  </span>
+
+  <span class="app-user">
+    <span class="who" id="who"></span>
+    <span class="avatar" id="avatar" aria-hidden="true">?</span>
+    <a class="btn btn-ghost" id="signIn" href="login.html" hidden>Sign in</a>
+    <button class="btn btn-ghost" id="signOut" hidden>Sign out</button>
+  </span>
+</header>
+
+<div class="chan-sum" id="chanSum"></div>
+
+<div class="app-body">
+  <nav class="side" aria-label="Channel sections">
+    <div class="side-grp">Channel</div>
+    <a href="#/matches" data-view="matches" class="on"><i></i> Matches</a>
+    <a href="#/data" data-view="data"><i></i> Data</a>
+    <a href="#/players" data-view="players"><i></i> Players</a>
+  </nav>
+  <main class="view" id="view">
+    <div class="state"><div class="spinner"></div><b>Opening your channel</b><p>One moment.</p></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supa.js?v=1"></script>
+<script src="assets/data.js?v=1"></script>
+<script src="assets/app.js?v=1"></script>
+</body>
+</html>

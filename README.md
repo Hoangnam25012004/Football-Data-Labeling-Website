@@ -1,14 +1,61 @@
-# Football Data Labeling Website
+# HoangNam Analytics — client site + labeling app
 
-A single-page web app for tagging football match events from video — events + hotkeys,
-player/receiver coordinates on a pitch, per-player and team stats, pass-distribution
-matrices, half-by-half timelines, and XLSX/CSV export.
+Two websites in one repository, sharing one Supabase project.
 
-**Live site:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/
+| | What it is | Who uses it | Lives at |
+|---|---|---|---|
+| **Client site** | Marketing pages plus the app clubs log into: one channel per club, holding matches, data and players | Customers | `/` |
+| **Labeling app** | The tagging tool — events + hotkeys, pitch coordinates, stats, XLSX/CSV export | Our analysts | `/tagger` |
 
-**Sign in:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/auth
+**Client site:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/
+**Sample channel:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/app.html
+**Labeling app:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/tagger/
+**Analyst sign-in:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/tagger/auth
 
-## How it runs
+> **The labeling app moved.** It used to be the site root; the client site now is.
+> Old bookmarks to `/` land on the client site. Sign-in still works either way —
+> `auth.js` derives its own root from where it is served, and a copy of `auth.html`
+> is kept at `/auth` so links in older confirmation emails still resolve.
+> **Update Supabase → Authentication → URL Configuration** to point Site URL at
+> `.../Football-Data-Labeling-Website/tagger/` so new confirmation emails land on
+> the tagging app rather than the client site.
+
+## Repository layout
+```
+index.html, shared.*, cloud-sync.js, auth.*   the labeling app (deployed to /tagger)
+Stats/, Player-Lists/                          its sub-pages    (deployed to /tagger/…)
+client/                                        the client site  (deployed to /)
+  index.html      landing page
+  app.html        the channel app — matches, data, players
+  login.html      client sign-in
+  assets/         site.css, app.css, data.js, supa.js, app.js
+supabase/migrations/                           schema, in order
+```
+Nothing moves inside the repo — the relocation happens only in
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), so opening
+`index.html` from disk still works exactly as before.
+
+## The client site
+A **channel is a club**. A club signs in and sees only its own matches, and only the
+ones an analyst has marked published.
+
+- **Matches** — the fixture list with results, straight from `public.matches`.
+- **Data** — every published match added up, plus the per-match table.
+- **Players** — who scored and who created, built from the tagged goals.
+
+`client/assets/supa.js` reads Supabase; `client/assets/data.js` carries the
+Saint Lucia campaign as a seed channel so the site is never an empty room and
+works signed-out. Both produce the same shape, so the UI cannot tell them apart.
+
+**Before a real client logs in, run
+[`supabase/migrations/0013_client_channels.sql`](supabase/migrations/0013_client_channels.sql).**
+It adds `clubs`, `club_members` and `staff`, plus `published`/`club_id` on matches
+and a `match_stats` view. Part A is additive and safe. Part B — the half that
+actually restricts who reads what — is commented out on purpose: today's policies
+are `to authenticated`, meaning **any signed-in account can read every match in the
+database**. Put your analysts in `public.staff` first, then uncomment it.
+
+## How the labeling app runs
 The whole app is the static file [`index.html`](index.html) — no backend required.
 It is hosted for free on **GitHub Pages** and served over HTTPS, so anyone with the
 link can use it in a modern browser (Chrome/Edge recommended).

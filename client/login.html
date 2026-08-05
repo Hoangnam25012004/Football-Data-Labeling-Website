@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in — HoangNam Analytics</title>
+<link rel="stylesheet" href="assets/site.css?v=1">
+<link rel="stylesheet" href="assets/app.css?v=1">
+</head>
+<body class="auth-page">
+
+<main class="auth-card">
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="1.6"><path d="M1 11.5 L5 3 L9 8 L13 2.5"/></svg>
+    </span>
+    <span class="brand-name">Hoang<em>Nam</em> Analytics</span>
+  </a>
+
+  <h1>Sign in</h1>
+  <p class="intro">Your club's channel — matches, data and players from every game we have tagged for you.</p>
+
+  <form id="loginForm" autocomplete="on">
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" name="username" type="email" autocomplete="username" required>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <button class="btn btn-primary" id="submitBtn" type="submit">Sign in</button>
+  </form>
+
+  <div class="msg" id="msg" hidden></div>
+
+  <p class="auth-alt">
+    No account yet? <a href="index.html#contact">Ask us for one</a> —
+    accounts are created per club.<br>
+    <a href="app.html">Look around the sample channel first</a>
+  </p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supa.js?v=1"></script>
+<script>
+(function () {
+  'use strict';
+  var form = document.getElementById('loginForm');
+  var msg = document.getElementById('msg');
+  var btn = document.getElementById('submitBtn');
+
+  function show(text, isErr) {
+    msg.textContent = text;
+    msg.className = 'msg' + (isErr ? ' err' : '');
+    msg.hidden = false;
+  }
+
+  /* Already signed in? Go straight through. */
+  if (window.HNA && window.HNA.configured()) {
+    window.HNA.auth.session().then(function (s) {
+      if (s) location.replace('app.html');
+    });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var email = document.getElementById('email').value.trim();
+    var password = document.getElementById('password').value;
+    if (!email || !password) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+    msg.hidden = true;
+
+    window.HNA.auth.signIn(email, password).then(function () {
+      show('Signed in ✓ — opening your channel.', false);
+      /* Hold briefly so the browser's password manager sees a successful
+         login before the page goes away. Same reason auth.html does it. */
+      setTimeout(function () { location.replace('app.html'); }, 700);
+    }).catch(function (err) {
+      var m = (err && err.message) || 'Sign-in failed.';
+      if (/invalid login/i.test(m)) m = 'That email and password do not match an account.';
+      show(m, true);
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+    });
+  });
+})();
+</script>
+</body>
+</html>

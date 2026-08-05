@@ -28,25 +28,48 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Stage only the files the public site needs (keeps the upload clean)
+      # Stage only the files the public site needs (keeps the upload clean).
+      #
+      # LAYOUT: the client-facing site is the root of the deployment; the whole
+      # tagging app moves under /tagger, assets and all, so its relative links
+      # (cloud-sync.js, Stats/, ../shared.js) keep resolving without edits.
+      # auth.js derives its own root from document.currentScript.src, so the
+      # sign-in gate follows the move by itself.
+      #
+      # Adding a file? Add a cp line here too, or it 404s on the live site
+      # even though the build goes green.
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp index.html _site/index.html
-          cp cloud-sync.js _site/cloud-sync.js
-          cp pitchtagger_events.json _site/pitchtagger_events.json || true
-          # sign-in gate: auth.js guards every page, auth.html is the sign-in/sign-up
-          # screen. Pages serves auth.html at the extension-less /auth.
-          cp auth.js _site/auth.js
+
+          # ---------- client site (the root) ----------
+          cp client/index.html  _site/index.html
+          cp client/app.html    _site/app.html
+          cp client/login.html  _site/login.html
+          mkdir -p _site/assets
+          cp client/assets/site.css _site/assets/site.css
+          cp client/assets/app.css  _site/assets/app.css
+          cp client/assets/data.js  _site/assets/data.js
+          cp client/assets/supa.js  _site/assets/supa.js
+          cp client/assets/app.js   _site/assets/app.js
+
+          # ---------- tagging app, relocated under /tagger ----------
+          mkdir -p _site/tagger/Stats _site/tagger/Player-Lists
+          cp index.html                 _site/tagger/index.html
+          cp cloud-sync.js              _site/tagger/cloud-sync.js
+          cp auth.js                    _site/tagger/auth.js
+          cp auth.html                  _site/tagger/auth.html
+          cp shared.css                 _site/tagger/shared.css
+          cp shared.js                  _site/tagger/shared.js
+          cp pitchtagger_events.json    _site/tagger/pitchtagger_events.json || true
+          cp Stats/index.html           _site/tagger/Stats/index.html
+          cp Stats/report.js            _site/tagger/Stats/report.js
+          cp Player-Lists/index.html    _site/tagger/Player-Lists/index.html
+
+          # Old confirmation emails and bookmarks still point at /auth on the
+          # root. Keep a copy there so those links resolve instead of 404ing.
           cp auth.html _site/auth.html
-          # shared assets used by the standalone sub-pages
-          cp shared.css _site/shared.css
-          cp shared.js _site/shared.js
-          # standalone Stats and Player-Lists pages
-          mkdir -p _site/Stats _site/Player-Lists
-          cp Stats/index.html _site/Stats/index.html
-          cp Stats/report.js _site/Stats/report.js
-          cp Player-Lists/index.html _site/Player-Lists/index.html
+          cp auth.js   _site/auth.js
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
