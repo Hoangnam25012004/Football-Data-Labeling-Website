@@ -72,6 +72,11 @@ body{display:flex;flex-direction:column}
 body>header{flex:none}
 .page{flex:1;min-height:0;display:flex;flex-direction:column;box-sizing:border-box}
 .stats-wrap{flex:1;min-height:0;max-height:none}
+/* the side picker and the category tabs are rows of their own under the header,
+   not part of it — the top line is the three views and the exports. Both stay put
+   while the view below them scrolls, so they are outside .stats-wrap. */
+.sub-row{flex:none;margin-bottom:10px}
+.sub-team{justify-content:center}
 /* flat look: no grey panels behind the visualizations (charts sit straight on
    the page background; only tables/lists keep their own styling) */
 .chart-card,.gen-form{background:transparent;border:none}
@@ -191,19 +196,6 @@ body>header{flex:none}
     <button id="viewDashBtn">Dashboard</button>
     <button id="viewStatsBtn">Stats</button>
   </div>
-  <!-- which side Dashboard / Stats are about. Hidden on Overall, which is both at once. -->
-  <div class="stats-toggle" id="teamToggle" style="margin-left:10px;display:none">
-    <button id="statHomeBtn"></button>
-    <button id="statAwayBtn"></button>
-  </div>
-  <!-- category tabs (Dashboard / Stats only): the 34-column table, and the
-       visualizations that go with it, split into 4 views -->
-  <div class="stats-toggle" id="catToggle" style="margin-left:10px;display:none">
-    <button data-cat="shooting">Shooting</button>
-    <button data-cat="distribution">Distribution</button>
-    <button data-cat="defensive">Defensive</button>
-    <button data-cat="other">Other</button>
-  </div>
   <div class="spacer"></div>
   <div class="exports">
     <button id="expXlsx">⭳ XLSX</button>
@@ -218,6 +210,20 @@ body>header{flex:none}
     <b style="color:var(--ink)">No match is open</b><br>
     Stats belong to a match. Go back to the tagging tab, open <b>☁ Cloud</b>
     to create or join a match, then reopen this page.
+  </div>
+  <!-- which side Dashboard / Stats are about — centred on its own row under the
+       header, so the top line carries the three views and the exports, nothing else -->
+  <div class="stats-toggle sub-row sub-team" id="teamToggle" style="display:none">
+    <button id="statHomeBtn"></button>
+    <button id="statAwayBtn"></button>
+  </div>
+  <!-- category tabs (Dashboard / Stats only): the 34-column table, and the
+       visualizations that go with it, split into 4 views -->
+  <div class="stats-toggle sub-row" id="catToggle" style="display:none">
+    <button data-cat="shooting">Shooting</button>
+    <button data-cat="distribution">Distribution</button>
+    <button data-cat="defensive">Defensive</button>
+    <button data-cat="other">Other</button>
   </div>
   <div class="stats-wrap"><div id="statsHolder"></div></div>
 </div>
