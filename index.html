@@ -10,10 +10,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+  /* Red and black, to match the client site and the sub-pages, with the team
+     identity white (home) and yellow (away). Both team colours are light, so
+     anything printed ON one carries --team-ink rather than the white it used to.
+     This file does not load shared.css — it carries its own copy of the theme;
+     keep the two in step.
+     Left alone on purpose: --danger / --warn, the greens and reds that mean
+     success vs fail, and the green pitch — a pitch is not chrome. */
   :root{
-    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3240;
-    --ink:#e6edf3; --mut:#8b97a7; --accent:#39d98a; --accent2:#2f81f7;
-    --home:#2f81f7; --away:#f7682f; --danger:#f7506b; --warn:#f7b32f; --radius:10px;
+    --bg:#000000; --panel:#0C0A0B; --panel2:#141011; --line:#2A2325;
+    --ink:#EFEAE8; --mut:#9C8F92; --accent:#E0122B; --accent2:#E0122B;
+    --home:#EEEEEE; --away:#FFFF66; --team-ink:#14100F;
+    --danger:#f7506b; --warn:#f7b32f; --radius:10px;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
@@ -39,8 +47,8 @@
   #fmSubs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:22px}
   .fm-sub{font-size:11px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2)}
   .fm-sub b{font-weight:800;margin-right:3px}
-  .fm-sub.home{border-color:var(--home);color:#9cc2ff} .fm-sub.home b{color:var(--home)}
-  .fm-sub.away{border-color:var(--away);color:#ffb38a} .fm-sub.away b{color:var(--away)}
+  .fm-sub.home{border-color:var(--home);color:#D8D3D1} .fm-sub.home b{color:var(--home)}
+  .fm-sub.away{border-color:var(--away);color:#E3E0AE} .fm-sub.away b{color:var(--away)}
   .fm-sub-empty{color:var(--mut);font-size:11px}
   .fm-dirlbl{position:absolute;top:6px;font-size:11px;font-weight:800;z-index:4;pointer-events:none;text-shadow:0 1px 2px #000,0 0 3px #000}
   .fm-dirlbl.home{left:10px;color:var(--home)}
@@ -69,7 +77,7 @@
     justify-content:center;font-size:12px;font-weight:900;line-height:1;cursor:pointer;z-index:4;
     font-family:system-ui,sans-serif;touch-action:none}
   .goal-x:hover{background:#ffd166}
-  .fm-dot{position:absolute;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;border:2px solid #000;z-index:3}
+  .fm-dot{position:absolute;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:var(--home);color:var(--team-ink);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;border:2px solid #000;z-index:3}
   .fm-dot.away{background:var(--away)}
   .fm-dot .lbl{position:absolute;top:25px;left:50%;transform:translateX(-50%);font-size:9px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600}
   /* position-zone grid (editor & display) */
@@ -90,8 +98,8 @@
   .quick{padding:12px;border-bottom:1px solid var(--line)}
   .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:10px}
   .seg button{flex:1;background:transparent;border:none;color:var(--mut);padding:8px;cursor:pointer;font-weight:600;font-size:12px}
-  .seg button.act-home{background:var(--home);color:#fff}
-  .seg button.act-away{background:var(--away);color:#fff}
+  .seg button.act-home{background:var(--home);color:var(--team-ink)}
+  .seg button.act-away{background:var(--away);color:var(--team-ink)}
   .seg .hk{font-size:10px;opacity:.7;margin-left:4px}
   label.fld{display:flex;justify-content:space-between;align-items:center;color:var(--mut);font-size:11px;margin:8px 0 5px}
   label.fld .mini{font-weight:400}
@@ -100,9 +108,9 @@
 
   .ev-list{display:flex;flex-direction:column;gap:5px;max-height:230px;overflow:auto;padding-right:2px}
   .ev-item{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;cursor:pointer}
-  .ev-item.sel{border-color:var(--accent);background:#16302440}
+  .ev-item.sel{border-color:var(--accent);background:#2A0A1040}
   .ev-key{width:46px;height:28px;text-align:center;background:#000;border:1px solid var(--line);border-radius:6px;font-weight:700;color:var(--accent);font-size:12px;text-transform:lowercase;padding:0 4px}
-  .ev-key:focus{outline:none;border-color:var(--accent);background:#06281a}
+  .ev-key:focus{outline:none;border-color:var(--accent);background:#2A0A10}
   .ev-name{flex:1;font-weight:600}
   .ev-x{color:var(--mut);font-weight:700;cursor:pointer;padding:0 4px}
   .ev-x:hover{color:var(--danger)}
@@ -125,7 +133,7 @@
   .mac-list{display:flex;flex-direction:column;gap:5px;max-height:230px;overflow:auto;padding-right:2px}
   .mac-item{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
   .mac-key{width:56px;height:28px;text-align:center;background:#000;border:1px solid var(--line);border-radius:6px;font-weight:700;color:var(--accent);font-size:12px;text-transform:lowercase;padding:0 4px}
-  .mac-key:focus{outline:none;border-color:var(--accent);background:#06281a}
+  .mac-key:focus{outline:none;border-color:var(--accent);background:#2A0A10}
   /* red, both sides, exactly like a clashing key looks in the reference tool: this code is
      already an event hotkey or another macro's, so it would never reach the macro */
   .mac-key.bad,.mac-key.bad:focus{border-color:var(--danger);color:var(--danger);background:#2a0e12}
@@ -139,9 +147,9 @@
 
   .syntax-hint{font-size:11px;color:var(--mut);margin-top:5px;line-height:1.5}
   .syntax-hint code{background:#000;padding:1px 5px;border-radius:4px;color:var(--accent)}
-  .active-banner{margin-top:10px;background:#16302440;border:1px solid var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--mut)}
+  .active-banner{margin-top:10px;background:#2A0A1040;border:1px solid var(--accent);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--mut)}
   .active-banner b{color:var(--accent);font-size:13px}
-  .addbtn{width:100%;margin-top:10px;background:var(--accent);color:#06281a;border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer;font-size:13px}
+  .addbtn{width:100%;margin-top:10px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer;font-size:13px}
   .addbtn:hover{filter:brightness(1.08)}
 
   /* flex-end, not space-between: the "Events N" heading that sat on the left is gone, so
@@ -163,8 +171,8 @@
   td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
   tr:hover td{background:var(--panel2)}
   .team-tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700}
-  .team-tag.home{background:var(--home);color:#fff}
-  .team-tag.away{background:var(--away);color:#fff}
+  .team-tag.home{background:var(--home);color:var(--team-ink)}
+  .team-tag.away{background:var(--away);color:var(--team-ink)}
   /* mirrored home | timeline | away layout */
   th.a-side,td.a-side{text-align:right}
   th.tl-col,td.tl-col{text-align:center;border-left:1px solid var(--line);border-right:1px solid var(--line);background:#0d1117}
@@ -194,10 +202,10 @@
   .rowbtns .edit,.rowbtns .del{cursor:pointer;font-weight:700;padding:0 5px}
   .edit{color:var(--accent2)} .edit:hover{filter:brightness(1.25)}
   .del{color:var(--danger)}
-  tr.editing td{background:#2f81f733;box-shadow:inset 3px 0 0 var(--accent2)}
+  tr.editing td{background:#E0122B26;box-shadow:inset 3px 0 0 var(--accent2)}
   .empty{padding:30px;text-align:center;color:var(--mut)}
   .kbd{background:#000;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:10px;color:var(--mut)}
-  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--accent);color:#06281a;padding:8px 16px;border-radius:8px;font-weight:700;opacity:0;transition:.2s;pointer-events:none;z-index:99}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 16px;border-radius:8px;font-weight:700;opacity:0;transition:.2s;pointer-events:none;z-index:99}
   .toast.show{opacity:1}
 
   /* header Event button */
@@ -242,8 +250,8 @@
   .stats-modal{max-width:96vw;width:1180px}
   .stats-toggle{display:flex;gap:6px;margin-left:14px}
   .stats-toggle button{background:var(--panel2);border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:5px 16px;cursor:pointer;font-weight:600;font-size:12px}
-  .stats-toggle button.act-home{background:var(--home);color:#fff;border-color:var(--home)}
-  .stats-toggle button.act-away{background:var(--away);color:#fff;border-color:var(--away)}
+  .stats-toggle button.act-home{background:var(--home);color:var(--team-ink);border-color:var(--home)}
+  .stats-toggle button.act-away{background:var(--away);color:var(--team-ink);border-color:var(--away)}
   .stats-wrap{overflow:auto;max-height:68vh;border:1px solid var(--line);border-radius:8px}
   table.stats{border-collapse:collapse;font-size:11px;white-space:nowrap;width:100%}
   table.stats th,table.stats td{border:1px solid var(--line);padding:4px 8px;text-align:center}
@@ -251,16 +259,16 @@
   table.stats thead tr:first-child th{top:0;z-index:2}
   table.stats thead tr:nth-child(2) th{top:25px;z-index:1;color:var(--mut);font-weight:600}
   table.stats .grp{font-weight:700}
-  table.stats .grp.g0{background:#22364f;color:#cfe2ff}
-  table.stats .grp.g1{background:#1f4031;color:#bff0d6}
-  table.stats .grp.g2{background:#43321f;color:#f3dcc0}
-  table.stats .grp.g3{background:#3a2440;color:#e8c9f0}
-  table.stats .grp.g4{background:#3a3a1f;color:#eeeec0}
-  table.stats .grp.g5{background:#402427;color:#f0c9cf}
+  table.stats .grp.g0{background:#3B1220;color:#F6CCD8}
+  table.stats .grp.g1{background:#3A1C12;color:#F6D8C2}
+  table.stats .grp.g2{background:#2E2412;color:#EFE3BE}
+  table.stats .grp.g3{background:#2B1430;color:#E4C8EF}
+  table.stats .grp.g4{background:#12262A;color:#C2E3EA}
+  table.stats .grp.g5{background:#331A1A;color:#F0CACA}
   table.stats td.no,table.stats th.no{font-weight:700;color:var(--accent);background:var(--panel2);position:sticky;left:0;z-index:1}
-  table.stats tbody tr:hover td{background:#1c233066}
+  table.stats tbody tr:hover td{background:#1F171933}
   .stats-empty{padding:24px;text-align:center;color:var(--mut)}
-  .stats-toggle button.act-gen{background:var(--accent);color:#06281a;border-color:var(--accent)}
+  .stats-toggle button.act-gen{background:var(--accent);color:#fff;border-color:var(--accent)}
   /* Player lists / formation modal */
   .lineup-modal{max-width:96vw;width:1180px;max-height:92vh}
   .lineup-body{display:flex;gap:14px;overflow:hidden}
@@ -268,7 +276,7 @@
   .lu-add{display:flex;gap:6px}
   .lu-add input{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 8px;font-size:12px;width:54px}
   .lu-add input#luName{flex:1;width:auto}
-  .lu-add button{background:var(--accent);color:#06281a;border:none;border-radius:6px;padding:0 12px;font-weight:700;cursor:pointer}
+  .lu-add button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:0 12px;font-weight:700;cursor:pointer}
   .lu-roster{flex:1;overflow:auto;max-height:64vh;display:flex;flex-direction:column;gap:4px}
   .lu-prow{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px}
   .lu-prow .num{width:26px;height:22px;display:flex;align-items:center;justify-content:center;background:#000;border-radius:4px;color:var(--accent);font-weight:700;font-size:11px;flex-shrink:0}
@@ -281,7 +289,7 @@
   .lu-pitchwrap{background:#142b18;border:1px solid var(--line);border-radius:8px;overflow:hidden;padding:6px}
   .lu-pitch{position:relative;width:100%;aspect-ratio:105/68;touch-action:none}
   .lu-pitch svg{position:absolute;inset:0;width:100%;height:100%}
-  .lu-dot{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;cursor:grab;border:2px solid #000;user-select:none;z-index:2;touch-action:none}
+  .lu-dot{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:var(--home);color:var(--team-ink);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;cursor:grab;border:2px solid #000;user-select:none;z-index:2;touch-action:none}
   .lu-dot.away{background:var(--away)}
   .lu-dot .lbl{position:absolute;top:31px;left:50%;transform:translateX(-50%);font-size:10px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600;pointer-events:none}
   .lu-dir{display:flex;align-items:center;gap:12px}
@@ -298,15 +306,19 @@
   .pm-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;max-height:60vh}
   table.pmtx{border-collapse:collapse;font-size:11px;white-space:nowrap}
   table.pmtx th,table.pmtx td{border:1px solid var(--line);padding:4px 8px;text-align:center;min-width:30px}
-  table.pmtx .pm-h{position:sticky;top:0;z-index:2;background:#1b2740;color:#cfe2ff;font-weight:700}
-  table.pmtx .pm-rh{position:sticky;left:0;z-index:1;background:#2f5fa8;color:#fff;font-weight:700}
+  table.pmtx .pm-h{position:sticky;top:0;z-index:2;background:#232022;color:#E6E1DF;font-weight:700}
+  table.pmtx .pm-rh{position:sticky;left:0;z-index:1;background:var(--home);color:var(--team-ink);font-weight:700}
   table.pmtx thead .pm-h:first-child{left:0;z-index:3}
   table.pmtx .pm-diag{background:var(--panel2);color:var(--mut)}
   table.pmtx .pm-sum{background:var(--panel2);font-weight:700;color:var(--ink)}
   table.pmtx .pm-z{color:var(--mut)}
   table.pmtx tbody tr:last-child td,table.pmtx tbody tr:last-child th{background:var(--panel2);font-weight:700}
-  .pm-away table.pmtx .pm-h{background:#3a2417;color:#f3dcc0}
-  .pm-away table.pmtx .pm-rh{background:#a85a2e}
+  .pm-away table.pmtx .pm-h{background:#26260F;color:#EFEFC4}
+  .pm-away table.pmtx .pm-rh{background:var(--away);color:var(--team-ink)}
+  /* the "Σ recv" corner is a summary, not a player: the row above already gives it
+     the dark panel, so it keeps light ink rather than the dark the colour calls for */
+  table.pmtx tbody tr:last-child th.pm-rh,
+  .pm-away table.pmtx tbody tr:last-child th.pm-rh{background:var(--panel2);color:var(--ink)}
   /* New-match modal: team autocomplete from the teams database */
   .nm-teams{display:flex;gap:10px;align-items:flex-start}
   .nm-side{flex:1;min-width:0}
@@ -360,8 +372,8 @@
   /* General (team comparison) view */
   .gen-wrap{display:flex;flex-direction:column;gap:2px;padding:6px}
   .gen-top{display:flex;align-items:center;justify-content:space-between;padding:6px 4px;font-weight:700}
-  .gen-top .gh{color:#fff;background:var(--home);padding:3px 12px;border-radius:6px}
-  .gen-top .ga{color:#fff;background:var(--away);padding:3px 12px;border-radius:6px}
+  .gen-top .gh{color:var(--team-ink);background:var(--home);padding:3px 12px;border-radius:6px}
+  .gen-top .ga{color:var(--team-ink);background:var(--away);padding:3px 12px;border-radius:6px}
   .gen-sec{background:var(--panel2);color:var(--accent);font-weight:700;padding:6px 10px;border-radius:6px;margin-top:8px;font-size:12px}
   .gen-row{display:grid;grid-template-columns:60px 1fr 150px 1fr 60px;align-items:center;gap:8px;padding:3px 4px;font-size:12px}
   .gen-row .vh{text-align:right;font-weight:700;color:var(--home)}
@@ -1732,13 +1744,13 @@ function openVideoWindow(){
       const grp=d.createElementNS(SVGNS,'g');
       const c=d.createElementNS(SVGNS,'circle');
       c.setAttribute('cx',vx);c.setAttribute('cy',vy);c.setAttribute('r',7);
-      // one colour for ALL dots, per team — same blue/orange as the formation dots (--home/--away;
+      // one colour for ALL dots, per team — same white/yellow as the formation dots (--home/--away;
       // hardcoded because this overlay lives in the popup window's own document, outside the main CSS)
-      c.setAttribute('fill',state.team==='away'?'#f7682f':'#2f81f7');
+      c.setAttribute('fill',state.team==='away'?'#FFFF66':'#EEEEEE');
       c.setAttribute('stroke','#000');c.setAttribute('stroke-width',1);
       const t=d.createElementNS(SVGNS,'text');
       t.setAttribute('x',vx);t.setAttribute('y',vy+3);t.setAttribute('text-anchor','middle');
-      t.setAttribute('font-size',8);t.setAttribute('font-weight',700);t.setAttribute('fill','#fff');
+      t.setAttribute('font-size',8);t.setAttribute('font-weight',700);t.setAttribute('fill','#14100F');
       t.textContent=String(i+1);
       grp.appendChild(c);grp.appendChild(t);
       makeDotDraggable(grp,c,t,dot);
@@ -3095,8 +3107,12 @@ function passMatrixHTML(team){
   const name=(team==='home'?$('homeName').value:$('awayName').value)||team;
   if(!players.length)return `<div class="pm-title" style="color:${team==='home'?'var(--home)':'var(--away)'}">${name} — Pass Distribution</div><div class="stats-empty">No completed passes for this team yet.</div>`;
   let max=0; players.forEach(f=>players.forEach(t=>{if(f!==t)max=Math.max(max,(mtx[f]&&mtx[f][t])||0);}));
-  const rgb=team==='home'?'47,129,247':'247,104,47';
-  const bg=v=>v?`style="background:rgba(${rgb},${(0.12+0.6*v/(max||1)).toFixed(3)})"`:'';
+  const rgb=team==='home'?'238,238,238':'255,255,102';   // --home / --away, as rgb for the alpha ramp
+  // both team colours are light, so a busy cell washes out to near-white over the
+  // black page: past the halfway point of the ramp the count is printed in dark ink
+  const bg=v=>{if(!v)return '';
+    const a=0.12+0.6*v/(max||1);
+    return `style="background:rgba(${rgb},${a.toFixed(3)})${a>=0.45?';color:var(--team-ink)':''}"`;};
   let head='<th class="pm-h">From \\ To</th>'+players.map(p=>`<th class="pm-h">${p}</th>`).join('')+'<th class="pm-h">Σ</th>';
   const colSum={}; let grand=0, body='';
   players.forEach(f=>{

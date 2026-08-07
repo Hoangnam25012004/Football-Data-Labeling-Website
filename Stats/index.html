@@ -7,15 +7,15 @@
 <script src="../auth.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="../shared.css?v=11">
+<link rel="stylesheet" href="../shared.css?v=12">
 <style>
 /* ============================================================
    Red-and-black theme, matching the client site.
 
-   Scoped to this page on purpose: shared.css is also loaded by
-   Player-Lists, so the tokens are re-declared here (after the link,
-   so these win) rather than edited at source. Player-Lists keeps the
-   theme it had.
+   The tokens are re-declared here (after the link, so these win). That
+   started as a way to leave Player-Lists on the old theme; Player-Lists
+   has since been brought over, so shared.css now carries the same values
+   and this block only restates them. Change one, change the other.
 
    Team identity on THIS page: home white, away yellow. Both are light,
    so every number/label printed ON a team fill carries --team-ink now

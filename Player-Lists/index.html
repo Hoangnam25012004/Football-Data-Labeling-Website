@@ -6,11 +6,11 @@
 <title>Player lists — Pitch Tagger</title>
 <script src="../auth.js?v=1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="../shared.css?v=11">
+<link rel="stylesheet" href="../shared.css?v=12">
 </head>
 <body>
 <header>
-  <h1>Hoang<span>Nam</span> · Player lists &amp; formation</h1>
+  <h1>Hoang<span>Nam</span></h1>
   <div class="stats-toggle" style="margin-left:14px">
     <button id="luHomeBtn"></button>
     <button id="luAwayBtn"></button>
@@ -75,7 +75,6 @@
         <div class="lu-pitchwrap"><div class="lu-pitch" id="luPitch"></div></div>
         <div class="lu-dir">
           <button id="luDir">⇄ Switch Attacking Direction</button>
-          <span class="mini">Drag a player on the pitch to move him</span>
         </div>
       </div>
     </section>
@@ -273,8 +272,9 @@ function renderPool(){
               :'No players for this match yet — add them with "New player name".')}</td>`;
     box.appendChild(tr);
   }
-  st.textContent=linked
-    ? '✓ '+(q?rows.length+'/'+all.length:all.length)+' players · '+picked+' selected'
+  // the "N players · M selected" tally is gone; the bar is only for the warnings now,
+  // and it collapses (.lu-foot:empty) when there is nothing wrong to say
+  st.textContent=linked ? ''
     : (sb?'⚠ this match has no team linked — create it from Cloud (pick a database team)'
          :'⚠ '+(dbErr||'offline')+' — players are saved for this match only');
   markSortHeaders();

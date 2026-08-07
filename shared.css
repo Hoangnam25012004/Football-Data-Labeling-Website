@@ -1,9 +1,22 @@
 /* shared.css — theme + pitch/stats/roster styles for the Stats/ and
-   Player-Lists/ standalone pages (lifted from the main app). */
+   Player-Lists/ standalone pages (lifted from the main app).
+
+   Red and black, to match the client site, with the team identity white
+   (home) and yellow (away). Both team colours are light, so anything
+   printed ON one carries --team-ink rather than the white it used to.
+
+   Stats/ re-states these same tokens in its own <style> — it did so back
+   when this file still carried the old blue/green theme and Player-Lists
+   kept it. The values are the ones below now; if you change a token here,
+   change it there too.
+
+   Left alone on purpose: --danger / --warn (fail and caution), and the
+   green pitch under .lu-pitchwrap / .pz — a pitch is not chrome. */
 :root{
-  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3240;
-  --ink:#e6edf3; --mut:#8b97a7; --accent:#39d98a; --accent2:#2f81f7;
-  --home:#2f81f7; --away:#f7682f; --danger:#f7506b; --warn:#f7b32f; --radius:10px;
+  --bg:#000000; --panel:#0C0A0B; --panel2:#141011; --line:#2A2325;
+  --ink:#EFEAE8; --mut:#9C8F92; --accent:#E0122B; --accent2:#E0122B;
+  --home:#EEEEEE; --away:#FFFF66; --team-ink:#14100F;
+  --danger:#f7506b; --warn:#f7b32f; --radius:10px;
 }
 *{box-sizing:border-box}
 body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
@@ -18,9 +31,9 @@ header h1 span{color:var(--accent)}
 /* team toggle (Home / Away / General) */
 .stats-toggle{display:flex;gap:6px}
 .stats-toggle button{background:var(--panel2);border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:5px 16px;cursor:pointer;font-weight:600;font-size:12px}
-.stats-toggle button.act-home{background:var(--home);color:#fff;border-color:var(--home)}
-.stats-toggle button.act-away{background:var(--away);color:#fff;border-color:var(--away)}
-.stats-toggle button.act-gen{background:var(--accent);color:#06281a;border-color:var(--accent)}
+.stats-toggle button.act-home{background:var(--home);color:var(--team-ink);border-color:var(--home)}
+.stats-toggle button.act-away{background:var(--away);color:var(--team-ink);border-color:var(--away)}
+.stats-toggle button.act-gen{background:var(--accent);color:#fff;border-color:var(--accent)}
 
 .exports{display:flex;gap:6px}
 .exports button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:600}
@@ -34,15 +47,15 @@ table.stats thead th{position:sticky;background:var(--panel2);color:var(--ink)}
 table.stats thead tr:first-child th{top:0;z-index:2}
 table.stats thead tr:nth-child(2) th{top:25px;z-index:1;color:var(--mut);font-weight:600}
 table.stats .grp{font-weight:700}
-table.stats .grp.g0{background:#22364f;color:#cfe2ff}
-table.stats .grp.g1{background:#1f4031;color:#bff0d6}
-table.stats .grp.g2{background:#43321f;color:#f3dcc0}
-table.stats .grp.g3{background:#3a2440;color:#e8c9f0}
-table.stats .grp.g4{background:#3a3a1f;color:#eeeec0}
-table.stats .grp.g5{background:#402427;color:#f0c9cf}
+table.stats .grp.g0{background:#3B1220;color:#F6CCD8}
+table.stats .grp.g1{background:#3A1C12;color:#F6D8C2}
+table.stats .grp.g2{background:#2E2412;color:#EFE3BE}
+table.stats .grp.g3{background:#2B1430;color:#E4C8EF}
+table.stats .grp.g4{background:#12262A;color:#C2E3EA}
+table.stats .grp.g5{background:#331A1A;color:#F0CACA}
 table.stats td.no,table.stats th.no{font-weight:700;color:var(--accent);background:var(--panel2);position:sticky;left:0;z-index:1}
 table.stats td.pl,table.stats th.pl{text-align:left}   /* registered name next to the shirt number */
-table.stats tbody tr:hover td{background:#1c233066}
+table.stats tbody tr:hover td{background:#1F171933}
 .stats-empty{padding:24px;text-align:center;color:var(--mut)}
 
 /* stats charts (Shooting donut + Distribution scatter) */
@@ -72,7 +85,7 @@ table.stats tbody tr:hover td{background:#1c233066}
 .half-toggle{display:flex;gap:6px;flex:none}
 .half-toggle button{background:var(--panel);border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:4px 12px;cursor:pointer;font-weight:600;font-size:12px}
 .half-toggle button:hover{border-color:var(--accent)}
-.half-toggle button.on{background:var(--accent);color:#06281a;border-color:var(--accent)}
+.half-toggle button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .head-ctrls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .def-sel{background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 8px;font-size:12px;font-weight:600;cursor:pointer}
 .def-sel:focus{outline:none;border-color:var(--accent)}
@@ -82,21 +95,25 @@ table.stats tbody tr:hover td{background:#1c233066}
 .pm-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;max-height:60vh}
 table.pmtx{border-collapse:collapse;font-size:11px;white-space:nowrap}
 table.pmtx th,table.pmtx td{border:1px solid var(--line);padding:4px 8px;text-align:center;min-width:30px}
-table.pmtx .pm-h{position:sticky;top:0;z-index:2;background:#1b2740;color:#cfe2ff;font-weight:700}
-table.pmtx .pm-rh{position:sticky;left:0;z-index:1;background:#2f5fa8;color:#fff;font-weight:700}
+table.pmtx .pm-h{position:sticky;top:0;z-index:2;background:#232022;color:#E6E1DF;font-weight:700}
+table.pmtx .pm-rh{position:sticky;left:0;z-index:1;background:var(--home);color:var(--team-ink);font-weight:700}
 table.pmtx thead .pm-h:first-child{left:0;z-index:3}
 table.pmtx .pm-diag{background:var(--panel2);color:var(--mut)}
 table.pmtx .pm-sum{background:var(--panel2);font-weight:700;color:var(--ink)}
 table.pmtx .pm-z{color:var(--mut)}
 table.pmtx tbody tr:last-child td,table.pmtx tbody tr:last-child th{background:var(--panel2);font-weight:700}
-.pm-away table.pmtx .pm-h{background:#3a2417;color:#f3dcc0}
-.pm-away table.pmtx .pm-rh{background:#a85a2e}
+.pm-away table.pmtx .pm-h{background:#26260F;color:#EFEFC4}
+.pm-away table.pmtx .pm-rh{background:var(--away);color:var(--team-ink)}
+/* the "Σ recv" corner is a summary, not a player: the row above already gives it the
+   dark panel, so it keeps light ink rather than the dark the team colour calls for */
+table.pmtx tbody tr:last-child th.pm-rh,
+.pm-away table.pmtx tbody tr:last-child th.pm-rh{background:var(--panel2);color:var(--ink)}
 
 /* General (team comparison) view */
 .gen-wrap{display:flex;flex-direction:column;gap:2px;padding:6px;max-width:900px}
 .gen-top{display:flex;align-items:center;justify-content:space-between;padding:6px 4px;font-weight:700}
-.gen-top .gh{color:#fff;background:var(--home);padding:3px 12px;border-radius:6px}
-.gen-top .ga{color:#fff;background:var(--away);padding:3px 12px;border-radius:6px}
+.gen-top .gh{color:var(--team-ink);background:var(--home);padding:3px 12px;border-radius:6px}
+.gen-top .ga{color:var(--team-ink);background:var(--away);padding:3px 12px;border-radius:6px}
 .gen-sec{background:var(--panel2);color:var(--accent);font-weight:700;padding:6px 10px;border-radius:6px;margin-top:8px;font-size:12px}
 .gen-row{display:grid;grid-template-columns:60px 1fr 150px 1fr 60px;align-items:center;gap:8px;padding:3px 4px;font-size:12px}
 .gen-row .vh{text-align:right;font-weight:700;color:var(--home)}
@@ -123,7 +140,7 @@ table.pmtx tbody tr:last-child td,table.pmtx tbody tr:last-child th{background:v
 .lu-add input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:7px 10px;font-size:12px}
 .lu-add input:focus{outline:none;border-color:var(--accent)}
 .lu-add input::placeholder{color:var(--mut)}
-.lu-add button{background:var(--accent);color:#06281a;border:none;border-radius:6px;padding:0 14px;font-weight:700;font-size:15px;cursor:pointer}
+.lu-add button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:0 14px;font-weight:700;font-size:15px;cursor:pointer}
 .lu-add button:disabled{background:var(--panel2);color:var(--mut);cursor:not-allowed}
 .lu-search{display:flex}
 .lu-search input{flex:1;background:var(--panel2) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238b97a7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>") no-repeat 10px center;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:7px 10px 7px 32px;font-size:12px}
@@ -157,13 +174,14 @@ table.lu-tbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fix
 .lu-act:disabled{color:var(--mut);cursor:not-allowed;filter:none}
 .lu-empty{color:var(--mut);font-size:11px;text-align:center;padding:16px 10px}
 .lu-foot{padding:8px 14px;border-top:1px solid var(--line);color:var(--mut);font-size:11px}
+.lu-foot:empty{display:none}   /* the pool count is gone; the bar only shows for warnings */
 
 /* formation card */
 .lu-formbody{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
 .lu-pitchwrap{background:#142b18;border:1px solid var(--line);border-radius:8px;overflow:hidden;padding:6px;width:100%;max-width:860px;margin:0 auto}
 .lu-pitch{position:relative;width:100%;aspect-ratio:105/68;touch-action:none}
 .lu-pitch svg{position:absolute;inset:0;width:100%;height:100%}
-.lu-dot{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:var(--home);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;cursor:grab;border:2px solid #000;user-select:none;z-index:2;touch-action:none}
+.lu-dot{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:var(--home);color:var(--team-ink);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;cursor:grab;border:2px solid #000;user-select:none;z-index:2;touch-action:none}
 .lu-dot.away{background:var(--away)}
 .lu-dot .lbl{position:absolute;top:31px;left:50%;transform:translateX(-50%);font-size:10px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px #000,0 0 2px #000;font-weight:600;pointer-events:none}
 .lu-dir{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
