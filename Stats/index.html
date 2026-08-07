@@ -17,20 +17,29 @@
    so these win) rather than edited at source. Player-Lists keeps the
    theme it had.
 
-   Only the chrome moves. Deliberately NOT touched:
-     --home / --away  team identity, and the PDF report uses the same
-                      blue/gold pairing — screen and print must agree
+   Team identity on THIS page: home white, away yellow. Both are light,
+   so every number/label printed ON a team fill carries --team-ink now
+   instead of the white it used to. The PDF report keeps its own
+   blue/amber pair (report.js, C.home / C.away): it prints on white
+   paper, where a white home colour would vanish.
+
+   Deliberately NOT touched:
      #39d98a / #f7506b  success vs fail on duels, tackles, crosses
      #f7b32f, #ffd23f, #e5484d  goals and cards
+     #2f81f7 in DEF_CATS / TAKEON_PARTS  an event category, not a team
    ============================================================ */
 :root{
   --bg:#000000; --panel:#0C0A0B; --panel2:#141011; --line:#2A2325;
   --ink:#EFEAE8; --mut:#9C8F92; --accent:#E0122B;
+  --home:#EEEEEE; --away:#FFFF66; --team-ink:#14100F;
 }
 /* the accent is red now, so the dark-green text that used to sit on it
    would be unreadable — active toggles carry white */
 .stats-toggle button.act-gen{color:#fff}
 .half-toggle button.on{color:#fff}
+/* ...and the team colours are light, so the two team toggles carry dark ink
+   rather than the white shared.css sets on them */
+.stats-toggle button.act-home,.stats-toggle button.act-away{color:var(--team-ink)}
 /* row hover: the old tint was blue-grey */
 table.stats tbody tr:hover td{background:#1F171933}
 /* the six column-group bands. Still six distinguishable steps, but warm —
@@ -41,6 +50,20 @@ table.stats .grp.g2{background:#2E2412;color:#EFE3BE}
 table.stats .grp.g3{background:#2B1430;color:#E4C8EF}
 table.stats .grp.g4{background:#12262A;color:#C2E3EA}
 table.stats .grp.g5{background:#331A1A;color:#F0CACA}
+/* pass matrix: its headers are team identity too, so they follow the team
+   colour — the colour itself on the row heads, a dark wash of it behind the
+   sticky top row (shared.css tints them blue / brown) */
+table.pmtx .pm-h{background:#232022;color:#E6E1DF}
+table.pmtx .pm-rh{background:var(--home);color:var(--team-ink)}
+.pm-away table.pmtx .pm-h{background:#26260F;color:#EFEFC4}
+.pm-away table.pmtx .pm-rh{background:var(--away);color:var(--team-ink)}
+/* ...except the "Σ recv" corner. That row is a summary, not a player, and shared.css
+   already puts the dark panel behind it — so it is spelled out for both sides here
+   rather than left to a specificity duel between the two rules (the away selector
+   carries one class more, and would otherwise paint the corner the team colour
+   while the home one stayed dark) */
+table.pmtx tbody tr:last-child th.pm-rh,
+.pm-away table.pmtx tbody tr:last-child th.pm-rh{background:var(--panel2);color:var(--ink)}
 
 /* fill the viewport exactly: header + page + stats-wrap as a flex column, so no
    dead band is left under the scroll area regardless of header/padding heights */
@@ -103,8 +126,8 @@ body>header{flex:none}
 .sm-sub{color:var(--mut);font-size:10.5px;text-align:center;margin:6px auto 0;max-width:520px;line-height:1.5}
 #heatCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .hm-mark{position:absolute;width:26px;height:26px;border-radius:50%;transform:translate(-50%,-50%);
-  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;
-  border:2px solid rgba(255,255,255,0.85);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.55);
+  display:flex;align-items:center;justify-content:center;color:var(--team-ink);font-weight:800;font-size:12px;
+  border:2px solid rgba(0,0,0,0.55);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.55);
   transition:opacity .12s, transform .12s;z-index:2}
 .hm-mark.dim{opacity:0.3}
 .hm-mark.sel{transform:translate(-50%,-50%) scale(1.25);z-index:3}
@@ -116,7 +139,7 @@ body>header{flex:none}
 .hm-row.hm-off .hm-no{opacity:0.5}                       /* played, but no located touch */
 .hm-row.hm-off .hm-name,.hm-row.hm-off .hm-cnt{color:var(--mut)}
 .hm-no{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-weight:800;font-size:11px;color:#fff}
+  font-weight:800;font-size:11px;color:var(--team-ink)}
 .hm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hm-cnt{margin-left:auto;color:var(--mut);font-weight:700;font-size:12px}
 .hm-cnt-foot{border-top:1px solid var(--line);margin-top:6px;padding:7px 6px 2px;font-size:11px;color:var(--mut)}
@@ -139,7 +162,7 @@ body>header{flex:none}
 .gf-pitch{position:relative;width:100%;aspect-ratio:68/105;border-radius:6px;overflow:hidden}
 .gf-dot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;z-index:2;pointer-events:none}
 .gf-no{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:800;color:#fff;background:var(--home);border:2px solid rgba(255,255,255,0.85);
+  font-size:11px;font-weight:800;color:var(--team-ink);background:var(--home);border:2px solid rgba(0,0,0,0.55);
   box-shadow:0 1px 3px rgba(0,0,0,0.6)}
 .gf-dot.away .gf-no{background:var(--away)}
 .gf-nm{margin-top:1px;font-size:9px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.9);
@@ -153,7 +176,7 @@ body>header{flex:none}
 .gf-sub{display:inline-flex;align-items:center;max-width:100%;padding:2px;
   background:var(--panel2);border:1px solid var(--line);border-radius:999px;font-size:11px;color:var(--ink)}
 .gf-sno{flex:none;width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:10px;font-weight:800;color:#fff;background:var(--home)}
+  font-size:10px;font-weight:800;color:var(--team-ink);background:var(--home)}
 .gf-sub.away .gf-sno{background:var(--away)}
 .gf-snm{padding:0 7px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gf-snm:empty{display:none}
@@ -420,7 +443,7 @@ function shotMapHTML(team){
 }
 /* ---- Distribution: each player a bubble at (pass accuracy %, pass volume) (image 2) ---- */
 function passScatterHTML(team){
-  const P=computeStats(rows,team), fill=team==='home'?'#2f81f7':'#f7682f';
+  const P=computeStats(rows,team), fill=team==='home'?'var(--home)':'var(--away)';
   const players=sortedPlayers(P).filter(no=>P[no].passes>0);
   if(!players.length)return `<div class="chart-card"><div class="stats-empty">No passes yet.</div></div>`;
   const W=460,H=380,mL=44,mR=22,mT=18,mB=36, maxVol=Math.max(...players.map(no=>P[no].passes));
@@ -453,7 +476,7 @@ function passScatterHTML(team){
   }
   const bubbles=pts.map(p=>
     `<g><circle cx="${p.cx.toFixed(1)}" cy="${p.cy.toFixed(1)}" r="${p.rr.toFixed(1)}" fill="${fill}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/>`
-    +`<text x="${p.cx.toFixed(1)}" y="${(p.cy+3.5).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${p.no}</text></g>`).join('');
+    +`<text x="${p.cx.toFixed(1)}" y="${(p.cy+3.5).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--team-ink)">${p.no}</text></g>`).join('');
   // no pixel cap on the svg: it fills the card (whose own max-width sets the size),
   // so the scatter shares the row evenly with the pass matrix instead of sitting
   // small beside it now that the cross map has moved to the row below
@@ -565,7 +588,7 @@ const othHead=()=>`<div class="chart-head"><div></div>`
 function setOthCat(v){othCat=v;renderStats();}
 function foulMapHTML(team){
   const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
-  const teamColor=team==='home'?'var(--home)':'var(--away)', fill=team==='home'?'#2f81f7':'#f7682f';
+  const teamColor=team==='home'?'var(--home)':'var(--away)', fill=teamColor;
   // no data -> keep the pitch and 0% bands, just draw no dots
   const evs=rows.filter(r=>r.team===team&&FOUL_EVENTS.has(r.event)&&r.pXY);
   const cards=rows.filter(r=>r.team===team&&(r.event==='yellow card'||r.event==='red card')&&r.t!=null);
@@ -598,7 +621,7 @@ function foulMapHTML(team){
     const shape=f.half===1
       ?`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${fill}" fill-opacity="0.92" ${ring}/>`
       :`<rect x="${(f.x-11).toFixed(1)}" y="${(f.y-11).toFixed(1)}" width="22" height="22" rx="3" fill="${fill}" fill-opacity="0.92" ${ring}/>`;
-    return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${f.no}</text></g>`;
+    return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="var(--team-ink)">${f.no}</text></g>`;
   }).join('');
   const pitch=`<g transform="translate(0 ${mT})"><rect width="${PW}" height="${PH}" fill="rgba(26,62,32,0.72)"/>`
     +`<rect width="${PW/3}" height="${PH}" fill="url(#dngPat)"/>`
@@ -617,7 +640,7 @@ function foulMapHTML(team){
    half; ratio bands like the foul map, but no cards / dangerous-zone overlay. */
 function plainEventMapHTML(team,eventName){
   const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
-  const teamColor=team==='home'?'var(--home)':'var(--away)', fill=team==='home'?'#2f81f7':'#f7682f';
+  const teamColor=team==='home'?'var(--home)':'var(--away)', fill=teamColor;
   // no data -> keep the pitch and 0% bands, just draw no dots
   const evs=rows.filter(r=>r.team===team&&r.event===eventName&&r.pXY);
   const dir={1:attackDir(team,1),2:attackDir(team,2)};
@@ -640,7 +663,7 @@ function plainEventMapHTML(team,eventName){
     const shape=f.half===1
       ?`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${fill}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/>`
       :`<rect x="${(f.x-11).toFixed(1)}" y="${(f.y-11).toFixed(1)}" width="22" height="22" rx="3" fill="${fill}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/>`;
-    return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${f.no}</text></g>`;
+    return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="var(--team-ink)">${f.no}</text></g>`;
   }).join('');
   const pitch=`<g transform="translate(0 ${mT})"><rect width="${PW}" height="${PH}" fill="rgba(26,62,32,0.72)"/>`
     +`<g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG('right')}${dots}</g>`;
@@ -716,7 +739,7 @@ function pdWindows(){
   return w;
 }
 function passNetHTML(team){
-  const fill=team==='home'?'#2f81f7':'#f7682f';
+  const fill=team==='home'?'var(--home)':'var(--away)';
   const wins=pdWindows(); if(pdWin>=wins.length)pdWin=0;
   const w=wins[pdWin], L=+dur.halfLen||45;
   const opts=wins.map((x,i)=>`<option value="${i}"${i===pdWin?' selected':''}>${x.label}</option>`).join('');
@@ -766,8 +789,8 @@ function passNetHTML(team){
       +` stroke="#e8edf4" stroke-opacity="0.85" stroke-width="${Math.min(7,1.5+n*0.9).toFixed(1)}" marker-end="url(#${mkId})"/>`;
   });
   const dots=Object.entries(nodes).map(([p,n])=>
-    `<g><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${R}" fill="${fill}" stroke="rgba(255,255,255,0.9)" stroke-width="2.5"/>`
-    +`<text x="${n.x.toFixed(1)}" y="${(n.y+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">${p}</text></g>`).join('');
+    `<g><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${R}" fill="${fill}" stroke="rgba(0,0,0,0.75)" stroke-width="2.5"/>`
+    +`<text x="${n.x.toFixed(1)}" y="${(n.y+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="var(--team-ink)">${p}</text></g>`).join('');
   const defs=`<defs><marker id="${mkId}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4"`
     +` orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e8edf4"/></marker></defs>`;
   const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG('right')+defs+seg+dots+'</svg>');
@@ -783,8 +806,12 @@ function passMatrixHTML(team){
   const {players,mtx}=passMatrix(rows,team);
   if(!players.length)return `<div class="stats-empty">No completed passes for this team yet.</div>`;
   let max=0; players.forEach(f=>players.forEach(t=>{if(f!==t)max=Math.max(max,(mtx[f]&&mtx[f][t])||0);}));
-  const rgb=team==='home'?'47,129,247':'247,104,47';
-  const bg=v=>v?`style="background:rgba(${rgb},${(0.12+0.6*v/(max||1)).toFixed(3)})"`:'';
+  const rgb=team==='home'?'238,238,238':'255,255,102';   // --home / --away, as rgb for the alpha ramp
+  // both team colours are light, so a busy cell washes out to near-white over the
+  // black page: past the halfway point of the ramp the count is printed in dark ink
+  const bg=v=>{if(!v)return '';
+    const a=0.12+0.6*v/(max||1);
+    return `style="background:rgba(${rgb},${a.toFixed(3)})${a>=0.45?';color:var(--team-ink)':''}"`;};
   let head='<th class="pm-h">From \\ To</th>'+players.map(p=>`<th class="pm-h">${p}</th>`).join('')+'<th class="pm-h">Σ</th>';
   const colSum={}; let grand=0, body='';
   players.forEach(f=>{
@@ -870,7 +897,7 @@ function squadInHalf(team,half){
    marker or a row in the player list isolates that player's heatmap. */
 let _heatBy={}, _heatOrder=[];   // points grouped by player, built in heatMapHTML
 function heatMapHTML(team){
-  const fill=team==='home'?'#2f81f7':'#f7682f';
+  const fill=team==='home'?'var(--home)':'var(--away)';
   const head=`<div class="chart-head"><div></div>`
     +`<div class="half-toggle"><button class="${heatHalf===0?'on':''}" onclick="setHeatHalf(0)">All</button>`
     +`<button class="${heatHalf===1?'on':''}" onclick="setHeatHalf(1)">1st</button>`
@@ -1081,7 +1108,7 @@ function matchSummaryHTML(){
     const badge=e.kind==='sub'
       ? (e.pairs.length>1?`<text text-anchor="middle" y="${up?-20:30}" font-size="11" font-weight="800" fill="${col}">x${e.pairs.length}</text>`:'')
       : (e.no?`<circle cy="${up?-24:26}" r="9.5" fill="${col}" stroke="rgba(255,255,255,0.85)" stroke-width="1.5"/>`
-        +`<text text-anchor="middle" y="${up?-20.5:29.5}" font-size="10" font-weight="800" fill="#fff">${e.no}</text>`:'');
+        +`<text text-anchor="middle" y="${up?-20.5:29.5}" font-size="10" font-weight="800" fill="var(--team-ink)">${e.no}</text>`:'');
     const tip=e.kind==='sub'
       ? `<title>${esc(minLbl(e)+' '+e.pairs.map(p=>(p.off||'?')+' ▼ '+(p.on||'?')+' ▲').join(' · '))}</title>`:'';
     return `<g transform="translate(${x.toFixed(1)} ${y})">${tip}${icon(e.kind)}${badge}`
