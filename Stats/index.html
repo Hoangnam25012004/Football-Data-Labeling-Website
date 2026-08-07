@@ -121,6 +121,29 @@ body>header{flex:none}
 .dist-maps>.chart-card{flex:1 1 0;min-width:420px;max-width:none}
 .dist-maps>.chart-card svg{max-height:560px}
 .takeon-legend{flex-wrap:wrap;row-gap:6px}
+/* Defensive map (Dashboard): the upright pitch beside its ranking. Capped by WIDTH
+   rather than height — the pitch is portrait and carries a band row underneath, so a
+   full-width map would run off the bottom before the ranking beside it ever ended. */
+.dm-flex{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+.dm-map{flex:1;min-width:300px;max-width:460px}
+.dm-side{flex:1;min-width:300px;max-width:540px}
+.dm-title{font-weight:700;font-size:15px;margin:2px 0 10px}
+.dm-wrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.dm-rank{width:100%;border-collapse:collapse;font-size:13px}
+.dm-rank th{position:sticky;top:0;z-index:1;background:var(--panel2);color:var(--mut);
+  font-weight:600;text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.dm-rank td{padding:8px 12px;border-bottom:1px solid var(--line)}
+.dm-rank .dm-r{width:66px;text-align:center}
+.dm-rank td.dm-r{color:var(--mut);font-weight:700}
+.dm-rank .dm-c{width:74px;text-align:right}
+.dm-rank td.dm-c{font-weight:700}
+.dm-rank tbody tr{cursor:pointer}
+.dm-rank tbody tr:hover td{background:var(--panel2)}
+.dm-rank tbody tr.sel td{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent)}
+.dm-rank tbody tr.dim td{opacity:0.45}
+.dm-no{color:var(--ink)}
+.dm-empty{color:var(--mut);text-align:center;padding:18px 12px}
+.dm-hint{font-size:11px;color:var(--mut);padding:8px 2px 0;line-height:1.5}
 /* player heatmap card (Distribution tab) */
 .hm-flex{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
 .hm-flex>div:first-child{flex:1;min-width:340px}
@@ -236,7 +259,8 @@ body>header{flex:none}
    been opened at all. Player-Lists has always checked; this page did not. */
 const ourLineups=()=>lineupsAreFor(loadMeta().matchId)?loadLineups():blankLineups();
 // no shotHalf any more: the shooting map shows both halves at once, normalised to attack up
-let rows=loadRows(), meta=loadMeta(), lineups=ourLineups(), statView='overall', statTeam='home', statCat='shooting', defHalf=1, defCat='tackles', othCat='fouls';
+let rows=loadRows(), meta=loadMeta(), lineups=ourLineups(), statView='overall', statTeam='home', statCat='shooting', defHalf=0, defCat='tackles', othCat='fouls';
+let defPlayer='';   // defensive map: shirt number the ranking has narrowed it to ('' = whole team)
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
 let pdWin=0;      // pass-network map: index into the 15-minute time windows
 
@@ -367,28 +391,100 @@ const DEF_CATS={
   takeOnConcern:{label:'Take-on Concern',parts:[['take-on concern','Take-on Concern','#ff8a3d']]},
   mistakes:{label:'Mistakes',parts:[['mistake','Mistake','#f7b32f']]}
 };
+/* a value going into onclick="fn('…')": escaped for the JS string, then for the attribute */
+const jsArg=s=>esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
+/* ---- Defensive: one VERTICAL map per action, beside its ranking ----
+   The dropdown picks the action and the All / 1st / 2nd buttons pick the period.
+   Both halves are normalised so the team always attacks UP, so "All" is one
+   picture rather than two behind a toggle. The bands read like the other maps'
+   do, turned to match the pitch: down the left = share by third along the pitch
+   (attacking third at the top), along the bottom = share by third across it.
+   Clicking a player in the ranking narrows the dots AND the bands to him;
+   clicking him again gives the whole team back. */
 function defMapHTML(team){
   const cat=DEF_CATS[defCat]||DEF_CATS.tackles;
   const opts=Object.entries(DEF_CATS).map(([k,c])=>`<option value="${k}"${k===defCat?' selected':''}>${c.label}</option>`).join('');
   const head=`<div class="chart-head"><div></div>`
     +`<div class="head-ctrls"><select class="def-sel" onchange="setDefCat(this.value)">${opts}</select>`
-    +`<div class="half-toggle"><button class="${defHalf===1?'on':''}" onclick="setDefHalf(1)">1st</button>`
+    +`<div class="half-toggle"><button class="${defHalf===0?'on':''}" onclick="setDefHalf(0)">All</button>`
+    +`<button class="${defHalf===1?'on':''}" onclick="setDefHalf(1)">1st</button>`
     +`<button class="${defHalf===2?'on':''}" onclick="setDefHalf(2)">2nd</button></div></div></div>`;
+  // the pitch stood on end: the landscape 1050x680 becomes 680 wide x 1050 tall,
+  // with a margin down the left for the length bands and one below for the width bands
+  const d=PITCH_DIMS.football, PW=d.h, PH=d.w, mL=140, mB=130, W=mL+PW, H=PH+mB;
+  const teamColor=team==='home'?'var(--home)':'var(--away)';
   // keyed through evKey: event names come from a user-editable list, so "Take-on Concern"
   // must find the same dots as "take-on concern" (see the evKey note in shared.js)
   const col={}; cat.parts.forEach(([ev,,c])=>col[evKey(ev)]=c);
-  // no data -> keep the pitch, just draw no dots
-  const acts=rows.filter(r=>r.team===team && col[evKey(r.event)] && r.pXY && eventHalf(r)===defHalf);
-  const d=PITCH_DIMS.football, W=d.w, H=d.h;
-  const dots=acts.map(r=>{const cx=(r.pXY.x/100*W).toFixed(1), cy=(r.pXY.y/100*H).toFixed(1);
-    return `<g><circle cx="${cx}" cy="${cy}" r="13" fill="${col[evKey(r.event)]}" fill-opacity="0.9" stroke="#000000" stroke-width="2"/>`
-      +`<text x="${cx}" y="${(+cy+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#06281a">${r.playerFrom||''}</text></g>`;}).join('');
-  const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG(attackDir(team,defHalf))+dots+'</svg>');
-  const legend=cat.parts.map(([,lbl,c])=>`<span class="sm-leg"><span class="leg-dot" style="background:${c}"></span>${lbl}</span>`).join('');
-  return `<div class="chart-card map-card">${head}<div class="shotmap-pitch">${pitch}</div><div class="shotmap-legend">${legend}</div></div>`;
+  const dir={1:attackDir(team,1),2:attackDir(team,2)};
+  const acts=rows.filter(r=>r.team===team&&col[evKey(r.event)]&&r.pXY&&(!defHalf||eventHalf(r)===defHalf))
+    .map(r=>{
+      const flip=dir[eventHalf(r)]==='left';
+      const px=flip?100-r.pXY.x:r.pXY.x, py=flip?100-r.pXY.y:r.pXY.y;
+      return {x:py/100*PW, y:(100-px)/100*PH,          // attacking right -> attacking up
+              c:col[evKey(r.event)], no:(r.playerFrom||'').toString().trim()};
+    });
+  // the ranking: everyone with at least one of these actions, most first. Ties share a
+  // rank and the next one skips, so the numbers stay the positions they name.
+  const cnt={}; acts.forEach(a=>{if(a.no)cnt[a.no]=(cnt[a.no]||0)+1;});
+  if(defPlayer&&!cnt[defPlayer])defPlayer='';   // he has none of these in this period
+  const order=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]
+    ||((isNaN(+a)||isNaN(+b))?String(a).localeCompare(String(b)):+a-+b));
+  const shown=defPlayer?acts.filter(a=>a.no===defPlayer):acts;
+  // no data -> keep the pitch and the 0% bands, just draw no dots
+  const vCnt=[0,0,0]; shown.forEach(a=>vCnt[Math.min(2,Math.floor(a.y/PH*3))]++);
+  const hCnt=[0,0,0]; shown.forEach(a=>hCnt[Math.min(2,Math.floor(a.x/PW*3))]++);
+  const pctL=n=>shown.length?Math.round(n/shown.length*100)+'%':'0%';
+  const dots=shown.map(a=>{
+    const cx=a.x.toFixed(1), cy=a.y.toFixed(1);
+    return `<g><circle cx="${cx}" cy="${cy}" r="16" fill="${a.c}" fill-opacity="0.92" stroke="#000000" stroke-width="2"/>`
+      +`<text x="${cx}" y="${(+cy+6).toFixed(1)}" text-anchor="middle" font-size="17" font-weight="800" fill="#06281a">${esc(a.no)}</text></g>`;
+  }).join('');
+  // attacking arrow, stood up inside the centre circle
+  const ax=PW/2, ay=PH/2;
+  const arrow=`<g opacity="0.5" stroke="#fff" fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">`
+    +`<line x1="${ax}" y1="${ay+54}" x2="${ax}" y2="${ay-54}"/>`
+    +`<polyline points="${ax-26},${ay-28} ${ax},${ay-54} ${ax+26},${ay-28}"/></g>`;
+  const pitchG=`<g transform="translate(${mL} 0)">`
+    +`<rect width="${PW}" height="${PH}" fill="rgba(26,62,32,0.72)"/>`
+    +`<g transform="translate(0 ${PH}) rotate(-90)"><g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(PH,PW,false)}</g></g>`
+    +arrow+dots+`</g>`;
+  let over='';
+  for(let i=0;i<3;i++)
+    over+=`<text x="${(mL/2).toFixed(0)}" y="${((i+0.5)*PH/3+12).toFixed(0)}" text-anchor="middle" font-size="34" font-weight="700" fill="${teamColor}">${pctL(vCnt[i])}</text>`;
+  [1,2].forEach(i=>over+=`<line x1="12" y1="${i*PH/3}" x2="${mL}" y2="${i*PH/3}" stroke="var(--line)" stroke-width="2"/>`);
+  over+=`<text x="${(mL/2).toFixed(0)}" y="${(PH+mB/2+9).toFixed(0)}" text-anchor="middle" font-size="26" fill="var(--mut)">Total</text>`;
+  for(let i=0;i<3;i++)
+    over+=`<text x="${(mL+(i+0.5)*PW/3).toFixed(0)}" y="${(PH+mB/2+12).toFixed(0)}" text-anchor="middle" font-size="34" font-weight="700" fill="${teamColor}">${pctL(hCnt[i])}</text>`;
+  [1,2].forEach(i=>over+=`<line x1="${mL+i*PW/3}" y1="${PH+14}" x2="${mL+i*PW/3}" y2="${H-14}" stroke="var(--line)" stroke-width="2"/>`);
+  over+=`<line x1="${mL}" y1="12" x2="${mL}" y2="${H-14}" stroke="var(--line)" stroke-width="2"/>`
+    +`<line x1="12" y1="${PH}" x2="${W-12}" y2="${PH}" stroke="var(--line)" stroke-width="2"/>`;
+  const names=squadNames(lineups,team);
+  let lastC=null;
+  const rankRows=order.map((no,i)=>{
+    const c=cnt[no], rk=c===lastC?'':String(i+1); lastC=c;
+    const cls=defPlayer===no?' class="sel"':(defPlayer?' class="dim"':'');
+    return `<tr${cls} onclick="setDefPlayer('${jsArg(no)}')">`
+      +`<td class="dm-r">${rk}</td>`
+      +`<td><b class="dm-no">${esc(no)}.</b> ${esc(playerLabel(names,no))}</td>`
+      +`<td class="dm-c">${c}</td></tr>`;
+  }).join('');
+  const lbl=cat.label.toLowerCase();
+  const legend=cat.parts.map(([,l,c])=>`<span class="sm-leg"><span class="leg-dot" style="background:${c}"></span>${l}</span>`).join('');
+  return `<div class="chart-card map-card">${head}<div class="dm-flex">`
+    +`<div class="dm-map"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">`
+    +`${pitchG}${over}</svg><div class="shotmap-legend">${legend}</div></div>`
+    +`<div class="dm-side"><div class="dm-title">${esc(cat.label)}</div>`
+    +`<div class="dm-wrap"><table class="dm-rank">`
+    +`<thead><tr><th class="dm-r">Rank</th><th>Name</th><th class="dm-c">Count</th></tr></thead><tbody>`
+    +(rankRows||`<tr><td colspan="3" class="dm-empty">No ${esc(lbl)} tagged for this period.</td></tr>`)
+    +`</tbody></table></div>`
+    +`<div class="dm-hint">Click a player to show only his ${esc(lbl)} — the bands follow him. Click again for the whole team.</div>`
+    +`</div></div></div>`;
 }
-function setDefCat(v){defCat=v;renderStats();}
+function setDefCat(v){defCat=v;defPlayer='';renderStats();}
 function setDefHalf(h){defHalf=h;renderStats();}
+function setDefPlayer(no){defPlayer=defPlayer===no?'':no;renderStats();}
 /* ---- Shooting: donut of Goals / On-target / Off-target+Blocked (image 1) ---- */
 function arcPath(cx,cy,rr,a0,a1){
   const p=a=>[cx+rr*Math.cos(a),cy+rr*Math.sin(a)];
