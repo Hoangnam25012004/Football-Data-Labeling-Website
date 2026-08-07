@@ -124,10 +124,11 @@ body>header{flex:none}
 /* Defensive map (Dashboard): the upright pitch beside its ranking. Capped by WIDTH
    rather than height — the pitch is portrait and carries a band row underneath, so a
    full-width map would run off the bottom before the ranking beside it ever ended. */
-.dm-flex{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+.dm-flex{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;justify-content:center}
 .dm-map{flex:1;min-width:300px;max-width:460px}
-.dm-side{flex:1;min-width:300px;max-width:540px}
+.dm-side{flex:1;min-width:300px;max-width:560px}
 .dm-title{font-weight:700;font-size:15px;margin:2px 0 10px}
+.dm-sub{color:var(--mut);font-weight:600;font-size:12px;margin-left:7px}
 .dm-wrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
 .dm-rank{width:100%;border-collapse:collapse;font-size:13px}
 .dm-rank th{position:sticky;top:0;z-index:1;background:var(--panel2);color:var(--mut);
@@ -137,13 +138,11 @@ body>header{flex:none}
 .dm-rank td.dm-r{color:var(--mut);font-weight:700}
 .dm-rank .dm-c{width:74px;text-align:right}
 .dm-rank td.dm-c{font-weight:700}
-.dm-rank tbody tr{cursor:pointer}
-.dm-rank tbody tr:hover td{background:var(--panel2)}
+.dm-rank tbody tr{cursor:default}
 .dm-rank tbody tr.sel td{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent)}
 .dm-rank tbody tr.dim td{opacity:0.45}
 .dm-no{color:var(--ink)}
 .dm-empty{color:var(--mut);text-align:center;padding:18px 12px}
-.dm-hint{font-size:11px;color:var(--mut);padding:8px 2px 0;line-height:1.5}
 /* player heatmap card (Distribution tab) */
 .hm-flex{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
 .hm-flex>div:first-child{flex:1;min-width:340px}
@@ -260,7 +259,6 @@ body>header{flex:none}
 const ourLineups=()=>lineupsAreFor(loadMeta().matchId)?loadLineups():blankLineups();
 // no shotHalf any more: the shooting map shows both halves at once, normalised to attack up
 let rows=loadRows(), meta=loadMeta(), lineups=ourLineups(), statView='overall', statTeam='home', statCat='shooting', defHalf=0, defCat='tackles', othCat='fouls';
-let defPlayer='';   // defensive map: shirt number the ranking has narrowed it to ('' = whole team)
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
 let pdWin=0;      // pass-network map: index into the 15-minute time windows
 
@@ -391,16 +389,29 @@ const DEF_CATS={
   takeOnConcern:{label:'Take-on Concern',parts:[['take-on concern','Take-on Concern','#ff8a3d']]},
   mistakes:{label:'Mistakes',parts:[['mistake','Mistake','#f7b32f']]}
 };
-/* a value going into onclick="fn('…')": escaped for the JS string, then for the attribute */
+/* a value going into an inline handler, fn('…'): escaped for the JS string, then for the attribute */
 const jsArg=s=>esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
+/* hover a ranking row to isolate that player, the way the touch heatmap does.
+   Nothing is re-rendered: the whole team's dots are drawn already, and every
+   player's bands were worked out alongside them, so this only flips attributes.
+   Keyed by shirt number; '' puts the whole team back. */
+let _defBands={};
+function defHover(p){
+  const b=_defBands[p]||_defBands['']||[];
+  document.querySelectorAll('.dm-band').forEach((t,i)=>{if(b[i]!=null)t.textContent=b[i];});
+  document.querySelectorAll('.dm-dot').forEach(g=>{g.style.display=(!p||g.dataset.p===p)?'':'none';});
+  document.querySelectorAll('.dm-rank tbody tr').forEach(tr=>{
+    tr.classList.toggle('sel',!!p&&tr.dataset.p===p);
+    tr.classList.toggle('dim',!!p&&tr.dataset.p!==p);
+  });
+}
 /* ---- Defensive: one VERTICAL map per action, beside its ranking ----
    The dropdown picks the action and the All / 1st / 2nd buttons pick the period.
    Both halves are normalised so the team always attacks UP, so "All" is one
    picture rather than two behind a toggle. The bands read like the other maps'
    do, turned to match the pitch: down the left = share by third along the pitch
    (attacking third at the top), along the bottom = share by third across it.
-   Clicking a player in the ranking narrows the dots AND the bands to him;
-   clicking him again gives the whole team back. */
+   Hovering a player in the ranking narrows the dots AND both sets of bands to him. */
 function defMapHTML(team){
   const cat=DEF_CATS[defCat]||DEF_CATS.tackles;
   const opts=Object.entries(DEF_CATS).map(([k,c])=>`<option value="${k}"${k===defCat?' selected':''}>${c.label}</option>`).join('');
@@ -422,22 +433,36 @@ function defMapHTML(team){
       const flip=dir[eventHalf(r)]==='left';
       const px=flip?100-r.pXY.x:r.pXY.x, py=flip?100-r.pXY.y:r.pXY.y;
       return {x:py/100*PW, y:(100-px)/100*PH,          // attacking right -> attacking up
-              c:col[evKey(r.event)], no:(r.playerFrom||'').toString().trim()};
+              c:col[evKey(r.event)], k:evKey(r.event), no:(r.playerFrom||'').toString().trim()};
     });
-  // the ranking: everyone with at least one of these actions, most first. Ties share a
-  // rank and the next one skips, so the numbers stay the positions they name.
-  const cnt={}; acts.forEach(a=>{if(a.no)cnt[a.no]=(cnt[a.no]||0)+1;});
-  if(defPlayer&&!cnt[defPlayer])defPlayer='';   // he has none of these in this period
-  const order=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]
+  /* the ranking: everyone with at least one of these actions. Tackles, Ground Duels and
+     Aerial Duels are a won-lost pair, and a pair ranks on how often the player came out
+     on top rather than on how often he tried; the rest rank on how many. The pair is
+     spotted the way report.js spots it — parts[0] is the winning event — so the dropdown
+     stays the single place either of them is described. Ties share a rank and the next
+     one skips it, so the numbers stay the positions they name. */
+  const succKey=cat.parts.length===2?evKey(cat.parts[0][0]):null;
+  const cnt={}, won={};
+  acts.forEach(a=>{if(!a.no)return;
+    cnt[a.no]=(cnt[a.no]||0)+1; if(a.k===succKey)won[a.no]=(won[a.no]||0)+1;});
+  const rateOf=no=>cnt[no]?(won[no]||0)/cnt[no]:0;
+  const order=Object.keys(cnt).sort((a,b)=>(succKey?rateOf(b)-rateOf(a):0)||cnt[b]-cnt[a]
     ||((isNaN(+a)||isNaN(+b))?String(a).localeCompare(String(b)):+a-+b));
-  const shown=defPlayer?acts.filter(a=>a.no===defPlayer):acts;
-  // no data -> keep the pitch and the 0% bands, just draw no dots
-  const vCnt=[0,0,0]; shown.forEach(a=>vCnt[Math.min(2,Math.floor(a.y/PH*3))]++);
-  const hCnt=[0,0,0]; shown.forEach(a=>hCnt[Math.min(2,Math.floor(a.x/PW*3))]++);
-  const pctL=n=>shown.length?Math.round(n/shown.length*100)+'%':'0%';
-  const dots=shown.map(a=>{
+  // no data -> keep the pitch and the 0% bands, just draw no dots.
+  // Every player's bands are worked out here so hovering costs nothing later.
+  const bandsOf=list=>{
+    const v=[0,0,0], h=[0,0,0];
+    list.forEach(a=>{v[Math.min(2,Math.floor(a.y/PH*3))]++;h[Math.min(2,Math.floor(a.x/PW*3))]++;});
+    const p=n=>list.length?Math.round(n/list.length*100)+'%':'0%';
+    return [p(v[0]),p(v[1]),p(v[2]),p(h[0]),p(h[1]),p(h[2])];
+  };
+  _defBands={'':bandsOf(acts)};
+  order.forEach(no=>{_defBands[no]=bandsOf(acts.filter(a=>a.no===no));});
+  const band=_defBands[''];
+  const dots=acts.map(a=>{
     const cx=a.x.toFixed(1), cy=a.y.toFixed(1);
-    return `<g><circle cx="${cx}" cy="${cy}" r="16" fill="${a.c}" fill-opacity="0.92" stroke="#000000" stroke-width="2"/>`
+    return `<g class="dm-dot" data-p="${esc(a.no)}">`
+      +`<circle cx="${cx}" cy="${cy}" r="16" fill="${a.c}" fill-opacity="0.92" stroke="#000000" stroke-width="2"/>`
       +`<text x="${cx}" y="${(+cy+6).toFixed(1)}" text-anchor="middle" font-size="17" font-weight="800" fill="#06281a">${esc(a.no)}</text></g>`;
   }).join('');
   // attacking arrow, stood up inside the centre circle
@@ -451,40 +476,41 @@ function defMapHTML(team){
     +arrow+dots+`</g>`;
   let over='';
   for(let i=0;i<3;i++)
-    over+=`<text x="${(mL/2).toFixed(0)}" y="${((i+0.5)*PH/3+12).toFixed(0)}" text-anchor="middle" font-size="34" font-weight="700" fill="${teamColor}">${pctL(vCnt[i])}</text>`;
+    over+=`<text class="dm-band" x="${(mL/2).toFixed(0)}" y="${((i+0.5)*PH/3+12).toFixed(0)}" text-anchor="middle" font-size="34" font-weight="700" fill="${teamColor}">${band[i]}</text>`;
   [1,2].forEach(i=>over+=`<line x1="12" y1="${i*PH/3}" x2="${mL}" y2="${i*PH/3}" stroke="var(--line)" stroke-width="2"/>`);
   over+=`<text x="${(mL/2).toFixed(0)}" y="${(PH+mB/2+9).toFixed(0)}" text-anchor="middle" font-size="26" fill="var(--mut)">Total</text>`;
   for(let i=0;i<3;i++)
-    over+=`<text x="${(mL+(i+0.5)*PW/3).toFixed(0)}" y="${(PH+mB/2+12).toFixed(0)}" text-anchor="middle" font-size="34" font-weight="700" fill="${teamColor}">${pctL(hCnt[i])}</text>`;
+    over+=`<text class="dm-band" x="${(mL+(i+0.5)*PW/3).toFixed(0)}" y="${(PH+mB/2+12).toFixed(0)}" text-anchor="middle" font-size="34" font-weight="700" fill="${teamColor}">${band[3+i]}</text>`;
   [1,2].forEach(i=>over+=`<line x1="${mL+i*PW/3}" y1="${PH+14}" x2="${mL+i*PW/3}" y2="${H-14}" stroke="var(--line)" stroke-width="2"/>`);
   over+=`<line x1="${mL}" y1="12" x2="${mL}" y2="${H-14}" stroke="var(--line)" stroke-width="2"/>`
     +`<line x1="12" y1="${PH}" x2="${W-12}" y2="${PH}" stroke="var(--line)" stroke-width="2"/>`;
   const names=squadNames(lineups,team);
-  let lastC=null;
+  let prevK=null;
   const rankRows=order.map((no,i)=>{
-    const c=cnt[no], rk=c===lastC?'':String(i+1); lastC=c;
-    const cls=defPlayer===no?' class="sel"':(defPlayer?' class="dim"':'');
-    return `<tr${cls} onclick="setDefPlayer('${jsArg(no)}')">`
+    const c=cnt[no], s=won[no]||0;
+    const k=succKey?c+'/'+s:String(c);          // tied when the figures they are ranked on match
+    const rk=k===prevK?'':String(i+1); prevK=k;
+    return `<tr data-p="${esc(no)}" onmouseenter="defHover('${jsArg(no)}')" onmouseleave="defHover('')">`
       +`<td class="dm-r">${rk}</td>`
       +`<td><b class="dm-no">${esc(no)}.</b> ${esc(playerLabel(names,no))}</td>`
-      +`<td class="dm-c">${c}</td></tr>`;
+      +`<td class="dm-c">${c}</td>`
+      +(succKey?`<td class="dm-c">${Math.round(s/c*100)}%</td>`:'')
+      +`</tr>`;
   }).join('');
-  const lbl=cat.label.toLowerCase();
   const legend=cat.parts.map(([,l,c])=>`<span class="sm-leg"><span class="leg-dot" style="background:${c}"></span>${l}</span>`).join('');
   return `<div class="chart-card map-card">${head}<div class="dm-flex">`
     +`<div class="dm-map"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">`
     +`${pitchG}${over}</svg><div class="shotmap-legend">${legend}</div></div>`
-    +`<div class="dm-side"><div class="dm-title">${esc(cat.label)}</div>`
+    +`<div class="dm-side"><div class="dm-title">${esc(cat.label)}`
+    +(succKey?`<span class="dm-sub">· ranked by success rate</span>`:'')+`</div>`
     +`<div class="dm-wrap"><table class="dm-rank">`
-    +`<thead><tr><th class="dm-r">Rank</th><th>Name</th><th class="dm-c">Count</th></tr></thead><tbody>`
-    +(rankRows||`<tr><td colspan="3" class="dm-empty">No ${esc(lbl)} tagged for this period.</td></tr>`)
-    +`</tbody></table></div>`
-    +`<div class="dm-hint">Click a player to show only his ${esc(lbl)} — the bands follow him. Click again for the whole team.</div>`
-    +`</div></div></div>`;
+    +`<thead><tr><th class="dm-r">Rank</th><th>Name</th><th class="dm-c">Count</th>`
+    +(succKey?`<th class="dm-c">Success</th>`:'')+`</tr></thead><tbody>`
+    +(rankRows||`<tr><td colspan="${succKey?4:3}" class="dm-empty">No ${esc(cat.label.toLowerCase())} tagged for this period.</td></tr>`)
+    +`</tbody></table></div></div></div></div>`;
 }
-function setDefCat(v){defCat=v;defPlayer='';renderStats();}
+function setDefCat(v){defCat=v;renderStats();}
 function setDefHalf(h){defHalf=h;renderStats();}
-function setDefPlayer(no){defPlayer=defPlayer===no?'':no;renderStats();}
 /* ---- Shooting: donut of Goals / On-target / Off-target+Blocked (image 1) ---- */
 function arcPath(cx,cy,rr,a0,a1){
   const p=a=>[cx+rr*Math.cos(a),cy+rr*Math.sin(a)];
