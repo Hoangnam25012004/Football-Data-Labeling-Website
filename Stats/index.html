@@ -185,13 +185,19 @@ body>header{flex:none}
 </head>
 <body>
 <header>
-  <h1>Hoang<span>Nam</span> · Stats</h1>
+  <h1>Hoang<span>Nam</span></h1>
   <div class="stats-toggle" style="margin-left:14px">
-    <button id="statGenBtn">General</button>
+    <button id="viewOverallBtn">Overall</button>
+    <button id="viewDashBtn">Dashboard</button>
+    <button id="viewStatsBtn">Stats</button>
+  </div>
+  <!-- which side Dashboard / Stats are about. Hidden on Overall, which is both at once. -->
+  <div class="stats-toggle" id="teamToggle" style="margin-left:10px;display:none">
     <button id="statHomeBtn"></button>
     <button id="statAwayBtn"></button>
   </div>
-  <!-- category tabs (only for Home / Away): the 34-column table split into 4 views -->
+  <!-- category tabs (Dashboard / Stats only): the 34-column table, and the
+       visualizations that go with it, split into 4 views -->
   <div class="stats-toggle" id="catToggle" style="margin-left:10px;display:none">
     <button data-cat="shooting">Shooting</button>
     <button data-cat="distribution">Distribution</button>
@@ -224,7 +230,7 @@ body>header{flex:none}
    been opened at all. Player-Lists has always checked; this page did not. */
 const ourLineups=()=>lineupsAreFor(loadMeta().matchId)?loadLineups():blankLineups();
 // no shotHalf any more: the shooting map shows both halves at once, normalised to attack up
-let rows=loadRows(), meta=loadMeta(), lineups=ourLineups(), statTeam='general', statCat='shooting', defHalf=1, defCat='tackles', othCat='fouls';
+let rows=loadRows(), meta=loadMeta(), lineups=ourLineups(), statView='overall', statTeam='home', statCat='shooting', defHalf=1, defCat='tackles', othCat='fouls';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
 let pdWin=0;      // pass-network map: index into the 15-minute time windows
 
@@ -253,6 +259,14 @@ const STAT_CATS={
     ['Fouls',s=>s.fouls],['Fouls Won',s=>s.foulsWon],['Offsides',s=>s.offsides],['Saves',s=>s.saves]]
 };
 
+/* Three views of the open match, picked by the top row of buttons:
+     Overall    both sides at once — the summary timeline, the starting formations
+                and the team-vs-team comparison
+     Dashboard  one side, one category: the visualizations
+     Stats      the same side and category: the per-player table
+   Dashboard and Stats are the two halves of what used to be one combined view, so
+   they share the side picker and the category tabs and differ only in what they
+   render underneath. */
 function renderStats(){
   /* No open match -> the notice, not the last match's leftovers. The stores are shared by
      every match this browser has opened, so with none open there is nothing here that can
@@ -261,47 +275,60 @@ function renderStats(){
   const open=!!meta.matchId;
   $('noMatchMsg').style.display=open?'none':'block';
   document.querySelector('.stats-wrap').style.display=open?'':'none';
+  $('teamToggle').style.display='none';
   $('catToggle').style.display='none';
   if(!open)return;
-  $('statGenBtn').className=statTeam==='general'?'act-gen':'';
+  $('viewOverallBtn').className=statView==='overall'?'act-gen':'';
+  $('viewDashBtn').className=statView==='dashboard'?'act-gen':'';
+  $('viewStatsBtn').className=statView==='stats'?'act-gen':'';
+  const perTeam=statView!=='overall';
+  $('teamToggle').style.display=perTeam?'flex':'none';
+  $('catToggle').style.display=perTeam?'flex':'none';
   $('statHomeBtn').className=statTeam==='home'?'act-home':'';
   $('statAwayBtn').className=statTeam==='away'?'act-away':'';
   $('statHomeBtn').textContent=meta.home;
   $('statAwayBtn').textContent=meta.away;
-  $('catToggle').style.display=statTeam==='general'?'none':'flex';
   document.querySelectorAll('#catToggle button').forEach(b=>b.className=b.dataset.cat===statCat?'act-gen':'');
   const holder=$('statsHolder');
-  if(statTeam==='general'){renderGeneral();return;}
+  if(!perTeam){renderGeneral();return;}
   // the whole matchday squad, not just the players who happened to be tagged: a
   // substitute who came on without touching the ball still gets his (zero) row
   const P=withSquad(computeStats(rows,statTeam),lineups,statTeam), players=sortedPlayers(P);
   if(!players.length){holder.innerHTML='<div class="stats-empty">No events for this team yet.</div>';return;}
+  if(statView==='stats'){holder.innerHTML=statTableHTML(P,players);return;}
+  holder.innerHTML=dashboardHTML(statTeam);
+  if(statCat==='distribution')heatHover('');   // canvas must exist in the DOM first
+}
+/* Stats view: the per-player table for the chosen category, and nothing else. */
+function statTableHTML(P,players){
   const names=squadNames(lineups,statTeam), cols=STAT_CATS[statCat];
   const head='<th class="no">No</th><th class="pl">Player</th>'+cols.map(c=>`<th>${c[0]}</th>`).join('');
   const body=players.map(no=>'<tr><td class="no">'+esc(no)+'</td>'
     +`<td class="pl">${esc(playerLabel(names,no))}</td>`
     +cols.map(c=>`<td>${c[1](P[no])}</td>`).join('')+'</tr>').join('');
-  const table=`<table class="stats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
-  // charts sit BELOW the table. Shooting: donut + shot-location map side by side.
-  // Distribution: pass matrix on the left, volume/accuracy scatter on its right.
+  return `<table class="stats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+/* Dashboard view: the visualizations for the chosen category, and nothing else.
+   Shooting: donut + shot-location map side by side.
+   Distribution: pass matrix on the left, volume/accuracy scatter on its right. */
+function dashboardHTML(team){
   let extra='';
   if(statCat==='shooting'){
-    extra=`<div class="chart-row">${shootingChartHTML(statTeam)}${shotMapHTML(statTeam)}</div>`;
+    extra=`<div class="chart-row">${shootingChartHTML(team)}${shotMapHTML(team)}</div>`;
   }else if(statCat==='distribution'){
-    extra=`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(statTeam)}</div>${passScatterHTML(statTeam)}</div>`
-      +`<div class="chart-row dist-maps">${crossMapHTML(statTeam)}${takeOnMapHTML(statTeam)}</div>`
-      +`<div class="chart-row">${heatMapHTML(statTeam)}</div>`
-      +`<div class="chart-row pt-row">${passTypesHTML(statTeam)}${passNetHTML(statTeam)}</div>`;
+    extra=`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(team)}</div>${passScatterHTML(team)}</div>`
+      +`<div class="chart-row dist-maps">${crossMapHTML(team)}${takeOnMapHTML(team)}</div>`
+      +`<div class="chart-row">${heatMapHTML(team)}</div>`
+      +`<div class="chart-row pt-row">${passTypesHTML(team)}${passNetHTML(team)}</div>`;
   }else if(statCat==='defensive'){
-    extra=`<div class="chart-row">${defMapHTML(statTeam)}</div>`;
+    extra=`<div class="chart-row">${defMapHTML(team)}</div>`;
   }else if(statCat==='other'){
-    const othMap=othCat==='fouls'?foulMapHTML(statTeam)
-      :othCat==='foulsWon'?plainEventMapHTML(statTeam,'foul won')
-      :plainEventMapHTML(statTeam,'offside');
+    const othMap=othCat==='fouls'?foulMapHTML(team)
+      :othCat==='foulsWon'?plainEventMapHTML(team,'foul won')
+      :plainEventMapHTML(team,'offside');
     extra=`<div class="chart-row">${othMap}</div>`;
   }
-  holder.innerHTML=table+extra;
-  if(statCat==='distribution')heatHover('');   // canvas must exist in the DOM first
+  return extra;
 }
 /* attacking direction for a half — inferred from where this team's shots land
    ('right' if their shots average past midfield, else 'left'); if a half has no
@@ -1240,7 +1267,9 @@ $('expCsv').onclick=()=>{
   });
 };
 
-$('statGenBtn').onclick=()=>{statTeam='general';renderStats();};
+$('viewOverallBtn').onclick=()=>{statView='overall';renderStats();};
+$('viewDashBtn').onclick=()=>{statView='dashboard';renderStats();};
+$('viewStatsBtn').onclick=()=>{statView='stats';renderStats();};
 $('statHomeBtn').onclick=()=>{statTeam='home';renderStats();};
 $('statAwayBtn').onclick=()=>{statTeam='away';renderStats();};
 document.querySelectorAll('#catToggle button').forEach(b=>b.onclick=()=>{statCat=b.dataset.cat;renderStats();});
