@@ -8,15 +8,20 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth.js?v=1"></script>
 <style>
+  /* Red and black, the same tokens index.html, shared.css and the client site
+     carry — this is the first screen anyone sees, so it should not be the one
+     page in its own palette. Left alone on purpose: --danger / --warn, and --ok
+     below, which say failed or succeeded rather than anything about the brand. */
   :root{
-    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3240;
-    --ink:#e6edf3; --mut:#8b97a7; --accent:#39d98a; --danger:#f7506b; --warn:#f7b32f;
+    --bg:#000000; --panel:#0C0A0B; --panel2:#141011; --line:#2A2325;
+    --ink:#EFEAE8; --mut:#9C8F92; --accent:#E0122B;
+    --danger:#f7506b; --warn:#f7b32f; --ok:#39d98a;
   }
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
        font-family:"Segoe UI",system-ui,sans-serif;font-size:13px;color:var(--ink);
-       /* a faint pitch-green glow behind the card, so the page still reads as the app */
-       background:radial-gradient(900px 520px at 50% -10%,#12301f 0%,var(--bg) 62%)}
+       /* the same faint glow behind the card, in the brand red instead of pitch green */
+       background:radial-gradient(900px 520px at 50% -10%,#36060E 0%,var(--bg) 62%)}
   .auth{width:100%;max-width:390px;display:flex;flex-direction:column;align-items:stretch;gap:14px}
 
   .brand{font-size:34px;font-weight:800;letter-spacing:.5px;margin:0;text-align:center;line-height:1.1}
@@ -27,7 +32,8 @@
   .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
   .tabs button{flex:1;background:transparent;border:0;color:var(--mut);font:inherit;font-weight:700;
                padding:9px 0;border-radius:999px;cursor:pointer}
-  .tabs button.on{background:var(--accent);color:#06281a}
+  /* white on the red, as everywhere else the accent is a filled button */
+  .tabs button.on{background:var(--accent);color:#fff}
   .tabs button:not(.on):hover{color:var(--ink)}
 
   form{display:flex;flex-direction:column;gap:10px;margin:0}
@@ -35,13 +41,13 @@
   .fld>span{font-size:11px;font-weight:700;color:var(--mut);letter-spacing:.4px;padding-left:14px}
   .fld input{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
              border-radius:999px;padding:12px 16px;font:inherit;font-size:13px;width:100%}
-  .fld input::placeholder{color:#5d6b7e}
-  .fld input:focus{outline:none;border-color:var(--accent);background:#20293a}
+  .fld input::placeholder{color:#6E6265}
+  .fld input:focus{outline:none;border-color:var(--accent);background:#1C1618}
   /* whichever form is not in use is display:none — it stays in the document, but a
      password manager reads each form on its own, so the other one cannot confuse it */
   .hide{display:none}
 
-  .primary{margin-top:4px;background:var(--accent);color:#06281a;border:0;border-radius:999px;
+  .primary{margin-top:4px;background:var(--accent);color:#fff;border:0;border-radius:999px;
            padding:12px 0;font:inherit;font-size:14px;font-weight:800;cursor:pointer}
   .primary:hover{filter:brightness(1.08)}
   .primary[disabled]{opacity:.6;cursor:progress}
@@ -52,11 +58,11 @@
   .msg{margin:0;padding:10px 14px;border-radius:10px;font-size:12px;line-height:1.5;display:none;white-space:pre-line}
   .msg.show{display:block}
   .msg.bad{background:#2a1620;border:1px solid var(--danger);color:#ffc3ce}
-  .msg.ok{background:#12281d;border:1px solid var(--accent);color:#bff0d6}
+  .msg.ok{background:#12281d;border:1px solid var(--ok);color:#bff0d6}
   .msg.info{background:var(--panel);border:1px solid var(--line);color:var(--mut)}
 
   .foot{margin:0;text-align:center;color:var(--mut);font-size:11px;line-height:1.6}
-  .foot b{color:#b9c4d2;font-weight:600}
+  .foot b{color:#C9BFBD;font-weight:600}
 </style>
 </head>
 <body>
