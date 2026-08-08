@@ -12,8 +12,10 @@
 const {loadStats}=require('./harness');
 const {test,eq,deepEq,ok,notOk}=require('./tiny-test');
 
-const NAMES={funcs:['matchTime','eventHalf','teamGoals','scoreBarHTML','subMarkers',
-  'matchSummaryHTML','pitchSVGV','benchListHTML','formationSideHTML'],
+// markMin / subsPanelHTML are lifted too: the timeline labels its markers with the
+// first, and the score bar puts each side's substitutions beside the score with the second
+const NAMES={funcs:['matchTime','eventHalf','teamGoals','markMin','subsPanelHTML','scoreBarHTML',
+  'subMarkers','matchSummaryHTML','pitchSVGV','benchListHTML','formationSideHTML'],
   consts:['SUMMARY_EVENTS']};
 // 45-minute halves, the 2nd starting at video 2760 -> match second = 2700 + (t - 2760)
 const DUR={enabled:true,halfLen:45,h1Start:0,h1End:2760,h2Start:2760,h2End:5700};

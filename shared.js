@@ -320,7 +320,10 @@ function goalMouthG(box,marks,o){
         +'" rx="4" fill="'+m.color+'" stroke="'+ring+'" stroke-width="2.5"/>'
       :'<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+R+'" fill="'+m.color
         +'" stroke="'+ring+'" stroke-width="2.5"/>';
-    return '<g>'+shape+'<text x="'+cx.toFixed(1)+'" y="'+(cy+R*0.38).toFixed(1)
+    // optional cls / p: the Stats shooting map tags each mark with the player who took
+    // the shot, so hovering its ranking can isolate him in the goal as well as on the pitch
+    return '<g'+(m.cls?' class="'+m.cls+'"':'')+(m.p==null?'':' data-p="'+esc(m.p)+'"')+'>'
+      +shape+'<text x="'+cx.toFixed(1)+'" y="'+(cy+R*0.38).toFixed(1)
       +'" text-anchor="middle" font-size="'+Math.round(R*1.1)+'" font-weight="800" fill="'+ink+'">'
       +(m.label==null?'':m.label)+'</text></g>';
   }).join('');

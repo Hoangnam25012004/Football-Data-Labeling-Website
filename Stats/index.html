@@ -121,6 +121,24 @@ body>header{flex:none}
 .dist-maps>.chart-card{flex:1 1 0;min-width:420px;max-width:none}
 .dist-maps>.chart-card svg{max-height:560px}
 .takeon-legend{flex-wrap:wrap;row-gap:6px}
+/* Shooting (Dashboard): who took the shots, in the space under the donut and beside
+   the map. Hovering a row isolates that player on the map (see shotHover). */
+.sr-card{flex:1;min-width:280px;max-width:460px;align-self:flex-start}
+.sr-title{font-weight:700;font-size:15px;margin:2px 0 10px}
+.sr-wrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.sr-rank{width:100%;border-collapse:collapse;font-size:13px}
+.sr-rank th{position:sticky;top:0;z-index:1;background:var(--panel2);color:var(--mut);
+  font-weight:600;text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.sr-rank td{padding:8px 12px;border-bottom:1px solid var(--line)}
+.sr-rank .sr-r{width:66px;text-align:center}
+.sr-rank td.sr-r{color:var(--mut);font-weight:700}
+.sr-rank .sr-c{width:74px;text-align:right}
+.sr-rank td.sr-c{font-weight:700}
+.sr-rank tbody tr{cursor:default}
+.sr-rank tbody tr.sel td{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent)}
+.sr-rank tbody tr.dim td{opacity:0.45}
+.sr-no{color:var(--ink)}
+.sr-empty{color:var(--mut);text-align:center;padding:18px 12px}
 /* Defensive map (Dashboard): the upright pitch beside its ranking. Capped by WIDTH
    rather than height — the pitch is portrait and carries a band row underneath, so a
    full-width map would run off the bottom before the ranking beside it ever ended. */
@@ -185,6 +203,15 @@ body>header{flex:none}
 .sb-score{flex:none;font-size:24px;font-weight:800;color:var(--ink);background:var(--panel);
   border:1px solid var(--line);border-radius:10px;padding:5px 18px;letter-spacing:1px}
 .sb-score i{font-style:normal;color:var(--mut);margin:0 10px;font-size:20px}
+/* Overall: each side's substitutions, flanking the score */
+.sb-subs{flex:none;width:190px;max-height:104px;overflow-y:auto;
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 7px}
+.sp-row{display:flex;align-items:baseline;gap:7px;font-size:11.5px;line-height:1.75;white-space:nowrap}
+.sp-on{color:#39d98a;font-weight:800;flex:none}
+.sp-off{color:#f7506b;font-weight:800;flex:none}
+.sp-min{color:var(--mut);font-variant-numeric:tabular-nums;flex:none;min-width:30px}
+.sp-nm{color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+.sp-empty{color:var(--mut);font-size:11px;text-align:center;padding:12px 4px}
 .gf-title{font-weight:700;font-size:13px;margin-bottom:8px}
 .gf-pitch{position:relative;width:100%;aspect-ratio:68/105;border-radius:6px;overflow:hidden}
 .gf-dot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;z-index:2;pointer-events:none}
@@ -250,7 +277,7 @@ body>header{flex:none}
   <div class="stats-wrap"><div id="statsHolder"></div></div>
 </div>
 
-<script src="../shared.js?v=17"></script>
+<script src="../shared.js?v=18"></script>
 <script>
 /* The lineup store is shared by every tab and by every match this browser has ever opened,
    so a stored squad is only ours if its stamp names the match that is actually open. Taking
@@ -342,7 +369,7 @@ function statTableHTML(P,players){
 function dashboardHTML(team){
   let extra='';
   if(statCat==='shooting'){
-    extra=`<div class="chart-row">${shootingChartHTML(team)}${shotMapHTML(team)}</div>`;
+    extra=`<div class="chart-row">${shootingChartHTML(team)}${shotMapHTML(team)}${shotRankHTML(team)}</div>`;
   }else if(statCat==='distribution'){
     extra=`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(team)}</div>${passScatterHTML(team)}</div>`
       +`<div class="chart-row dist-maps">${crossMapHTML(team)}${takeOnMapHTML(team)}</div>`
@@ -564,14 +591,18 @@ function shotMapHTML(team){
   // a strike from deep pushes the bottom edge back to fit it
   const deepest=shots.reduce((m,s)=>Math.max(m,s.vy),0);
   const bottom=Math.min(H,Math.max(H*0.5,deepest+70));
+  // sm-dot / data-p: the ranking beside the map hovers on these (see shotHover)
   const dots=shots.map(s=>{
     const cx=s.vx.toFixed(1), cy=s.vy.toFixed(1), col=kinds[s.r.event];
-    return `<g><circle cx="${cx}" cy="${cy}" r="17" fill="${col}" fill-opacity="0.92" stroke="#000000" stroke-width="2.5"/>`
+    return `<g class="sm-dot" data-p="${esc(String(s.r.playerFrom||'').trim())}">`
+      +`<circle cx="${cx}" cy="${cy}" r="17" fill="${col}" fill-opacity="0.92" stroke="#000000" stroke-width="2.5"/>`
       +`<text x="${cx}" y="${(+cy+6).toFixed(1)}" text-anchor="middle" font-size="17" font-weight="800" fill="#06281a">${s.r.playerFrom||''}</text></g>`;
   }).join('');
-  // …and the goal itself, standing on the goal line at the top
+  // …and the goal itself, standing on the goal line at the top — its marks are tagged
+  // the same way, so isolating a player takes his shots and his goalmouth marks together
   const gm=goalMarks(rows,team,r=>kinds[r.event]
-    ?{x:r.gXY.x,y:r.gXY.y,label:r.playerFrom||'',color:kinds[r.event]}:null);
+    ?{x:r.gXY.x,y:r.gXY.y,label:r.playerFrom||'',color:kinds[r.event],
+      cls:'sm-dot',p:String(r.playerFrom||'').trim()}:null);
   const GW=W*0.54, GH=GW/3, GX=(W-GW)/2, PAD=22;
   // The goal stands clear of the pitch rather than on the goal line. The map is capped at
   // 520 css px across a 680-unit viewBox, so one unit is 520/680 px and a centimetre
@@ -595,6 +626,39 @@ function shotMapHTML(team){
     +`<span class="sm-leg"><span class="leg-dot" style="background:#8b97a7"></span>Off / Blocked / Missed</span>`;
   return `<div class="chart-card map-card">`
     +`<div class="shotmap-pitch shotmap-v">${pitch}</div>${note}<div class="shotmap-legend">${legend}</div></div>`;
+}
+/* hover a row in the shooting ranking to isolate that player — his shots on the pitch
+   AND his marks in the goal above it, since both carry the same data-p. Nothing is
+   re-rendered: the whole team is drawn already, so this only flips display. */
+function shotHover(p){
+  document.querySelectorAll('.sm-dot').forEach(g=>{g.style.display=(!p||g.dataset.p===p)?'':'none';});
+  document.querySelectorAll('.sr-rank tbody tr').forEach(tr=>{
+    tr.classList.toggle('sel',!!p&&tr.dataset.p===p);
+    tr.classList.toggle('dim',!!p&&tr.dataset.p!==p);
+  });
+}
+/* ---- Shooting: who took them, beside the map ----
+   The same shots the map plots (the located ones), counted per player, most first.
+   Ties share a rank and the next one skips it, as in the defensive ranking. */
+function shotRankHTML(team){
+  const shots=rows.filter(r=>r.team===team&&SHOT_KINDS.has(evKey(r.event))&&r.pXY);
+  const cnt={}; shots.forEach(r=>{const no=String(r.playerFrom||'').trim(); if(no)cnt[no]=(cnt[no]||0)+1;});
+  const order=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]
+    ||((isNaN(+a)||isNaN(+b))?String(a).localeCompare(String(b)):+a-+b));
+  const names=squadNames(lineups,team);
+  let prevC=null;
+  const rankRows=order.map((no,i)=>{
+    const c=cnt[no], rk=c===prevC?'':String(i+1); prevC=c;
+    return `<tr data-p="${esc(no)}" onmouseenter="shotHover('${jsArg(no)}')" onmouseleave="shotHover('')">`
+      +`<td class="sr-r">${rk}</td>`
+      +`<td><b class="sr-no">${esc(no)}.</b> ${esc(playerLabel(names,no))}</td>`
+      +`<td class="sr-c">${c}</td></tr>`;
+  }).join('');
+  return `<div class="chart-card sr-card"><div class="sr-title">Shots</div>`
+    +`<div class="sr-wrap"><table class="sr-rank">`
+    +`<thead><tr><th class="sr-r">Rank</th><th>Name</th><th class="sr-c">Count</th></tr></thead><tbody>`
+    +(rankRows||`<tr><td colspan="3" class="sr-empty">No shot has been placed on the pitch yet.</td></tr>`)
+    +`</tbody></table></div></div>`;
 }
 /* ---- Distribution: each player a bubble at (pass accuracy %, pass volume) (image 2) ---- */
 function passScatterHTML(team){
@@ -1160,10 +1224,36 @@ function teamGoals(team){
   return rows.filter(r=>r.team===team&&r.event==='goal').length
        + rows.filter(r=>r.team===opp&&(r.event==='own goal'||r.event==='own-goal')).length;
 }
+/* the minute a marker is labelled with. Stoppage time is capped by the half, so a
+   45:52 first-half goal is 45+1' and a 95:30 second-half one is 90+6' (never 46' / 96').
+   Takes {sec,half} as subMarkers() and the timeline both build them. */
+function markMin(e){
+  const halfMin=(+dur.halfLen||45), m=Math.floor(e.sec/60)+1, cap=e.half*halfMin;
+  return m>cap?`${cap}+${m-cap}'`:`${m}'`;
+}
+/* ---- Overall: each side's substitutions, listed beside the score ----
+   The minute, then who came on (green ▲) and who went off (red ▼). Reads the same
+   subMarkers() the timeline does, so the panel and the timeline cannot disagree —
+   including the grouping that makes several swaps in one minute a single entry. */
+function subsPanelHTML(team){
+  const names=squadNames(lineups,team);
+  const nm=no=>{const k=String(no==null?'':no).trim();
+    return k?k+'. '+playerLabel(names,k):'—';};
+  const line=(dir,cls,min,no)=>`<div class="sp-row"><span class="${cls}">${dir}</span>`
+    +`<span class="sp-min">${min}</span><span class="sp-nm">${esc(nm(no))}</span></div>`;
+  const out=[];
+  subMarkers().filter(m=>m.team===team).sort((a,b)=>a.half-b.half||a.sec-b.sec)
+    .forEach(m=>{const min=markMin(m);
+      m.pairs.forEach(p=>{out.push(line('▲','sp-on',min,p.on));out.push(line('▼','sp-off',min,p.off));});});
+  return `<div class="sb-subs">`
+    +(out.length?out.join(''):`<div class="sp-empty">No substitutions</div>`)+`</div>`;
+}
 function scoreBarHTML(){
-  return `<div class="score-bar"><span class="sb-name home">${meta.home}</span>`
+  return `<div class="score-bar">${subsPanelHTML('home')}`
+    +`<span class="sb-name home">${meta.home}</span>`
     +`<span class="sb-score">${teamGoals('home')}<i>:</i>${teamGoals('away')}</span>`
-    +`<span class="sb-name away">${meta.away}</span></div>`;
+    +`<span class="sb-name away">${meta.away}</span>`
+    +`${subsPanelHTML('away')}</div>`;
 }
 /* ---- General: horizontal match-summary timeline (goals / own goals / cards / subs).
    Home events sit above the axis, away events below; stacked when they collide. */
@@ -1248,9 +1338,7 @@ function matchSummaryHTML(){
     :cardRect(k==='yc'?'#ffd23f':'#e5484d',-5);
   // stoppage-time minutes are capped by the half: a 45:52 first-half goal is
   // 45+1', a 95:30 second-half goal is 90+6' (never 46' / 96')
-  const halfMin=hl/60;
-  const minLbl=e=>{const m=Math.floor(e.sec/60)+1, cap=e.half*halfMin;
-    return m>cap?`${cap}+${m-cap}'`:`${m}'`;};
+  const minLbl=markMin;
   // every event sits on one lane per team — home above the axis, away below;
   // near-simultaneous events of the same team are nudged right so icons never overlap
   const lastX={home:-1e9,away:-1e9};
