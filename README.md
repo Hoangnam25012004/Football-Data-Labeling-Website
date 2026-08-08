@@ -39,9 +39,19 @@ Nothing moves inside the repo — the relocation happens only in
 A **channel is a club**. A club signs in and sees only its own matches, and only the
 ones an analyst has marked published.
 
-- **Matches** — the fixture list with results, straight from `public.matches`.
-- **Data** — every published match added up, plus the per-match table.
-- **Players** — who scored and who created, built from the tagged goals.
+The rail has three sections, and About Hoang Nam at its foot leading back to the
+public site.
+
+- **Home** — the fixture list with results, straight from `public.matches`.
+  Opening a fixture gives the head-to-head and the shot breakdown.
+- **Channel** — the channels this account is in. Creating one makes you its
+  admin: you invite people by email, set what each of them is (admin / analyst /
+  viewer) and remove them again. One channel is one club.
+- **Data** — team stats, recent results and the last starting XI the analyst
+  entered, then every published match added up and the per-match table.
+
+**Players** (who scored and who created) no longer has a rail entry, but the view
+is unchanged and still opens at `#/players`.
 
 `client/assets/supa.js` reads Supabase; `client/assets/data.js` carries the
 Saint Lucia campaign as a seed channel so the site is never an empty room and
@@ -54,6 +64,18 @@ and a `match_stats` view. Part A is additive and safe. Part B — the half that
 actually restricts who reads what — is commented out on purpose: today's policies
 are `to authenticated`, meaning **any signed-in account can read every match in the
 database**. Put your analysts in `public.staff` first, then uncomment it.
+
+**For the Channel section, also run
+[`supabase/migrations/0014_channel_admin.sql`](supabase/migrations/0014_channel_admin.sql).**
+0013 made a channel something only staff could hand out; 0014 makes it something a
+signed-in person can create. It adds `club_invites`, the trigger that makes the
+creator an admin, the guard that stops a channel losing its last one, and
+`claim_club_invites()` — the function that turns an invite into a membership the
+first time that email signs in (nothing is emailed; you send the link yourself).
+It replaces the write policies on `clubs` and `club_members` only, and leaves
+`matches`, `events`, `teams` and `players` exactly as they were, so the tagging
+app is untouched. Until it is run, the Channel section says which file to run
+rather than failing silently.
 
 ## How the labeling app runs
 The whole app is the static file [`index.html`](index.html) — no backend required.

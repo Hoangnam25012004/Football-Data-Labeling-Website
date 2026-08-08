@@ -6,7 +6,7 @@
 <title>Channel — HoangNam Analytics</title>
 <meta name="description" content="Match data, reports and players for your club.">
 <link rel="stylesheet" href="assets/site.css?v=1">
-<link rel="stylesheet" href="assets/app.css?v=1">
+<link rel="stylesheet" href="assets/app.css?v=2">
 </head>
 <body class="app">
 
@@ -39,11 +39,19 @@
 <div class="chan-sum" id="chanSum"></div>
 
 <div class="app-body">
-  <nav class="side" aria-label="Channel sections">
-    <div class="side-grp">Channel</div>
-    <a href="#/matches" data-view="matches" class="on"><i></i> Matches</a>
+  <nav class="side" aria-label="Sections">
+    <div class="side-grp">Menu</div>
+    <a href="#/home" data-view="home" class="on"><i></i> Home</a>
+    <a href="#/channel" data-view="channel"><i></i> Channel</a>
     <a href="#/data" data-view="data"><i></i> Data</a>
-    <a href="#/players" data-view="players"><i></i> Players</a>
+
+    <!-- pinned to the bottom of the rail; the only link on it that
+         leaves the app, so it is a plain href and not a route -->
+    <div class="side-foot">
+      <a class="side-out" href="https://hoangnam25012004.github.io/Football-Data-Labeling-Website/index.html">
+        <i></i> About Hoang Nam
+      </a>
+    </div>
   </nav>
   <main class="view" id="view">
     <div class="state"><div class="spinner"></div><b>Opening your channel</b><p>One moment.</p></div>
@@ -51,8 +59,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="assets/supa.js?v=1"></script>
+<script src="assets/supa.js?v=2"></script>
 <script src="assets/data.js?v=1"></script>
-<script src="assets/app.js?v=1"></script>
+<script src="assets/app.js?v=2"></script>
 </body>
 </html>
