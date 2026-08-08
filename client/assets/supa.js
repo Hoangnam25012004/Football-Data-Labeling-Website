@@ -201,20 +201,9 @@
           .then(function (r) { if (r.error) throw asError(r.error); return shapeClub(r.data); });
       },
 
-      update: function (clubId, fields) {
-        var c = client();
-        if (!c) return Promise.reject(new Error('The Supabase client did not load.'));
-        return c.from('clubs').update(fields).eq('id', clubId).select('*').single()
-          .then(function (r) { if (r.error) throw asError(r.error); return shapeClub(r.data); });
-      },
-
-      remove: function (clubId) {
-        var c = client();
-        if (!c) return Promise.reject(new Error('The Supabase client did not load.'));
-        return c.from('clubs').delete().eq('id', clubId)
-          .then(function (r) { if (r.error) throw asError(r.error); return true; });
-      },
-
+      /* Renaming and deleting a channel are not offered: 0014 leaves both
+         with its admins, but nothing in the UI asks for them yet, and an
+         API call no screen makes is an API call nobody has tried. */
       members: function (clubId) {
         var c = client();
         if (!c) return Promise.resolve([]);
