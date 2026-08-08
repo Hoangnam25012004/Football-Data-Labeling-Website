@@ -116,13 +116,13 @@ test('shirt numbers are escaped before they reach the SVG', () => {
 
 /* ================= the row wiring =================
    Layout itself is CSS, but which builder goes in which row is code: this guards
-   the split — pass matrix + scatter on one row, the two maps on the next. */
-test('Distribution renders matrix + scatter, then cross map + take-on map', () => {
+   the order — the touch heatmap leads, then pass matrix + scatter, then the two maps. */
+test('Distribution leads with the heatmap, then matrix + scatter, then the two maps', () => {
   const branch=/statCat==='distribution'\)\{([\s\S]*?)\}else if/.exec(H.STATS)[1];
   ok(/chart-row dist-row.*passMatrixHTML.*passScatterHTML/s.test(branch)
-     &&!/dist-row[^`]*crossMapHTML/s.test(branch),'row 1: matrix + scatter only');
+     &&!/dist-row[^`]*crossMapHTML/s.test(branch),'matrix + scatter share a row, alone');
   ok(/chart-row dist-maps.*crossMapHTML.*takeOnMapHTML/s.test(branch),
-     'row 2: cross map on the left, take-ons & step-ins beside it');
-  ok(branch.indexOf('dist-row')<branch.indexOf('dist-maps'),'maps go below');
-  ok(branch.indexOf('dist-maps')<branch.indexOf('heatMapHTML'),'and above the heatmap');
+     'cross map on the left, take-ons & step-ins beside it');
+  ok(branch.indexOf('heatMapHTML')<branch.indexOf('dist-row'),'the heatmap opens the tab');
+  ok(branch.indexOf('dist-row')<branch.indexOf('dist-maps'),'and the two maps go below both');
 });

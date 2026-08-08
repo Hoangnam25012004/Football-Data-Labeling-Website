@@ -177,17 +177,14 @@ body>header{flex:none}
 .hm-mark.dim{opacity:0.3}
 .hm-mark.sel{transform:translate(-50%,-50%) scale(1.25);z-index:3}
 .hm-list{flex:none;width:220px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px}
-.hm-hint{font-size:11px;color:var(--mut);padding:2px 6px 8px;line-height:1.4}
 .hm-row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;font-size:13px;color:var(--ink);cursor:default}
 .hm-row:hover,.hm-row.sel{background:var(--panel2)}
 .hm-row.dim{opacity:0.45}
 .hm-row.hm-off .hm-no{opacity:0.5}                       /* played, but no located touch */
-.hm-row.hm-off .hm-name,.hm-row.hm-off .hm-cnt{color:var(--mut)}
+.hm-row.hm-off .hm-name{color:var(--mut)}
 .hm-no{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-weight:800;font-size:11px;color:var(--team-ink)}
 .hm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hm-cnt{margin-left:auto;color:var(--mut);font-weight:700;font-size:12px}
-.hm-cnt-foot{border-top:1px solid var(--line);margin-top:6px;padding:7px 6px 2px;font-size:11px;color:var(--mut)}
 /* General tab: match-summary timeline + starting formations flanking the comparison */
 .sum-card{margin:14px 14px 0}
 .sum-wrap{width:100%;overflow-x:auto}
@@ -371,9 +368,9 @@ function dashboardHTML(team){
   if(statCat==='shooting'){
     extra=`<div class="chart-row">${shootingChartHTML(team)}${shotMapHTML(team)}${shotRankHTML(team)}</div>`;
   }else if(statCat==='distribution'){
-    extra=`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(team)}</div>${passScatterHTML(team)}</div>`
+    extra=`<div class="chart-row">${heatMapHTML(team)}</div>`
+      +`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(team)}</div>${passScatterHTML(team)}</div>`
       +`<div class="chart-row dist-maps">${crossMapHTML(team)}${takeOnMapHTML(team)}</div>`
-      +`<div class="chart-row">${heatMapHTML(team)}</div>`
       +`<div class="chart-row pt-row">${passTypesHTML(team)}${passNetHTML(team)}</div>`;
   }else if(statCat==='defensive'){
     extra=`<div class="chart-row">${defMapHTML(team)}</div>`;
@@ -1138,12 +1135,13 @@ function heatMapHTML(team){
       +` onmouseenter="heatHover('${p}')" onmouseleave="heatHover('')">${p}</div>`;
   }).join('');
   const names=squadNames(lineups,team);
+  // shirt number and name only: the touch tally is not listed any more, though a player
+  // with none located is still the one that reads faded (hm-off)
   const list=_heatOrder.map(p=>{
     const n=_heatBy[p].length;
     return `<div class="hm-row${n?'':' hm-off'}" data-p="${p}" onmouseenter="heatHover('${p}')" onmouseleave="heatHover('')">`
       +`<span class="hm-no" style="background:${fill}">${esc(p)}</span>`
-      +`<span class="hm-name" title="${esc(playerLabel(names,p))}">${esc(playerLabel(names,p))}</span>`
-      +`<span class="hm-cnt">${n}</span></div>`;
+      +`<span class="hm-name" title="${esc(playerLabel(names,p))}">${esc(playerLabel(names,p))}</span></div>`;
   }).join('');
   const d=PITCH_DIMS.football;
   const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG('right')+'</svg>');
@@ -1155,9 +1153,7 @@ function heatMapHTML(team){
     +`<div><div class="shotmap-pitch" id="hmPitch">${pitch}`
     +`<canvas id="heatCv" width="${d.w}" height="${d.h}"></canvas>${markers}</div>`
     +`<div class="shotmap-legend">${legend}</div></div>`
-    +`<div class="hm-list"><div class="hm-hint">Markers = average position · hover a player to isolate his heatmap`
-    +`<br>Faded = played, no located touch</div>${list}`
-    +`<div class="hm-cnt-foot">Located touches: ${pts.length}</div></div></div></div>`;
+    +`<div class="hm-list">${list}</div></div></div>`;
 }
 /* hover with '' restores the whole-team heatmap */
 function heatHover(p){
@@ -1354,8 +1350,12 @@ function matchSummaryHTML(){
         +`<text text-anchor="middle" y="${up?-20.5:29.5}" font-size="10" font-weight="800" fill="var(--team-ink)">${e.no}</text>`:'');
     const tip=e.kind==='sub'
       ? `<title>${esc(minLbl(e)+' '+e.pairs.map(p=>(p.off||'?')+' ▼ '+(p.on||'?')+' ▲').join(' · '))}</title>`:'';
-    return `<g transform="translate(${x.toFixed(1)} ${y})">${tip}${icon(e.kind)}${badge}`
-      +`<text text-anchor="middle" y="${up?20:-16}" font-size="10" fill="var(--mut)">${minLbl(e)}</text></g>`;
+    // a substitution made at the break lands ON the HT tick, and its "46'" was printing
+    // over the word HT. Standing in line with the tick already says when it happened,
+    // so that one carries no minute — the hover still spells it out.
+    const atBreak=e.kind==='sub'&&Math.abs(pos(e)-H1)<1;
+    const min=atBreak?'':`<text text-anchor="middle" y="${up?20:-16}" font-size="10" fill="var(--mut)">${minLbl(e)}</text>`;
+    return `<g transform="translate(${x.toFixed(1)} ${y})">${tip}${icon(e.kind)}${badge}${min}</g>`;
   }).join('');
   return `<div class="chart-card sum-card">${scoreBarHTML()}<div class="sum-wrap">`
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;min-width:900px">${g}${marks}</svg></div></div>`;
