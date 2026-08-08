@@ -176,6 +176,10 @@ function loadStats(state,names){
     'var meta='+JSON.stringify(state.meta||{home:'Home',away:'Away',sport:'football'})+';',
     'var lineups='+JSON.stringify(state.lineups||{})+';',
     'var dur='+JSON.stringify(state.dur||{enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0})+';',
+    /* state.globals: the page's loose `let`s (which view a map is on, which half…). They
+       are declared on shared lines that grabConst cannot pick apart one at a time, so a
+       test that needs a particular one sets it here and leaves it out of `consts`. */
+    Object.entries(state.globals||{}).map(([k,v])=>'var '+k+'='+JSON.stringify(v)+';').join('\n'),
     consts.join('\n'), funcs.join('\n'),
     ';globalThis.P={rows,meta,lineups,dur,'
       +(names.consts||[]).concat(names.funcs||[]).join(',')+'};'

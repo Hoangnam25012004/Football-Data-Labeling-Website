@@ -1,128 +1,162 @@
-/* Stats tab → Distribution: the take-ons & step-ins map, and the row it lives in.
+/* Stats tab → Distribution: the one map that carries passes, crosses, take-ons and
+   step-ins, and the row it lives in.
 
-   The three events share ONE map, told apart by colour, with the whole match on a
-   single pitch: both halves are normalised so the team attacks RIGHT and the marker
-   shape says which half it was (circle 1st, square 2nd) — the same reading as the
-   map in the PDF report. It is drawn on the cross map's geometry so the two sit
-   side by side at the same size on the row below the pass table. */
+   The dropdown picks which action, the All / 1st / 2nd buttons pick the period, and
+   both halves are normalised so the team always attacks UP — one picture, not two
+   behind a toggle. Passes OPEN on an 18-cell grid (the share started in each cell)
+   because a whole match of arrows is unreadable; the other three open on their marks,
+   and hovering a player in the ranking swaps to his either way.
+
+   These tests carry over from the take-ons & step-ins map this one replaced: the
+   colour per event, the evKey convention, whose events land on it, the normalisation,
+   the ratio bands and the escaping all have to hold here too. */
 const H=require('./harness');
 const {loadStats}=H;
 const {test,eq,deepEq,ok,notOk}=require('./tiny-test');
 
-const NAMES={funcs:['matchTime','eventHalf','attackDir','dirArrowSVG','takeOnMapHTML'],
-  consts:['TAKEON_PARTS']};
+const NAMES={funcs:['matchTime','eventHalf','attackDir','distMapHTML'],
+  consts:['DIST_CATS','jsArg']};
 const DUR={enabled:true,halfLen:45,h1Start:0,h1End:2760,h2Start:2760,h2End:5700};
 const GREEN='#39d98a', RED='#f7506b', BLUE='#2f81f7';
 // t<2760 = 1st half, t>=2760 = 2nd. With no shots tagged, attackDir defaults to
 // right in the 1st half and left in the 2nd, so 2nd-half marks are mirrored.
-const ev=(team,event,x,y,t)=>({id:'e'+event+x+t,t,team,event,playerFrom:'7',playerTo:'',
-  pXY:(x==null?null:{x,y})});
-const load=rows=>loadStats({rows,lineups:{},dur:DUR,
-  meta:{home:'Haiti',away:'Saint Lucia',sport:'football'}},NAMES);
-const map=(rows,team)=>load(rows).takeOnMapHTML(team||'home');
+const ev=(team,event,x,y,t,to)=>({id:'e'+event+x+t,t,team,event,playerFrom:'7',playerTo:'',
+  pXY:(x==null?null:{x,y}), rXY:(to==null?null:{x:to,y:50})});
+// `cat`/`half` are the page's loose lets, so they go in through globals
+const map=(rows,o)=>{o=o||{};
+  return loadStats({rows,lineups:{},dur:DUR,meta:{home:'Haiti',away:'Saint Lucia',sport:'football'},
+    globals:{distCat:o.cat||'takeons',distHalf:o.half||0}},NAMES)
+    .distMapHTML(o.team||'home');};
 const count=(s,re)=>(s.match(re)||[]).length;
-// the pitch markings are circles too (centre circle, centre + penalty spots), so
-// markers are counted on the fill-opacity only they carry
-const MARK=/fill-opacity="0.92"/g, MARK_C=/<circle[^>]*fill-opacity="0.92"/g,
-      MARK_R=/<rect[^>]*fill-opacity="0.92"/g;
-// the three band percentages along the top of the map, left third first
-const topBands=s=>(s.match(/y="40"[^>]*>([\d.]+%)</g)||[]).map(m=>/>([\d.]+%)</.exec(m)[1]);
+// every mark is wrapped in the group the ranking hovers on, so they count cleanly
+// however they are drawn (a dot for take-ons, an arrow for a pass)
+const MARK=/class="dl-dot"/g;
+// the six band percentages, in document order: the three down the LEFT (by third along
+// the pitch, attacking third first) then the three along the bottom (across it)
+const bands=s=>(s.match(/class="dl-band"[^>]*>(\d+%)</g)||[]).map(m=>/>(\d+%)</.exec(m)[1]);
+const leftBands=s=>bands(s).slice(0,3);
 
 /* ================= what lands on the map ================= */
-test('each of the three events gets its own colour', () => {
-  const s=map([ev('home','take-on succes',30,30,100),
-               ev('home','take-on fail',40,40,200),
-               ev('home','step in',50,50,300)]);
-  eq(count(s,new RegExp('fill="'+GREEN+'"','g')),1,'take-on success is green');
-  eq(count(s,new RegExp('fill="'+RED+'"','g')),1,'take-on fail is red');
-  eq(count(s,new RegExp('fill="'+BLUE+'"','g')),1,'step-in is blue');
+test('each action gets its own colour, in its own dropdown entry', () => {
+  const t=map([ev('home','take-on succes',30,30,100),ev('home','take-on fail',40,40,200)],{cat:'takeons'});
+  eq(count(t,new RegExp('fill="'+GREEN+'"','g')),1,'take-on success is green');
+  eq(count(t,new RegExp('fill="'+RED+'"','g')),1,'take-on fail is red');
+  const s=map([ev('home','step in',50,50,300)],{cat:'stepins'});
+  eq(count(s,new RegExp('fill="'+BLUE+'"','g')),1,'step-in is blue, on its own entry');
+});
+
+test('an action only lands on the entry that names it', () => {
+  eq(count(map([ev('home','step in',50,50,300)],{cat:'takeons'}),MARK),0,'no step-in on Take-ons');
+  eq(count(map([ev('home','take-on succes',30,30,100)],{cat:'stepins'}),MARK),0,'nor the other way');
 });
 
 test('event names are matched case-insensitively (evKey convention)', () => {
-  const s=map([ev('home','Take-On Succes',30,30,100),ev('home','STEP IN',40,40,200)]);
-  eq(count(s,new RegExp('fill="'+GREEN+'"','g')),1);
-  eq(count(s,new RegExp('fill="'+BLUE+'"','g')),1);
+  eq(count(map([ev('home','Take-On Succes',30,30,100)],{cat:'takeons'}),MARK),1);
+  eq(count(map([ev('home','STEP IN',40,40,200)],{cat:'stepins'}),MARK),1);
 });
 
 test('take-on concern stays OFF this map — it is a Defensive action', () => {
-  const s=map([ev('home','take-on concern',30,30,100)]);
+  const s=map([ev('home','take-on concern',30,30,100)],{cat:'takeons'});
   eq(count(s,MARK),0,'no marker drawn');
-  deepEq(topBands(s),['0%','0%','0%']);
+  deepEq(leftBands(s),['0%','0%','0%']);
 });
 
 test('an event with no pitch dot is left off, not drawn at 0,0', () => {
-  const s=map([ev('home','step in',null,null,100),ev('home','step in',50,50,200)]);
-  eq(count(s,MARK),1);
+  eq(count(map([ev('home','step in',null,null,100),ev('home','step in',50,50,200)],{cat:'stepins'}),MARK),1);
 });
 
-test('the other side\'s take-ons never appear', () => {
-  const s=map([ev('away','take-on succes',30,30,100)],'home');
-  eq(count(s,MARK),0);
+test('the other side\'s events never appear', () => {
+  eq(count(map([ev('away','take-on succes',30,30,100)],{cat:'takeons'}),MARK),0);
 });
 
 /* ================= halves ================= */
-test('circle marks the 1st half, rounded square the 2nd', () => {
-  const s=map([ev('home','step in',30,30,100),ev('home','step in',30,30,3000)]);
-  eq(count(s,MARK_C),1,'one 1st-half circle');
-  eq(count(s,MARK_R),1,'one 2nd-half square');
+test('both halves are normalised so the team always attacks UP', () => {
+  // no shots tagged -> 1st half attacks right, 2nd half left. The pitch is on end and
+  // 1050 long, so x=20 in the 1st half sits deep (y=840) and the same x in the 2nd is
+  // mirrored to 80 and lands up near the goal (y=210), where a 1st-half 80 would.
+  const s=map([ev('home','step in',20,50,100),ev('home','step in',20,50,3000)],{cat:'stepins'});
+  ok(/<circle cx="340.0" cy="840.0"/.test(s),'1st half: 20% of the length, from the back');
+  ok(/<circle cx="340.0" cy="210.0"/.test(s),'2nd half: mirrored to 80%');
 });
 
-test('both halves are normalised so the team always attacks RIGHT', () => {
-  // no shots tagged -> 1st half attacks right, 2nd half left, so the 2nd-half mark
-  // at x=20 is mirrored to x=80 and lands on the same spot as a 1st-half x=80
-  const s=map([ev('home','step in',20,50,100),ev('home','step in',20,50,3000)]);
-  ok(/<circle cx="210.0"/.test(s),'1st half: 20% of a 1050-wide pitch');
-  ok(/<rect x="829.0"/.test(s),'2nd half: mirrored to 80% (840 minus the 11 half-width)');
+test('the All / 1st / 2nd buttons pick the period', () => {
+  const rows=[ev('home','step in',30,30,100),ev('home','step in',30,30,3000)];
+  eq(count(map(rows,{cat:'stepins',half:0}),MARK),2,'All keeps both');
+  eq(count(map(rows,{cat:'stepins',half:1}),MARK),1,'1st keeps one');
+  eq(count(map(rows,{cat:'stepins',half:2}),MARK),1,'2nd keeps the other');
 });
 
-/* ================= the ratio bands (shared with the cross map) ================= */
-test('the top band splits the marks by third along the pitch', () => {
+/* ================= the ratio bands ================= */
+test('the left band splits the marks by third along the pitch, attacking third first', () => {
   const s=map([ev('home','step in',10,50,100),ev('home','step in',20,50,200),
-               ev('home','step in',50,50,300),ev('home','step in',90,50,400)]);
-  deepEq(topBands(s),['50%','25%','25%']);
+               ev('home','step in',50,50,300),ev('home','step in',90,50,400)],{cat:'stepins'});
+  deepEq(leftBands(s),['25%','25%','50%'],'one up front, one in the middle, two at the back');
 });
 
 test('no data -> the pitch and its 0% bands stay, instead of a text note', () => {
-  const s=map([]);
-  deepEq(topBands(s),['0%','0%','0%']);
-  ok(/Attacking/.test(s),'the pitch is still drawn');
+  const s=map([],{cat:'stepins'});
+  deepEq(bands(s),['0%','0%','0%','0%','0%','0%']);
+  ok(/rotate\(-90\)/.test(s),'the pitch is still drawn, on end');
   notOk(/stats-empty/.test(s),'no "no data" placeholder');
 });
 
-/* ================= presentation ================= */
 test('the bands take the colour of the team being shown', () => {
-  ok(/fill="var\(--home\)"/.test(map([ev('home','step in',30,30,100)],'home')));
-  ok(/fill="var\(--away\)"/.test(map([ev('away','step in',30,30,100)],'away')));
+  ok(/class="dl-band"[^>]*fill="var\(--home\)"/.test(map([ev('home','step in',30,30,100)],{cat:'stepins'})));
+  ok(/class="dl-band"[^>]*fill="var\(--away\)"/.test(
+     map([ev('away','step in',30,30,100)],{cat:'stepins',team:'away'})));
 });
 
-test('the legend names the three events and both half shapes', () => {
-  const s=map([ev('home','step in',30,30,100)]);
-  ['Take-on success','Take-on fail','Step-in','Circle = 1st half','Square = 2nd half']
-    .forEach(l=>ok(s.includes(l),l+' in the legend'));
-  ok(/takeon-legend/.test(s),'the legend may wrap without changing the card height');
+/* ================= the two readings ================= */
+test('Passes open on the 18-cell grid; the other three open on their marks', () => {
+  const p=map([ev('home','pass success',30,30,100,60)],{cat:'passes'});
+  ok(/data-mode="grid" data-mode0="grid"/.test(p),'the card opens in grid mode');
+  eq(count(p,/class="dl-grid"/g),1,'and the grid is drawn');
+  eq(count(p,/ \/ 1</g),18,'18 cells, each carrying its n / total');
+  const s=map([ev('home','step in',30,30,100)],{cat:'stepins'});
+  ok(/data-mode="dots" data-mode0="dots"/.test(s),'step-ins open on the marks');
 });
 
-test('it is drawn on the cross map geometry, so the pair lines up on one row', () => {
-  const s=map([ev('home','step in',30,30,100)]);
-  ok(/viewBox="0 0 1200 756"/.test(s),'same viewBox as the cross map');
-  ok(/class="chart-card cross-card"/.test(s),'and the same card sizing');
+test('a pass with a receiver is an arrow, a take-on is a dot', () => {
+  ok(/<line [^>]*marker-end=/.test(map([ev('home','pass success',30,50,100,70)],{cat:'passes'})),
+     'origin to target');
+  notOk(/<line [^>]*marker-end=/.test(map([ev('home','take-on succes',30,50,100)],{cat:'takeons'})),
+     'take-ons have no target to point at');
+});
+
+/* ================= the ranking ================= */
+test('the ranking orders on total, with Succ. and % for a won-lost pair', () => {
+  const s=map([ev('home','take-on succes',30,30,100),ev('home','take-on fail',30,30,150),
+               ev('away','take-on succes',30,30,200)],{cat:'takeons'});
+  ok(/<th class="dl-c">Succ\.<\/th>/.test(s)&&/<th class="dl-c">Total<\/th>/.test(s)
+     &&/<th class="dl-c">%<\/th>/.test(s),'all five columns');
+  ok(/>1<\/td><td><b class="dl-no">7\.<\/b>[^<]*<\/td><td class="dl-c">1<\/td><td class="dl-c">2<\/td><td class="dl-c">50%<\/td>/.test(s),
+     'one of two take-ons won reads 1 / 2 / 50%');
+});
+
+test('step-ins are ranked on count alone — there is nothing to succeed at', () => {
+  const s=map([ev('home','step in',30,30,100)],{cat:'stepins'});
+  notOk(/Succ\./.test(s),'no Succ. column');
+  ok(/<th class="dl-c">Total<\/th>/.test(s),'just Total');
+});
+
+test('hovering a ranking row is what isolates a player', () => {
+  const s=map([ev('home','step in',30,30,100)],{cat:'stepins'});
+  ok(/onmouseenter="distHover\('7'\)"/.test(s)&&/onmouseleave="distHover\(''\)"/.test(s));
+  ok(/class="dl-dot" data-p="7"/.test(s),'and the mark carries the number it isolates on');
 });
 
 test('shirt numbers are escaped before they reach the SVG', () => {
   const r=ev('home','step in',30,30,100); r.playerFrom='<b>7';
-  const s=map([r]);
+  const s=map([r],{cat:'stepins'});
   ok(s.includes('&lt;b&gt;7')&&!s.includes('<b>7'));
 });
 
 /* ================= the row wiring =================
-   Layout itself is CSS, but which builder goes in which row is code: this guards
-   the order — the touch heatmap leads, then pass matrix + scatter, then the two maps. */
-test('Distribution leads with the heatmap, then matrix + scatter, then the two maps', () => {
+   Layout itself is CSS, but which builder goes in which row is code: this guards the
+   order — the touch heatmap leads, and the one distribution map follows it. */
+test('Distribution is the heatmap and then the one map, nothing else', () => {
   const branch=/statCat==='distribution'\)\{([\s\S]*?)\}else if/.exec(H.STATS)[1];
-  ok(/chart-row dist-row.*passMatrixHTML.*passScatterHTML/s.test(branch)
-     &&!/dist-row[^`]*crossMapHTML/s.test(branch),'matrix + scatter share a row, alone');
-  ok(/chart-row dist-maps.*crossMapHTML.*takeOnMapHTML/s.test(branch),
-     'cross map on the left, take-ons & step-ins beside it');
-  ok(branch.indexOf('heatMapHTML')<branch.indexOf('dist-row'),'the heatmap opens the tab');
-  ok(branch.indexOf('dist-row')<branch.indexOf('dist-maps'),'and the two maps go below both');
+  ok(branch.indexOf('heatMapHTML')<branch.indexOf('distMapHTML'),'the heatmap opens the tab');
+  ['passMatrixHTML','passScatterHTML','crossMapHTML','takeOnMapHTML','passTypesHTML','passNetHTML']
+    .forEach(f=>notOk(new RegExp(f).test(H.STATS),f+' is gone from the page'));
 });

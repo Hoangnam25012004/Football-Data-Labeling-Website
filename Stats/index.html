@@ -50,20 +50,6 @@ table.stats .grp.g2{background:#2E2412;color:#EFE3BE}
 table.stats .grp.g3{background:#2B1430;color:#E4C8EF}
 table.stats .grp.g4{background:#12262A;color:#C2E3EA}
 table.stats .grp.g5{background:#331A1A;color:#F0CACA}
-/* pass matrix: its headers are team identity too, so they follow the team
-   colour — the colour itself on the row heads, a dark wash of it behind the
-   sticky top row (shared.css tints them blue / brown) */
-table.pmtx .pm-h{background:#232022;color:#E6E1DF}
-table.pmtx .pm-rh{background:var(--home);color:var(--team-ink)}
-.pm-away table.pmtx .pm-h{background:#26260F;color:#EFEFC4}
-.pm-away table.pmtx .pm-rh{background:var(--away);color:var(--team-ink)}
-/* ...except the "Σ recv" corner. That row is a summary, not a player, and shared.css
-   already puts the dark panel behind it — so it is spelled out for both sides here
-   rather than left to a specificity duel between the two rules (the away selector
-   carries one class more, and would otherwise paint the corner the team colour
-   while the home one stayed dark) */
-table.pmtx tbody tr:last-child th.pm-rh,
-.pm-away table.pmtx tbody tr:last-child th.pm-rh{background:var(--panel2);color:var(--ink)}
 
 /* fill the viewport exactly: header + page + stats-wrap as a flex column, so no
    dead band is left under the scroll area regardless of header/padding heights */
@@ -80,47 +66,30 @@ body>header{flex:none}
 /* flat look: no grey panels behind the visualizations (charts sit straight on
    the page background; only tables/lists keep their own styling) */
 .chart-card,.gen-form{background:transparent;border:none}
-/* Distribution: pass-type breakdown table (below the heatmap) */
-.pt-card{flex:1;max-width:900px}
-/* Distribution: pass-network map beside the Passes table — the row aligns both
-   cards to its bottom edge so table and map finish on the same line */
-.pt-row{align-items:flex-end}
-.pn-card{flex:1;min-width:460px}
-.pn-pitch{max-width:640px;margin:0 auto}
-.pn-stats{display:flex;justify-content:space-around;gap:12px;margin:12px auto 0;max-width:640px;
-  border-top:1px solid var(--line);padding-top:10px}
-.pn-stats div{text-align:center}
-.pn-stats span{display:block;color:var(--mut);font-size:12px;padding-bottom:6px;white-space:nowrap}
-.pn-stats b{font-size:16px;color:var(--ink)}
-.pt-head{display:flex;align-items:center;gap:26px;padding:4px 2px 12px}
-.pt-title{font-size:17px;font-weight:800;color:var(--ink);margin-right:auto}
-.pt-head span{color:var(--mut);font-size:12px}
-.pt-head span b{color:var(--ink);font-size:13px;margin-left:6px}
-.ptable{width:100%;border-collapse:collapse;font-size:13px}
-.ptable th,.ptable td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
-.ptable th:first-child,.ptable td:first-child{text-align:left}
-.ptable .pt-sec th{background:var(--panel2);color:var(--mut);font-size:12px;font-weight:700}
-.ptable .pt-lbl{font-weight:600}
-/* Distribution row 1: the pass matrix at its natural width beside the volume /
-   accuracy scatter, with EQUAL heights — the row stretches both cards to the
-   taller one and centres each card's content vertically; the svg caps its height
-   and letterboxes (viewBox keeps the aspect ratio), so nothing distorts.
-   space-evenly, not centre: neither card can grow to fill the width the maps
-   freed when they moved to their own row, so centring the pair left the two of
-   them one 14px gap apart with ~300px of slack banked either side. Spread
-   evenly, the space before, between and after them comes out the same. */
-.scatter-card{flex:1;min-width:320px;max-width:560px}
-.cross-card{flex:1.35;min-width:400px}
-.dist-row{align-items:stretch;justify-content:space-evenly}
-.dist-row .pm-col,.dist-row .chart-card{display:flex;flex-direction:column;justify-content:center}
-.dist-row .scatter-card svg{max-height:470px}
-/* Distribution row 2: the cross map (under the pass table) beside take-ons &
-   step-ins. Both maps are drawn on the SAME viewBox, so an equal flex basis puts
-   two pitches of exactly the same size side by side, aligned top and bottom. */
-.dist-maps{align-items:stretch}
-.dist-maps>.chart-card{flex:1 1 0;min-width:420px;max-width:none}
-.dist-maps>.chart-card svg{max-height:560px}
-.takeon-legend{flex-wrap:wrap;row-gap:6px}
+/* Distribution map (Dashboard): the upright pitch beside its ranking. Passes open on
+   the 18-cell grid, the other three on their marks; distHover swaps data-mode. */
+.dl-flex{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;justify-content:center}
+.dl-map{flex:1;min-width:300px;max-width:460px}
+.dl-side{flex:1;min-width:320px;max-width:600px}
+.dl-title{font-weight:700;font-size:15px;margin:2px 0 10px}
+.dl-wrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.dl-rank{width:100%;border-collapse:collapse;font-size:13px}
+.dl-rank th{position:sticky;top:0;z-index:1;background:var(--panel2);color:var(--mut);
+  font-weight:600;text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.dl-rank td{padding:8px 12px;border-bottom:1px solid var(--line)}
+.dl-rank .dl-r{width:60px;text-align:center}
+.dl-rank td.dl-r{color:var(--mut);font-weight:700}
+.dl-rank .dl-c{width:64px;text-align:right}
+.dl-rank td.dl-c{font-weight:700}
+.dl-rank tbody tr{cursor:default}
+.dl-rank tbody tr.sel td{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent)}
+.dl-rank tbody tr.dim td{opacity:0.45}
+.dl-no{color:var(--ink)}
+.dl-empty{color:var(--mut);text-align:center;padding:18px 12px}
+/* the two readings are exclusive: the grid while nothing is hovered on a category that
+   opens with it, the marks otherwise */
+.dl-card[data-mode="grid"] .dl-dot{display:none}
+.dl-card[data-mode="dots"] .dl-grid{display:none}
 /* Shooting (Dashboard): who took the shots, in the space under the donut and beside
    the map. Hovering a row isolates that player on the map (see shotHover). */
 .sr-card{flex:1;min-width:280px;max-width:460px;align-self:flex-start}
@@ -185,6 +154,9 @@ body>header{flex:none}
 .hm-no{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-weight:800;font-size:11px;color:var(--team-ink)}
 .hm-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hm-pos{margin-left:auto;flex:none;color:var(--mut);font-weight:700;font-size:11px;letter-spacing:.02em}
+.hm-row.hm-off .hm-pos{opacity:0.7}
+.hm-list{width:250px}   /* the position column needs the room */
 /* General tab: match-summary timeline + starting formations flanking the comparison */
 .sum-card{margin:14px 14px 0}
 .sum-wrap{width:100%;overflow-x:auto}
@@ -284,7 +256,7 @@ const ourLineups=()=>lineupsAreFor(loadMeta().matchId)?loadLineups():blankLineup
 // no shotHalf any more: the shooting map shows both halves at once, normalised to attack up
 let rows=loadRows(), meta=loadMeta(), lineups=ourLineups(), statView='overall', statTeam='home', statCat='shooting', defHalf=0, defCat='tackles', othCat='fouls';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
-let pdWin=0;      // pass-network map: index into the 15-minute time windows
+let distCat='passes', distHalf=0;   // the distribution map: which action, and which half
 
 /* per-category column sets — the wide table split into 4 tabs.
    Defensive = Defensive + Duels; Other = Set Pieces + Discipline. */
@@ -369,9 +341,7 @@ function dashboardHTML(team){
     extra=`<div class="chart-row">${shootingChartHTML(team)}${shotMapHTML(team)}${shotRankHTML(team)}</div>`;
   }else if(statCat==='distribution'){
     extra=`<div class="chart-row">${heatMapHTML(team)}</div>`
-      +`<div class="chart-row dist-row"><div class="pm-col">${passMatrixHTML(team)}</div>${passScatterHTML(team)}</div>`
-      +`<div class="chart-row dist-maps">${crossMapHTML(team)}${takeOnMapHTML(team)}</div>`
-      +`<div class="chart-row pt-row">${passTypesHTML(team)}${passNetHTML(team)}</div>`;
+      +`<div class="chart-row">${distMapHTML(team)}</div>`;
   }else if(statCat==='defensive'){
     extra=`<div class="chart-row">${defMapHTML(team)}</div>`;
   }else if(statCat==='other'){
@@ -413,8 +383,10 @@ const DEF_CATS={
   takeOnConcern:{label:'Take-on Concern',parts:[['take-on concern','Take-on Concern','#ff8a3d']]},
   mistakes:{label:'Mistakes',parts:[['mistake','Mistake','#f7b32f']]}
 };
-/* a value going into an inline handler, fn('…'): escaped for the JS string, then for the attribute */
-const jsArg=s=>esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
+/* a value going into an inline handler, fn('…'): escaped for the JS string, then for the
+   attribute. split/join rather than a regex literal — the test harness lifts this by
+   scanning the source, and its scanner reads a regex's quotes as string quotes. */
+const jsArg=s=>esc(String(s==null?'':s).split('\\').join('\\\\').split("'").join("\\'"));
 /* hover a ranking row to isolate that player, the way the touch heatmap does.
    Nothing is re-rendered: the whole team's dots are drawn already, and every
    player's bands were worked out alongside them, so this only flips attributes.
@@ -657,143 +629,159 @@ function shotRankHTML(team){
     +(rankRows||`<tr><td colspan="3" class="sr-empty">No shot has been placed on the pitch yet.</td></tr>`)
     +`</tbody></table></div></div>`;
 }
-/* ---- Distribution: each player a bubble at (pass accuracy %, pass volume) (image 2) ---- */
-function passScatterHTML(team){
-  const P=computeStats(rows,team), fill=team==='home'?'var(--home)':'var(--away)';
-  const players=sortedPlayers(P).filter(no=>P[no].passes>0);
-  if(!players.length)return `<div class="chart-card"><div class="stats-empty">No passes yet.</div></div>`;
-  const W=460,H=380,mL=44,mR=22,mT=18,mB=36, maxVol=Math.max(...players.map(no=>P[no].passes));
-  const X=acc=>mL+(acc/100)*(W-mL-mR), Y=vol=>H-mB-(maxVol?vol/maxVol:0)*(H-mT-mB);
-  let g=`<rect x="${mL}" y="${mT}" width="${W-mL-mR}" height="${H-mT-mB}" fill="none" stroke="var(--line)"/>`;
-  g+=`<line x1="${X(50)}" y1="${mT}" x2="${X(50)}" y2="${H-mB}" stroke="var(--line)" stroke-dasharray="4 4"/>`;
-  g+=`<line x1="${mL}" y1="${Y(maxVol/2)}" x2="${W-mR}" y2="${Y(maxVol/2)}" stroke="var(--line)" stroke-dasharray="4 4"/>`;
-  g+=`<text x="${mL}" y="${H-10}" font-size="11" fill="var(--mut)">0%</text>`;
-  g+=`<text x="${X(50)}" y="${H-10}" text-anchor="middle" font-size="11" fill="var(--mut)">Pass Accuracy →</text>`;
-  g+=`<text x="${W-mR}" y="${H-10}" text-anchor="end" font-size="11" fill="var(--mut)">100%</text>`;
-  g+=`<text x="10" y="${mT+10}" font-size="11" fill="var(--mut)">↑ Volume</text>`;
-  // bubbles are pushed apart when they overlap so every shirt number stays readable
-  const pts=players.map(no=>{
-    const s=P[no], acc=s.passes?s.passesComp/s.passes*100:0;
-    return {no, rr:8+(s.passes/maxVol)*9, cx:X(acc), cy:Y(s.passes)};
+/* ---- Distribution: ONE upright map for passes, crosses, take-ons and step-ins ----
+   The dropdown picks which, the All / 1st / 2nd buttons pick the period, and the
+   ranking beside it says who did most. Both halves are normalised so the team always
+   attacks UP, so "All" is one picture rather than two behind a toggle.
+
+   Passes OPEN on an 18-cell grid — the share of the team's passes started in each
+   cell — because a whole match of arrows is a thicket you cannot read. The other
+   three open on their marks. Hovering a player in the ranking swaps to HIS marks
+   either way, and the bands down the left and along the bottom follow him.
+
+   Same won/lost shape as DEF_CATS: two parts means parts[0] is the winning event,
+   which is what the ranking's Succ. and % columns count. */
+const DIST_CATS={
+  passes:{label:'Passes',grid:true,arrow:true,
+    parts:[['pass success','Succeeded','#39d98a'],['pass fail','Failed','#f7506b']]},
+  crosses:{label:'Crosses',arrow:true,
+    parts:[['cross success','Succeeded','#39d98a'],['cross fail','Failed','#f7506b']]},
+  takeons:{label:'Take-ons',
+    parts:[['take-on succes','Succeeded','#39d98a'],['take-on fail','Failed','#f7506b']]},
+  stepins:{label:'Step-ins',
+    parts:[['step in','Step-in','#2f81f7']]}
+};
+let _distBands={};
+/* hover a ranking row to isolate that player, as the touch heatmap does. Nothing is
+   re-rendered: every mark is drawn already and every player's bands were worked out
+   with them, so this only flips attributes. Isolating always shows marks, even in the
+   grid mode passes open on; letting go puts the card back to whichever it opened in. */
+function distHover(p){
+  const card=document.querySelector('.dl-card'); if(!card)return;
+  card.dataset.mode=p?'dots':(card.dataset.mode0||'dots');
+  const b=_distBands[p]||_distBands['']||[];
+  document.querySelectorAll('.dl-band').forEach((t,i)=>{if(b[i]!=null)t.textContent=b[i];});
+  document.querySelectorAll('.dl-dot').forEach(g=>{g.style.display=(!p||g.dataset.p===p)?'':'none';});
+  document.querySelectorAll('.dl-rank tbody tr').forEach(tr=>{
+    tr.classList.toggle('sel',!!p&&tr.dataset.p===p);
+    tr.classList.toggle('dim',!!p&&tr.dataset.p!==p);
   });
-  for(let it=0;it<80;it++){
-    let moved=false;
-    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
-      const p=pts[i], q=pts[j];
-      let dx=q.cx-p.cx, dy=q.cy-p.cy, dd=Math.hypot(dx,dy);
-      const min=p.rr+q.rr+2;
-      if(dd<min){ if(!dd){dx=1;dy=0;dd=1;}
-        const push=(min-dd)/2;
-        p.cx-=dx/dd*push; p.cy-=dy/dd*push; q.cx+=dx/dd*push; q.cy+=dy/dd*push; moved=true; }
-    }
-    pts.forEach(p=>{p.cx=Math.max(mL+p.rr,Math.min(W-mR-p.rr,p.cx));
-                    p.cy=Math.max(mT+p.rr,Math.min(H-mB-p.rr,p.cy));});
-    if(!moved)break;
+}
+function distMapHTML(team){
+  const cat=DIST_CATS[distCat]||DIST_CATS.passes;
+  const opts=Object.entries(DIST_CATS).map(([k,c])=>`<option value="${k}"${k===distCat?' selected':''}>${c.label}</option>`).join('');
+  const head=`<div class="chart-head"><div></div>`
+    +`<div class="head-ctrls"><select class="def-sel" onchange="setDistCat(this.value)">${opts}</select>`
+    +`<div class="half-toggle"><button class="${distHalf===0?'on':''}" onclick="setDistHalf(0)">All</button>`
+    +`<button class="${distHalf===1?'on':''}" onclick="setDistHalf(1)">1st</button>`
+    +`<button class="${distHalf===2?'on':''}" onclick="setDistHalf(2)">2nd</button></div></div></div>`;
+  // the pitch on end, with a margin down the left for the length bands and one below
+  // for the width bands — the same frame the defensive map uses
+  const d=PITCH_DIMS.football, PW=d.h, PH=d.w, mL=140, mB=130, W=mL+PW, H=PH+mB;
+  const teamColor=team==='home'?'var(--home)':'var(--away)';
+  // keyed through evKey: event names come from a user-editable list (see shared.js)
+  const col={}; cat.parts.forEach(([ev,,c])=>col[evKey(ev)]=c);
+  const succKey=cat.parts.length===2?evKey(cat.parts[0][0]):null;
+  const dir={1:attackDir(team,1),2:attackDir(team,2)};
+  const N=(xy,h)=>{const flip=dir[h]==='left';
+    const px=flip?100-xy.x:xy.x, py=flip?100-xy.y:xy.y;
+    return {x:py/100*PW, y:(100-px)/100*PH};};   // attacking right -> attacking up
+  const evs=rows.filter(r=>r.team===team&&col[evKey(r.event)]&&r.pXY&&(!distHalf||eventHalf(r)===distHalf))
+    .map(r=>{const h=eventHalf(r);
+      return {a:N(r.pXY,h), b:(cat.arrow&&r.rXY&&r.rXY.x!=null)?N(r.rXY,h):null,
+              c:col[evKey(r.event)], k:evKey(r.event), no:String(r.playerFrom||'').trim()};});
+  // the ranking: ordered on TOTAL, ties sharing a rank and the next one skipping it
+  const cnt={}, won={};
+  evs.forEach(e=>{if(!e.no)return;
+    cnt[e.no]=(cnt[e.no]||0)+1; if(e.k===succKey)won[e.no]=(won[e.no]||0)+1;});
+  const order=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]||(won[b]||0)-(won[a]||0)
+    ||((isNaN(+a)||isNaN(+b))?String(a).localeCompare(String(b)):+a-+b));
+  // every player's bands are worked out here so hovering costs nothing later
+  const bandsOf=list=>{
+    const v=[0,0,0], h=[0,0,0];
+    list.forEach(e=>{v[Math.min(2,Math.floor(e.a.y/PH*3))]++;h[Math.min(2,Math.floor(e.a.x/PW*3))]++;});
+    const p=n=>list.length?Math.round(n/list.length*100)+'%':'0%';
+    return [p(v[0]),p(v[1]),p(v[2]),p(h[0]),p(h[1]),p(h[2])];
+  };
+  _distBands={'':bandsOf(evs)};
+  order.forEach(no=>{_distBands[no]=bandsOf(evs.filter(e=>e.no===no));});
+  const band=_distBands[''];
+  // arrowheads, one per colour — only for the categories that actually draw arrows,
+  // so a dots-only map carries no unused marker of its own colour
+  const mkId=c=>'dlm'+c.replace(/[^0-9a-z]/gi,'');
+  const defs=cat.arrow?'<defs>'+[...new Set(cat.parts.map(p=>p[2]))].map(c=>
+    `<marker id="${mkId(c)}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4"`
+    +` orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`).join('')+'</defs>':'';
+  const marks=evs.map(e=>{
+    const g=`<g class="dl-dot" data-p="${esc(e.no)}">`;
+    if(e.b)return g+`<line x1="${e.a.x.toFixed(1)}" y1="${e.a.y.toFixed(1)}" x2="${e.b.x.toFixed(1)}" y2="${e.b.y.toFixed(1)}"`
+      +` stroke="${e.c}" stroke-width="3" stroke-opacity="0.85" marker-end="url(#${mkId(e.c)})"/>`
+      +`<circle cx="${e.a.x.toFixed(1)}" cy="${e.a.y.toFixed(1)}" r="7" fill="${e.c}"/></g>`;
+    return g+`<circle cx="${e.a.x.toFixed(1)}" cy="${e.a.y.toFixed(1)}" r="12" fill="${e.c}" fill-opacity="0.92"`
+      +` stroke="#000000" stroke-width="1.5"/></g>`;
+  }).join('');
+  // the 18 cells: 3 across the width, 6 along the length, each the share of the team's
+  // events that STARTED in it. Shown only while nothing is hovered (see distHover).
+  const GC=3, GR=6, tot=evs.length;
+  const cell=[]; for(let i=0;i<GC*GR;i++)cell.push(0);
+  evs.forEach(e=>{const c0=Math.min(GC-1,Math.floor(e.a.x/PW*GC)), r0=Math.min(GR-1,Math.floor(e.a.y/PH*GR));
+    cell[r0*GC+c0]++;});
+  let grid='';
+  for(let i=1;i<GC;i++)grid+=`<line x1="${i*PW/GC}" y1="0" x2="${i*PW/GC}" y2="${PH}" stroke="rgba(255,255,255,0.16)" stroke-width="2"/>`;
+  for(let i=1;i<GR;i++)grid+=`<line x1="0" y1="${i*PH/GR}" x2="${PW}" y2="${i*PH/GR}" stroke="rgba(255,255,255,0.16)" stroke-width="2"/>`;
+  for(let r0=0;r0<GR;r0++)for(let c0=0;c0<GC;c0++){
+    const n=cell[r0*GC+c0], x=((c0+0.5)*PW/GC).toFixed(0), y=(r0+0.5)*PH/GR;
+    grid+=`<text x="${x}" y="${(y-4).toFixed(0)}" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${tot?Math.round(n/tot*1000)/10:0}%</text>`
+      +`<text x="${x}" y="${(y+28).toFixed(0)}" text-anchor="middle" font-size="24" fill="var(--mut)">${n} / ${tot}</text>`;
   }
-  const bubbles=pts.map(p=>
-    `<g><circle cx="${p.cx.toFixed(1)}" cy="${p.cy.toFixed(1)}" r="${p.rr.toFixed(1)}" fill="${fill}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/>`
-    +`<text x="${p.cx.toFixed(1)}" y="${(p.cy+3.5).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--team-ink)">${p.no}</text></g>`).join('');
-  // no pixel cap on the svg: it fills the card (whose own max-width sets the size),
-  // so the scatter shares the row evenly with the pass matrix instead of sitting
-  // small beside it now that the cross map has moved to the row below
-  return `<div class="chart-card scatter-card">`
-    +`<div class="scatter-wrap"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block">${g}${bubbles}</svg></div></div>`;
-}
-/* ---- Distribution: cross map — origin→target arrows with zone ratios.
-   Both halves are normalised so the team attacks RIGHT (same rule as the
-   heatmap). Top band: share of crosses by origin third of the pitch length;
-   right band: share of located cross targets by height third. */
-function crossMapHTML(team){
-  const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
-  const teamColor=team==='home'?'var(--home)':'var(--away)';
-  // no data -> keep the pitch and 0% bands, just draw no arrows
-  const evs=rows.filter(r=>r.team===team&&(r.event==='cross success'||r.event==='cross fail')&&r.pXY);
-  const dir={1:attackDir(team,1),2:attackDir(team,2)};
-  const cr=evs.map(r=>{
-    const flip=dir[eventHalf(r)]==='left', f=p=>({x:(flip?100-p.x:p.x)/100*PW, y:(flip?100-p.y:p.y)/100*PH});
-    return {a:f(r.pXY), b:r.rXY?f(r.rXY):null, ok:r.event==='cross success'};
-  });
-  const oCnt=[0,0,0]; cr.forEach(c=>oCnt[Math.min(2,Math.floor(c.a.x/PW*3))]++);
-  const tgt=cr.filter(c=>c.b), tCnt=[0,0,0]; tgt.forEach(c=>tCnt[Math.min(2,Math.floor(c.b.y/PH*3))]++);
-  const pctL=(n,dd)=>dd?(Math.round(n/dd*1000)/10)+'%':'0%';
+  const ax=PW/2, ay=PH/2;
+  const arrow=`<g opacity="0.5" stroke="#fff" fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">`
+    +`<line x1="${ax}" y1="${ay+54}" x2="${ax}" y2="${ay-54}"/>`
+    +`<polyline points="${ax-26},${ay-28} ${ax},${ay-54} ${ax+26},${ay-28}"/></g>`;
+  const pitchG=`<g transform="translate(${mL} 0)">`
+    +`<rect width="${PW}" height="${PH}" fill="rgba(26,62,32,0.72)"/>`
+    +`<g transform="translate(0 ${PH}) rotate(-90)"><g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(PH,PW,false)}</g></g>`
+    +arrow+`<g class="dl-grid">${grid}</g>`+marks+`</g>`;
   let over='';
   for(let i=0;i<3;i++)
-    over+=`<text x="${((i+0.5)*PW/3).toFixed(0)}" y="40" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${pctL(oCnt[i],cr.length)}</text>`;
-  [1,2].forEach(i=>over+=`<line x1="${i*PW/3}" y1="10" x2="${i*PW/3}" y2="${mT-16}" stroke="var(--line)" stroke-width="2"/>`);
+    over+=`<text class="dl-band" x="${(mL/2).toFixed(0)}" y="${((i+0.5)*PH/3+12).toFixed(0)}" text-anchor="middle" font-size="34" font-weight="700" fill="${teamColor}">${band[i]}</text>`;
+  [1,2].forEach(i=>over+=`<line x1="12" y1="${i*PH/3}" x2="${mL}" y2="${i*PH/3}" stroke="var(--line)" stroke-width="2"/>`);
+  over+=`<text x="${(mL/2).toFixed(0)}" y="${(PH+mB/2+9).toFixed(0)}" text-anchor="middle" font-size="26" fill="var(--mut)">Total</text>`;
   for(let i=0;i<3;i++)
-    over+=`<text x="${PW+mR2/2}" y="${(mT+(i+0.5)*PH/3+10).toFixed(0)}" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${pctL(tCnt[i],tgt.length)}</text>`;
-  [1,2].forEach(i=>over+=`<line x1="${PW+18}" y1="${mT+i*PH/3}" x2="${W-18}" y2="${mT+i*PH/3}" stroke="var(--line)" stroke-width="2"/>`);
-  const seg=cr.map(c=>{
-    const col=c.ok?'#39d98a':'#f7506b';
-    let s=`<circle cx="${c.a.x.toFixed(1)}" cy="${c.a.y.toFixed(1)}" r="8" fill="${col}" fill-opacity="0.9" stroke="#000000" stroke-width="1.5"/>`;
-    if(c.b)s+=`<line x1="${c.a.x.toFixed(1)}" y1="${c.a.y.toFixed(1)}" x2="${c.b.x.toFixed(1)}" y2="${c.b.y.toFixed(1)}"`
-      +` stroke="${col}" stroke-width="3.5" stroke-dasharray="9 8" marker-end="url(#${c.ok?'cmOk':'cmNo'})" opacity="0.9"/>`;
-    return s;
+    over+=`<text class="dl-band" x="${(mL+(i+0.5)*PW/3).toFixed(0)}" y="${(PH+mB/2+12).toFixed(0)}" text-anchor="middle" font-size="34" font-weight="700" fill="${teamColor}">${band[3+i]}</text>`;
+  [1,2].forEach(i=>over+=`<line x1="${mL+i*PW/3}" y1="${PH+14}" x2="${mL+i*PW/3}" y2="${H-14}" stroke="var(--line)" stroke-width="2"/>`);
+  over+=`<line x1="${mL}" y1="12" x2="${mL}" y2="${H-14}" stroke="var(--line)" stroke-width="2"/>`
+    +`<line x1="12" y1="${PH}" x2="${W-12}" y2="${PH}" stroke="var(--line)" stroke-width="2"/>`;
+  const names=squadNames(lineups,team);
+  let prevK=null;
+  const rankRows=order.map((no,i)=>{
+    const c=cnt[no], s=won[no]||0;
+    const k=succKey?c+'/'+s:String(c);          // tied when the figures they are ranked on match
+    const rk=k===prevK?'':String(i+1); prevK=k;
+    return `<tr data-p="${esc(no)}" onmouseenter="distHover('${jsArg(no)}')" onmouseleave="distHover('')">`
+      +`<td class="dl-r">${rk}</td>`
+      +`<td><b class="dl-no">${esc(no)}.</b> ${esc(playerLabel(names,no))}</td>`
+      +(succKey?`<td class="dl-c">${s}</td>`:'')
+      +`<td class="dl-c">${c}</td>`
+      +(succKey?`<td class="dl-c">${Math.round(s/c*100)}%</td>`:'')
+      +`</tr>`;
   }).join('');
-  const defs='<defs>'
-    +'<marker id="cmOk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#39d98a"/></marker>'
-    +'<marker id="cmNo" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#f7506b"/></marker></defs>';
-  const pitch=`<g transform="translate(0 ${mT})"><rect width="${PW}" height="${PH}" fill="rgba(26,62,32,0.72)"/>`
-    +`<g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG('right')}${seg}</g>`;
-  const legend=`<span class="sm-leg"><span class="leg-dot" style="background:#39d98a"></span>Cross success</span>`
-    +`<span class="sm-leg"><span class="leg-dot" style="background:#f7506b"></span>Cross fail</span>`;
-  return `<div class="chart-card cross-card">`
-    +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block">${defs}${over}${pitch}</svg>`
-    +`<div class="shotmap-legend">${legend}</div></div>`;
+  const cols=succKey?5:3;
+  const legend=cat.parts.map(([,l,c])=>`<span class="sm-leg"><span class="leg-dot" style="background:${c}"></span>${l}</span>`).join('');
+  const mode=cat.grid?'grid':'dots';
+  return `<div class="chart-card map-card dl-card" data-mode="${mode}" data-mode0="${mode}">${head}<div class="dl-flex">`
+    +`<div class="dl-map"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">`
+    +`${defs}${pitchG}${over}</svg><div class="shotmap-legend">${legend}</div></div>`
+    +`<div class="dl-side"><div class="dl-title">${esc(cat.label)}</div>`
+    +`<div class="dl-wrap"><table class="dl-rank">`
+    +`<thead><tr><th class="dl-r">Rank</th><th>Name</th>`
+    +(succKey?`<th class="dl-c">Succ.</th>`:'')+`<th class="dl-c">Total</th>`
+    +(succKey?`<th class="dl-c">%</th>`:'')+`</tr></thead><tbody>`
+    +(rankRows||`<tr><td colspan="${cols}" class="dl-empty">No ${esc(cat.label.toLowerCase())} tagged for this period.</td></tr>`)
+    +`</tbody></table></div></div></div></div>`;
 }
-/* ---- Distribution: take-ons & step-ins — the three events share ONE map, told
-   apart by colour, with the whole match on a single pitch: both halves are
-   normalised so the team attacks RIGHT and the marker shape says which half it
-   was (circle 1st, square 2nd). Same reading as the map in the PDF report, drawn
-   on the cross map's geometry so the two sit side by side at the same size:
-   top band = share by origin third along the pitch, right band = by height third. */
-const TAKEON_PARTS=[['take-on succes','Take-on success','#39d98a'],
-  ['take-on fail','Take-on fail','#f7506b'],
-  ['step in','Step-in','#2f81f7']];
-function takeOnMapHTML(team){
-  const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
-  const teamColor=team==='home'?'var(--home)':'var(--away)';
-  // keyed through evKey: event names come from a user-editable list, so "Step In"
-  // must find the same rows as "step in" (see the evKey note in shared.js)
-  const col={}; TAKEON_PARTS.forEach(([ev,,c])=>col[evKey(ev)]=c);
-  // no data -> keep the pitch and 0% bands, just draw no dots
-  const evs=rows.filter(r=>r.team===team&&col[evKey(r.event)]&&r.pXY);
-  const dir={1:attackDir(team,1),2:attackDir(team,2)};
-  const fl=evs.map(r=>{
-    const h=eventHalf(r), flip=dir[h]==='left';
-    return {x:(flip?100-r.pXY.x:r.pXY.x)/100*PW, y:(flip?100-r.pXY.y:r.pXY.y)/100*PH,
-            half:h, col:col[evKey(r.event)], no:(r.playerFrom||'').toString().trim()};
-  });
-  const oCnt=[0,0,0]; fl.forEach(f=>oCnt[Math.min(2,Math.floor(f.x/PW*3))]++);
-  const tCnt=[0,0,0]; fl.forEach(f=>tCnt[Math.min(2,Math.floor(f.y/PH*3))]++);
-  const pctL=n=>fl.length?(Math.round(n/fl.length*1000)/10)+'%':'0%';
-  let over='';
-  for(let i=0;i<3;i++)
-    over+=`<text x="${((i+0.5)*PW/3).toFixed(0)}" y="40" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${pctL(oCnt[i])}</text>`;
-  [1,2].forEach(i=>over+=`<line x1="${i*PW/3}" y1="10" x2="${i*PW/3}" y2="${mT-16}" stroke="var(--line)" stroke-width="2"/>`);
-  for(let i=0;i<3;i++)
-    over+=`<text x="${PW+mR2/2}" y="${(mT+(i+0.5)*PH/3+10).toFixed(0)}" text-anchor="middle" font-size="30" font-weight="700" fill="${teamColor}">${pctL(tCnt[i])}</text>`;
-  [1,2].forEach(i=>over+=`<line x1="${PW+18}" y1="${mT+i*PH/3}" x2="${W-18}" y2="${mT+i*PH/3}" stroke="var(--line)" stroke-width="2"/>`);
-  const dots=fl.map(f=>{
-    const shape=f.half===1
-      ?`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${f.col}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/>`
-      :`<rect x="${(f.x-11).toFixed(1)}" y="${(f.y-11).toFixed(1)}" width="22" height="22" rx="3" fill="${f.col}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/>`;
-    return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(f.no)}</text></g>`;
-  }).join('');
-  const pitch=`<g transform="translate(0 ${mT})"><rect width="${PW}" height="${PH}" fill="rgba(26,62,32,0.72)"/>`
-    +`<g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG('right')}${dots}</g>`;
-  const legend=TAKEON_PARTS.map(([,lbl,c])=>
-      `<span class="sm-leg"><span class="leg-dot" style="background:${c}"></span>${lbl}</span>`).join('')
-    +`<span class="sm-leg"><span class="leg-dot" style="border:1.5px solid var(--mut)"></span>Circle = 1st half</span>`
-    +`<span class="sm-leg"><span class="leg-dot" style="border:1.5px solid var(--mut);border-radius:2px"></span>Square = 2nd half</span>`;
-  return `<div class="chart-card cross-card">`
-    +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block">${over}${pitch}</svg>`
-    +`<div class="shotmap-legend takeon-legend">${legend}</div></div>`;
-}
-/* ---- Other: foul map — every located foul, both halves normalised to attack
-   RIGHT. Marker shape = half (circle 1st, square 2nd); a yellow/red ring marks
-   fouls that led to a card (same player's card event within 90s). Hatched area
-   = dangerous zone (own defensive third); ratio bands like the cross map. */
+function setDistCat(v){distCat=v;renderStats();}
+function setDistHalf(h){distHalf=h;renderStats();}
 const FOUL_EVENTS=new Set(['foul','foul throw','handball foul']);
 /* Other tab: dropdown switches between the foul map, the foul-won map and the offside map */
 const OTH_CATS={fouls:'Fouls',foulsWon:'Fouls Won',offsides:'Offsides'};
@@ -895,6 +883,18 @@ function plainEventMapHTML(team,eventName){
    attack RIGHT): forward within ±45°, backward beyond ±135°, else sideways.
    Area = origin third of the pitch length. Passes missing a tagged origin or
    target can't be classified and are skipped in the affected section. */
+/* The 15-minute windows each half is cut into, the last slice of a half absorbing any
+   stoppage. Nothing on the dashboard reads these any more — the pass-network map they
+   were written for is gone — but the PDF report still builds a page per window, so this
+   stays here with passTypeData() as one of the helpers Stats/report.js shares. */
+function pdWindows(){
+  const L=+dur.halfLen||45, w=[];
+  for(let h=1;h<=2;h++)for(let s=0;s<L;s+=15){
+    const e=Math.min(s+15,L);
+    w.push({half:h,s,e,last:e===L,label:`${s+(h-1)*L}' - ${e+(h-1)*L}'${e===L?'+':''}`});
+  }
+  return w;
+}
 function passTypeData(team){   // shared with the PDF report (Stats/report.js)
   const evs=rows.filter(r=>r.team===team&&(r.event==='pass success'||r.event==='pass fail'));
   const tot=evs.length, suc=evs.filter(r=>r.event==='pass success').length;
@@ -919,128 +919,6 @@ function passTypeData(team){   // shared with the PDF report (Stats/report.js)
     add(catG, ang<=45?'Passes Forward':ang>=135?'Passes Backward':'Passes Sideways', ok);
   });
   return {tot,suc,catD,catG,catA};
-}
-function passTypesHTML(team){
-  const teamColor=team==='home'?'var(--home)':'var(--away)';
-  const {tot,suc,catD,catG,catA}=passTypeData(team);
-  if(!tot)return `<div class="chart-card pt-card"><div class="stats-empty">No passes yet.</div></div>`;
-  const rate=(n,dd)=>dd?(Math.round(n/dd*1000)/10).toFixed(1)+'%':'–';
-  const section=(title,cat)=>{
-    const base=Object.values(cat).reduce((s,v)=>s+v[1],0);
-    let h=`<tr class="pt-sec"><th>${title}</th><th>Succeeded</th><th>Count</th><th>Success Rate</th><th>Ratio</th></tr>`;
-    Object.entries(cat).forEach(([lbl,[s,n]])=>{
-      h+=`<tr><td class="pt-lbl" style="color:${teamColor}">${lbl}</td><td>${s}</td><td>${n}</td><td>${rate(s,n)}</td><td>${rate(n,base)}</td></tr>`;
-    });
-    return h;
-  };
-  const head=`<div class="pt-head"><b class="pt-title">Passes</b>`
-    +`<span>Total Pass Count <b>${tot}</b></span><span>Succeeded <b>${suc}</b></span><span>Success Rate <b>${rate(suc,tot)}</b></span></div>`;
-  return `<div class="chart-card pt-card">${head}<table class="ptable">`
-    +section('Pass Distance',catD)+section('Pass Direction',catG)+section('Area',catA)
-    +'</table></div>';
-}
-/* ---- Distribution: pass-network map per 15-minute window (Wyscout style).
-   Windows come from the match half length (Duration settings): every half is
-   cut into 15' slices and the last slice of each half absorbs the remainder
-   plus stoppage time — 45'/half → 0-15/15-30/30-45+/45-60/60-75/75-90+,
-   40'/half → 0-15/15-30/30-40+/40-55/55-70/70-80+, and so on for shorter
-   halves. Nodes sit at each player's average pass-involvement position in the
-   window (halves normalised to attack RIGHT); arrows are completed passes. */
-function pdWindows(){
-  const L=+dur.halfLen||45, w=[];
-  for(let h=1;h<=2;h++)for(let s=0;s<L;s+=15){
-    const e=Math.min(s+15,L);
-    w.push({half:h,s,e,last:e===L,label:`${s+(h-1)*L}' - ${e+(h-1)*L}'${e===L?'+':''}`});
-  }
-  return w;
-}
-function passNetHTML(team){
-  const fill=team==='home'?'var(--home)':'var(--away)';
-  const wins=pdWindows(); if(pdWin>=wins.length)pdWin=0;
-  const w=wins[pdWin], L=+dur.halfLen||45;
-  const opts=wins.map((x,i)=>`<option value="${i}"${i===pdWin?' selected':''}>${x.label}</option>`).join('');
-  const head=`<div class="chart-head"><div></div>`
-    +`<select class="def-sel" onchange="setPdWin(this.value)">${opts}</select></div>`;
-  const inWin=r=>{
-    if(r.t==null||eventHalf(r)!==w.half)return false;
-    const ms=matchTime(r.t)-(w.half-1)*L*60;   // seconds inside this half (stoppage keeps counting)
-    return ms>=w.s*60 && (w.last||ms<w.e*60);
-  };
-  const isPass=r=>r.event==='pass success'||r.event==='pass fail';
-  const passes=rows.filter(r=>r.team===team&&isPass(r));
-  const winPasses=passes.filter(inWin);
-  const opp=team==='home'?'away':'home';
-  const oppWin=rows.filter(r=>r.team===opp&&isPass(r)&&inWin(r)).length;
-  // no passes in the window -> keep the pitch, stats read 0 / 0%
-  const suc=winPasses.filter(r=>r.event==='pass success').length;
-  // average involvement position per player (origin for the passer, target for the receiver)
-  const flipH={1:attackDir(team,1)==='left',2:attackDir(team,2)==='left'};
-  const pos={};
-  const addP=(p,x,y,flip)=>{p=String(p||'').trim();if(!p)return;(pos[p]=pos[p]||[]).push({x:flip?100-x:x,y:flip?100-y:y});};
-  winPasses.forEach(r=>{
-    const flip=flipH[eventHalf(r)];
-    if(r.pXY)addP(r.playerFrom,r.pXY.x,r.pXY.y,flip);
-    if(r.event==='pass success'&&r.rXY)addP(r.playerTo,r.rXY.x,r.rXY.y,flip);
-  });
-  const d=PITCH_DIMS.football, PW=d.w, PH=d.h, R=17;
-  const nodes={};
-  Object.entries(pos).forEach(([p,a])=>{
-    nodes[p]={x:a.reduce((s,v)=>s+v.x,0)/a.length/100*PW, y:a.reduce((s,v)=>s+v.y,0)/a.length/100*PH};
-  });
-  // directed edges = completed passes between two mapped players
-  const edges={};
-  winPasses.forEach(r=>{
-    if(r.event!=='pass success')return;
-    const f=String(r.playerFrom||'').trim(), t=String(r.playerTo||'').trim();
-    if(!f||!t||f===t||!nodes[f]||!nodes[t])return;
-    edges[f+'>'+t]=(edges[f+'>'+t]||0)+1;
-  });
-  const mkId='pnA'+(team==='home'?'H':'A');
-  let seg='';
-  Object.entries(edges).forEach(([k,n])=>{
-    const [f,t]=k.split('>'), a=nodes[f], b=nodes[t];
-    const dx=b.x-a.x, dy=b.y-a.y, dd=Math.hypot(dx,dy)||1, ux=dx/dd, uy=dy/dd;
-    const x1=a.x+ux*R, y1=a.y+uy*R, x2=b.x-ux*(R+7), y2=b.y-uy*(R+7);
-    seg+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"`
-      +` stroke="#e8edf4" stroke-opacity="0.85" stroke-width="${Math.min(7,1.5+n*0.9).toFixed(1)}" marker-end="url(#${mkId})"/>`;
-  });
-  const dots=Object.entries(nodes).map(([p,n])=>
-    `<g><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${R}" fill="${fill}" stroke="rgba(0,0,0,0.75)" stroke-width="2.5"/>`
-    +`<text x="${n.x.toFixed(1)}" y="${(n.y+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="var(--team-ink)">${p}</text></g>`).join('');
-  const defs=`<defs><marker id="${mkId}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4"`
-    +` orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e8edf4"/></marker></defs>`;
-  const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG('right')+defs+seg+dots+'</svg>');
-  const pctS=(n,dd)=>dd?(Math.round(n/dd*1000)/10).toFixed(1)+'%':'0.0%';
-  const stats=`<div class="pn-stats">`
-    +`<div><span>Count / Total Pass Count</span><b>${winPasses.length} / ${passes.length}</b></div>`
-    +`<div><span>Pass Accuracy</span><b>${pctS(suc,winPasses.length)}</b></div>`
-    +`<div><span>Possession</span><b>${pctS(winPasses.length,winPasses.length+oppWin)}</b></div></div>`;
-  return `<div class="chart-card pn-card">${head}<div class="shotmap-pitch pn-pitch">${pitch}</div>${stats}</div>`;
-}
-function setPdWin(i){pdWin=+i;renderStats();}
-function passMatrixHTML(team){
-  const {players,mtx}=passMatrix(rows,team);
-  if(!players.length)return `<div class="stats-empty">No completed passes for this team yet.</div>`;
-  let max=0; players.forEach(f=>players.forEach(t=>{if(f!==t)max=Math.max(max,(mtx[f]&&mtx[f][t])||0);}));
-  const rgb=team==='home'?'238,238,238':'255,255,102';   // --home / --away, as rgb for the alpha ramp
-  // both team colours are light, so a busy cell washes out to near-white over the
-  // black page: past the halfway point of the ramp the count is printed in dark ink
-  const bg=v=>{if(!v)return '';
-    const a=0.12+0.6*v/(max||1);
-    return `style="background:rgba(${rgb},${a.toFixed(3)})${a>=0.45?';color:var(--team-ink)':''}"`;};
-  let head='<th class="pm-h">From \\ To</th>'+players.map(p=>`<th class="pm-h">${p}</th>`).join('')+'<th class="pm-h">Σ</th>';
-  const colSum={}; let grand=0, body='';
-  players.forEach(f=>{
-    let rowSum=0, cells='';
-    players.forEach(t=>{
-      if(f===t){cells+='<td class="pm-diag">–</td>';return;}
-      const v=(mtx[f]&&mtx[f][t])||0; rowSum+=v; colSum[t]=(colSum[t]||0)+v; grand+=v;
-      cells+=`<td ${bg(v)}>${v||'<span class="pm-z">0</span>'}</td>`;
-    });
-    body+=`<tr><th class="pm-rh">${f}</th>${cells}<td class="pm-sum">${rowSum}</td></tr>`;
-  });
-  const foot='<th class="pm-rh">Σ recv</th>'+players.map(p=>`<td class="pm-sum">${colSum[p]||0}</td>`).join('')+`<td class="pm-sum">${grand}</td>`;
-  return `<div class="pm-wrap pm-${team}"><table class="pmtx"><thead><tr>${head}</tr></thead><tbody>${body}<tr>${foot}</tr></tbody></table></div>`;
 }
 /* ---- Distribution: touch heatmap (every event that has a pitch location).
    Both halves are normalised so the team always attacks RIGHT — events from a
@@ -1078,6 +956,16 @@ function touchPoints(team){
    the XI it started with. eventHalf() is deliberately left alone — the maps, the
    timeline and the report all classify EVENTS with it, and an event can only
    happen while the ball is in play. */
+/* the position Player lists put a player in — the zone his dot sits in on the formation
+   board, saved with the starting XI. A named substitute has no zone of his own, so he
+   reads "subs"; anyone the squad does not place at all reads "–". */
+function squadPos(team,no){
+  const lu=(lineups&&lineups[team])||null; if(!lu)return '–';
+  const k=String(no==null?'':no).trim(); if(!k)return '–';
+  const x=(lu.xi||[]).find(p=>p&&String(p.no).trim()===k);
+  if(x)return x.pos||'–';
+  return (lu.subs||[]).some(s=>String(s==null?'':s).trim()===k)?'subs':'–';
+}
 function squadInHalf(team,half){
   if(!half)return squadOnPitch(lineups,team);
   const lu=(lineups&&lineups[team])||null; if(!lu)return [];
@@ -1119,13 +1007,18 @@ function heatMapHTML(team){
     +`<button class="${heatHalf===1?'on':''}" onclick="setHeatHalf(1)">1st</button>`
     +`<button class="${heatHalf===2?'on':''}" onclick="setHeatHalf(2)">2nd</button></div></div>`;
   // no data -> keep the pitch, just no heat/markers
-  const pts=touchPoints(team).filter(t=>!heatHalf||t.half===heatHalf);
+  const all=touchPoints(team);                                        // both halves
+  const pts=all.filter(t=>!heatHalf||t.half===heatHalf);              // the one on screen
   _heatBy={}; pts.forEach(t=>{const k=t.p; (_heatBy[k]=_heatBy[k]||[]).push(t);});
-  // everyone who took the pitch IN THIS HALF is listed, even with no located touch — a
-  // substitute who came on and never got on the ball used to disappear from the map
-  // entirely. He has no average position to mark, so he gets a list row with 0 and no
-  // marker. A touch always counts on its own: it proves he was on, lineups or not.
-  squadInHalf(team,heatHalf).forEach(no=>{if(!_heatBy[no])_heatBy[no]=[];});
+  /* The SAME names are listed whichever half is on screen: the whole matchday squad
+     Player lists named, plus anyone with a touch in either half. Nothing here reads
+     heatHalf, so the list cannot change under you — a player with no located touch in
+     the half being shown simply has no marker and reads faded, rather than vanishing.
+     A touch always counts on its own: it proves he was on, lineups or not. */
+  const lu=(lineups&&lineups[team])||null;
+  squadInHalf(team,0)
+    .concat(((lu&&lu.xi)||[]).map(p=>p&&p.no), (lu&&lu.subs)||[], all.map(t=>t.p))
+    .forEach(no=>{const k=String(no==null?'':no).trim(); if(k&&!_heatBy[k])_heatBy[k]=[];});
   _heatOrder=Object.keys(_heatBy).filter(p=>p!=='')
     .sort((a,b)=>{const na=+a,nb=+b;return(!isNaN(na)&&!isNaN(nb))?na-nb:a.localeCompare(b);});
   const markers=_heatOrder.filter(p=>_heatBy[p].length).map(p=>{
@@ -1135,13 +1028,14 @@ function heatMapHTML(team){
       +` onmouseenter="heatHover('${p}')" onmouseleave="heatHover('')">${p}</div>`;
   }).join('');
   const names=squadNames(lineups,team);
-  // shirt number and name only: the touch tally is not listed any more, though a player
-  // with none located is still the one that reads faded (hm-off)
+  // shirt number, name and the position Player lists put him in. No touch tally: a player
+  // with none located in this half is the one that reads faded (hm-off)
   const list=_heatOrder.map(p=>{
     const n=_heatBy[p].length;
     return `<div class="hm-row${n?'':' hm-off'}" data-p="${p}" onmouseenter="heatHover('${p}')" onmouseleave="heatHover('')">`
       +`<span class="hm-no" style="background:${fill}">${esc(p)}</span>`
-      +`<span class="hm-name" title="${esc(playerLabel(names,p))}">${esc(playerLabel(names,p))}</span></div>`;
+      +`<span class="hm-name" title="${esc(playerLabel(names,p))}">${esc(playerLabel(names,p))}</span>`
+      +`<span class="hm-pos">${esc(squadPos(team,p))}</span></div>`;
   }).join('');
   const d=PITCH_DIMS.football;
   const pitch=pitchSVG('football').replace('</svg>', dirArrowSVG('right')+'</svg>');
