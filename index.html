@@ -88,12 +88,12 @@
   /* not clickable: nothing is uploaded from here (see the drop handlers) */
   .drop{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--panel2);border:2px dashed var(--line);color:var(--mut);cursor:default;text-align:center;flex-direction:column;gap:8px}
   /* thin caption bar under the video (same look as the popped-out video window) */
-  .controls{display:flex;align-items:center;gap:16px;padding:3px 12px;background:#0d1117;color:var(--mut);border-top:1px solid var(--line);font-size:11px;white-space:nowrap;overflow:hidden}
-  .controls b{color:var(--accent);font-variant-numeric:tabular-nums}
+  .controls{display:flex;align-items:center;gap:16px;padding:3px 12px;background:var(--panel);color:var(--mut);border-top:1px solid var(--line);font-size:11px;white-space:nowrap;overflow:hidden}
+  .controls b{color:#fff;font-variant-numeric:tabular-nums}
   .controls .dim{opacity:.75}
   .controls .ctl-hints{margin-left:auto;opacity:.85}
   #ctlPP{color:var(--ink);cursor:pointer}
-  .tcode{font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
+  .tcode{font-variant-numeric:tabular-nums;color:#fff;font-weight:600}
 
   .quick{padding:12px;border-bottom:1px solid var(--line)}
   .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:10px}
@@ -175,10 +175,10 @@
   .team-tag.away{background:var(--away);color:var(--team-ink)}
   /* mirrored home | timeline | away layout */
   th.a-side,td.a-side{text-align:right}
-  th.tl-col,td.tl-col{text-align:center;border-left:1px solid var(--line);border-right:1px solid var(--line);background:#0d1117}
-  td.tl-col{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer}
+  th.tl-col,td.tl-col{text-align:center;border-left:1px solid var(--line);border-right:1px solid var(--line);background:var(--panel)}
+  td.tl-col{color:#fff;font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer}
   td.tl-col .tl-extra{display:block;color:var(--home);font-size:11px;font-weight:600}
-  td.blank{background:#0d111733}
+  td.blank{background:#0C0A0B33}
   tr.just-added td{background:#16302488;transition:background .6s}
   .xy{font-size:10px;color:var(--mut);font-variant-numeric:tabular-nums}
   .evt{font-weight:700;color:var(--ink)}   /* event names in the DEFAULT text colour (side = column) */
@@ -197,11 +197,11 @@
   body.video-popped .video-wrap{display:none}
   body.video-popped #controls{display:none!important}
   body.video-popped #seekRow{display:none!important}
-  .tlink{color:var(--accent);cursor:pointer;font-variant-numeric:tabular-nums}
+  .tlink{color:#fff;cursor:pointer;font-variant-numeric:tabular-nums}
   .rowbtns{white-space:nowrap;text-align:right}
   .rowbtns .edit,.rowbtns .del{cursor:pointer;font-weight:700;padding:0 5px}
-  .edit{color:var(--accent2)} .edit:hover{filter:brightness(1.25)}
-  .del{color:var(--danger)}
+  .edit{color:#fff} .edit:hover{filter:brightness(1.25)}
+  .del{color:#fff}
   tr.editing td{background:#E0122B26;box-shadow:inset 3px 0 0 var(--accent2)}
   .empty{padding:30px;text-align:center;color:var(--mut)}
   .kbd{background:#000;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:10px;color:var(--mut)}
