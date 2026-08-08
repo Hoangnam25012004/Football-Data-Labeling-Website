@@ -234,5 +234,6 @@ create policy staff_read on public.staff for select to authenticated
 --    32746  Saint Lucia 2–1 Barbados     11/06/2025  (our_side = home)
 --
 --  Those are the app's short match codes, not the uuid primary key —
---  match on public.matches.match_code (see 0002_match_code.sql).
+--  match on public.matches.code (see 0002_match_code.sql, which names the
+--  column `code`; match_code is only the name of the trigger function).
 -- ============================================================

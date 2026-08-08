@@ -290,6 +290,72 @@ test('a match brings the starting XI of the channel-s own side', () => {
   eq(res.matches[0].lineup.dir,'lr');
 });
 
+/* ================= the columns actually exist =================
+   Postgres fails the WHOLE select when one column in it is not there, so a
+   single wrong name returns no rows at all rather than a row with a gap —
+   which is exactly how `match_code` (the trigger function's name; the column
+   is `code`) left every live channel showing "nothing published yet" while
+   the seed channel carried on looking fine. */
+const MIG=path.join(ROOT,'supabase','migrations');
+const sqlFiles=fs.readdirSync(MIG).filter(f=>f.endsWith('.sql')).sort();
+const noComments=s=>s.split('\n').filter(l=>!/^\s*--/.test(l)).join('\n');
+
+function columnsOf(table){
+  const cols=new Set();
+  sqlFiles.forEach(f=>{
+    const sql=noComments(fs.readFileSync(path.join(MIG,f),'utf8'));
+    const ct=new RegExp('create table if not exists public\\.'+table+'\\s*\\(([\\s\\S]*?)\\n\\);').exec(sql);
+    if(ct) ct[1].split('\n').forEach(line=>{
+      const m=/^\s*([a-z_]+)\s+[a-z]/i.exec(line);
+      if(m&&!/^(primary|unique|foreign|check|constraint)$/i.test(m[1])) cols.add(m[1]);
+    });
+    const alt=new RegExp('alter table public\\.'+table+'\\b([\\s\\S]*?);','g');
+    for(let a;(a=alt.exec(sql));){
+      const add=/add column if not exists\s+([a-z_]+)/g;
+      for(let c;(c=add.exec(a[1]));) cols.add(c[1]);
+    }
+  });
+  return cols;
+}
+
+function matchStatsColumns(){
+  const sql=noComments(fs.readFileSync(path.join(MIG,'0013_client_channels.sql'),'utf8'));
+  const view=/create or replace view public\.match_stats as([\s\S]*?);/.exec(sql)[1];
+  const cols=new Set(['match_id','team']);
+  const re=/count\(\*\)[^\n]*?\bas\s+([a-z_]+)/g;
+  for(let m;(m=re.exec(view));) cols.add(m[1]);
+  return cols;
+}
+
+test('every column the client asks matches for is one the schema has', () => {
+  const have=columnsOf('matches');
+  ok(have.has('code'),'sanity: 0002 adds public.matches.code');
+  notOk(have.has('match_code'),'sanity: and never a match_code');
+  const asked=/from\('matches'\)[\s\S]*?\.select\('([^']+)'\)/.exec(SUPA)[1].split(',');
+  asked.forEach(c=>ok(have.has(c.trim()),'matches has no column '+c.trim()));
+});
+
+test('and every field it reads off match_stats is one the view produces', () => {
+  const have=matchStatsColumns();
+  ok(have.has('passes_done'),'sanity: the view rolls up completed passes');
+  const body=/function statsFromView\([\s\S]*?\n  \}/.exec(SUPA)[0];
+  const re=/\br\.([a-z_]+)/g;
+  const asked=new Set();
+  for(let m;(m=re.exec(body));) asked.add(m[1]);
+  ok(asked.size>10,'sanity: it reads a good many of them — got '+asked.size);
+  asked.forEach(c=>ok(have.has(c),'match_stats has no column '+c));
+});
+
+test('the code column is what the share link and the tagger both use', () => {
+  // Stats/ and cloud-sync.js look a match up by the same 5-digit code, so the
+  // slug the client builds has to be that code and not something of its own
+  ok(/slug: String\(m\.code \|\| m\.id\)/.test(SUPA),'the slug is the share code');
+  const tagger=page('cloud-sync.js')+page('Stats/index.html');
+  ok(/\/\^\\d\{5\}\$\/\.test\([a-z]+\) \? 'code' : 'id'/.test(tagger)||
+     /\/\^\\d\{5\}\$\/\.test\([a-z]+\)\?'code':'id'/.test(tagger),
+     'and the tagger side resolves that same code column');
+});
+
 /* ================= the rail ================= */
 const rail=/<nav class="side"[\s\S]*?<\/nav>/.exec(APPHTML)[0];
 

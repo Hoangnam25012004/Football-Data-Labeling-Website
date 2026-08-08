@@ -294,7 +294,11 @@
       var c = client();
       if (!c) return Promise.resolve([]);
       return c.from('matches')
-        .select('id,match_code,home_name,away_name,home_score,away_score,kickoff,competition,stage,venue,our_side,published,lineups')
+        /* `code` — the 5-digit share code from 0002. It is NOT called
+           match_code: that is the name of the trigger function that fills
+           it in. Asking for a column that is not there fails the whole
+           query, which is why this returned nothing at all. */
+        .select('id,code,home_name,away_name,home_score,away_score,kickoff,competition,stage,venue,our_side,published,lineups')
         .eq('club_id', clubId).eq('published', true)
         .order('kickoff', { ascending: true })
         .then(function (r) {
@@ -324,9 +328,9 @@
           }
           var st = byMatch[m.id] || {};
           return {
-            id: m.match_code || m.id,
+            id: m.code || m.id,
             uuid: m.id,
-            slug: String(m.match_code || m.id),
+            slug: String(m.code || m.id),
             date: m.kickoff,
             dateLabel: dateLabel(m.kickoff),
             home: { name: m.home_name, crest: monogram(m.home_name), score: m.home_score },
