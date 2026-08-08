@@ -90,6 +90,10 @@ body>header{flex:none}
    opens with it, the marks otherwise */
 .dl-card[data-mode="grid"] .dl-dot{display:none}
 .dl-card[data-mode="dots"] .dl-grid{display:none}
+/* Other (Dashboard): the fouls / fouls-won / offsides map. It borrowed the cross map's
+   sizing until that map was removed, which left it with no rule at all and shrank it to
+   its content — it carries its own now. The svg inside caps and centres itself. */
+.oth-card{flex:1;min-width:420px}
 /* Shooting (Dashboard): who took the shots, in the space under the donut and beside
    the map. Hovering a row isolates that player on the map (see shotHover). */
 .sr-card{flex:1;min-width:280px;max-width:460px;align-self:flex-start}
@@ -115,7 +119,6 @@ body>header{flex:none}
 .dm-map{flex:1;min-width:300px;max-width:460px}
 .dm-side{flex:1;min-width:300px;max-width:560px}
 .dm-title{font-weight:700;font-size:15px;margin:2px 0 10px}
-.dm-sub{color:var(--mut);font-weight:600;font-size:12px;margin-left:7px}
 .dm-wrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
 .dm-rank{width:100%;border-collapse:collapse;font-size:13px}
 .dm-rank th{position:sticky;top:0;z-index:1;background:var(--panel2);color:var(--mut);
@@ -497,8 +500,7 @@ function defMapHTML(team){
   return `<div class="chart-card map-card">${head}<div class="dm-flex">`
     +`<div class="dm-map"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">`
     +`${pitchG}${over}</svg><div class="shotmap-legend">${legend}</div></div>`
-    +`<div class="dm-side"><div class="dm-title">${esc(cat.label)}`
-    +(succKey?`<span class="dm-sub">· ranked by success rate</span>`:'')+`</div>`
+    +`<div class="dm-side"><div class="dm-title">${esc(cat.label)}</div>`
     +`<div class="dm-wrap"><table class="dm-rank">`
     +`<thead><tr><th class="dm-r">Rank</th><th>Name</th><th class="dm-c">Count</th>`
     +(succKey?`<th class="dm-c">Success</th>`:'')+`</tr></thead><tbody>`
@@ -835,7 +837,7 @@ function foulMapHTML(team){
     +`<span class="sm-leg"><span class="leg-dot" style="background:repeating-linear-gradient(45deg,rgba(247,80,107,0.45) 0 4px,rgba(247,80,107,0.12) 4px 8px)"></span>Dangerous zone</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:${fill};box-shadow:0 0 0 3px #ffd23f"></span>Led to yellow card</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:${fill};box-shadow:0 0 0 3px #e5484d"></span>Led to red card</span>`;
-  return `<div class="chart-card cross-card">${othHead()}`
+  return `<div class="chart-card oth-card">${othHead()}`
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block;max-width:1000px;margin:0 auto">${defs}${over}${pitch}</svg>`
     +`<div class="shotmap-legend">${legend}</div></div>`;
 }
@@ -873,7 +875,7 @@ function plainEventMapHTML(team,eventName){
     +`<g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG('right')}${dots}</g>`;
   const legend=`<span class="sm-leg"><span class="leg-dot" style="background:${fill}"></span>1st half</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:${fill};border-radius:3px"></span>2nd half</span>`;
-  return `<div class="chart-card cross-card">${othHead()}`
+  return `<div class="chart-card oth-card">${othHead()}`
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block;max-width:1000px;margin:0 auto">${over}${pitch}</svg>`
     +`<div class="shotmap-legend">${legend}</div></div>`;
 }
@@ -966,6 +968,15 @@ function squadPos(team,no){
   if(x)return x.pos||'–';
   return (lu.subs||[]).some(s=>String(s==null?'':s).trim()===k)?'subs':'–';
 }
+/* Reading order for a team sheet: the goalkeeper, then out through the lines to the
+   forwards, left to right within each. It is FORMATION_GRID (shared.js) walked from the
+   GK's column outward and from the left flank across, so the two stay in step — every
+   label that grid can produce is here. A substitute has no place in it and sorts after
+   the eleven; anyone the squad does not place at all sorts after him. */
+const POS_ORDER=['GK','LB','CB','RB','LWB','CDM','RWB','LM','CM','RM','LW','CAM','RW','LF','CF','RF'];
+const POS_RANK={}; POS_ORDER.forEach((p,i)=>{POS_RANK[p]=i;});
+const posRank=(team,no)=>{const p=squadPos(team,no);
+  return POS_RANK[p]!=null?POS_RANK[p]:(p==='subs'?100:200);};
 function squadInHalf(team,half){
   if(!half)return squadOnPitch(lineups,team);
   const lu=(lineups&&lineups[team])||null; if(!lu)return [];
@@ -1019,8 +1030,12 @@ function heatMapHTML(team){
   squadInHalf(team,0)
     .concat(((lu&&lu.xi)||[]).map(p=>p&&p.no), (lu&&lu.subs)||[], all.map(t=>t.p))
     .forEach(no=>{const k=String(no==null?'':no).trim(); if(k&&!_heatBy[k])_heatBy[k]=[];});
+  // read down the team sheet, not up the shirt numbers: goalkeeper first, then out
+  // through the lines to the forwards, left to right within each. Substitutes come
+  // after the eleven, and anyone the squad does not place at all after them.
   _heatOrder=Object.keys(_heatBy).filter(p=>p!=='')
-    .sort((a,b)=>{const na=+a,nb=+b;return(!isNaN(na)&&!isNaN(nb))?na-nb:a.localeCompare(b);});
+    .sort((a,b)=>{const ra=posRank(team,a), rb=posRank(team,b); if(ra!==rb)return ra-rb;
+      const na=+a,nb=+b;return(!isNaN(na)&&!isNaN(nb))?na-nb:String(a).localeCompare(String(b));});
   const markers=_heatOrder.filter(p=>_heatBy[p].length).map(p=>{
     const a=_heatBy[p];
     const mx=a.reduce((s,t)=>s+t.x,0)/a.length, my=a.reduce((s,t)=>s+t.y,0)/a.length;
