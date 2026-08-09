@@ -200,7 +200,10 @@ Email + password works as soon as the project exists. The rest is dashboard-only
    - *Redirect URLs:* add `https://hoangnam25012004.github.io/Football-Data-Labeling-Website/**`
      (and `http://localhost:8765/**` if you develop locally).
 
-   Sign-up sends `emailRedirectTo` pointing at `/auth`, but **Supabase honours it only if it
+   There are two sign-up screens now, and they point their confirmation links at different
+   pages: the tagging app's `/auth` sends `emailRedirectTo` back to itself, and the client
+   site's `/login.html` back to itself. The wildcard above covers both — narrow it to exact
+   URLs and you have to list both. **Supabase honours `emailRedirectTo` only if it
    matches Redirect URLs** — otherwise it silently falls back to the Site URL. Leave Site URL
    at its factory default and the confirmation email lands the user on
    `http://localhost:3000/#access_token=…`: *This site can't be reached*, on a confirmation

@@ -164,13 +164,22 @@ test('Possession is a fixed column, so Distribution does not print it twice', ()
      'and all five fixed columns are on every category');
 });
 
-test('the campaign row is one ratio of totals, not a mean of ratios', () => {
+test('Team Data is the matches and nothing else — no campaign row, no note', () => {
+  notOk(/class="tot"|Campaign/.test(teamData),'the totals row is gone');
+  notOk(/mean of ratios|Click a row to open/.test(teamData),'and the paragraph under it with it');
+  notOk(/tr\.tot/.test(APPCSS),'nothing still styles a row that is never drawn');
+  // a row is still the way into a match, it just no longer says so in prose
+  ok(/tr\[data-go\]/.test(teamData),'clicking a row still opens that match');
+});
+
+test('what the whole campaign came to is worked out on the Overview', () => {
   const tot=/function totalOf\(aggs, which\)[\s\S]*?\n  \}/.exec(APPJS)[0];
   ok(/window\.newStat\(\)/.test(tot),'the totals start from shared.js-s own zero row');
-  // the same column function is applied to the summed stats, which is what
-  // makes pct(shotsOn,totalShots) come out right for the campaign
-  ok(/c\[1\]\(S, O\)/.test(teamData),'and the column functions are re-run over them');
-  ok(/a mean of ratios would be misleading/.test(teamData),'the note still says so');
+  // one ratio of the totals, never a mean of per-match ratios
+  ok(/pct\(S\.passesComp, S\.passes\)/.test(overview)&&
+     /pct\(S\.passes, S\.passes \+ O\.passes\)/.test(overview),
+     'pass accuracy and possession are computed from the summed passes');
+  ok(/totalOf\(aggs, 'us'\), O = totalOf\(aggs, 'them'\)/.test(overview),'both sides are summed');
 });
 
 /* ================= grouped headers ================= */
@@ -210,6 +219,28 @@ test('the reports are read once per channel, and dropped when it changes', () =>
   const load=/function loadMatches\(ch\)[\s\S]*?\n  \}/.exec(APPJS)[0];
   ok(/state\.reports = null; state\.reportsFor = null; reportJob = null;/.test(load),
      'switching channel cannot leave the last club-s numbers on the screen');
+});
+
+/* ================= what was taken off the page ================= */
+test('the Data page carries no strapline under its title', () => {
+  ok(/head\('Data'\)/.test(renderData),'head() is called with a title and nothing else');
+  notOk(/Every published match in this channel/.test(APPJS),'the sentence is gone from the file');
+  // head() draws no .sub at all when there is none, so no empty flex item is left
+  const head=/function head\(title, sub\)[\s\S]*?\n  \}/.exec(APPJS)[0];
+  ok(/sub \?/.test(head),'and an absent one opens no gap');
+});
+
+test('the Recent formation card is gone, and so is everything that drew it', () => {
+  notOk(/formationCard|PITCH_SVG/.test(APPJS),'no builder and no pitch left in app.js');
+  // the comment that says where it went is welcome; markup that draws it is not
+  notOk(/card-h">Recent formation/.test(APPJS),'nor the card it made');
+  ['fm-card','fm-pitch','fm-dot','fm-meta','fm-subs','fm-sub']
+    .forEach(c=>notOk(new RegExp('\\.'+c+'[\\s{,]').test(APPCSS),'.'+c+' styling went with it'));
+  notOk(/dgrid/.test(APPJS)||/\.dgrid/.test(APPCSS),
+        'and the two-column grid that only existed to sit beside it');
+  // the line-up itself is untouched: the match page still draws it
+  ok(/lineup: \(m\.lineups && m\.lineups\[side\]\) \|\| null/.test(SUPA),
+     'matches still carry their line-up — only this card stopped using it');
 });
 
 /* ================= Overview ================= */

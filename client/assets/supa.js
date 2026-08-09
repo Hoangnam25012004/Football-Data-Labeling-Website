@@ -17,6 +17,18 @@
     anonKey: 'sb_publishable_ZcIbdPmEdfW0POArBW_eNg_aZbc-lFa'
   };
 
+  /* Where a confirmation link should come back to: this site's own sign-in
+     page. Read off this script's own URL rather than off location — supa.js
+     is loaded by app.html as often as by login.html, and a signed-up club
+     following a link out of their inbox should land on the club's site, not
+     wherever they happened to start. supa.js is served from assets/, so the
+     site root is one level up. */
+  var ROOT = (function () {
+    try { return new URL('../', document.currentScript.src).href; } catch (e) {}
+    try { return location.href.replace(/[^/]*(\?[^#]*)?(#.*)?$/, ''); } catch (e) {}
+    return '';           // the test sandbox: no document, no location, no page to come back to
+  })();
+
   var sb = null;
   function client() {
     if (sb) return sb;
@@ -170,6 +182,20 @@
         if (!c) return Promise.reject(new Error('Sign-in is unavailable: the Supabase client did not load.'));
         return c.auth.signInWithPassword({ email: email, password: password })
           .then(function (r) { if (r.error) throw r.error; return r.data; });
+      },
+      /* Creating an account, and nothing more. It joins no channel: a new
+         account is in none, and which club someone belongs to is an admin's
+         decision, taken by invitation (see channels.invite / claim). What
+         comes back tells the caller which of the two happened — a session
+         means the project lets new accounts straight in, no session means it
+         has emailed them a confirmation link first. */
+      signUp: function (email, password, name) {
+        var c = client();
+        if (!c) return Promise.reject(new Error('Sign-up is unavailable: the Supabase client did not load.'));
+        return c.auth.signUp({
+          email: email, password: password,
+          options: { data: { full_name: name || '' }, emailRedirectTo: ROOT + 'login.html' }
+        }).then(function (r) { if (r.error) throw r.error; return r.data || {}; });
       },
       signOut: function () {
         var c = client();

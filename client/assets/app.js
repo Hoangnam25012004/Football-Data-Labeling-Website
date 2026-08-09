@@ -303,7 +303,9 @@
     var onTeam = rest[0] === 'team';
     var cat = onTeam && TD_TABS.some(function (t) { return t[0] === rest[1]; }) ? rest[1] : 'shooting';
 
-    view.appendChild(head('Data', 'Every published match in this channel, added up'));
+    /* No strapline: the two tabs under the title say what the page is, and
+       head() draws nothing where there is nothing to say. */
+    view.appendChild(head('Data'));
     view.appendChild(dataTabs(onTeam));
 
     if (!state.matches.length) {
@@ -430,8 +432,7 @@
     });
     var avg = function (t) { return played.length ? Math.round(t / played.length * 10) / 10 : null; };
 
-    var top = el('div', 'dgrid');
-    var stat = el('div', 'card');
+    var stat = el('div', 'card stat-card');
     stat.innerHTML =
       '<p class="card-h">Team stats <span class="right">' + esc(state.channel ? state.channel.name : '') + '</span></p>' +
       '<div class="tstats">' +
@@ -442,12 +443,10 @@
         tstat('Average goals conceded', avg(ga)) +
         tstat('Goal difference', (gf - ga > 0 ? '+' : '') + (gf - ga)) +
       '</div>';
-    top.appendChild(stat);
-    top.appendChild(formationCard(all));
-    body.appendChild(top);
-    /* Full width, and not squeezed in beside the pitch: this is the widest
-       thing on the Overview — two team names, two scores and a date — and in
-       half a column at laptop width the names had nowhere left to go. */
+    body.appendChild(stat);
+    /* Both full width. The pitch that used to sit beside this one is gone, and
+       nothing here is narrow enough to want half a row: the results card is
+       two team names, two scores and a date. */
     body.appendChild(recentResultsCard(played));
 
     var aggs = aggregates();
@@ -607,7 +606,6 @@
     var tab = TD_TABS.filter(function (t) { return t[0] === cat; })[0];
     var cols = sectionCols(tab[2]);
     var rows = aggs.slice().reverse();          // most recent match first
-    var S = totalOf(aggs, 'us'), O = totalOf(aggs, 'them');
 
     /* --- two header rows: the groups, then the leaves --- */
     var top = '<th class="c-date" rowspan="2">Date</th>' +
@@ -645,19 +643,12 @@
         cells(a) + '</tr>';
     }).join('');
 
-    var campaign = '<tr class="tot">' +
-      '<td class="c-date">Campaign</td>' +
-      '<td class="c-opp"><span class="cop"><b>' + aggs.length +
-        (aggs.length === 1 ? ' match' : ' matches') + '</b></span></td>' +
-      '<td class="c-res">—</td>' +
-      '<td class="c-sc">' + aggs.reduce(function (t, a) { return t + a.gf; }, 0) + ' : ' +
-        aggs.reduce(function (t, a) { return t + a.ga; }, 0) + '</td>' +
-      '<td>' + pct(S.passes, S.passes + O.passes) + '</td>' +
-      cols.map(function (c) { return '<td>' + esc(String(c[1](S, O))) + '</td>'; }).join('') + '</tr>';
-
+    /* No campaign row: this table is the matches, one each. What the whole
+       campaign came to is the Overview's job, and totalOf() still works it
+       out for the strip there. */
     var wrap = el('div', 'stbl-wrap');
     wrap.innerHTML = '<table class="stbl"><thead><tr>' + top + '</tr><tr>' + second + '</tr></thead>' +
-      '<tbody>' + tbody + campaign + '</tbody></table>';
+      '<tbody>' + tbody + '</tbody></table>';
     /* One listener rather than one per row — the table is redrawn on every
        tab click and rows outnumber everything else on the page. */
     wrap.addEventListener('click', function (e) {
@@ -665,11 +656,6 @@
       if (tr) location.hash = '#/match/' + encodeURIComponent(tr.getAttribute('data-go'));
     });
     body.appendChild(wrap);
-
-    body.appendChild(el('p', 'note',
-      'One row per submitted match, from the club\'s own side. The campaign row adds the ' +
-      'counts up and works its percentages out from those totals, not as an average of the ' +
-      'rows above — a mean of ratios would be misleading. Click a row to open the full analysis.'));
   }
 
   /* ---------------------------------------------------------
@@ -784,60 +770,10 @@
            '<span class="ts-v">' + num(value) + '</span></div>';
   }
 
-  /* The starting XI the analyst entered on the labeling site, drawn where
-     they put it. x/y are percentages of a 105:68 pitch, which is exactly
-     what the tagger stores, so nothing is recomputed here. */
-  function formationCard(matches) {
-    var card = el('div', 'card fm-card');
-    var m = null;
-    for (var i = matches.length - 1; i >= 0; i--) {
-      var lu = matches[i].lineup;
-      if (lu && lu.xi && lu.xi.length) { m = matches[i]; break; }
-    }
-    if (!m) {
-      card.innerHTML = '<p class="card-h">Recent formation</p>' +
-        '<p class="note" style="margin:0">No starting line-up has been entered for a match in this channel yet.</p>';
-      return card;
-    }
-
-    var lu = m.lineup;
-    var names = {};
-    (lu.roster || []).forEach(function (p) { names[String(p.no)] = p.name || ''; });
-
-    var dots = lu.xi.map(function (p) {
-      var x = Math.max(4, Math.min(96, Number(p.x)));
-      var y = Math.max(6, Math.min(94, Number(p.y)));
-      if (isNaN(x) || isNaN(y)) return '';
-      var nm = names[String(p.no)];
-      return '<span class="fm-dot" style="left:' + x + '%;top:' + y + '%">' +
-             '<b>' + esc(p.no) + '</b>' + (nm ? '<em>' + esc(nm) + '</em>' : '') + '</span>';
-    }).join('');
-
-    var subs = (lu.subs || []).map(function (n) {
-      return '<span class="fm-sub"><b>' + esc(n) + '</b>' + esc(names[String(n)] || '') + '</span>';
-    }).join('');
-
-    card.innerHTML =
-      '<p class="card-h">Recent formation <span class="right">' +
-        esc(m.home.name) + ' ' + num(m.home.score) + ' : ' + num(m.away.score) + ' ' + esc(m.away.name) +
-      '</span></p>' +
-      '<div class="fm-pitch">' + PITCH_SVG + dots + '</div>' +
-      '<p class="fm-meta">' + esc(m.dateLabel) + ' · ' + lu.xi.length + ' starters' +
-        (lu.dir === 'rl' ? ' · attacking right to left' : ' · attacking left to right') + '</p>' +
-      (subs ? '<div class="fm-subs">' + subs + '</div>' : '');
-    return card;
-  }
-
-  var PITCH_SVG =
-    '<svg viewBox="0 0 105 68" preserveAspectRatio="none" aria-hidden="true">' +
-      '<rect x="0.4" y="0.4" width="104.2" height="67.2" fill="none"/>' +
-      '<line x1="52.5" y1="0.4" x2="52.5" y2="67.6"/>' +
-      '<circle cx="52.5" cy="34" r="9.15" fill="none"/>' +
-      '<rect x="0.4" y="13.85" width="16.5" height="40.3" fill="none"/>' +
-      '<rect x="88.1" y="13.85" width="16.5" height="40.3" fill="none"/>' +
-      '<rect x="0.4" y="24.85" width="5.5" height="18.3" fill="none"/>' +
-      '<rect x="99.1" y="24.85" width="5.5" height="18.3" fill="none"/>' +
-    '</svg>';
+  /* The Recent formation card that used to sit here is gone, and the pitch
+     SVG with it. The starting XI is still in every match's `lineup` and is
+     still drawn — on the match page, by the Stats view, for the match it
+     actually belongs to, which is the only place it means anything. */
 
   /* ---------------------------------------------------------
      View: channel — the list, one channel's members, and the

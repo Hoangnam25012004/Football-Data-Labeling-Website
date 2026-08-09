@@ -256,11 +256,12 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
 @media (max-width:1100px){ .kpis.six{grid-template-columns:repeat(3,minmax(0,1fr))} }
 @media (max-width:560px){ .kpis.six{grid-template-columns:repeat(2,minmax(0,1fr))} }
 
-/* ---------- Data: team stats, recent results, formation ---------- */
-.dgrid{display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); gap:14px; margin-bottom:20px; align-items:start}
-@media (max-width:1000px){ .dgrid{grid-template-columns:minmax(0,1fr)} }
+/* ---------- Data: team stats and recent results ----------
+   .dcol is the Channel view's stack of cards; the Data view had one too,
+   beside a pitch, and both went when the formation card did. */
 .dcol{display:flex; flex-direction:column; gap:14px; min-width:0}
 
+.stat-card{margin-bottom:14px}
 .tstats{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; background:var(--line-soft)}
 .tstats.sec{grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:1px}
 .tstat{background:var(--carbon-2); padding:12px 4px 12px 0}
@@ -400,43 +401,12 @@ table.stbl .c-sc{
 table.stbl thead .c-sc{
   font-family:var(--f-mono); font-size:9px; font-weight:400; color:var(--ash-dim);
 }
-table.stbl tr.tot td{
-  background:var(--carbon); color:var(--chalk); font-weight:600;
-  border-top:1px solid var(--line); border-bottom:0;
-}
-table.stbl tr.tot .c-date{color:var(--chalk); letter-spacing:.1em; text-transform:uppercase; font-size:9.5px}
-table.stbl tr.tot:hover td{background:var(--carbon)}
+table.stbl tbody tr:last-child td{border-bottom:0}
 /* on a phone there is not enough width left over to freeze two columns in */
 @media (max-width:720px){
   table.stbl .c-date, table.stbl .c-opp{position:static}
   table.stbl .c-opp::after{display:none}
 }
-
-/* the pitch is green everywhere on this site — a pitch is not chrome */
-.fm-card{min-width:0}
-.fm-pitch{
-  position:relative; width:100%; aspect-ratio:105/68; background:#142b18;
-  border:1px solid var(--line); border-radius:2px; overflow:hidden;
-}
-.fm-pitch svg{position:absolute; inset:0; width:100%; height:100%; stroke:rgba(255,255,255,.18); stroke-width:.4; fill:none}
-.fm-dot{
-  position:absolute; transform:translate(-50%,-50%); display:grid; place-items:center;
-  width:26px; height:26px; border-radius:50%; background:var(--chalk); color:var(--void);
-  border:2px solid rgba(0,0,0,.55); font-family:var(--f-mono); font-size:10px; font-weight:700;
-}
-.fm-dot em{
-  position:absolute; top:28px; left:50%; transform:translateX(-50%); font-style:normal;
-  font-size:9.5px; color:#fff; white-space:nowrap; letter-spacing:.02em;
-  text-shadow:0 1px 2px #000, 0 0 3px #000; font-family:var(--f-body); font-weight:600;
-}
-@media (max-width:560px){ .fm-dot{width:21px; height:21px; font-size:9px} .fm-dot em{display:none} }
-.fm-meta{margin:10px 0 0; font-family:var(--f-mono); font-size:10px; color:var(--ash-dim); letter-spacing:.05em}
-.fm-subs{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
-.fm-sub{
-  font-family:var(--f-mono); font-size:10px; color:var(--ash); letter-spacing:.04em;
-  border:1px solid var(--line); border-radius:2px; padding:3px 8px;
-}
-.fm-sub b{color:var(--chalk); margin-right:6px}
 
 /* ---------- one match ---------- */
 /* The mounted Stats view brings its own stylesheet (Stats/stats-view.css) and
@@ -548,7 +518,22 @@ body.auth-page{display:grid; place-items:center; min-height:100vh; padding:24px}
   font-family:var(--f-display); font-stretch:87.5%; font-weight:700; text-transform:uppercase;
   letter-spacing:.03em; font-size:26px; margin:0 0 8px; line-height:1.1;
 }
-.auth-card p.intro{color:var(--ash); font-size:14px; margin:0 0 24px}
+.auth-card p.intro{color:var(--ash); font-size:14px; margin:0 0 22px}
+/* Sign in / Sign up. A segmented control rather than the rule-and-underline
+   the app uses for its own sections: this is a choice between two forms, not
+   a place in a page. */
+.auth-tabs{
+  display:grid; grid-template-columns:1fr 1fr; gap:2px; margin:0 0 24px;
+  border:1px solid var(--line); border-radius:3px; padding:2px; background:var(--void);
+}
+.auth-tabs button{
+  font-family:var(--f-display); font-stretch:87.5%; font-weight:700; text-transform:uppercase;
+  letter-spacing:.06em; font-size:12.5px; color:var(--ash-dim);
+  background:transparent; border:0; border-radius:2px; padding:10px 0; cursor:pointer;
+  transition:background .16s, color .16s;
+}
+.auth-tabs button:hover{color:var(--chalk)}
+.auth-tabs button.on{background:var(--red); color:#fff}
 .field{display:grid; gap:7px; margin-bottom:16px}
 .field label{font-family:var(--f-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ash-dim)}
 .field input{
@@ -556,6 +541,8 @@ body.auth-page{display:grid; place-items:center; min-height:100vh; padding:24px}
   padding:11px 12px; font-size:14px; font-family:var(--f-body); width:100%;
 }
 .field input:focus{outline:none; border-color:var(--red)}
+/* the password rules, stated under the box rather than only on rejection */
+.field-note{margin:0; font-family:var(--f-mono); font-size:10px; line-height:1.7; color:var(--ash-dim)}
 .auth-card .btn{width:100%; justify-content:center; margin-top:6px}
 .msg{
   margin-top:16px; font-size:13px; padding:11px 13px; border-radius:2px;
