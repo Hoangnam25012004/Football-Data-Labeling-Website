@@ -79,7 +79,7 @@
   /* Postgres speaks in error codes; these are the ones a person can act
      on. Anything else is passed through as it came, which is still more
      use than "something went wrong". */
-  function asError(e) {
+  function asError(e, what) {
     var msg = (e && e.message) || 'The database refused that.';
     var code = (e && e.code) || '';
     if (code === '42P01' || /relation .* does not exist/i.test(msg))
@@ -87,7 +87,13 @@
     if (code === '42883' || /function .* does not exist/i.test(msg))
       return new Error('This database is missing the channel functions — run supabase/migrations/0014_channel_admin.sql.');
     if (code === '42501' || /row-level security|permission denied/i.test(msg))
-      return new Error('Your account is not an admin of this channel.');
+      /* Every other call here is about a channel that already exists, where
+         "not an admin" is the reason. Creating one is not: there is no admin
+         of a channel that is not there yet, and saying so sent this bug
+         looking in the wrong place for a week. */
+      return new Error(what === 'create'
+        ? 'The database would not let this account create a channel. Check that you are still signed in.'
+        : 'Your account is not an admin of this channel.');
     if (code === '23505') return new Error('That already exists in this channel.');
     if (/must keep at least one admin/i.test(msg))
       return new Error('A channel must keep at least one admin — make someone else an admin first.');
@@ -209,8 +215,26 @@
              the columns stay on public.clubs only because channels seeded
              before this still carry them. */
         };
-        return c.from('clubs').insert(row).select('*').single()
-          .then(function (r) { if (r.error) throw asError(r.error); return shapeClub(r.data); });
+        /* No .select() on the way back, and that is the whole point.
+           Adding one makes the statement INSERT ... RETURNING, and Postgres
+           then requires the new row to satisfy the SELECT policy before it
+           will hand it over — clubs_read, which asks is_club_member(). The
+           membership that makes that true is written by clubs_creator_admin,
+           an AFTER INSERT trigger, and those fire at the END of the
+           statement. So the row is refused by the very statement creating
+           it: 42501, for everyone except staff, whose is_staff() short-
+           circuits both policies. That is why this worked in development
+           and for nobody else.
+
+           Nothing is lost by not asking: the slug is built here, so the
+           caller already knows how to find the channel once the trigger has
+           run — and app.js re-reads the list anyway, because the role has to
+           come from the membership the database made. */
+        return c.from('clubs').insert(row)
+          .then(function (r) {
+            if (r.error) throw asError(r.error, 'create');
+            return shapeClub(row);
+          });
       },
 
       /* Renaming and deleting a channel are not offered: 0014 leaves both

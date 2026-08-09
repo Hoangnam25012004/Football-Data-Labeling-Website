@@ -192,6 +192,21 @@ test('creating a channel writes one clubs row, and the caller never sets the rol
   notOk(one(res.createCalls,'club_members','insert'),'and no membership is written from here');
 });
 
+test('the insert asks for nothing back, or it refuses itself', () => {
+  // INSERT ... RETURNING makes Postgres apply the SELECT policy to the new
+  // row before handing it over. clubs_read asks is_club_member(), and the
+  // membership comes from clubs_creator_admin — an AFTER INSERT trigger, so
+  // it fires at the END of the statement. The row is therefore refused by
+  // the statement that creates it (42501) for everyone whose is_staff() is
+  // false, which is every client account. A .select() here is that bug.
+  const ins=one(res.createCalls,'clubs','insert');
+  notOk(ins.cols,'no column list, so PostgREST sends no RETURNING');
+  notOk(ins.single,'and nothing asks for the single row back');
+  eq(res.created.slug,ins.payload.slug,'the caller is handed the slug it generated');
+  ok(/c\.slug === created\.slug/.test(APPJS),'and app.js finds the new channel by that slug');
+  notOk(/insert\(row\)\s*\.select/.test(SUPA),'the insert is not re-decorated with one');
+});
+
 test('a channel carries no competition and no stage', () => {
   // a club plays in several over a season — a qualifying campaign, a league, a
   // cup — so one of each pinned to the channel is wrong from the second one on.

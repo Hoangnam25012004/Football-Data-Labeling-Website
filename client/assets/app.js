@@ -875,10 +875,13 @@
         country: card.querySelector('#ncCountry').value
       }).then(function (created) {
         /* Re-read rather than trusting the row we just wrote: the role
-           comes from the membership the database made, not from here. */
+           comes from the membership the database made, not from here.
+           Matched on the slug, which this browser generated and which is
+           unique — the insert is not asked to return anything, so there is
+           no id to match on. See channels.create() for why. */
         return window.HNA.clubs().then(function (clubs) {
           state.channels = clubs || [];
-          var mine = state.channels.filter(function (c) { return c.id === created.id; })[0];
+          var mine = state.channels.filter(function (c) { return c.slug === created.slug; })[0];
           if (mine) {
             state.channel = mine;
             return loadMatches(mine).then(function () {
