@@ -5,9 +5,9 @@
    so a match tagged on the labeling site turns up here as soon as
    an analyst points it at a channel and publishes it.
 
-   Everything degrades: no session → the app shows the seed channel;
-   no channels → seed channel; view missing → matches without stats.
-   The UI never has to know which source it got.
+   No session means no channel, and the app says so — there is no sample
+   to fall back on. A missing view still leaves the matches readable,
+   just without their aggregated numbers.
    ============================================================ */
 (function (global) {
   'use strict';

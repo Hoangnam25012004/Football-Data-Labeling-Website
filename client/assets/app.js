@@ -1,9 +1,9 @@
 /* ============================================================
    Client app — channels, matches, data, players.
 
-   A channel is a club. Channels come from Supabase when the person
-   is signed in and belongs to one; the Saint Lucia seed channel is
-   always there so the app is never an empty room.
+   A channel is a club. Channels come from Supabase, and only for a
+   signed-in account that belongs to one — there is no sample to fall
+   back on, so "no channel" is a state the app says out loud.
    ============================================================ */
 (function () {
   'use strict';
@@ -28,18 +28,9 @@
      Boot
      --------------------------------------------------------- */
   function boot() {
-    var seed = window.HNA_SEED;
-    var seedChannel = {
-      id: seed.club.id, slug: seed.club.slug, name: seed.club.name, crest: seed.club.crest,
-      competition: seed.club.competition, stage: seed.club.stage, seed: true,
-      matches: seed.matches, contributors: seed.contributors
-    };
-
     var ready = (window.HNA && window.HNA.configured())
       ? window.HNA.auth.user().catch(function () { return null; })
       : Promise.resolve(null);
-
-    state.seedChannel = seedChannel;
 
     ready.then(function (user) {
       state.user = user;
@@ -50,29 +41,28 @@
          to would not appear until the next load. */
       return window.HNA.channels.claim().then(function () { return window.HNA.clubs(); });
     }).then(function (clubs) {
-      state.channels = (clubs || []).map(function (c) { return Object.assign({}, c, { seed: false }); });
-      state.channels.push(seedChannel);
+      state.channels = clubs || [];
       var wanted = new URLSearchParams(location.search).get('club');
-      state.channel = state.channels.filter(function (c) { return c.slug === wanted; })[0] || state.channels[0];
+      state.channel = state.channels.filter(function (c) { return c.slug === wanted; })[0]
+                   || state.channels[0] || null;
       return loadMatches(state.channel);
     }).then(function () {
       state.loading = false;
       renderShell();
       route();
     }).catch(function (err) {
+      /* No channel is a state the app has to be able to sit in: signed out, or
+         signed in and not yet invited to one. There is nothing to fall back on. */
       state.loading = false;
-      state.channels = [seedChannel];
-      state.channel = seedChannel;
-      state.matches = seedChannel.matches;
+      state.channels = []; state.channel = null; state.matches = [];
       renderShell();
       route();
-      if (window.console) console.warn('Falling back to the seed channel:', err);
+      if (window.console) console.warn('No channel could be opened:', err);
     });
   }
 
   function loadMatches(ch) {
     if (!ch) { state.matches = []; return Promise.resolve(); }
-    if (ch.seed) { state.matches = ch.matches; return Promise.resolve(); }
     return window.HNA.matches(ch.id).then(function (rows) {
       state.matches = rows || [];
     }).catch(function () { state.matches = []; });
@@ -83,20 +73,20 @@
      --------------------------------------------------------- */
   function renderShell() {
     var ch = state.channel;
-    $('#chanCrest').textContent = ch.crest;
-    $('#chanName').textContent = ch.name;
+    $('#chanCrest').textContent = ch ? ch.crest : '···';
+    $('#chanName').textContent = ch ? ch.name : (state.user ? 'No channel' : 'Not signed in');
 
     var menu = $('#chanMenu');
     menu.innerHTML = '';
     state.channels.forEach(function (c) {
       var b = el('button', 'chan-opt' + (c === ch ? ' on' : ''),
         '<span class="crest sm' + (c === ch ? '' : ' opp') + '">' + esc(c.crest) + '</span>' +
-        '<span>' + esc(c.name) + '<em>' + esc(c.seed ? 'sample channel · from the match reports' : (c.stage || c.competition || 'live channel')) + '</em></span>');
+        '<span>' + esc(c.name) + '<em>' + esc(c.country || 'channel') + '</em></span>');
       b.type = 'button';
       b.addEventListener('click', function () {
         state.channel = c;
         $('#chanWrap').classList.remove('open');
-        loadMatches(c).then(function () { renderShell(); location.hash = '#/matches'; route(); });
+        loadMatches(c).then(function () { renderShell(); location.hash = '#/home'; route(); });
       });
       menu.appendChild(b);
     });
@@ -108,7 +98,7 @@
       $('#signOut').hidden = false;
       $('#signIn').hidden = true;
     } else {
-      who.innerHTML = 'Not signed in<b>viewing the sample channel</b>';
+      who.innerHTML = 'Not signed in<b>sign in to open your channel</b>';
       $('#avatar').textContent = '?';
       $('#signOut').hidden = true;
       $('#signIn').hidden = false;
@@ -120,6 +110,7 @@
   function renderSummary() {
     var box = $('#chanSum');
     var ch = state.channel;
+    if (!ch) { box.innerHTML = ''; return; }
     var ms = state.matches.filter(function (m) { return m.result; });
     var w = ms.filter(function (m) { return m.result === 'W'; }).length;
     var d = ms.filter(function (m) { return m.result === 'D'; }).length;
@@ -139,7 +130,6 @@
       bits.push('<span>GF <b>' + gf + '</b></span><span>GA <b>' + ga + '</b></span>');
       bits.push('<span>Pts <b>' + (w * 3 + d) + '</b></span>');
     }
-    if (ch.seed) bits.push('<span class="badge-seed">Sample data</span>');
     box.innerHTML = bits.join('');
   }
 
@@ -179,17 +169,16 @@
      View: matches
      --------------------------------------------------------- */
   function renderMatches(view) {
+    if (!state.channel) return view.appendChild(noChannel());
+
     view.appendChild(head('Matches', state.matches.length
-      ? state.matches.length + ' analysed · ' + (state.channel.stage || state.channel.competition || '')
+      ? state.matches.length + ' analysed'
       : 'Nothing published in this channel yet'));
 
     if (!state.matches.length) {
-      view.appendChild(emptyState(
-        'No matches published yet',
-        state.user
-          ? 'Once an analyst points a tagged match at this channel and marks it published, it appears here within seconds.'
-          : 'Sign in to see your club\'s channel. The sample channel is open to everyone.'
-      ));
+      view.appendChild(emptyState('No matches published yet',
+        'Once an analyst sends a tagged match over to this channel with Submit Analysis, ' +
+        'it appears here.'));
       return;
     }
 
@@ -214,8 +203,8 @@
           '<span class="crest sm' + (ourHome ? ' opp' : '') + '">' + esc(m.away.crest) + '</span>' +
           '<span class="tn' + (ourHome ? '' : ' us') + '">' + esc(m.away.name) + '</span>' +
         '</span>' +
-        '<span class="m-det"><b>' + esc(m.competition || state.channel.competition || '') + '</b><br>' +
-          esc(m.stage || state.channel.stage || '') + '</span>' +
+        '<span class="m-det"><b>' + esc(m.competition || '') + '</b><br>' +
+          esc(m.stage || '') + '</span>' +
         '<span class="m-end">' +
           (m.result ? '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' : '') +
           '<button type="button" class="m-open" title="Open the analysis" aria-label="Open the analysis">' +
@@ -235,12 +224,22 @@
       list.appendChild(b);
     });
     view.appendChild(list);
+  }
 
-    if (state.channel.seed) {
-      view.appendChild(el('p', 'note',
-        'Every figure in this channel was read out of the four match reports produced on the labeling site. ' +
-        'Nothing on this page is estimated.'));
+  /* Signed out, or signed in and not in a channel yet. There is nothing to
+     show and nothing to fall back on, so say which of the two it is. */
+  function noChannel() {
+    if (!state.user) {
+      var s = emptyState('Not signed in',
+        'Your club\'s matches, data and players live in a channel. Sign in to open yours.');
+      var a = el('a', 'btn btn-primary', 'Sign in');
+      a.href = 'login.html';
+      s.appendChild(a);
+      return s;
     }
+    return emptyState('No channel yet',
+      'This account is not in a channel. Create one under Channel, or ask whoever runs ' +
+      'your club\'s channel to invite this email address.');
   }
 
   /* ---------------------------------------------------------
@@ -254,7 +253,6 @@
     back.addEventListener('click', function () { location.hash = '#/matches'; });
     view.appendChild(back);
 
-    view.appendChild(matchHead(m));
     view.appendChild(matchTabs(m, 'overview'));
 
     /* timeline */
@@ -370,14 +368,6 @@
      sides, the four categories, the maps and the exports — because it is the
      same file, not a second version of it.
      --------------------------------------------------------- */
-  function matchHead(m) {
-    var context = m.stage || m.competition || state.channel.stage || state.channel.competition || '';
-    return head(
-      esc(m.home.name) + ' ' + num(m.home.score) + ' — ' + num(m.away.score) + ' ' + esc(m.away.name),
-      m.dateLabel + (context ? ' · ' + context : '') + ' · Match ID ' + m.id
-    );
-  }
-
   function matchTabs(m, on) {
     var wrap = el('div', 'mtabs');
     [['overview', '', 'Overview'], ['stats', '/stats', 'Analysis']].forEach(function (t) {
@@ -398,15 +388,7 @@
     var back = el('button', 'back', '&larr; All matches');
     back.addEventListener('click', function () { location.hash = '#/home'; });
     view.appendChild(back);
-    view.appendChild(matchHead(m));
     view.appendChild(matchTabs(m, 'stats'));
-
-    if (!m.uuid) {
-      view.appendChild(emptyState('Nothing to open',
-        'The sample channel was read out of finished match reports rather than tagged here, ' +
-        'so there is no analysis behind it.'));
-      return;
-    }
 
     var holder = el('div', 'pt-stats');
     holder.innerHTML = '<div class="state" style="border:0"><div class="spinner"></div>' +
@@ -444,6 +426,7 @@
      View: data (campaign aggregates)
      --------------------------------------------------------- */
   function renderData(view) {
+    if (!state.channel) return view.appendChild(noChannel());
     view.appendChild(head('Data', 'Every published match in this channel, added up'));
 
     var all = state.matches;
@@ -470,7 +453,7 @@
 
     var stat = el('div', 'card');
     stat.innerHTML =
-      '<p class="card-h">Team stats <span class="right">' + esc(state.channel.name) + '</span></p>' +
+      '<p class="card-h">Team stats <span class="right">' + esc(state.channel ? state.channel.name : '') + '</span></p>' +
       '<div class="tstats">' +
         tstat('Total', played.length) + tstat('Win', w) + tstat('Draw', d) + tstat('Loss', l) +
       '</div>' +
@@ -562,11 +545,12 @@
      View: players
      --------------------------------------------------------- */
   function renderPlayers(view) {
+    if (!state.channel) return view.appendChild(noChannel());
     view.appendChild(head('Players', 'Who put the numbers on the board'));
 
-    var contributors = state.channel.contributors;
-    if (!contributors || !contributors.length) {
-      /* build one from whatever match player tables exist */
+    /* built from whatever the match player tables carry */
+    var contributors;
+    {
       var tally = {};
       state.matches.forEach(function (m) {
         (m.players || []).forEach(function (p) {
@@ -739,7 +723,7 @@
   }
 
   function ownChannels() {
-    return state.channels.filter(function (c) { return !c.seed; });
+    return state.channels;
   }
 
   function renderChannelList(view) {
@@ -989,8 +973,7 @@
         /* Re-read rather than trusting the row we just wrote: the role
            comes from the membership the database made, not from here. */
         return window.HNA.clubs().then(function (clubs) {
-          state.channels = (clubs || []).map(function (c) { return Object.assign({}, c, { seed: false }); });
-          state.channels.push(state.seedChannel);
+          state.channels = clubs || [];
           var mine = state.channels.filter(function (c) { return c.id === created.id; })[0];
           if (mine) {
             state.channel = mine;

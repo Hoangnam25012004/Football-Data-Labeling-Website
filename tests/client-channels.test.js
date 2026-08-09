@@ -375,6 +375,41 @@ test('the code column is what the share link and the tagger both use', () => {
      'and the tagger side resolves that same code column');
 });
 
+/* ================= no sample channel ================= */
+test('there is no seed channel left to fall back on', () => {
+  notOk(/HNA_SEED|seedChannel|\.seed\b/.test(APPJS),'app.js holds no seed');
+  notOk(fs.existsSync(path.join(ROOT,'client/assets/data.js')),'and the file that carried it is gone');
+  notOk(/data\.js/.test(APPHTML),'app.html does not load it');
+  notOk(/cp client\/assets\/data\.js/.test(YML),'nor does the deploy copy it');
+});
+
+test('an app with no channel says which of the two reasons it is', () => {
+  // signed out is not the same problem as signed in without a membership,
+  // and neither is the same as an empty channel
+  const fn=/function noChannel\(\)[\s\S]*?\n  \}/.exec(APPJS)[0];
+  ok(/if \(!state\.user\)/.test(fn),'it checks which');
+  ok(/Not signed in/.test(fn)&&/login\.html/.test(fn),'signed out gets a way in');
+  ok(/No channel yet/.test(fn)&&/invite this email address/.test(fn),'signed in gets told what to ask for');
+  ['renderMatches','renderData','renderPlayers'].forEach(v=>{
+    const body=new RegExp('function '+v+'\\(view\\) \\{\\n    if \\(!state\\.channel\\)').test(APPJS);
+    ok(body,v+' checks for a channel before it reads one');
+  });
+});
+
+test('nothing still promises a sample channel to a visitor', () => {
+  ['client/index.html','client/login.html','client/app.html'].forEach(f=>
+    notOk(/sample channel/i.test(page(f)),f+' still offers one'));
+});
+
+/* ================= the match page ================= */
+test('a match page opens on its tabs, not on a title it repeats', () => {
+  notOk(/matchHead/.test(APPJS),'the fixture heading and its meta line are gone');
+  ok(/function matchTabs\(m, on\)/.test(APPJS),'the tabs stay — they are how you cross between the two');
+  const stats=/function renderMatchStats\(view, slug\)[\s\S]*?matchTabs\(m, 'stats'\)/.exec(APPJS);
+  ok(stats,'Analysis still shows them');
+  ok(/All matches/.test(stats[0]),'and the way back is still there');
+});
+
 /* ================= the rail ================= */
 const rail=/<nav class="side"[\s\S]*?<\/nav>/.exec(APPHTML)[0];
 

@@ -49,7 +49,6 @@ jobs:
           mkdir -p _site/assets
           cp client/assets/site.css _site/assets/site.css
           cp client/assets/app.css  _site/assets/app.css
-          cp client/assets/data.js  _site/assets/data.js
           cp client/assets/supa.js  _site/assets/supa.js
           cp client/assets/app.js   _site/assets/app.js
 

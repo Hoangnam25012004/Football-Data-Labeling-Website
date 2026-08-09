@@ -8,7 +8,7 @@ Two websites in one repository, sharing one Supabase project.
 | **Labeling app** | The tagging tool — events + hotkeys, pitch coordinates, stats, XLSX/CSV export | Our analysts | `/tagger` |
 
 **Client site:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/
-**Sample channel:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/app.html
+**Client app:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/app.html
 **Labeling app:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/tagger/
 **Analyst sign-in:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/tagger/auth
 
@@ -28,7 +28,7 @@ client/                                        the client site  (deployed to /)
   index.html      landing page
   app.html        the channel app — matches, data, players
   login.html      client sign-in
-  assets/         site.css, app.css, data.js, supa.js, app.js
+  assets/         site.css, app.css, supa.js, app.js
 supabase/migrations/                           schema, in order
 ```
 Nothing moves inside the repo — the relocation happens only in
@@ -73,9 +73,9 @@ public site.
 **Players** (who scored and who created) no longer has a rail entry, but the view
 is unchanged and still opens at `#/players`.
 
-`client/assets/supa.js` reads Supabase; `client/assets/data.js` carries the
-Saint Lucia campaign as a seed channel so the site is never an empty room and
-works signed-out. Both produce the same shape, so the UI cannot tell them apart.
+`client/assets/supa.js` is the only source of channel data. There is no sample
+channel to fall back on: signed out, or signed in without a membership, the app
+says which of the two it is rather than showing somebody else's numbers.
 
 **Before a real client logs in, run
 [`supabase/migrations/0013_client_channels.sql`](supabase/migrations/0013_client_channels.sql).**
