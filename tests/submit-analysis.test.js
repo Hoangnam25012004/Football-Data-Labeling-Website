@@ -196,6 +196,83 @@ test('0016 leaves the tagging app alone', () => {
   notOk(/drop table|truncate|delete from/i.test(SQL),'nothing is dropped or emptied');
 });
 
+/* ================= seeding a channel from SQL =================
+   A channel normally comes from the client site, where whoever creates one
+   becomes its admin. The SQL Editor has no session to take an admin from, so
+   the first channel is seeded instead — and that script writes reports of its
+   own, which means it has to build the same payload the browser would. */
+const SEED=page('supabase/seed/saint_lucia_channel.sql');
+const VIEW=page('Stats/stats-view.js');
+
+/* The keys of a jsonb_build_object(...) call. Anchored to the start of a line,
+   because a quoted string in the VALUE half — coalesce(attributes->>'team_name')
+   — looks exactly like a key otherwise. */
+function jsonKeys(sql){
+  const out=[]; const re=/^\s*'([A-Za-z]+)',/gm;
+  for(let m;(m=re.exec(sql));) out.push(m[1]);
+  return out;
+}
+const noSqlComments=s=>s.replace(/--[^\n]*/g,'');
+
+test('the seeded rows are the shape cloud-sync would have written', () => {
+  // dbToRow() is what a browser turns a database row into, and what the view
+  // reads. A snapshot built in SQL that disagrees opens blank, with nothing
+  // anywhere saying why.
+  const js=/function dbToRow\(d\) \{[\s\S]*?\n  \}/.exec(CLOUD)[0];
+  const jsKeys=[]; const re=/(?:^|[\s{,])([A-Za-z]+):/g;
+  for(let m;(m=re.exec(js.slice(js.indexOf('return {'))));) jsKeys.push(m[1]);
+
+  const a=SEED.indexOf("'rows',"), b=SEED.indexOf('order by e.t_seconds', a);
+  const sqlKeys=jsonKeys(SEED.slice(a,b)).filter(k=>k!=='rows'&&k!=='x'&&k!=='y');
+
+  jsKeys.filter(k=>k!=='x'&&k!=='y').forEach(k=>
+    ok(sqlKeys.includes(k),'the seed does not write "'+k+'", which dbToRow does'));
+  sqlKeys.forEach(k=>
+    ok(jsKeys.includes(k),'the seed writes "'+k+'", which dbToRow does not'));
+});
+
+test('and the meta it writes is the one the view starts from', () => {
+  const blank=/const blankMeta=\(\)=>\(\{[\s\S]*?\}\);/.exec(VIEW)[0];
+  const a=SEED.indexOf("'meta', jsonb_build_object("), b=SEED.indexOf('),',a);
+  jsonKeys(SEED.slice(a,b)).filter(k=>k!=='meta').forEach(k=>
+    ok(blank.includes(k+':'),'the view has no place for meta.'+k));
+  ['home','away','sport','matchId','matchCode'].forEach(k=>
+    ok(SEED.includes("'"+k+"',"),'the seed must carry meta.'+k));
+});
+
+test('running the seed twice changes nothing', () => {
+  ok(/on conflict \(slug\) do nothing/.test(SEED),'the channel is not created twice');
+  ok(/on conflict \(club_id, user_id\)\s*\ndo update set role = 'admin'/.test(SEED),
+     'and the admin row is brought up to date rather than duplicated');
+  ok(/where not exists \(select 1 from public\.match_reports r where r\.match_id = m\.id\)/.test(SEED),
+     'a second run does not stack another version of the same report');
+});
+
+test('the seed publishes exactly the four qualifiers, on the right side', () => {
+  const rows=/\(values([\s\S]*?)\) as v\(/.exec(SEED)[1];
+  [['45956','away'],['55357','home'],['51977','away'],['32746','home']].forEach(([code,side])=>{
+    const line=rows.split('\n').filter(l=>l.includes("'"+code+"'"))[0];
+    ok(line,'match '+code+' is in the list');
+    ok(line.includes("'"+side+"'"),'match '+code+' has Saint Lucia on the '+side);
+  });
+  eq((rows.match(/^\s*\('/gm)||[]).length,4,'four matches, no more');
+  ok(/published   = true/.test(SEED),'and they are published, or the club sees nothing');
+});
+
+test('competition and stage are put on the match, never on the club', () => {
+  const clubInsert=/insert into public\.clubs \(([^)]*)\)/.exec(SEED)[1];
+  notOk(/competition|stage/.test(clubInsert),'the channel is created without either');
+  ok(/competition = 'FIFA World Cup 26 Qualifying'/.test(SEED),'the match carries the competition');
+  ok(/stage       = 'Concacaf Second Round/.test(SEED),'and the stage');
+});
+
+test('the seed only ever adds — it drops and deletes nothing', () => {
+  const sql=noSqlComments(SEED);           // the prose says "drop those columns"
+  notOk(/drop |truncate|delete from/i.test(sql));
+  ['events','event_types','teams','players'].forEach(t=>
+    notOk(new RegExp('update public\\.'+t+'\\b').test(sql),'public.'+t+' is not written to'));
+});
+
 /* ================= shipping ================= */
 test('the client can reach the files it loads at runtime', () => {
   // it loads them out of the deployed tagging app, so those cp lines cover both

@@ -187,10 +187,20 @@ test('creating a channel writes one clubs row, and the caller never sets the rol
   eq(ins.payload.name,'Saint Lucia');
   eq(ins.payload.sport,'football');
   eq(ins.payload.country,'Saint Lucia');
-  eq(ins.payload.competition,'FIFA World Cup 26 Qualifying');
   notOk('role' in ins.payload,'the role comes from the database trigger, not from the browser');
   notOk('created_by' in ins.payload,'nor does the browser name the owner — the column defaults to auth.uid()');
   notOk(one(res.createCalls,'club_members','insert'),'and no membership is written from here');
+});
+
+test('a channel carries no competition and no stage', () => {
+  // a club plays in several over a season — a qualifying campaign, a league, a
+  // cup — so one of each pinned to the channel is wrong from the second one on.
+  // They belong to the match, and the fixture list already reads them there.
+  const ins=one(res.createCalls,'clubs','insert');
+  notOk('competition' in ins.payload,'not sent, even though one was passed in');
+  notOk('stage' in ins.payload,'nor a stage');
+  notOk(/id="ncComp"|id="ncStage"/.test(APPJS),'and the form does not ask for them');
+  ok(/ch\.competition/.test(APPJS),'a channel seeded with one before this still shows it');
 });
 
 test('the slug is url-safe, unique-ish, and survives diacritics', () => {

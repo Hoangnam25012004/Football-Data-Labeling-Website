@@ -193,9 +193,11 @@
           name: name,
           crest_text: (fields.crest ? String(fields.crest).trim().toUpperCase() : monogram(name)).slice(0, 4),
           sport: fields.sport || 'football',
-          country: fields.country || null,
-          competition: fields.competition || null,
-          stage: fields.stage || null
+          country: fields.country || null
+          /* competition / stage are deliberately not set. They belong to a
+             match, not to a club — one club plays in several competitions, and
+             the columns stay on public.clubs only because channels seeded
+             before this still carry them. */
         };
         return c.from('clubs').insert(row).select('*').single()
           .then(function (r) { if (r.error) throw asError(r.error); return shapeClub(r.data); });

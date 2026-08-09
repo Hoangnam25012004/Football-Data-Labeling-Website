@@ -946,14 +946,14 @@
             '<datalist id="countryList">' + COUNTRIES.map(function (c) {
               return '<option value="' + esc(c) + '"></option>'; }).join('') + '</datalist></div>' +
         '</div>' +
-        '<div class="f2">' +
-          '<div class="field"><label for="ncCrest">Monogram</label>' +
-            '<input id="ncCrest" maxlength="4" placeholder="auto" autocomplete="off"></div>' +
-          '<div class="field"><label for="ncComp">Competition <span class="opt">optional</span></label>' +
-            '<input id="ncComp" placeholder="FIFA World Cup 26 Qualifying" autocomplete="off"></div>' +
-        '</div>' +
-        '<div class="field"><label for="ncStage">Stage <span class="opt">optional</span></label>' +
-          '<input id="ncStage" placeholder="Concacaf Second Round · Group C" autocomplete="off"></div>' +
+        /* No competition or stage here. A club plays in several over a season —
+           a qualifying campaign, a league, a cup — so one of each pinned to the
+           channel would be wrong the moment the second one starts. They belong
+           to the MATCH, which is where they are already read from: the fixture
+           list shows each match's own, and the summary strip simply leaves the
+           line out when the channel has none. */
+        '<div class="field"><label for="ncCrest">Monogram <span class="opt">optional</span></label>' +
+          '<input id="ncCrest" maxlength="4" placeholder="auto" autocomplete="off"></div>' +
         '<div class="form-end">' +
           '<button class="btn btn-primary" type="submit" id="ncGo">Create channel</button>' +
           '<span class="form-msg" id="ncMsg"></span>' +
@@ -984,9 +984,7 @@
         name: nameBox.value,
         crest: crestBox.value,
         sport: card.querySelector('#ncSport').value,
-        country: card.querySelector('#ncCountry').value,
-        competition: card.querySelector('#ncComp').value,
-        stage: card.querySelector('#ncStage').value
+        country: card.querySelector('#ncCountry').value
       }).then(function (created) {
         /* Re-read rather than trusting the row we just wrote: the role
            comes from the membership the database made, not from here. */

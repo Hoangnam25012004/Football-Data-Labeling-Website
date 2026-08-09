@@ -56,7 +56,17 @@ public site.
   eighteen hundred rows to page in.
 - **Channel** — the channels this account is in. Creating one makes you its
   admin: you invite people by email, set what each of them is (admin / analyst /
-  viewer) and remove them again. One channel is one club.
+  viewer) and remove them again. One channel is one club. A channel carries no
+  competition or stage: a club plays in several over a season, so those live on
+  the match, and the fixture list reads each match's own.
+
+  The first channel is the awkward one — creating one from the site needs a
+  session, because whoever creates it becomes its admin, and the SQL Editor has
+  none. [`supabase/seed/saint_lucia_channel.sql`](supabase/seed/saint_lucia_channel.sql)
+  is that first channel done from SQL: it names the admin, points the four
+  tagged qualifiers at it, publishes them, and writes each one's first report so
+  the Analysis tab works without four trips through Submit Analysis. Run it once,
+  after 0014–0016. Running it again changes nothing.
 - **Data** — team stats, recent results and the last starting XI the analyst
   entered, then every published match added up and the per-match table.
 
