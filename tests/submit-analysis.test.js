@@ -149,23 +149,15 @@ test('the heavy parts are fetched when a match is opened, not on every page load
 });
 
 /* ================= getting there ================= */
-test('the play button on a row opens the analysis, the row opens the match', () => {
-  ok(/parts\[2\] === 'stats' \? renderMatchStats/.test(APPJS),'#/match/<code>/stats is routed');
-  ok(/location\.hash = href \+ '\/stats'/.test(APPJS),'the button goes there');
-  ok(/e\.stopPropagation\(\)/.test(APPJS),'without the row opening underneath it');
-});
-
-test('a row full of controls is still reachable from a keyboard', () => {
-  // it had to stop being a <button> — a button cannot contain a button
-  ok(/el\('div', 'mrow'\)/.test(APPJS));
-  ok(/setAttribute\('role', 'button'\)/.test(APPJS)&&/setAttribute\('tabindex', '0'\)/.test(APPJS));
-  ok(/e\.key === 'Enter' \|\| e\.key === ' '/.test(APPJS),'Enter and Space open it');
-});
-
-test('the two tabs of a match both exist and only one is lit', () => {
-  const fn=/function matchTabs\(m, on\)[\s\S]*?\n  \}/.exec(APPJS)[0];
-  ok(/'overview', '', 'Overview'/.test(fn)&&/'stats', '\/stats', 'Analysis'/.test(fn));
-  ok(/on === t\[0\] \? ' on' : ''/.test(fn),'exactly the one you are on');
+test('a row opens the analysis, and is a button again', () => {
+  // it was a div with role and tabindex only because a second control inside
+  // it aimed somewhere else; with one page per match there is nothing to aim
+  ok(/el\('button', 'mrow'\)/.test(APPJS),'a real button, keyboard-reachable for free');
+  notOk(/setAttribute\('role', 'button'\)/.test(APPJS),'no hand-rolled role');
+  notOk(/e\.key === 'Enter'/.test(APPJS),'and no hand-rolled key handling');
+  ok(/location\.hash = '#\/match\/' \+ encodeURIComponent\(m\.slug \|\| m\.id\)/.test(APPJS),
+     'clicking it opens that match');
+  ok(/class="m-open" aria-hidden="true"/.test(APPJS),'the ▶ is decoration now, not a second target');
 });
 
 /* ================= the table it lands in ================= */

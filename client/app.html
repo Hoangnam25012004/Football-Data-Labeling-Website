@@ -6,7 +6,7 @@
 <title>Channel — HoangNam Analytics</title>
 <meta name="description" content="Match data, reports and players for your club.">
 <link rel="stylesheet" href="assets/site.css?v=1">
-<link rel="stylesheet" href="assets/app.css?v=5">
+<link rel="stylesheet" href="assets/app.css?v=6">
 </head>
 <body class="app">
 
@@ -25,6 +25,8 @@
       <span id="chanName">Loading</span>
       <span class="caret" aria-hidden="true">▼</span>
     </button>
+    <!-- an open channel has to say so somewhere that cannot be scrolled past -->
+    <span class="badge-public" id="chanPublic" title="Anyone can read this channel, without an account" hidden>Public</span>
     <div class="chan-menu" id="chanMenu" role="menu"></div>
   </span>
 
@@ -36,7 +38,6 @@
   </span>
 </header>
 
-<div class="chan-sum" id="chanSum"></div>
 
 <div class="app-body">
   <nav class="side" aria-label="Sections">
@@ -60,6 +61,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supa.js?v=7"></script>
-<script src="assets/app.js?v=7"></script>
+<script src="assets/app.js?v=8"></script>
 </body>
 </html>

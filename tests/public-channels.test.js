@@ -97,9 +97,11 @@ test('closing it needs no confirm — only opening does', () => {
 
 /* ================= it is visible that it is open ================= */
 test('a public channel says so where it cannot be missed', () => {
-  ok(/badge-public/.test(APPJS)&&/badge-public/.test(page('client/assets/app.css')),
-     'a badge on the summary strip');
-  ok(/c\.isPublic \? ' · public' : ''/.test(APPJS),'and on the row in the channel list');
+  // in the bar beside the channel name, which is on screen whatever you scroll
+  ok(/id="chanPublic"/.test(page('client/app.html')),'the badge is in the top bar');
+  ok(/\$\('#chanPublic'\)\.hidden = !\(ch && ch\.isPublic\)/.test(APPJS),'shown only when it is one');
+  ok(/badge-public/.test(page('client/assets/app.css')),'and it is styled');
+  ok(/c\.isPublic \? ' · public' : ''/.test(APPJS),'the row in the channel list says so too');
 });
 
 test('a signed-out visitor is now asked for the channel list', () => {

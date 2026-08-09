@@ -200,7 +200,7 @@ test('a channel carries no competition and no stage', () => {
   notOk('competition' in ins.payload,'not sent, even though one was passed in');
   notOk('stage' in ins.payload,'nor a stage');
   notOk(/id="ncComp"|id="ncStage"/.test(APPJS),'and the form does not ask for them');
-  ok(/ch\.competition/.test(APPJS),'a channel seeded with one before this still shows it');
+  ok(/esc\(m\.competition \|\| ''\)/.test(APPJS),'each match still shows its own on the fixture row');
 });
 
 test('the slug is url-safe, unique-ish, and survives diacritics', () => {
@@ -401,13 +401,30 @@ test('nothing still promises a sample channel to a visitor', () => {
     notOk(/sample channel/i.test(page(f)),f+' still offers one'));
 });
 
+test('the strip of running totals is gone from the bar', () => {
+  notOk(/chan-sum|chanSum/.test(APPHTML),'the element is not in the page');
+  notOk(/renderSummary|chanSum/.test(APPJS),'nothing builds it');
+  notOk(/\.chan-sum/.test(APPCSS),'and its styling went with it');
+  // the same numbers are still a section of their own, so nothing was lost
+  ok(/tstat\('Total'/.test(APPJS)&&/tstat\('Win'/.test(APPJS),'Data still counts them');
+  ok(/Goal difference/.test(APPJS),'including the difference the strip used to show');
+});
+
 /* ================= the match page ================= */
-test('a match page opens on its tabs, not on a title it repeats', () => {
-  notOk(/matchHead/.test(APPJS),'the fixture heading and its meta line are gone');
-  ok(/function matchTabs\(m, on\)/.test(APPJS),'the tabs stay — they are how you cross between the two');
-  const stats=/function renderMatchStats\(view, slug\)[\s\S]*?matchTabs\(m, 'stats'\)/.exec(APPJS);
-  ok(stats,'Analysis still shows them');
-  ok(/All matches/.test(stats[0]),'and the way back is still there');
+test('a match is one page — the analysis, and the way back', () => {
+  notOk(/matchHead/.test(APPJS),'no fixture heading repeating the row you came from');
+  notOk(/matchTabs|renderMatch\b/.test(APPJS),'no Overview to cross to, so no tabs either');
+  notOk(/fillBars/.test(APPJS),'and the bars that only Overview drew are gone with it');
+  const stats=/function renderMatchStats\(view, slug\)[\s\S]*?\n  \}/.exec(APPJS)[0];
+  ok(/All matches/.test(stats),'the way back is still there');
+  ok(/PTStats\.mount/.test(stats),'and the analysis is what the page is');
+});
+
+test('every route into a match lands on that one page', () => {
+  const r=/function route\(\)[\s\S]*?\n  \}/.exec(APPJS)[0];
+  ok(/parts\[0\] === 'match' && parts\[1\]/.test(r)&&/return renderMatchStats\(view, slug\)/.test(r),
+     'one destination, whatever the URL says');
+  ok(/\/stats is kept as a suffix/.test(r),'and a link made while there were two tabs still works');
 });
 
 /* ================= the rail ================= */

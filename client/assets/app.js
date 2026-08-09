@@ -72,12 +72,13 @@
   }
 
   /* ---------------------------------------------------------
-     Shell: channel switcher, account, summary strip, nav
+     Shell: channel switcher, account, nav
      --------------------------------------------------------- */
   function renderShell() {
     var ch = state.channel;
     $('#chanCrest').textContent = ch ? ch.crest : '···';
     $('#chanName').textContent = ch ? ch.name : (state.user ? 'No channel' : 'Not signed in');
+    $('#chanPublic').hidden = !(ch && ch.isPublic);
 
     var menu = $('#chanMenu');
     menu.innerHTML = '';
@@ -107,34 +108,6 @@
       $('#signIn').hidden = false;
     }
 
-    renderSummary();
-  }
-
-  function renderSummary() {
-    var box = $('#chanSum');
-    var ch = state.channel;
-    if (!ch) { box.innerHTML = ''; return; }
-    var ms = state.matches.filter(function (m) { return m.result; });
-    var w = ms.filter(function (m) { return m.result === 'W'; }).length;
-    var d = ms.filter(function (m) { return m.result === 'D'; }).length;
-    var l = ms.filter(function (m) { return m.result === 'L'; }).length;
-    var gf = 0, ga = 0;
-    state.matches.forEach(function (m) {
-      var our = m.side === 'home' ? m.home.score : m.away.score;
-      var their = m.side === 'home' ? m.away.score : m.home.score;
-      if (our != null) gf += our;
-      if (their != null) ga += their;
-    });
-    var bits = [];
-    if (ch.competition) bits.push('<span>' + esc(ch.competition) + (ch.stage ? ' <span class="sep">·</span> ' + esc(ch.stage) : '') + '</span>');
-    bits.push('<span>Played <b>' + state.matches.length + '</b></span>');
-    if (ms.length) {
-      bits.push('<span>W <b>' + w + '</b></span><span>D <b>' + d + '</b></span><span>L <b>' + l + '</b></span>');
-      bits.push('<span>GF <b>' + gf + '</b></span><span>GA <b>' + ga + '</b></span>');
-      bits.push('<span>Pts <b>' + (w * 3 + d) + '</b></span>');
-    }
-    if (ch.isPublic) bits.push('<span class="badge-public" title="Anyone can read this channel">Public</span>');
-    box.innerHTML = bits.join('');
   }
 
   /* ---------------------------------------------------------
@@ -161,7 +134,9 @@
     view.innerHTML = '';
     if (parts[0] === 'match' && parts[1]) {
       var slug = decodeURIComponent(parts[1]);
-      return parts[2] === 'stats' ? renderMatchStats(view, slug) : renderMatch(view, slug);
+      /* /stats is kept as a suffix so links made while there were two
+         tabs still land on the one page there is now. */
+      return renderMatchStats(view, slug);
     }
     if (parts[0] === 'channel') return renderChannel(view, parts.slice(1));
     if (parts[0] === 'data') return renderData(view);
@@ -191,11 +166,10 @@
       '<span>Date</span><span>Fixture</span><span>Details</span><span style="text-align:right">Result</span>'));
 
     state.matches.forEach(function (m) {
-      /* A row with a control inside it, so it cannot stay a <button>: the row
-         opens the match, the ▶ on the end opens its analysis. */
-      var b = el('div', 'mrow');
-      b.setAttribute('role', 'button');
-      b.setAttribute('tabindex', '0');
+      /* One page per match again, so the row is a plain button: there is no
+         second thing inside it to aim somewhere else. */
+      var b = el('button', 'mrow');
+      b.type = 'button';
       var ourHome = m.side === 'home';
       b.innerHTML =
         '<span class="m-date">' + esc(m.dateLabel) + '<em>' + esc(m.venue || (ourHome ? 'Home' : 'Away')) +
@@ -211,19 +185,12 @@
           esc(m.stage || '') + '</span>' +
         '<span class="m-end">' +
           (m.result ? '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' : '') +
-          '<button type="button" class="m-open" title="Open the analysis" aria-label="Open the analysis">' +
+          '<span class="m-open" aria-hidden="true">' +
             '<svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor"><path d="M1 0 9 5 1 10Z"/></svg>' +
-          '</button>' +
+          '</span>' +
         '</span>';
-      var href = '#/match/' + encodeURIComponent(m.slug || m.id);
-      var open = function () { location.hash = href; };
-      b.addEventListener('click', open);
-      b.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
-      });
-      b.querySelector('.m-open').addEventListener('click', function (e) {
-        e.stopPropagation();                 // the row would otherwise open too
-        location.hash = href + '/stats';
+      b.addEventListener('click', function () {
+        location.hash = '#/match/' + encodeURIComponent(m.slug || m.id);
       });
       list.appendChild(b);
     });
@@ -248,124 +215,6 @@
   }
 
   /* ---------------------------------------------------------
-     View: one match
-     --------------------------------------------------------- */
-  function renderMatch(view, slug) {
-    var m = state.matches.filter(function (x) { return String(x.slug || x.id) === slug; })[0];
-    if (!m) { location.hash = '#/matches'; return; }
-
-    var back = el('button', 'back', '&larr; All matches');
-    back.addEventListener('click', function () { location.hash = '#/matches'; });
-    view.appendChild(back);
-
-    view.appendChild(matchTabs(m, 'overview'));
-
-    /* timeline */
-    if (m.timeline && m.timeline.length) {
-      var c = el('div', 'card');
-      c.style.marginBottom = '16px';
-      var marks = m.timeline.map(function (t) {
-        var cls = t.type === 'goal' ? (t.side === 'us' ? 'us' : 'them')
-                : (t.type === 'red' ? 'red' : 'card');
-        return '<span class="tl-mk ' + cls + '" style="left:' + Math.min(99, Math.max(1, t.at)) + '%" title="' + esc(t.text) + '">' +
-               (t.type === 'goal' ? '⚽' : '') + '</span>';
-      }).join('');
-      c.innerHTML =
-        '<p class="card-h">Timeline <span class="right">goals · cards</span></p>' +
-        '<div class="tl"><span class="tl-line"></span><span class="tl-half"></span>' + marks +
-        '<span class="tl-ax mono"><span>0\'</span><span>HT</span><span>FT</span></span></div>';
-      var evs = el('div', 'evlist');
-      evs.style.marginTop = '14px';
-      m.timeline.forEach(function (t) {
-        var ic = t.type === 'goal' ? (t.side === 'us' ? 'goal-us' : 'goal-them') : t.type;
-        evs.appendChild(el('div', 'ev' + (t.type === 'goal' ? ' goal' : ''),
-          '<span class="t">' + esc(String(t.text).split(' ')[0]) + '</span>' +
-          '<span class="ic ' + ic + '"></span>' +
-          '<span class="tx">' + esc(String(t.text).replace(/^\S+\s/, '')) + '</span>'));
-      });
-      c.appendChild(evs);
-      view.appendChild(c);
-    }
-
-    /* head to head */
-    var grid = el('div', 'grid2');
-    var usName = m.side === 'home' ? m.home.name : m.away.name;
-    var themName = m.side === 'home' ? m.away.name : m.home.name;
-
-    var METRICS = [
-      ['poss', 'Possession', '%'], ['shots', 'Shots', ''], ['onTarget', 'On target', ''],
-      ['shotAcc', 'Shot acc.', '%'], ['passes', 'Passes', ''], ['passAcc', 'Pass acc.', '%'],
-      ['crosses', 'Crosses', ''], ['recoveries', 'Recoveries', ''], ['tackles', 'Tackles', ''],
-      ['interceptions', 'Interceptions', ''], ['clearances', 'Clearances', ''], ['mistakes', 'Mistakes', '']
-    ];
-    var cmp = el('div', 'card');
-    var rows = '';
-    if (m.us && m.them) {
-      METRICS.forEach(function (mt) {
-        var a = m.us[mt[0]], b = m.them[mt[0]];
-        if (a == null || b == null) return;
-        var tot = (Number(a) + Number(b)) || 1;
-        rows += '<div class="cmp-row">' +
-          '<span class="v-l">' + a + mt[2] + '</span>' +
-          '<span class="cmp-bar l"><i data-w="' + Math.round(a / tot * 100) + '"></i></span>' +
-          '<span class="lbl">' + mt[1] + '</span>' +
-          '<span class="cmp-bar r"><i data-w="' + Math.round(b / tot * 100) + '"></i></span>' +
-          '<span class="v-r">' + b + mt[2] + '</span></div>';
-      });
-    }
-    cmp.innerHTML = '<p class="card-h">Head to head <span class="right">' + esc(usName) + ' vs ' + esc(themName) + '</span></p>' +
-      (rows ? '<div class="cmp">' + rows + '</div>'
-            : '<p class="note" style="margin:0">No aggregated numbers for this match yet.</p>');
-    grid.appendChild(cmp);
-
-    /* shot breakdown */
-    var shot = el('div', 'card');
-    if (m.us && m.us.shots != null) {
-      var s = m.us, tot = s.shots || 1;
-      var bar = function (label, v) {
-        if (v == null) return '';
-        return '<div class="pct-item"><span class="cap">' + label + ' <b>' + v + '</b></span>' +
-               '<span class="pct-track"><i data-w="' + Math.round(v / tot * 100) + '"></i></span></div>';
-      };
-      shot.innerHTML = '<p class="card-h">Where the ' + s.shots + ' shots went <span class="right">' + esc(usName) + '</span></p>' +
-        '<div class="cmp" style="gap:14px">' +
-          bar('On target', s.onTarget) + bar('Off target', s.offTarget) +
-          bar('Blocked', s.blocked) + bar('Missed', s.missed) +
-        '</div>' +
-        '<div class="kpis" style="margin:18px 0 0">' +
-          '<div class="kpi"><span class="k-l">Goals</span><span class="k-v">' + num(s.goals) + '</span><span class="k-d k-flat">from ' + s.shots + ' shots</span></div>' +
-          (s.shotAcc != null ? '<div class="kpi"><span class="k-l">Shot accuracy</span><span class="k-v">' + s.shotAcc + '%</span><span class="k-d k-flat">' + esc(themName) + ' ' + num(m.them && m.them.shotAcc) + '%</span></div>' : '') +
-          (s.crossesDone != null ? '<div class="kpi"><span class="k-l">Crosses done</span><span class="k-v">' + s.crossesDone + '</span><span class="k-d k-flat">of ' + num(s.crosses) + '</span></div>' : '') +
-        '</div>';
-    } else {
-      shot.innerHTML = '<p class="card-h">Shots</p><p class="note" style="margin:0">Not available for this match.</p>';
-    }
-    grid.appendChild(shot);
-    view.appendChild(grid);
-
-    /* player table */
-    if (m.players && m.players.length) {
-      var pc = el('div', 'card');
-      pc.style.marginTop = '16px';
-      var body = m.players.filter(function (p) { return p.shots || p.goals || p.assists || p.freekicks || p.corners; })
-        .map(function (p) {
-          return '<tr><td><span class="shirt">' + p.no + '</span><span class="pname">' + esc(p.name) + '</span></td>' +
-            '<td>' + (p.goals || '·') + '</td><td>' + (p.assists || '·') + '</td><td>' + (p.shots || '·') + '</td>' +
-            '<td>' + (p.onTarget || '·') + '</td><td>' + (p.offTarget || '·') + '</td><td>' + (p.blocked || '·') + '</td>' +
-            '<td>' + esc(p.shotAcc) + '</td><td>' + (p.freekicks || '·') + '</td><td>' + (p.corners || '·') + '</td></tr>';
-        }).join('');
-      pc.innerHTML = '<p class="card-h">Player metrics <span class="right">' + esc(usName) + ' · attacking columns</span></p>' +
-        '<div class="tbl-scroll"><table class="dt"><thead><tr><th>Player</th><th>Goals</th><th>Assists</th><th>Shots</th>' +
-        '<th>On tgt</th><th>Off tgt</th><th>Blocked</th><th>Shot acc</th><th>Freekicks</th><th>Corners</th></tr></thead>' +
-        '<tbody>' + body + '</tbody></table></div>' +
-        (m.formation ? '<p class="note">Formation logged as ' + esc(m.formation) + '.</p>' : '');
-      view.appendChild(pc);
-    }
-
-    fillBars(view);
-  }
-
-  /* ---------------------------------------------------------
      View: one match, the full analysis
 
      The same view the analyst uses, fed a published report instead of a live
@@ -373,19 +222,6 @@
      sides, the four categories, the maps and the exports — because it is the
      same file, not a second version of it.
      --------------------------------------------------------- */
-  function matchTabs(m, on) {
-    var wrap = el('div', 'mtabs');
-    [['overview', '', 'Overview'], ['stats', '/stats', 'Analysis']].forEach(function (t) {
-      var b = el('button', 'mtab' + (on === t[0] ? ' on' : ''), t[2]);
-      b.type = 'button';
-      b.addEventListener('click', function () {
-        location.hash = '#/match/' + encodeURIComponent(m.slug || m.id) + t[1];
-      });
-      wrap.appendChild(b);
-    });
-    return wrap;
-  }
-
   function renderMatchStats(view, slug) {
     var m = state.matches.filter(function (x) { return String(x.slug || x.id) === slug; })[0];
     if (!m) { location.hash = '#/home'; return; }
@@ -393,7 +229,6 @@
     var back = el('button', 'back', '&larr; All matches');
     back.addEventListener('click', function () { location.hash = '#/home'; });
     view.appendChild(back);
-    view.appendChild(matchTabs(m, 'stats'));
 
     var holder = el('div', 'pt-stats');
     holder.innerHTML = '<div class="state" style="border:0"><div class="spinner"></div>' +
@@ -1066,16 +901,6 @@
   function emptyState(title, body) {
     return el('div', 'state', '<b>' + esc(title) + '</b><p>' + esc(body) + '</p>');
   }
-  /* The bars start at width:0 in CSS and every view rebuilds its DOM, so
-     setting the final width is enough for the transition to run. Doing it
-     straight (rather than through a double rAF) means a backgrounded tab —
-     where rAF is paused — still ends up showing the right numbers. */
-  function fillBars(scope) {
-    scope.querySelectorAll('[data-w]').forEach(function (b) {
-      b.style.width = b.getAttribute('data-w') + '%';
-    });
-  }
-
   /* ---------------------------------------------------------
      Wiring
      --------------------------------------------------------- */
