@@ -150,9 +150,9 @@
   function renderMatches(view) {
     if (!state.channel) return view.appendChild(noChannel());
 
-    view.appendChild(head('Matches', state.matches.length
-      ? state.matches.length + ' analysed'
-      : 'Nothing published in this channel yet'));
+    /* No count beside the title: the list underneath is the count. */
+    view.appendChild(head('Matches',
+      state.matches.length ? '' : 'Nothing published in this channel yet'));
 
     if (!state.matches.length) {
       view.appendChild(emptyState('No matches published yet',
@@ -161,9 +161,13 @@
       return;
     }
 
+    /* The fixture is three columns, not one: who was at home, what it
+       finished, who was away. Reading down a column then answers a question
+       the old single cell could not — every home side, or every scoreline. */
     var list = el('div', 'mlist');
     list.appendChild(el('div', 'mlist-h',
-      '<span>Date</span><span>Fixture</span><span>Details</span><span style="text-align:right">Result</span>'));
+      '<span>Date</span><span>Home</span><span style="text-align:center">Final score</span>' +
+      '<span>Away</span><span style="text-align:right">Result</span>'));
 
     state.matches.forEach(function (m) {
       /* One page per match again, so the row is a plain button: there is no
@@ -174,15 +178,16 @@
       b.innerHTML =
         '<span class="m-date">' + esc(m.dateLabel) + '<em>' + esc(m.venue || (ourHome ? 'Home' : 'Away')) +
           ' · Match ID ' + esc(m.id) + '</em></span>' +
-        '<span class="m-fix">' +
+        '<span class="m-team m-home">' +
           '<span class="crest sm' + (ourHome ? '' : ' opp') + '">' + esc(m.home.crest) + '</span>' +
           '<span class="tn' + (ourHome ? ' us' : '') + '">' + esc(m.home.name) + '</span>' +
-          '<span class="m-score">' + num(m.home.score) + ' : ' + num(m.away.score) + '</span>' +
+        '</span>' +
+        '<span class="m-sc"><span class="m-score">' +
+          num(m.home.score) + ' : ' + num(m.away.score) + '</span></span>' +
+        '<span class="m-team m-away">' +
           '<span class="crest sm' + (ourHome ? ' opp' : '') + '">' + esc(m.away.crest) + '</span>' +
           '<span class="tn' + (ourHome ? '' : ' us') + '">' + esc(m.away.name) + '</span>' +
         '</span>' +
-        '<span class="m-det"><b>' + esc(m.competition || '') + '</b><br>' +
-          esc(m.stage || '') + '</span>' +
         '<span class="m-end">' +
           (m.result ? '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' : '') +
           '<span class="m-open" aria-hidden="true">' +
@@ -249,11 +254,6 @@
       /* the PDF button is part of the chrome that mount() just drew, so it did
          not exist when report.js ran */
       if (window.PTReport && window.PTReport.bind) window.PTReport.bind();
-      view.appendChild(el('p', 'note',
-        'Version ' + rep.version +
-        (rep.eventCount != null ? ' · ' + rep.eventCount + ' events' : '') +
-        (rep.publishedAt ? ' · submitted ' + String(rep.publishedAt).slice(0, 10) : '') +
-        '. This is the analysis as it was signed off; it changes when a new one is submitted.'));
     }).catch(function (e) {
       if (!holder.parentNode) return;
       holder.innerHTML = '';
@@ -659,20 +659,28 @@
     drawMembers();
     if (isAdmin) drawInvites();
 
+    /* One switch, not two buttons that swap places: the state and the way to
+       change it are the same control, so what it is now is never a sentence
+       you have to read to find out. Opening it still costs a confirm. */
     function drawPublic() {
       var on = !!ch.isPublic;
       publicCard.innerHTML =
         '<p class="card-h">Who can read this channel ' +
           '<span class="right">' + (on ? 'anyone' : 'members only') + '</span></p>' +
+        '<div class="pub-switch">' +
+          '<button class="tgl" type="button" id="pubGo" role="switch"' +
+            ' aria-checked="' + (on ? 'true' : 'false') + '" aria-labelledby="pubLbl">' +
+            '<span class="tgl-track"><span class="tgl-knob"></span></span>' +
+          '</button>' +
+          '<span class="tgl-txt" id="pubLbl">Public channel<em>' +
+            (on ? 'On · anyone can read it' : 'Off · members only') + '</em></span>' +
+        '</div>' +
         '<p class="pub-now' + (on ? ' on' : '') + '">' +
           (on
             ? 'Open to anyone. No account needed — the matches, the numbers and the full ' +
               'analyses, including the players named in them.'
             : 'Members only. Nobody outside the list above can open it.') +
         '</p>' +
-        '<button class="btn ' + (on ? 'btn-ghost' : 'btn-primary') + '" type="button" id="pubGo">' +
-          (on ? 'Make it members only' : 'Make this channel public') +
-        '</button>' +
         '<p class="note">Turning it off stops new readers. It does not take back what ' +
           'somebody already read or saved.</p>';
 
@@ -891,8 +899,11 @@
   /* ---------------------------------------------------------
      Small builders
      --------------------------------------------------------- */
+  /* A heading with nothing to say underneath it says nothing: an empty
+     .sub would still be a flex item and open a gap after the title. */
   function head(title, sub) {
-    return el('div', 'view-head', '<h1>' + title + '</h1><span class="sub">' + esc(sub) + '</span>');
+    return el('div', 'view-head', '<h1>' + title + '</h1>' +
+      (sub ? '<span class="sub">' + esc(sub) + '</span>' : ''));
   }
   function kpi(label, value, delta) {
     return '<div class="kpi"><span class="k-l">' + esc(label) + '</span><span class="k-v">' + num(value) + '</span>' +

@@ -65,7 +65,34 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
   font-family:var(--f-mono); text-transform:uppercase; align-self:center;
 }
 .badge-public[hidden]{display:none}
-/* the public switch: what it says now, before what it would become */
+/* the public switch: the control IS the state, so it is read before the
+   sentence underneath rather than after it */
+.pub-switch{display:flex; align-items:center; gap:13px; margin:0 0 14px}
+.tgl{
+  width:46px; height:26px; flex:none; padding:0; border:0; background:none;
+  cursor:pointer; border-radius:999px; line-height:0;
+}
+.tgl-track{
+  display:block; width:100%; height:100%; border-radius:999px; position:relative;
+  background:var(--carbon-2); border:1px solid var(--line);
+  transition:background .18s, border-color .18s;
+}
+.tgl-knob{
+  position:absolute; top:50%; left:3px; transform:translateY(-50%);
+  width:18px; height:18px; border-radius:50%; background:var(--ash-dim);
+  transition:left .18s, background .18s;
+}
+.tgl[aria-checked="true"] .tgl-track{background:var(--amber); border-color:var(--amber)}
+.tgl[aria-checked="true"] .tgl-knob{left:calc(100% - 21px); background:var(--void)}
+.tgl:disabled{opacity:.5; cursor:progress}
+.tgl:focus-visible{outline:2px solid var(--red); outline-offset:3px}
+.tgl-txt{font-size:13.5px; color:var(--chalk); line-height:1.4}
+.tgl-txt em{
+  display:block; font-style:normal; font-family:var(--f-mono); font-size:10.5px;
+  letter-spacing:.06em; color:var(--ash-dim);
+}
+.tgl[aria-checked="true"] + .tgl-txt em{color:var(--amber)}
+
 .pub-now{font-size:13.5px; color:var(--ash); margin:0 0 14px; max-width:64ch; line-height:1.6}
 .pub-now.on{color:var(--chalk)}
 .pub-now.on::before{
@@ -130,13 +157,15 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
 
 /* ---------- match list ---------- */
 .mlist{display:flex; flex-direction:column}
+/* Date, home, score, away, result — five columns, so a scoreline sits under
+   the words that name it and each side can be read straight down. */
 .mlist-h{
-  display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(240px,1.6fr) minmax(190px,1.4fr) 92px;
+  display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(140px,1.3fr) 96px minmax(140px,1.3fr) 92px;
   gap:14px; padding:0 4px 10px; border-bottom:1px solid var(--line);
   font-family:var(--f-mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--ash-dim);
 }
 .mrow{
-  display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(240px,1.6fr) minmax(190px,1.4fr) 92px;
+  display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(140px,1.3fr) 96px minmax(140px,1.3fr) 92px;
   gap:14px; align-items:center; padding:14px 4px; border-bottom:1px solid var(--line-soft);
   cursor:pointer; transition:background .18s; text-align:left; width:100%;
   background:transparent; border-left:0; border-right:0; border-top:0; color:inherit; font:inherit;
@@ -145,26 +174,35 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
 .mrow:last-child{border-bottom:0}
 .m-date{font-size:13px; color:var(--chalk); line-height:1.45}
 .m-date em{display:block; font-style:normal; font-family:var(--f-mono); font-size:10.5px; color:var(--ash-dim); letter-spacing:.06em}
-.m-fix{display:flex; align-items:center; gap:9px; flex-wrap:wrap; font-size:13.5px}
-.m-fix .tn{color:var(--ash); white-space:nowrap}
-.m-fix .tn.us{color:var(--chalk); font-weight:600}
+.m-team{display:flex; align-items:center; gap:9px; min-width:0; font-size:13.5px}
+.m-team .tn{color:var(--ash); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.m-team .tn.us{color:var(--chalk); font-weight:600}
+.m-sc{display:flex; align-items:center; justify-content:center}
 .m-score{
   font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-weight:700; font-size:13px;
   background:var(--carbon-2); border:1px solid var(--line); border-radius:2px; padding:3px 10px;
   color:var(--chalk); letter-spacing:.06em; white-space:nowrap;
 }
-.m-det{font-family:var(--f-mono); font-size:11px; color:var(--ash-dim); letter-spacing:.05em; line-height:1.6}
-.m-det b{color:var(--ash); font-weight:400}
 .m-end{display:flex; align-items:center; justify-content:flex-end; gap:10px}
 .m-open{
   width:24px; height:24px; border-radius:50%; border:1px solid var(--line); background:transparent;
   display:grid; place-items:center; color:var(--ash); flex:none; transition:all .2s;
 }
 .mrow:hover .m-open{border-color:var(--red); color:var(--red)}
+/* Narrow: the date and the result keep the top line to themselves and the
+   fixture folds under them, still reading home · score · away. */
 @media (max-width:820px){
   .mlist-h{display:none}
-  .mrow{grid-template-columns:minmax(0,1fr) 92px; row-gap:8px}
-  .mrow .m-det{grid-column:1/-1}
+  .mrow{
+    grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+    grid-template-areas:"date date end" "home score away";
+    row-gap:10px; column-gap:10px;
+  }
+  .m-date{grid-area:date}
+  .m-end{grid-area:end}
+  .m-home{grid-area:home}
+  .m-sc{grid-area:score}
+  .m-away{grid-area:away; justify-content:flex-end; text-align:right}
 }
 
 /* ---------- roster / contributor cards ---------- */

@@ -200,7 +200,10 @@ test('a channel carries no competition and no stage', () => {
   notOk('competition' in ins.payload,'not sent, even though one was passed in');
   notOk('stage' in ins.payload,'nor a stage');
   notOk(/id="ncComp"|id="ncStage"/.test(APPJS),'and the form does not ask for them');
-  ok(/esc\(m\.competition \|\| ''\)/.test(APPJS),'each match still shows its own on the fixture row');
+  // the fixture list no longer has a Details column to print them in, but they
+  // are still read off the match rather than the channel, which is the point
+  ok(/competition: m\.competition \|\| ''/.test(SUPA)&&/stage: m\.stage \|\| ''/.test(SUPA),
+     'each match still carries its own');
 });
 
 test('the slug is url-safe, unique-ish, and survives diacritics', () => {
