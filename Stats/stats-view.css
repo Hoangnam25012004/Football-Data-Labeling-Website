@@ -90,8 +90,42 @@ table.stats .grp.g5{background:#331A1A;color:#F0CACA}
    sizing until that map was removed, which left it with no rule at all and shrank it to
    its content — it carries its own now. The svg inside caps and centres itself. */
 .oth-card{flex:1;min-width:420px}
-/* Shooting (Dashboard): who took the shots, in the space under the donut and beside
-   the map. Hovering a row isolates that player on the map (see shotHover). */
+/* Shooting (Dashboard): the donut, the map and the ranking.
+
+   These used to be three items in a wrapping flex row, and the map is a pitch
+   stood on end — two to three times the height of the donut. So the moment the
+   row could not hold all three, the ranking wrapped to a line of its own, under
+   a donut that had already ended, with the whole height of the map empty beside
+   it. The table appeared to move a long way for a small change in window width.
+
+   They hold named places instead: side by side while there is room; then the
+   ranking tucks under the donut and the map takes the full height beside them;
+   then everything stacks. The ranking is never further from the map than the
+   width forces it to be.
+
+   Measured against the ROW rather than the window, because this file is mounted
+   in two places — the Stats page, and the client site behind a 196px rail and a
+   gutter that reaches 72px a side. At one window width those are 340px apart,
+   and a window breakpoint would be wrong in one of them. */
+.sh-row{display:block;container-type:inline-size}
+.sh-grid{display:grid;gap:14px;align-items:start;
+  grid-template-columns:minmax(0,1fr);
+  grid-template-areas:"donut" "map" "shots"}
+.sh-grid>.donut-card{grid-area:donut}
+.sh-grid>.map-card{grid-area:map;min-width:0}
+.sh-grid>.sr-card{grid-area:shots;min-width:0}
+@container (min-width:760px){
+  .sh-grid{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);
+    grid-template-areas:"donut map" "shots map"}
+}
+/* 1340 and not a pixel less: the donut and the ranking take 470 and 460 of it,
+   so a third column any earlier leaves the map — the thing being read — under
+   400px wide. Below this it is worth more as two columns. */
+@container (min-width:1340px){
+  .sh-grid{grid-template-columns:minmax(300px,470px) minmax(0,1fr) minmax(280px,460px);
+    grid-template-areas:"donut map shots"}
+}
+/* who took the shots. Hovering a row isolates that player on the map (see shotHover). */
 .sr-card{flex:1;min-width:280px;max-width:460px;align-self:flex-start}
 .sr-title{font-weight:700;font-size:15px;margin:2px 0 10px}
 .sr-wrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}

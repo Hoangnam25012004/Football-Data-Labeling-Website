@@ -126,7 +126,11 @@ function statTableHTML(P,players){
 function dashboardHTML(team){
   let extra='';
   if(statCat==='shooting'){
-    extra=`<div class="chart-row">${shootingChartHTML(team)}${shotMapHTML(team)}${shotRankHTML(team)}</div>`;
+    /* The three of these hold named places in a grid rather than wrapping as
+       they please — the map is far taller than the donut, so a wrapped row
+       stranded the ranking below everything. See .sh-grid in stats-view.css. */
+    extra=`<div class="chart-row sh-row"><div class="sh-grid">`
+      +`${shootingChartHTML(team)}${shotMapHTML(team)}${shotRankHTML(team)}</div></div>`;
   }else if(statCat==='distribution'){
     extra=`<div class="chart-row">${heatMapHTML(team)}</div>`
       +`<div class="chart-row">${distMapHTML(team)}</div>`;

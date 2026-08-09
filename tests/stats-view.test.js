@@ -229,6 +229,29 @@ test('the two pages that share shared.css ask for the same copy of it', () => {
   ok(+v(PAGE)>=13,'and bumped, because the page rules left it');
 });
 
+test('both hosts of the view ask for the same copy of it', () => {
+  // the Stats page loads it with a tag, the client site injects it from app.js —
+  // bump one and not the other and the two sites run different shooting layouts
+  const APP=page('client/assets/app.js');
+  ['stats-view.js','stats-view.css'].forEach(f=>{
+    const re=new RegExp(f.replace('.','\\.')+'\\?v=(\\d+)');
+    const inPage=(re.exec(PAGE)||[])[1], inApp=(re.exec(APP)||[])[1];
+    ok(inPage,'Stats/index.html versions '+f);
+    eq(inApp,inPage,'client/assets/app.js loads '+f+' too, so it must be bumped in step');
+  });
+});
+
+test('the shooting row gives its three cards named places', () => {
+  // a wrapping flex row dropped the ranking below the map, which is two to three
+  // times the donut's height — the table moved a long way for a small resize
+  ok(/class="chart-row sh-row"><div class="sh-grid"/.test(VIEW),'the row is a grid, not a wrap');
+  ok(/grid-template-areas:"donut" "map" "shots"/.test(CSS),'stacked is the base');
+  ok(/grid-template-areas:"donut map" "shots map"/.test(CSS),'then the ranking tucks under the donut');
+  ok(/grid-template-areas:"donut map shots"/.test(CSS),'and all three sit in a row when it fits');
+  ok(/container-type:inline-size/.test(CSS)&&/@container \(min-width:/.test(CSS),
+     'measured against the row, because the client site is 340px narrower than the Stats page');
+});
+
 test('the tokens the view draws with stayed in shared.css', () => {
   // moving these out would leave every .stats-* class unthemed on the client
   ok(/:root\{/.test(SHARED_CSS),'the token block is still there');
