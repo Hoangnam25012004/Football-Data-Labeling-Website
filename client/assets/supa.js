@@ -357,51 +357,32 @@
       }
     },
 
-    /* ---------- the raw events of one match ----------
-       Only what the shooting map needs. A select caps at 1000 rows and a
-       tagged match runs to two thousand, so it pages until a short page
-       comes back. Failing is not fatal: the match page simply shows the
-       aggregated cards it already had. */
-    events: function (matchUuid) {
+    /* ---------- the signed-off report for one match ----------
+       One row, not eighteen hundred: the match as Submit Analysis froze it.
+       This is the only thing the client site needs to draw the full Stats
+       view, and it is why a club never needs read access to public.events.
+       No report yet is not an error — it is a match nobody has submitted. */
+    report: function (matchUuid) {
       var c = client();
-      if (!c || !matchUuid) return Promise.resolve([]);
-      var PAGE = 1000, all = [];
-      function page(from) {
-        return c.from('events')
-          .select('id,team,event_name,player_from,x,y,goal_x,goal_y,t_seconds')
-          .eq('match_id', matchUuid)
-          .order('t_seconds', { ascending: true })
-          .range(from, from + PAGE - 1)
-          .then(function (r) {
-            if (r.error) throw asError(r.error);
-            var got = r.data || [];
-            all = all.concat(got);
-            return got.length === PAGE ? page(from + PAGE) : all.map(eventRow);
-          });
-      }
-      return page(0).catch(function () { return []; });
+      if (!c || !matchUuid) return Promise.resolve(null);
+      return c.from('match_reports')
+        .select('version,schema,payload,event_count,published_at')
+        .eq('match_id', matchUuid)
+        .order('version', { ascending: false })
+        .limit(1)
+        .then(function (r) {
+          if (r.error) throw asError(r.error);
+          var row = (r.data || [])[0];
+          if (!row) return null;
+          return {
+            version: row.version, schema: row.schema,
+            eventCount: row.event_count, publishedAt: row.published_at,
+            payload: row.payload || null
+          };
+        });
     }
   };
 
-  /* The tagger's own row shape, cut down to the fields a shot needs. The
-     twin that reads every field is dbToRow in Stats/index.html; the names
-     here are deliberately the same ones, so the map logic ported from that
-     page reads identically.
-
-     event_name carries NO leading hash — the hash is only how an event is
-     addressed while typing a chain. See 0015_match_stats_event_names.sql,
-     which is the same mistake made in SQL. */
-  function eventRow(d) {
-    return {
-      id: d.id,
-      t: d.t_seconds,
-      team: d.team,
-      event: String(d.event_name || '').trim().toLowerCase(),
-      no: d.player_from != null ? String(d.player_from) : '',
-      pXY: d.x != null ? { x: d.x, y: d.y } : null,
-      gXY: d.goal_x != null ? { x: d.goal_x, y: d.goal_y } : null
-    };
-  }
 
   API.monogram = monogram;
   API.dateLabel = dateLabel;

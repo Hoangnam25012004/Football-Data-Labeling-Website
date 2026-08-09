@@ -43,13 +43,17 @@ The rail has three sections, and About Hoang Nam at its foot leading back to the
 public site.
 
 - **Home** — the fixture list with results, straight from `public.matches`.
-  Opening a fixture gives the head-to-head, the shot breakdown, and the
-  **shooting map**: every shot where it was struck from, on a pitch stood on
-  end with both halves turned to attack upwards. That map is a port of the one
-  on the tagging app's Stats page rather than a link to it — Stats sits behind
-  the tagging app's own sign-in gate, which reads a different session than the
-  client site, so a club account cannot open it. The five shot kinds and their
-  three colours are pinned to `shared.js` by a test, so the two cannot drift.
+  A fixture opens on **Overview** (head-to-head and the shot breakdown); the ▶
+  on the end of a row opens **Analysis**, which is the whole Stats page mounted
+  inside this site — three views, both sides, the four categories, the maps and
+  the XLSX / CSV / PDF exports.
+
+  It is the same file the tagging app runs, not a copy: `Stats/stats-view.js`
+  is mounted by `Stats/index.html` and by the client app alike. What differs is
+  only how it is fed. The tagging app hands it the live match; the client hands
+  it one **published report** — so a club never needs read access to
+  `public.events`, never signs in to the tagging app, and never waits for
+  eighteen hundred rows to page in.
 - **Channel** — the channels this account is in. Creating one makes you its
   admin: you invite people by email, set what each of them is (admin / analyst /
   viewer) and remove them again. One channel is one club.
@@ -92,6 +96,16 @@ matched nothing and every column came back 0, which is why the head-to-head
 bars, the shot breakdown and the Data totals were empty on a real channel while
 the seeded sample looked fine. 0015 is a `create or replace` with the same
 columns in the same order.
+
+**And [`supabase/migrations/0016_match_reports.sql`](supabase/migrations/0016_match_reports.sql)**,
+which is what **Submit Analysis** writes into. Realtime stops at the tagging
+app: when an analyst has finished with a match they pick a channel under
+**▾ Other → ⇪ Submit Analysis**, and the match is frozen as it stands into one
+`match_reports` row — the events, the line-ups with their substitution history,
+and the half-to-video mapping. That is the row the client site reads. Publishing
+again adds a version rather than overwriting one, so there is a record of what a
+club was shown and when, and the dialog refuses to look ready while the database
+is still behind the tab doing the tagging.
 
 ## How the labeling app runs
 The whole app is the static file [`index.html`](index.html) — no backend required.

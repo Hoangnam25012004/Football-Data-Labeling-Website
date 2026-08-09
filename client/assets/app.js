@@ -165,7 +165,10 @@
 
     var view = $('#view');
     view.innerHTML = '';
-    if (parts[0] === 'match' && parts[1]) return renderMatch(view, decodeURIComponent(parts[1]));
+    if (parts[0] === 'match' && parts[1]) {
+      var slug = decodeURIComponent(parts[1]);
+      return parts[2] === 'stats' ? renderMatchStats(view, slug) : renderMatch(view, slug);
+    }
     if (parts[0] === 'channel') return renderChannel(view, parts.slice(1));
     if (parts[0] === 'data') return renderData(view);
     if (parts[0] === 'players') return renderPlayers(view);
@@ -195,8 +198,11 @@
       '<span>Date</span><span>Fixture</span><span>Details</span><span style="text-align:right">Result</span>'));
 
     state.matches.forEach(function (m) {
-      var b = el('button', 'mrow');
-      b.type = 'button';
+      /* A row with a control inside it, so it cannot stay a <button>: the row
+         opens the match, the ▶ on the end opens its analysis. */
+      var b = el('div', 'mrow');
+      b.setAttribute('role', 'button');
+      b.setAttribute('tabindex', '0');
       var ourHome = m.side === 'home';
       b.innerHTML =
         '<span class="m-date">' + esc(m.dateLabel) + '<em>' + esc(m.venue || (ourHome ? 'Home' : 'Away')) +
@@ -212,9 +218,20 @@
           esc(m.stage || state.channel.stage || '') + '</span>' +
         '<span class="m-end">' +
           (m.result ? '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' : '') +
-          '<span class="m-open"><svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor"><path d="M1 0 9 5 1 10Z"/></svg></span>' +
+          '<button type="button" class="m-open" title="Open the analysis" aria-label="Open the analysis">' +
+            '<svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor"><path d="M1 0 9 5 1 10Z"/></svg>' +
+          '</button>' +
         '</span>';
-      b.addEventListener('click', function () { location.hash = '#/match/' + encodeURIComponent(m.slug || m.id); });
+      var href = '#/match/' + encodeURIComponent(m.slug || m.id);
+      var open = function () { location.hash = href; };
+      b.addEventListener('click', open);
+      b.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
+      b.querySelector('.m-open').addEventListener('click', function (e) {
+        e.stopPropagation();                 // the row would otherwise open too
+        location.hash = href + '/stats';
+      });
       list.appendChild(b);
     });
     view.appendChild(list);
@@ -237,11 +254,8 @@
     back.addEventListener('click', function () { location.hash = '#/matches'; });
     view.appendChild(back);
 
-    var context = m.stage || m.competition || state.channel.stage || state.channel.competition || '';
-    view.appendChild(head(
-      esc(m.home.name) + ' ' + num(m.home.score) + ' — ' + num(m.away.score) + ' ' + esc(m.away.name),
-      m.dateLabel + (context ? ' · ' + context : '') + ' · Match ID ' + m.id
-    ));
+    view.appendChild(matchHead(m));
+    view.appendChild(matchTabs(m, 'overview'));
 
     /* timeline */
     if (m.timeline && m.timeline.length) {
@@ -326,25 +340,6 @@
     grid.appendChild(shot);
     view.appendChild(grid);
 
-    /* The shooting map needs the raw events, which are a second round trip,
-       so the card goes in straight away and fills itself. A seed match has no
-       uuid and never had events — it is skipped rather than left spinning. */
-    if (m.uuid && window.HNA && window.HNA.events) {
-      var holder = el('div', 'card shot-card');
-      holder.innerHTML = '<p class="card-h">Shooting</p>' +
-        '<div class="state" style="border:0;padding:22px"><div class="spinner"></div></div>';
-      view.appendChild(holder);
-      window.HNA.events(m.uuid).then(function (rows) {
-        /* the person may have navigated on while this was in flight */
-        if (!holder.parentNode) return;
-        holder.parentNode.replaceChild(shootingCard(m, rows), holder);
-      }).catch(function () {
-        if (!holder.parentNode) return;
-        holder.innerHTML = '<p class="card-h">Shooting</p>' +
-          '<p class="note err" style="margin:0">The events for this match could not be read.</p>';
-      });
-    }
-
     /* player table */
     if (m.players && m.players.length) {
       var pc = el('div', 'card');
@@ -365,6 +360,84 @@
     }
 
     fillBars(view);
+  }
+
+  /* ---------------------------------------------------------
+     View: one match, the full analysis
+
+     The same view the analyst uses, fed a published report instead of a live
+     database. Everything it can do there it can do here — three views, both
+     sides, the four categories, the maps and the exports — because it is the
+     same file, not a second version of it.
+     --------------------------------------------------------- */
+  function matchHead(m) {
+    var context = m.stage || m.competition || state.channel.stage || state.channel.competition || '';
+    return head(
+      esc(m.home.name) + ' ' + num(m.home.score) + ' — ' + num(m.away.score) + ' ' + esc(m.away.name),
+      m.dateLabel + (context ? ' · ' + context : '') + ' · Match ID ' + m.id
+    );
+  }
+
+  function matchTabs(m, on) {
+    var wrap = el('div', 'mtabs');
+    [['overview', '', 'Overview'], ['stats', '/stats', 'Analysis']].forEach(function (t) {
+      var b = el('button', 'mtab' + (on === t[0] ? ' on' : ''), t[2]);
+      b.type = 'button';
+      b.addEventListener('click', function () {
+        location.hash = '#/match/' + encodeURIComponent(m.slug || m.id) + t[1];
+      });
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+
+  function renderMatchStats(view, slug) {
+    var m = state.matches.filter(function (x) { return String(x.slug || x.id) === slug; })[0];
+    if (!m) { location.hash = '#/home'; return; }
+
+    var back = el('button', 'back', '&larr; All matches');
+    back.addEventListener('click', function () { location.hash = '#/home'; });
+    view.appendChild(back);
+    view.appendChild(matchHead(m));
+    view.appendChild(matchTabs(m, 'stats'));
+
+    if (!m.uuid) {
+      view.appendChild(emptyState('Nothing to open',
+        'The sample channel was read out of finished match reports rather than tagged here, ' +
+        'so there is no analysis behind it.'));
+      return;
+    }
+
+    var holder = el('div', 'pt-stats');
+    holder.innerHTML = '<div class="state" style="border:0"><div class="spinner"></div>' +
+      '<b>Opening the analysis</b><p>One moment.</p></div>';
+    view.appendChild(holder);
+
+    Promise.all([loadStatsView(), window.HNA.report(m.uuid)]).then(function (r) {
+      if (!holder.parentNode) return;          // someone navigated on while this loaded
+      var rep = r[1];
+      holder.innerHTML = '';
+      if (!rep || !rep.payload) {
+        holder.appendChild(emptyState('No analysis submitted yet',
+          'An analyst sends a match over from the labeling site once they have finished ' +
+          'with it. It appears here the moment they do.'));
+        return;
+      }
+      window.PTStats.mount(holder, rep.payload, {});
+      /* the PDF button is part of the chrome that mount() just drew, so it did
+         not exist when report.js ran */
+      if (window.PTReport && window.PTReport.bind) window.PTReport.bind();
+      view.appendChild(el('p', 'note',
+        'Version ' + rep.version +
+        (rep.eventCount != null ? ' · ' + rep.eventCount + ' events' : '') +
+        (rep.publishedAt ? ' · submitted ' + String(rep.publishedAt).slice(0, 10) : '') +
+        '. This is the analysis as it was signed off; it changes when a new one is submitted.'));
+    }).catch(function (e) {
+      if (!holder.parentNode) return;
+      holder.innerHTML = '';
+      holder.appendChild(emptyState('The analysis could not be opened',
+        (e && e.message) || String(e)));
+    });
   }
 
   /* ---------------------------------------------------------
@@ -531,144 +604,51 @@
   }
 
   /* ---------------------------------------------------------
-     The shooting map, drawn the way the Stats tab draws it.
+     The full Stats view, mounted inside this page.
 
-     Ported rather than reused: Stats/index.html is a page of the tagging
-     app, behind that app's own sign-in gate and its own session, so a club
-     cannot open it. What is ported is the part that has to agree — the
-     five shot kinds, their three colours, and the normalising that makes
-     both halves one picture. Change it there, change it here.
+     Stats/stats-view.js is the same file the tagging app's Stats page runs;
+     there is no second implementation. What differs is only how it is fed:
+     that page reads the tagging tab's localStorage and follows a #match=
+     link, while here it is handed one published report and fetches nothing.
 
-     The pitch stands on end and every shot is turned to attack UP, so a
-     first-half shot and a second-half one at the other end land on the
-     same spot. Coordinates are the tagger's own: x/y are percentages of a
-     105x68 pitch, drawn here at 10 units to the metre.
+     Its files live with the tagging app, and the deploy moves that whole app
+     under /tagger while this site becomes the root — so where they are
+     depends on which of the two layouts is being served. Read it off the URL
+     rather than guessing, the same way auth.js finds the site root.
      --------------------------------------------------------- */
-  var SHOT_COLORS = {
-    'goal': '#f7b32f', 'shot on target': '#39d98a',
-    'shot off target': '#8b97a7', 'blocked shot': '#8b97a7', 'miss shot': '#8b97a7'
-  };
-  var SHOT_LABELS = {
-    'goal': 'Goal', 'shot on target': 'On target', 'shot off target': 'Off target',
-    'blocked shot': 'Blocked', 'miss shot': 'Missed'
-  };
-  var PITCH_W = 680, PITCH_H = 1050;
-
-  function eventHalf(r, dur) {
-    var h2 = dur && dur.h2Start;
-    return (h2 > 0 && r.t >= h2) ? 2 : 1;
+  function taggerRoot() {
+    return /\/client\//.test(location.pathname) ? '../' : 'tagger/';
   }
 
-  /* The minute the match was in, not the minute of the video — only
-     answerable when the analyst mapped the halves to the footage. */
-  function matchMinute(t, dur) {
-    if (!dur || !dur.enabled || t == null) return null;
-    var off = (+dur.halfLen || 45) * 60;
-    var s = (dur.h2Start > 0 && t >= dur.h2Start)
-      ? off + (t - dur.h2Start)
-      : Math.max(0, t - (dur.h1Start || 0));
-    return Math.floor(s / 60) + 1;
+  var loaded = {};
+  function loadOnce(url, kind) {
+    if (loaded[url]) return loaded[url];
+    loaded[url] = new Promise(function (ok, fail) {
+      var n;
+      if (kind === 'css') {
+        n = document.createElement('link');
+        n.rel = 'stylesheet'; n.href = url;
+      } else {
+        n = document.createElement('script');
+        n.src = url; n.async = false;      // order matters: shared.js before the view
+      }
+      n.onload = function () { ok(true); };
+      n.onerror = function () { fail(new Error('Could not load ' + url)); };
+      document.head.appendChild(n);
+    });
+    return loaded[url];
   }
 
-  /* Which way a team was kicking in a half, read off where their shots
-     landed — nobody records it, and the average shot is taken in the half
-     being attacked. A half with no shots borrows the other one, reversed. */
-  function attackDir(rows, team, half, dur) {
-    var meanX = function (h) {
-      var xs = rows.filter(function (r) {
-        return r.team === team && SHOT_COLORS[r.event] && r.pXY && eventHalf(r, dur) === h;
-      }).map(function (r) { return r.pXY.x; });
-      return xs.length ? xs.reduce(function (a, v) { return a + v; }, 0) / xs.length : null;
-    };
-    var m = meanX(half);
-    if (m == null) { var o = meanX(half === 1 ? 2 : 1); if (o != null) m = 100 - o; }
-    if (m == null) return half === 1 ? 'right' : 'left';
-    return m >= 50 ? 'right' : 'left';
-  }
-
-  function shotsOf(rows, team, dur) {
-    var dir = { 1: attackDir(rows, team, 1, dur), 2: attackDir(rows, team, 2, dur) };
-    return rows
-      .filter(function (r) { return r.team === team && SHOT_COLORS[r.event] && r.pXY; })
-      .sort(function (a, b) { return (a.t || 0) - (b.t || 0); })
-      .map(function (r) {
-        var flip = dir[eventHalf(r, dur)] === 'left';
-        var px = flip ? 100 - r.pXY.x : r.pXY.x;
-        var py = flip ? 100 - r.pXY.y : r.pXY.y;
-        /* attacking right becomes attacking up */
-        return { r: r, vx: py / 100 * PITCH_W, vy: (100 - px) / 100 * PITCH_H };
-      });
-  }
-
-  /* A vertical pitch in tenths of a metre, goal line at the top. Only the
-     markings that fall in the attacking half are worth drawing. */
-  var VPITCH_LINES =
-    '<rect x="1" y="1" width="678" height="1048"/>' +
-    '<line x1="0" y1="525" x2="680" y2="525"/>' +
-    '<circle cx="340" cy="525" r="91.5"/>' +
-    '<rect x="138.4" y="0" width="403.2" height="165"/>' +
-    '<rect x="248.4" y="0" width="183.2" height="55"/>' +
-    '<circle cx="340" cy="110" r="4" class="spot"/>' +
-    '<rect x="303.4" y="-14" width="73.2" height="14" class="goal"/>';
-
-  function shootingCard(m, rows) {
-    var card = el('div', 'card shot-card');
-    var usName = m.side === 'home' ? m.home.name : m.away.name;
-    var shots = shotsOf(rows || [], m.side, m.dur);
-
-    if (!shots.length) {
-      card.innerHTML = '<p class="card-h">Shooting <span class="right">' + esc(usName) + '</span></p>' +
-        '<p class="note" style="margin:0">No shot in this match carries a position on the pitch yet. ' +
-        'They appear here as soon as an analyst places one.</p>';
-      return card;
-    }
-
-    /* cropped to the attacking half, but never so far that it hides a shot */
-    var deepest = shots.reduce(function (a, s) { return Math.max(a, s.vy); }, 0);
-    var bottom = Math.min(PITCH_H, Math.max(PITCH_H * 0.5, deepest + 70));
-
-    var dots = shots.map(function (s) {
-      var cx = s.vx.toFixed(1), cy = s.vy.toFixed(1);
-      return '<g><circle cx="' + cx + '" cy="' + cy + '" r="17" fill="' + SHOT_COLORS[s.r.event] +
-             '" fill-opacity="0.92" stroke="#000" stroke-width="2.5"/>' +
-             '<text x="' + cx + '" y="' + (+cy + 6).toFixed(1) + '" text-anchor="middle" ' +
-             'font-size="17" font-weight="800" fill="#14100F">' + esc(s.r.no) + '</text></g>';
-    }).join('');
-
-    var list = shots.map(function (s, i) {
-      var min = matchMinute(s.r.t, m.dur);
-      return '<div class="sl-row">' +
-        '<span class="sl-i">' + (i + 1) + '</span>' +
-        '<span class="sl-t">' + (min == null ? '—' : min + "'") + '</span>' +
-        '<span class="shirt">' + esc(s.r.no || '·') + '</span>' +
-        '<span class="sl-o"><i style="background:' + SHOT_COLORS[s.r.event] + '"></i>' +
-          esc(SHOT_LABELS[s.r.event] || s.r.event) + '</span>' +
-      '</div>';
-    }).join('');
-
-    var goals = shots.filter(function (s) { return s.r.event === 'goal'; }).length;
-
-    card.innerHTML =
-      '<p class="card-h">Shooting <span class="right">' + esc(usName) + ' · ' + shots.length +
-        ' shot' + (shots.length === 1 ? '' : 's') + ', ' + goals + ' scored</span></p>' +
-      '<div class="sm-wrap">' +
-        '<div class="sm-pitch"><svg viewBox="-14 -20 708 ' + (bottom + 40).toFixed(0) + '" ' +
-          'preserveAspectRatio="xMidYMid meet"><g class="lines">' + VPITCH_LINES + '</g>' + dots + '</svg>' +
-          '<p class="sm-dirn">Attacking upwards · both halves turned the same way</p>' +
-        '</div>' +
-        '<div class="sm-side">' +
-          '<div class="sm-legend">' +
-            '<span><i style="background:#f7b32f"></i>Goal</span>' +
-            '<span><i style="background:#39d98a"></i>On target</span>' +
-            '<span><i style="background:#8b97a7"></i>Off / Blocked / Missed</span>' +
-          '</div>' +
-          '<div class="sl">' + list + '</div>' +
-        '</div>' +
-      '</div>' +
-      (m.dur && m.dur.enabled ? '' :
-        '<p class="note">Minutes are not shown: the halves of this match have not been mapped ' +
-        'to the footage on the labeling site, so a video time is not a match minute.</p>');
-    return card;
+  /* Pulled in the first time someone opens a match's stats, not on every page
+     load — the spreadsheet library alone is larger than this whole site. */
+  function loadStatsView() {
+    var r = taggerRoot();
+    loadOnce(r + 'shared.css?v=13', 'css');
+    loadOnce(r + 'Stats/stats-view.css?v=1', 'css');
+    return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
+      .then(function () { return loadOnce(r + 'shared.js?v=18'); })
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=1'); })
+      .then(function () { return loadOnce(r + 'Stats/report.js?v=29'); });
   }
 
   /* ---------------------------------------------------------

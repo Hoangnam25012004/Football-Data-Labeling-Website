@@ -275,6 +275,30 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
 }
 .fm-sub b{color:var(--chalk); margin-right:6px}
 
+/* ---------- one match: Overview / Analysis ---------- */
+.mtabs{display:flex; gap:6px; margin:-8px 0 18px; flex-wrap:wrap}
+.mtab{
+  font-family:var(--f-mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase;
+  background:transparent; border:1px solid var(--line); color:var(--ash);
+  padding:7px 14px; border-radius:2px; cursor:pointer; transition:all .18s;
+}
+.mtab:hover{border-color:var(--ash-dim); color:var(--chalk)}
+.mtab.on{border-color:var(--red); color:var(--red)}
+.mrow .m-open{cursor:pointer; padding:0; font:inherit}
+.mrow .m-open:hover{border-color:var(--red); color:var(--red); background:var(--carbon-2)}
+.mrow:focus-visible{outline:2px solid var(--red); outline-offset:-2px}
+
+/* The mounted Stats view brings its own stylesheet (Stats/stats-view.css) and
+   the tagging app's tokens with it. Both are class-scoped, so all this has to
+   do is give them somewhere to sit. */
+.pt-stats{min-width:0}
+.pt-stats-bar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid var(--line);
+}
+.pt-stats-bar .pt-exports{margin-left:auto}
+.pt-stats .stats-wrap{max-height:none}
+
 /* ---------- the shooting map on a match page ---------- */
 .shot-card{margin-top:16px}
 .sm-wrap{display:grid; grid-template-columns:minmax(0,1.15fr) minmax(230px,.85fr); gap:20px; align-items:start}

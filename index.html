@@ -395,6 +395,7 @@
       <div class="other-menu" id="otherMenu" role="menu">
         <div class="other-who" id="otherWho" role="menuitem" aria-disabled="true"></div>
         <button class="other-item" id="cloudBtn" role="menuitem" title="Cloud sync — the Supabase connection this browser uses">☁ Cloud</button>
+        <button class="other-item" id="submitBtn" role="menuitem" title="Send this match to a client channel">⇪ Submit Analysis</button>
         <button class="other-item" id="signOutBtn" role="menuitem" title="Sign out of this account">⎋ Sign out</button>
       </div>
     </div>
@@ -585,6 +586,26 @@
     </div>
   </div>
 </div>
+<!-- Submit Analysis: the one place data leaves the tagging app for a client.
+     Nothing here is live — publishing freezes the match as it stands, and the
+     club goes on seeing that version until it is published again. -->
+<div class="modal-overlay" id="submitModal">
+  <div class="modal">
+    <div class="modal-head">
+      <b>Submit Analysis</b>
+      <span class="mini" id="submitState"></span>
+      <button class="modal-close" id="submitClose" title="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <label class="fld"><span>Channel (the club that will see it)</span></label>
+      <select class="txt" id="submitClub"></select>
+      <div class="mini" id="submitCount" style="margin-top:10px;line-height:1.7"></div>
+      <button class="addbtn" id="submitGo" style="margin-top:12px">Publish this match</button>
+      <div class="mini" id="submitMsg" style="margin-top:10px;line-height:1.7"></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="cloudModal">
   <div class="modal">
     <div class="modal-head">
@@ -3441,6 +3462,7 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
      listener, not .onclick: cloud-sync.js owns that property on this button and loads
      after us — both handlers run, and neither has to know about the other. */
   $('cloudBtn').addEventListener('click',()=>setOpen(false));
+  $('submitBtn').addEventListener('click',()=>setOpen(false));
 
   $('signOutBtn').onclick=()=>{
     setOpen(false);
@@ -3450,8 +3472,76 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
 })();
 
 // bridge for the cloud-sync module (loaded next)
+/* ---- Submit Analysis ----------------------------------------------------
+   The only place data leaves this app for a client. Publishing freezes the
+   match as it stands and the club sees that version until it is published
+   again — so the dialog says what is about to be frozen, and refuses to look
+   ready when the database is holding fewer events than this tab is. */
+(function(){
+  const modal=$('submitModal');
+  if(!modal)return;
+  const close=()=>modal.classList.remove('show');
+  const say=(id,text,bad)=>{const n=$(id);n.textContent=text||'';n.style.color=bad?'var(--danger)':'var(--mut)';};
+
+  $('submitClose').onclick=close;
+  modal.addEventListener('click',e=>{if(e.target===modal)close();});
+
+  $('submitBtn').onclick=async()=>{
+    modal.classList.add('show');
+    say('submitMsg',''); $('submitState').textContent='';
+    $('submitGo').disabled=true;
+    $('submitClub').innerHTML='';
+    if(!window.Cloud||!Cloud.connected||!Cloud.matchId){
+      say('submitCount','Open a match on the cloud first — ☁ Cloud, then a match code.',true);
+      return;
+    }
+    say('submitCount','Reading the match back out of the database…');
+    try{
+      const clubs=await Cloud.reportClubs();
+      if(!clubs.length){
+        say('submitCount','There is no channel to publish to yet. A club creates one on the client site, under Channel.',true);
+        return;
+      }
+      clubs.forEach(c=>{
+        const o=document.createElement('option'); o.value=c.id; o.textContent=c.name;
+        $('submitClub').appendChild(o);
+      });
+      const built=await Cloud.buildReport();
+      const last=await Cloud.reportStatus();
+      // the check that matters: the snapshot is built from what is STORED, so a
+      // sync still in flight would freeze a match that is missing its last events
+      const short=built.localCount>0&&built.eventCount<built.localCount;
+      const bits=[built.eventCount+' events stored.'];
+      if(built.localCount)bits.push('This tab has '+built.localCount+'.');
+      if(short)bits.push('⚠ The database is behind this tab — let the sync finish first.');
+      if(!built.payload.lineups)bits.push('⚠ No starting line-up saved for this match.');
+      bits.push(last?('Last published: v'+last.version+', '+last.event_count+' events.'):'Never published.');
+      say('submitCount',bits.join(' '),short);
+      $('submitState').textContent=short?'not ready':'ready';
+      $('submitGo').disabled=short;
+    }catch(e){say('submitCount',(e&&e.message)||String(e),true);}
+  };
+
+  $('submitGo').onclick=async()=>{
+    const sel=$('submitClub'), id=sel.value;
+    if(!id)return;
+    const name=sel.options[sel.selectedIndex].textContent;
+    if(!confirm('Publish this match to '+name+'?\n\nThe club sees this version until you publish again.'))return;
+    $('submitGo').disabled=true;
+    say('submitMsg','Publishing…');
+    try{
+      const r=await Cloud.publishReport(id);
+      say('submitMsg','Published as v'+r.version+' — '+r.eventCount+' events. '+name+' can open it now.');
+      $('submitState').textContent='v'+r.version;
+    }catch(e){
+      $('submitGo').disabled=false;
+      say('submitMsg',(e&&e.message)||String(e),true);
+    }
+  };
+})();
+
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, renderMacros, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
 </script>
-<script src="cloud-sync.js?v=46"></script>
+<script src="cloud-sync.js?v=47"></script>
 </body>
 </html>

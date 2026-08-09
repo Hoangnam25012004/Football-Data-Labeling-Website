@@ -20,6 +20,12 @@ const APPHTML=page('client/app.html');
 const APPCSS=page('client/assets/app.css');
 const SQL=page('supabase/migrations/0014_channel_admin.sql');
 const YML=page('.github/workflows/deploy.yml');
+const SQL15=page('supabase/migrations/0015_match_stats_event_names.sql');
+const DICT=JSON.parse(page('pitchtagger_events.json'));
+/* comments stripped before anything is extracted — a stray semicolon in one
+   would otherwise end a statement halfway through */
+const bare=s=>s.replace(/--[^\n]*/g,'');
+const viewBody=src=>/create or replace view public\.match_stats as([\s\S]*?);/.exec(bare(src))[1];
 
 /* ---------- a Supabase client that answers from a handler ---------- */
 function fakeDB(handler){
@@ -471,3 +477,42 @@ test('the two pages that share an asset ask for the same copy of it', () => {
   ok(+ver(APPHTML,'app.js')>=3,'app.js has been bumped for the channel and shooting work');
 });
 
+
+/* ================= the view that was counting nothing ================= */
+test('0015 stops match_stats looking for a hash that is never stored', () => {
+  const view=viewBody(SQL15);
+  notOk(/'#/.test(view),"no pattern still starts with a '#' — event_name never carries one");
+  ok(/lower\(trim\(event_name\)\)/.test(view),'and the name is folded before it is matched');
+});
+
+test('every name it matches on is a name the shipped dictionary actually has', () => {
+  const view=viewBody(SQL15);
+  const known=new Set((DICT.football||[]).map(e=>String(e.name||e).trim().toLowerCase()));
+  // the two the dictionary does not ship: a kind a tagger may add, and the
+  // corrected spelling of one the dictionary gets wrong
+  const allowed=new Set(['miss shot','take-on success']);
+  const used=new Set();
+  const re=/'([a-z0-9 \-]+)'/g;
+  for(let m;(m=re.exec(view));) used.add(m[1]);
+  ok(used.size>15,'sanity: it matches on a good many names — got '+used.size);
+  used.forEach(n=>ok(known.has(n)||allowed.has(n),'match_stats counts "'+n+'", which no event is called'));
+});
+
+test('the columns of the view are unchanged, which is what lets it be REPLACEd', () => {
+  const old=viewBody(page('supabase/migrations/0013_client_channels.sql'));
+  const names=v=>{const out=[];const re=/\bas\s+([a-z_]+)\s*(?:,|\n)/g;
+    for(let m;(m=re.exec(v));) out.push(m[1]); return out;};
+  const before=names(old), after=names(viewBody(SQL15));
+  eq(after.join(','),before.join(','),
+     'CREATE OR REPLACE VIEW refuses a changed column list — this would have to be a DROP');
+});
+
+test('the dictionary names the client depends on are still spelt that way', () => {
+  // if one of these is renamed in pitchtagger_events.json the view goes quietly
+  // to zero for that column, so the spelling is pinned here on purpose
+  const known=new Set((DICT.football||[]).map(e=>String(e.name||e).trim().toLowerCase()));
+  ['goal','shot on target','shot off target','blocked shot','pass success','pass fail',
+   'cross success','cross fail','tackle success','tackle fail','interception','clearance',
+   'aerial duel success','aerial duel fail','step in','offside','foul']
+    .forEach(n=>ok(known.has(n),'the dictionary no longer ships "'+n+'"'));
+});

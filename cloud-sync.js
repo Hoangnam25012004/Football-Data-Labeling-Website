@@ -400,15 +400,97 @@ const CONFIG = {
     if (error) console.warn('cloud delete:', error.message);
   }
 
+  /* ---------- Submit Analysis ----------
+     The border between this app and the client site. Everything above happens
+     as it is tagged; what crosses over is one signed-off row — the match as it
+     stood when somebody said it was finished.
+
+     Read back OUT of the database rather than out of this tab's localStorage.
+     A snapshot has to be what is actually stored, not what one browser happens
+     to be holding, and the two are compared before anything is published: a
+     report that is short of events is the hardest kind of wrong to notice,
+     because every number in it still adds up. */
+  async function fetchAllEvents(id) {
+    const PAGE = 1000, all = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await sb.from('events').select('*')
+        .eq('match_id', id).order('t_seconds').range(from, from + PAGE - 1);
+      if (error) throw error;
+      all.push(...(data || []));
+      if (!data || data.length < PAGE) break;
+    }
+    return all;
+  }
+
+  /* The four things Stats renders from, and nothing else. Scores, kick-off and
+     competition stay on public.matches — the client site already reads those. */
+  async function buildReport() {
+    if (!connected || !matchId) throw new Error('Open a match on the cloud first.');
+    const { data: m, error } = await sb.from('matches').select('*').eq('id', matchId).single();
+    if (error) throw error;
+    const stored = await fetchAllEvents(matchId);
+    const local = ((PT() && PT().state && PT().state.rows) || []).length;
+    return {
+      localCount: local,
+      eventCount: stored.length,
+      payload: {
+        schema: 1,
+        meta: {
+          home: m.home_name, away: m.away_name, sport: m.sport || 'football',
+          homeTeamId: m.home_team_id || null, awayTeamId: m.away_team_id || null,
+          matchId: m.id, matchCode: m.code || null
+        },
+        // the starting XI AND the substitution history — without the history every
+        // stat after the first change is worked out against the wrong eleven
+        lineups: (m.lineups && m.lineups.home && m.lineups.away) ? m.lineups : null,
+        dur: Object.assign({ enabled: false, halfLen: 45, h1Start: 0, h1End: 0, h2Start: 0, h2End: 0 },
+                           m.config || {}),
+        rows: stored.map(dbToRow)
+      }
+    };
+  }
+
+  async function reportClubs() {
+    if (!connected) throw new Error('Connect to the cloud first.');
+    const { data, error } = await sb.from('clubs').select('id,name,slug,crest_text').order('name');
+    if (error) throw error;
+    return data || [];
+  }
+
+  /* One transaction on the far side: the report is written and the match is
+     pointed at the channel and marked published, or neither happens. */
+  async function publishReport(clubId) {
+    const built = await buildReport();
+    const { data, error } = await sb.rpc('publish_match_report', {
+      p_match_id: matchId, p_club_id: clubId,
+      p_payload: built.payload, p_event_count: built.eventCount, p_schema: 1
+    });
+    if (error) throw error;
+    return { version: (data && data.version) || null, eventCount: built.eventCount };
+  }
+
+  /* What the open match was last published as, so the header can say how far
+     the tagging has moved on since — an analyst who keeps correcting after
+     publishing would otherwise think the club is seeing the corrections. */
+  async function reportStatus() {
+    if (!connected || !matchId) return null;
+    const { data } = await sb.from('match_reports')
+      .select('version,event_count,published_at')
+      .eq('match_id', matchId).order('version', { ascending: false }).limit(1);
+    return (data && data[0]) || null;
+  }
+
   window.Cloud = {
     get connected() { return connected; },
     get matchId() { return matchId; },
+    get matchCode() { return matchCode; },
     get r2Enabled() { return !!(CONFIG.R2 && CONFIG.R2.workerUrl); },
     get teams() { return teamsCache; },
     loadTeams, createTeam, createMatchWithTeams, findMatchByCode,
     openMatch: openByInput,
     onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged, onDurationChanged, onLineupsChanged,
-    setVideoUrl, uploadToR2
+    setVideoUrl, uploadToR2,
+    buildReport, reportClubs, publishReport, reportStatus
   };
 
   /* ---------- UI wiring ---------- */
