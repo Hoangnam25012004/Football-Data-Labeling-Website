@@ -275,6 +275,34 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
 }
 .fm-sub b{color:var(--chalk); margin-right:6px}
 
+/* ---------- the shooting map on a match page ---------- */
+.shot-card{margin-top:16px}
+.sm-wrap{display:grid; grid-template-columns:minmax(0,1.15fr) minmax(230px,.85fr); gap:20px; align-items:start}
+@media (max-width:820px){ .sm-wrap{grid-template-columns:minmax(0,1fr)} }
+.sm-pitch{background:#142b18; border:1px solid var(--line); border-radius:2px; padding:6px 6px 2px}
+.sm-pitch svg{width:100%; height:auto; display:block; max-height:60vh}
+.sm-pitch .lines{fill:none; stroke:rgba(255,255,255,.85); stroke-width:3}
+.sm-pitch .lines .spot{fill:#fff; stroke:none}
+.sm-pitch .lines .goal{fill:rgba(255,255,255,.18)}
+.sm-dirn{
+  margin:6px 0 4px; text-align:center; font-family:var(--f-mono); font-size:9.5px;
+  color:var(--ash-dim); letter-spacing:.06em;
+}
+.sm-side{display:flex; flex-direction:column; gap:12px; min-width:0}
+.sm-legend{display:flex; flex-direction:column; gap:7px; font-size:12px; color:var(--ash)}
+.sm-legend span{display:flex; align-items:center; gap:8px}
+.sm-legend i, .sl-o i{width:10px; height:10px; border-radius:50%; flex:none; display:inline-block}
+.sl{display:flex; flex-direction:column; max-height:44vh; overflow:auto; border-top:1px solid var(--line-soft)}
+.sl-row{
+  display:grid; grid-template-columns:26px 34px auto minmax(0,1fr); gap:8px; align-items:center;
+  padding:7px 2px; border-bottom:1px solid var(--line-soft); font-size:12.5px;
+}
+.sl-row:last-child{border-bottom:0}
+.sl-i{font-family:var(--f-mono); font-size:10px; color:var(--ash-dim); text-align:right}
+.sl-t{font-family:var(--f-mono); font-size:11px; color:var(--ash); font-variant-numeric:tabular-nums}
+.sl-row .shirt{margin-right:0}
+.sl-o{display:flex; align-items:center; gap:7px; color:var(--ash); min-width:0}
+
 /* ---------- Channel: the list, its members, the new-channel form ---------- */
 .clist{display:flex; flex-direction:column; border-top:1px solid var(--line-soft)}
 .crow{

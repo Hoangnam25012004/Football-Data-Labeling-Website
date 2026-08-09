@@ -43,7 +43,13 @@ The rail has three sections, and About Hoang Nam at its foot leading back to the
 public site.
 
 - **Home** — the fixture list with results, straight from `public.matches`.
-  Opening a fixture gives the head-to-head and the shot breakdown.
+  Opening a fixture gives the head-to-head, the shot breakdown, and the
+  **shooting map**: every shot where it was struck from, on a pitch stood on
+  end with both halves turned to attack upwards. That map is a port of the one
+  on the tagging app's Stats page rather than a link to it — Stats sits behind
+  the tagging app's own sign-in gate, which reads a different session than the
+  client site, so a club account cannot open it. The five shot kinds and their
+  three colours are pinned to `shared.js` by a test, so the two cannot drift.
 - **Channel** — the channels this account is in. Creating one makes you its
   admin: you invite people by email, set what each of them is (admin / analyst /
   viewer) and remove them again. One channel is one club.
@@ -76,6 +82,16 @@ It replaces the write policies on `clubs` and `club_members` only, and leaves
 `matches`, `events`, `teams` and `players` exactly as they were, so the tagging
 app is untouched. Until it is run, the Channel section says which file to run
 rather than failing silently.
+
+**And run [`supabase/migrations/0015_match_stats_event_names.sql`](supabase/migrations/0015_match_stats_event_names.sql).**
+0013 built `match_stats` on patterns like `event_name like '#goal%'`, believing
+an event is stored under the name you type, hash and all. It is not — the hash
+is only how an event is addressed while typing a chain, and what is stored is
+the bare dictionary name (`goal`, `pass success`). So every filter in the view
+matched nothing and every column came back 0, which is why the head-to-head
+bars, the shot breakdown and the Data totals were empty on a real channel while
+the seeded sample looked fine. 0015 is a `create or replace` with the same
+columns in the same order.
 
 ## How the labeling app runs
 The whole app is the static file [`index.html`](index.html) — no backend required.

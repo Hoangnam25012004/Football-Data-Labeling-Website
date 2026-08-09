@@ -298,7 +298,7 @@
            match_code: that is the name of the trigger function that fills
            it in. Asking for a column that is not there fails the whole
            query, which is why this returned nothing at all. */
-        .select('id,code,home_name,away_name,home_score,away_score,kickoff,competition,stage,venue,our_side,published,lineups')
+        .select('id,code,home_name,away_name,home_score,away_score,kickoff,competition,stage,venue,our_side,published,lineups,config')
         .eq('club_id', clubId).eq('published', true)
         .order('kickoff', { ascending: true })
         .then(function (r) {
@@ -347,12 +347,61 @@
             /* the starting XI the tagger entered, as {roster,xi,subs,dir}
                per side — the Data view draws the most recent one */
             lineup: (m.lineups && m.lineups[side]) || null,
+            /* the duration mapping, so a shot's video time can be shown as
+               the minute it happened — the tagger keeps it on the match */
+            dur: Object.assign({ enabled: false, halfLen: 45, h1Start: 0, h1End: 0, h2Start: 0, h2End: 0 },
+                               m.config || {}),
             live: true
           };
         });
       }
+    },
+
+    /* ---------- the raw events of one match ----------
+       Only what the shooting map needs. A select caps at 1000 rows and a
+       tagged match runs to two thousand, so it pages until a short page
+       comes back. Failing is not fatal: the match page simply shows the
+       aggregated cards it already had. */
+    events: function (matchUuid) {
+      var c = client();
+      if (!c || !matchUuid) return Promise.resolve([]);
+      var PAGE = 1000, all = [];
+      function page(from) {
+        return c.from('events')
+          .select('id,team,event_name,player_from,x,y,goal_x,goal_y,t_seconds')
+          .eq('match_id', matchUuid)
+          .order('t_seconds', { ascending: true })
+          .range(from, from + PAGE - 1)
+          .then(function (r) {
+            if (r.error) throw asError(r.error);
+            var got = r.data || [];
+            all = all.concat(got);
+            return got.length === PAGE ? page(from + PAGE) : all.map(eventRow);
+          });
+      }
+      return page(0).catch(function () { return []; });
     }
   };
+
+  /* The tagger's own row shape, cut down to the fields a shot needs. The
+     twin that reads every field is dbToRow in Stats/index.html; the names
+     here are deliberately the same ones, so the map logic ported from that
+     page reads identically.
+
+     event_name carries NO leading hash — the hash is only how an event is
+     addressed while typing a chain. See 0015_match_stats_event_names.sql,
+     which is the same mistake made in SQL. */
+  function eventRow(d) {
+    return {
+      id: d.id,
+      t: d.t_seconds,
+      team: d.team,
+      event: String(d.event_name || '').trim().toLowerCase(),
+      no: d.player_from != null ? String(d.player_from) : '',
+      pXY: d.x != null ? { x: d.x, y: d.y } : null,
+      gXY: d.goal_x != null ? { x: d.goal_x, y: d.goal_y } : null
+    };
+  }
 
   API.monogram = monogram;
   API.dateLabel = dateLabel;

@@ -298,7 +298,10 @@ test('a match brings the starting XI of the channel-s own side', () => {
    the seed channel carried on looking fine. */
 const MIG=path.join(ROOT,'supabase','migrations');
 const sqlFiles=fs.readdirSync(MIG).filter(f=>f.endsWith('.sql')).sort();
-const noComments=s=>s.split('\n').filter(l=>!/^\s*--/.test(l)).join('\n');
+/* whole-line AND trailing comments: 0001 declares "x real, y real," with the
+   comment on the same line, and a stray semicolon in one would end a
+   statement halfway through */
+const noComments=s=>s.replace(/--[^\n]*/g,'');
 
 function columnsOf(table){
   const cols=new Set();
@@ -455,14 +458,16 @@ test('every asset the client pages load is staged for GitHub Pages', () => {
   });
 });
 
-test('the pages that changed ask for a fresh copy of what changed', () => {
-  // an unbumped ?v= leaves a returning browser on the old file, and the old file
-  // has no channel API at all
-  ok(/app\.js\?v=2/.test(APPHTML),'app.js is bumped');
-  ok(/supa\.js\?v=2/.test(APPHTML),'supa.js is bumped');
-  ok(/app\.css\?v=2/.test(APPHTML),'app.css is bumped');
+test('the two pages that share an asset ask for the same copy of it', () => {
+  // an unbumped ?v= leaves a returning browser on the old file; a HALF-bumped one
+  // is worse, because the two pages then disagree about which file they are on
   const login=page('client/login.html');
-  ok(/supa\.js\?v=2/.test(login)&&/app\.css\?v=2/.test(login),
-     'login.html loads both of those too, so it is bumped in step');
+  const ver=(src,name)=>(new RegExp(name.replace('.','\\.')+'\\?v=(\\d+)').exec(src)||[])[1];
+  ['supa.js','app.css'].forEach(a=>{
+    const inApp=ver(APPHTML,a), inLogin=ver(login,a);
+    ok(inApp,'app.html versions '+a);
+    eq(inLogin,inApp,'login.html loads '+a+' too, so it must be bumped in step');
+  });
+  ok(+ver(APPHTML,'app.js')>=3,'app.js has been bumped for the channel and shooting work');
 });
 
