@@ -22,7 +22,12 @@
   }
   function num(v) { return v == null ? '—' : v; }
 
-  var state = { user: null, channels: [], channel: null, matches: [], loading: true };
+  /* `reports` is the Data view's source: every payload Submit Analysis froze
+     in this channel, keyed by match uuid, read once and kept. `reportsFor`
+     names the channel they belong to, so switching club cannot leave last
+     club's numbers on the screen. */
+  var state = { user: null, channels: [], channel: null, matches: [], loading: true,
+                reports: null, reportsFor: null };
 
   /* ---------------------------------------------------------
      Boot
@@ -65,6 +70,9 @@
   }
 
   function loadMatches(ch) {
+    /* A different channel is a different campaign: drop what was added up
+       for the last one rather than letting the Data view find it cached. */
+    state.reports = null; state.reportsFor = null; reportJob = null;
     if (!ch) { state.matches = []; return Promise.resolve(); }
     return window.HNA.matches(ch.id).then(function (rows) {
       state.matches = rows || [];
@@ -264,19 +272,153 @@
 
   /* ---------------------------------------------------------
      View: data (campaign aggregates)
+
+     Two sections behind one heading:
+
+       Overview   what the campaign came to — the record, the last five
+                  results, who put the numbers on the board
+       Team Data  one row per match, four categories of columns
+
+     Both are worked out from the reports Submit Analysis froze, through the
+     same computeStats()/sumTeam()/TEAM_SECTIONS shared.js gives the match
+     page. That is the whole point: a figure here and the same figure on the
+     match page come out of one implementation, so they cannot drift apart.
+
+     Which section is open lives in the hash — #/data/team/defensive is a
+     link somebody can send — so route() redraws on a tab click and the
+     signature stays renderData(view).
      --------------------------------------------------------- */
+  var TD_TABS = [
+    /* key, what the tab says, which of shared.js's TEAM_SECTIONS it draws */
+    ['shooting',     'Shooting',     'Attacking Stats'],
+    ['distribution', 'Distribution', 'Distribution Stats'],
+    ['defensive',    'Defensive',    'Defensive Stats'],
+    ['other',        'Other',        'Discipline & GK']
+  ];
+
   function renderData(view) {
     if (!state.channel) return view.appendChild(noChannel());
-    view.appendChild(head('Data', 'Every published match in this channel, added up'));
 
-    var all = state.matches;
-    if (!all.length) {
+    var rest = location.hash.replace(/^#\/?/, '').split('/').slice(1);
+    var onTeam = rest[0] === 'team';
+    var cat = onTeam && TD_TABS.some(function (t) { return t[0] === rest[1]; }) ? rest[1] : 'shooting';
+
+    view.appendChild(head('Data', 'Every published match in this channel, added up'));
+    view.appendChild(dataTabs(onTeam));
+
+    if (!state.matches.length) {
       view.appendChild(emptyState('Nothing to add up yet',
         'Aggregates appear once there is at least one published match in this channel.'));
       return;
     }
 
-    /* ---- team stats + recent results + the last formation ---- */
+    var body = el('div', 'dbody');
+    body.innerHTML = '<div class="state" style="border:0"><div class="spinner"></div>' +
+      '<b>Adding up the campaign</b><p>Reading every analysis submitted to this channel.</p></div>';
+    view.appendChild(body);
+
+    dataSource().then(function () {
+      if (!body.parentNode) return;              // someone navigated on while this loaded
+      body.innerHTML = '';
+      if (onTeam) renderTeamData(body, cat); else renderOverview(body);
+    }).catch(function (e) {
+      if (!body.parentNode) return;
+      body.innerHTML = '';
+      body.appendChild(emptyState('The submitted analyses could not be read',
+        (e && e.message) || String(e)));
+    });
+  }
+
+  function dataTabs(onTeam) {
+    var bar = el('div', 'dtabs');
+    [['overview', 'Overview'], ['team', 'Team Data']].forEach(function (t) {
+      var b = el('button', 'dtab' + ((t[0] === 'team') === !!onTeam ? ' on' : ''), t[1]);
+      b.type = 'button';
+      b.addEventListener('click', function () { location.hash = '#/data/' + t[0]; });
+      bar.appendChild(b);
+    });
+    return bar;
+  }
+
+  function catTabs(cat) {
+    var bar = el('div', 'dsubs');
+    TD_TABS.forEach(function (t) {
+      var b = el('button', 'chip' + (t[0] === cat ? ' on' : ''), t[1]);
+      b.type = 'button';
+      b.addEventListener('click', function () { location.hash = '#/data/team/' + t[0]; });
+      bar.appendChild(b);
+    });
+    return bar;
+  }
+
+  /* Both halves of the view need shared.js's stat engine and every report in
+     the channel. Fetched once per channel and kept: switching tab redraws
+     from what is already here rather than asking again, and two quick
+     clicks share the one in-flight request. */
+  var reportJob = null;
+  function dataSource() {
+    var ch = state.channel;
+    if (state.reportsFor === ch.id && state.reports) return Promise.resolve(state.reports);
+    if (reportJob && reportJob.forChannel === ch.id) return reportJob;
+
+    var job = Promise.all([
+      loadShared(),
+      window.HNA.reports(state.matches.map(function (m) { return m.uuid; }))
+    ]).then(function (r) {
+      state.reports = r[1] || {};
+      state.reportsFor = ch.id;
+      return state.reports;
+    }).catch(function (e) {
+      reportJob = null;                          // so leaving and coming back retries
+      throw e;
+    });
+    job.forChannel = ch.id;
+    reportJob = job;
+    return job;
+  }
+
+  /* One match, reduced to what every table and card below reads. `us` and
+     `them` are the two team columns; `players` is the club's own side broken
+     out by shirt number, which is what Key Players ranks.
+
+     shared.js is a classic script: its function declarations (sumTeam,
+     computeStats, squadNames, newStat) land on window, while its top-level
+     consts (pct, playerLabel, TEAM_SECTIONS) live only in the global lexical
+     scope, where a bare name still reaches them. Nothing here runs before
+     dataSource() has resolved, so both kinds are there. */
+  function aggregate(m) {
+    var rep = (state.reports || {})[m.uuid];
+    if (!rep || !Array.isArray(rep.rows) || !rep.rows.length) return null;
+    var other = m.side === 'home' ? 'away' : 'home';
+    return {
+      m: m,
+      gf: (m.side === 'home' ? m.home.score : m.away.score) || 0,
+      ga: (m.side === 'home' ? m.away.score : m.home.score) || 0,
+      us: window.sumTeam(rep.rows, m.side),
+      them: window.sumTeam(rep.rows, other),
+      players: window.computeStats(rep.rows, m.side),
+      names: window.squadNames(rep.lineups || {}, m.side)
+    };
+  }
+  function aggregates() {
+    return state.matches.map(aggregate).filter(Boolean);
+  }
+  /* Add a set of matches up into one stat object. The column functions in
+     TEAM_SECTIONS then work on the campaign exactly as they work on a match —
+     including the percentages, which come out as one ratio of totals rather
+     than a mean of ratios. */
+  function totalOf(aggs, which) {
+    var t = window.newStat();
+    aggs.forEach(function (a) {
+      var s = a[which];
+      for (var k in t) t[k] += (s[k] || 0);
+    });
+    return t;
+  }
+
+  /* ---------- Overview ---------- */
+  function renderOverview(body) {
+    var all = state.matches;
     var played = all.filter(function (m) { return m.result; });
     var w = played.filter(function (m) { return m.result === 'W'; }).length;
     var d = played.filter(function (m) { return m.result === 'D'; }).length;
@@ -289,8 +431,6 @@
     var avg = function (t) { return played.length ? Math.round(t / played.length * 10) / 10 : null; };
 
     var top = el('div', 'dgrid');
-    var left = el('div', 'dcol');
-
     var stat = el('div', 'card');
     stat.innerHTML =
       '<p class="card-h">Team stats <span class="right">' + esc(state.channel ? state.channel.name : '') + '</span></p>' +
@@ -302,83 +442,234 @@
         tstat('Average goals conceded', avg(ga)) +
         tstat('Goal difference', (gf - ga > 0 ? '+' : '') + (gf - ga)) +
       '</div>';
-    left.appendChild(stat);
+    top.appendChild(stat);
+    top.appendChild(formationCard(all));
+    body.appendChild(top);
+    /* Full width, and not squeezed in beside the pitch: this is the widest
+       thing on the Overview — two team names, two scores and a date — and in
+       half a column at laptop width the names had nowhere left to go. */
+    body.appendChild(recentResultsCard(played));
 
-    /* Most recent first — the list is kept in kickoff order for the
-       fixture list, which reads the other way round. */
-    var recent = played.slice().reverse().slice(0, 6);
-    var res = el('div', 'card');
+    var aggs = aggregates();
+    body.appendChild(keyPlayersRow(aggs));
+
+    if (!aggs.length) {
+      body.appendChild(el('p', 'note',
+        'Campaign totals appear once a match in this channel has been sent over with Submit Analysis.'));
+      return;
+    }
+
+    var S = totalOf(aggs, 'us'), O = totalOf(aggs, 'them');
+    var kpis = el('div', 'kpis six');
+    kpis.innerHTML =
+      kpi('Matches tagged', aggs.length, 'of ' + all.length + ' in this channel') +
+      kpi('Goals for', gf, 'across the campaign') +
+      kpi('Goals against', ga, 'goal difference ' + (gf - ga > 0 ? '+' : '') + (gf - ga)) +
+      kpi('Shots', S.totalShots, S.shotsOn + ' on target') +
+      kpi('Passes', S.passes, pct(S.passesComp, S.passes) + ' completed') +
+      kpi('Possession', pct(S.passes, S.passes + O.passes), 'share of the ball');
+    body.appendChild(kpis);
+  }
+
+  /* The last five, most recent first — the list is kept in kickoff order for
+     the fixture list, which reads the other way round. */
+  function recentResultsCard(played) {
+    var recent = played.slice().reverse().slice(0, 5);
+    var res = el('div', 'card res-card');
     res.innerHTML = '<p class="card-h">Recent match results <span class="right">latest ' + recent.length + '</span></p>';
     var rl = el('div', 'rlist');
+    if (!recent.length) {
+      res.appendChild(el('p', 'note', 'No match in this channel has a final score yet.'));
+      return res;
+    }
     recent.forEach(function (m) {
       var b = el('button', 'rrow');
       b.type = 'button';
       b.innerHTML =
         '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' +
-        '<span class="rn' + (m.side === 'home' ? ' us' : '') + '">' + esc(m.home.name) + '</span>' +
+        '<span class="rt"><span class="crest sm' + (m.side === 'home' ? '' : ' opp') + '">' + esc(m.home.crest) + '</span>' +
+          '<span class="rn' + (m.side === 'home' ? ' us' : '') + '">' + esc(m.home.name) + '</span></span>' +
         '<span class="rsc">' + num(m.home.score) + '</span>' +
         '<span class="rsc">' + num(m.away.score) + '</span>' +
-        '<span class="rn' + (m.side === 'away' ? ' us' : '') + '">' + esc(m.away.name) + '</span>' +
-        '<span class="rd">' + esc(m.dateLabel) + '</span>';
+        '<span class="rt"><span class="crest sm' + (m.side === 'away' ? '' : ' opp') + '">' + esc(m.away.crest) + '</span>' +
+          '<span class="rn' + (m.side === 'away' ? ' us' : '') + '">' + esc(m.away.name) + '</span></span>' +
+        '<span class="rd">' + esc(window.HNA.shortDate(m.date)) + '</span>' +
+        '<span class="m-open" aria-hidden="true">' +
+          '<svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor"><path d="M1 0 9 5 1 10Z"/></svg>' +
+        '</span>';
       b.addEventListener('click', function () { location.hash = '#/match/' + encodeURIComponent(m.slug || m.id); });
       rl.appendChild(b);
     });
     res.appendChild(rl);
-    left.appendChild(res);
-    top.appendChild(left);
-    top.appendChild(formationCard(all));
-    view.appendChild(top);
+    return res;
+  }
 
-    var ms = all.filter(function (m) { return m.us; });
-    if (!ms.length) {
-      view.appendChild(el('p', 'note',
-        'Per-match numbers appear once the matches in this channel carry tagged events.'));
+  /* ---------- Key players ----------
+     Goals, assists and key passes, added up across the club's own side of
+     every submitted match. A player is tallied under his NAME where the
+     squad gives one: shirt numbers move between windows — a national-team
+     call-up renumbers everybody — and a number is only an identity when
+     nothing better is on record. */
+  var KEY_PLAYERS = [
+    ['Top Scorer',   'goals',     'goals'],
+    ['Top Assist',   'assists',   'assists'],
+    ['Top Key Pass', 'keyPasses', 'key passes']
+  ];
+
+  function playerTally(aggs) {
+    var tally = {};
+    aggs.forEach(function (a) {
+      Object.keys(a.players).forEach(function (no) {
+        var nm = a.names[String(no).trim()] || '';
+        var key = nm ? 'n:' + nm.toLowerCase() : '#' + no;
+        var t = tally[key] || (tally[key] =
+          { name: nm || playerLabel(a.names, no), no: no, apps: 0, goals: 0, assists: 0, keyPasses: 0 });
+        t.no = no;                       // the most recent shirt he wore
+        t.apps++;
+        t.goals += a.players[no].goals;
+        t.assists += a.players[no].assists;
+        t.keyPasses += a.players[no].keyPasses;
+      });
+    });
+    return Object.keys(tally).map(function (k) { return tally[k]; });
+  }
+
+  /* Cards, not links. There is a #/players route, but nothing fills it in:
+     supa.js hands each match a lineup and no player rows, so renderPlayers
+     has never had anything to list. A chevron into an empty page is worse
+     than no chevron, so these say what they know and stop there. */
+  function keyPlayersRow(aggs) {
+    var people = playerTally(aggs);
+    var grid = el('div', 'kp-grid');
+    KEY_PLAYERS.forEach(function (spec) {
+      var best = people.slice().sort(function (a, b) {
+        return b[spec[1]] - a[spec[1]] || b.apps - a.apps;
+      })[0];
+      if (best && !best[spec[1]]) best = null;
+
+      grid.appendChild(el('div', 'kp' + (best ? '' : ' none'),
+        '<p class="kp-h">' + esc(spec[0]) + '</p>' +
+        '<div class="kp-b">' +
+          '<span class="kp-av">' + (best ? esc(best.no) : '–') + '</span>' +
+          '<span class="kp-n">' + (best ? esc(best.name) : 'Nobody yet') +
+            '<em>' + (best ? 'in ' + best.apps + (best.apps === 1 ? ' match' : ' matches')
+                           : 'no ' + spec[2] + ' recorded') + '</em></span>' +
+          '<b class="kp-v">' + (best ? best[spec[1]] : '—') + '</b>' +
+        '</div>'));
+    });
+    return grid;
+  }
+
+  /* ---------- Team Data ----------
+     One row per match. Date, opposing team, result, score and possession are
+     on every category; what follows them is whichever of shared.js's
+     TEAM_SECTIONS this tab names, so the columns are the same measures the
+     match page compares the two sides on. */
+  function sectionCols(title) {
+    var secs = (typeof TEAM_SECTIONS === 'undefined') ? [] : TEAM_SECTIONS;
+    var found = secs.filter(function (s) { return s[0] === title; })[0];
+    /* Possession is a fixed column on all four tabs, so Distribution must
+       not print it a second time. */
+    return (found ? found[1] : []).filter(function (c) { return c[0] !== 'Possession %'; });
+  }
+
+  /* Which header a column sits under. Only runs of ADJACENT columns sharing
+     a name are merged, so a set that changes order in shared.js degrades to
+     plain single headers rather than to a wrong span. */
+  var TD_GROUP = {
+    'Total Shots': 'Shots', 'Shots On Target': 'Shots', 'Shots Off Target': 'Shots',
+    'Blocked Shots': 'Shots', 'Miss Shots': 'Shots', 'Shooting Accuracy': 'Shots',
+    'Passes': 'Passing', 'Passes Completed': 'Passing', 'Pass Accuracy': 'Passing',
+    /* no Cross Accuracy: TEAM_SECTIONS does not carry one, and inventing it
+       here would be the one measure on this page that the match page cannot
+       also show */
+    'Crosses': 'Crossing', 'Crosses Completed': 'Crossing',
+    'Take-ons': 'Take-ons', 'Take-ons Won': 'Take-ons', 'Take-on Success': 'Take-ons',
+    'Tackles': 'Tackles', 'Tackles Won': 'Tackles', 'Tackle Success': 'Tackles',
+    'Aerial Duels': 'Duels', 'Aerial Duels Won': 'Duels',
+    'Ground Duels': 'Duels', 'Ground Duels Won': 'Duels',
+    'Corners': 'Set Pieces', 'Free-kicks': 'Set Pieces', 'Penalty Kicks': 'Set Pieces',
+    'Throw-ins': 'Set Pieces', 'Goal Kicks': 'Set Pieces',
+    'Fouls': 'Discipline', 'Offsides': 'Discipline'
+  };
+
+  function renderTeamData(body, cat) {
+    body.appendChild(catTabs(cat));
+
+    var aggs = aggregates();
+    if (!aggs.length) {
+      body.appendChild(emptyState('No submitted analysis to tabulate',
+        'These numbers come from what an analyst sends over with Submit Analysis. Once a match ' +
+        'in this channel has been submitted, every column below fills in.'));
       return;
     }
 
-    var sum = function (k) {
-      var t = 0, any = false;
-      ms.forEach(function (m) { if (m.us[k] != null) { t += Number(m.us[k]); any = true; } });
-      return any ? t : null;
+    var tab = TD_TABS.filter(function (t) { return t[0] === cat; })[0];
+    var cols = sectionCols(tab[2]);
+    var rows = aggs.slice().reverse();          // most recent match first
+    var S = totalOf(aggs, 'us'), O = totalOf(aggs, 'them');
+
+    /* --- two header rows: the groups, then the leaves --- */
+    var top = '<th class="c-date" rowspan="2">Date</th>' +
+              '<th class="c-opp" rowspan="2">Opposing team</th>' +
+              '<th class="c-res" rowspan="2">Result</th>' +
+              '<th class="c-sc" rowspan="2">Score</th>' +
+              '<th rowspan="2">Possession</th>';
+    var second = '';
+    for (var i = 0; i < cols.length;) {
+      var g = TD_GROUP[cols[i][0]], j = i;
+      while (g && j < cols.length && TD_GROUP[cols[j][0]] === g) j++;
+      if (g && j - i > 1) {
+        top += '<th class="gh" colspan="' + (j - i) + '">' + esc(g) + '</th>';
+        for (var k = i; k < j; k++) second += '<th>' + esc(cols[k][0]) + '</th>';
+        i = j;
+      } else {
+        top += '<th rowspan="2">' + esc(cols[i][0]) + '</th>';
+        i++;
+      }
+    }
+
+    var cells = function (a) {
+      return cols.map(function (c) { return '<td>' + esc(String(c[1](a.us, a.them))) + '</td>'; }).join('');
     };
-    var shots = sum('shots'), onT = sum('onTarget');
-    var passes = sum('passes'), done = sum('passesDone');
-
-    var kpis = el('div', 'kpis');
-    kpis.innerHTML =
-      kpi('Matches tagged', ms.length, 'of ' + all.length + ' in this channel') +
-      kpi('Goals for', sum('goals'), 'across the campaign') +
-      kpi('Goals against', ga, '') +
-      kpi('Shots', shots, onT != null ? onT + ' on target' : '') +
-      (passes ? kpi('Passes', passes, done != null ? Math.round(done / passes * 1000) / 10 + '% completed' : '') : '');
-    view.appendChild(kpis);
-
-    /* per-match table of the club's own column */
-    var COLS = [
-      ['poss', 'Poss %'], ['shots', 'Shots'], ['onTarget', 'On tgt'], ['goals', 'Goals'],
-      ['passes', 'Passes'], ['passAcc', 'Pass %'], ['crosses', 'Crosses'], ['crossesDone', 'Cr. done'],
-      ['recoveries', 'Recov.'], ['tackles', 'Tackles'], ['tackleAcc', 'Tkl %'],
-      ['interceptions', 'Int.'], ['clearances', 'Clear.'], ['aerialWon', 'Aer. won'], ['mistakes', 'Mist.']
-    ].filter(function (c) { return ms.some(function (m) { return m.us[c[0]] != null; }); });
-
-    var card = el('div', 'card');
-    var thead = '<tr><th>Match</th><th>Res</th>' + COLS.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') + '</tr>';
-    var tbody = ms.map(function (m) {
-      return '<tr><td class="pname">v ' + esc(m.opponent) + ' <span class="mono" style="color:var(--ash-dim)">(' +
-        (m.side === 'home' ? 'H' : 'A') + ')</span></td>' +
-        '<td>' + (m.result || '—') + '</td>' +
-        COLS.map(function (c) { return '<td>' + num(m.us[c[0]]) + '</td>'; }).join('') + '</tr>';
+    var tbody = rows.map(function (a) {
+      var m = a.m;
+      return '<tr data-go="' + esc(m.slug || m.id) + '">' +
+        '<td class="c-date">' + esc(window.HNA.shortDate(m.date)) + '</td>' +
+        '<td class="c-opp"><span class="cop"><span class="crest sm opp">' +
+          esc(window.HNA.monogram(m.opponent)) + '</span><b>' + esc(m.opponent) + '</b>' +
+          '<em>' + (m.side === 'home' ? 'H' : 'A') + '</em></span></td>' +
+        '<td class="c-res">' + (m.result ? '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' : '—') + '</td>' +
+        '<td class="c-sc">' + num(a.gf) + ' : ' + num(a.ga) + '</td>' +
+        '<td>' + pct(a.us.passes, a.us.passes + a.them.passes) + '</td>' +
+        cells(a) + '</tr>';
     }).join('');
-    var totals = '<tr><td class="pname"><b>Campaign</b></td><td>—</td>' +
-      COLS.map(function (c) {
-        if (/Acc$|^poss$/.test(c[0])) return '<td>—</td>';
-        var t = sum(c[0]);
-        return '<td><b>' + num(t) + '</b></td>';
-      }).join('') + '</tr>';
-    card.innerHTML = '<p class="card-h">Per match <span class="right">the club\'s own column</span></p>' +
-      '<div class="tbl-scroll"><table class="dt"><thead>' + thead + '</thead><tbody>' + tbody + totals + '</tbody></table></div>' +
-      '<p class="note">Percentages are per match and are not averaged in the campaign row — a mean of ratios would be misleading.</p>';
-    view.appendChild(card);
+
+    var campaign = '<tr class="tot">' +
+      '<td class="c-date">Campaign</td>' +
+      '<td class="c-opp"><span class="cop"><b>' + aggs.length +
+        (aggs.length === 1 ? ' match' : ' matches') + '</b></span></td>' +
+      '<td class="c-res">—</td>' +
+      '<td class="c-sc">' + aggs.reduce(function (t, a) { return t + a.gf; }, 0) + ' : ' +
+        aggs.reduce(function (t, a) { return t + a.ga; }, 0) + '</td>' +
+      '<td>' + pct(S.passes, S.passes + O.passes) + '</td>' +
+      cols.map(function (c) { return '<td>' + esc(String(c[1](S, O))) + '</td>'; }).join('') + '</tr>';
+
+    var wrap = el('div', 'stbl-wrap');
+    wrap.innerHTML = '<table class="stbl"><thead><tr>' + top + '</tr><tr>' + second + '</tr></thead>' +
+      '<tbody>' + tbody + campaign + '</tbody></table>';
+    /* One listener rather than one per row — the table is redrawn on every
+       tab click and rows outnumber everything else on the page. */
+    wrap.addEventListener('click', function (e) {
+      var tr = e.target.closest ? e.target.closest('tr[data-go]') : null;
+      if (tr) location.hash = '#/match/' + encodeURIComponent(tr.getAttribute('data-go'));
+    });
+    body.appendChild(wrap);
+
+    body.appendChild(el('p', 'note',
+      'One row per submitted match, from the club\'s own side. The campaign row adds the ' +
+      'counts up and works its percentages out from those totals, not as an average of the ' +
+      'rows above — a mean of ratios would be misleading. Click a row to open the full analysis.'));
   }
 
   /* ---------------------------------------------------------
@@ -463,6 +754,16 @@
     return loaded[url];
   }
 
+  /* The stat engine on its own: computeStats, sumTeam, TEAM_SECTIONS, pct.
+     The Data view needs those and nothing else — no spreadsheet library, no
+     renderers, and none of the tagging app's stylesheets, which would land
+     their own :root on this page for the sake of a table it does not draw.
+     Same URL as the line below, so whichever view is opened first is the one
+     that pays for it. */
+  function loadShared() {
+    return loadOnce(taggerRoot() + 'shared.js?v=18');
+  }
+
   /* Pulled in the first time someone opens a match's stats, not on every page
      load — the spreadsheet library alone is larger than this whole site. */
   function loadStatsView() {
@@ -470,7 +771,7 @@
     loadOnce(r + 'shared.css?v=13', 'css');
     loadOnce(r + 'Stats/stats-view.css?v=2', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
-      .then(function () { return loadOnce(r + 'shared.js?v=18'); })
+      .then(function () { return loadShared(); })
       .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=2'); })
       .then(function () { return loadOnce(r + 'Stats/report.js?v=29'); });
   }

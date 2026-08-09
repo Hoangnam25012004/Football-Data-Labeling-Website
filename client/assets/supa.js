@@ -108,6 +108,15 @@
     if (isNaN(d)) return iso;
     return DAYS[d.getDay()] + ', ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
   }
+  /* The same date in a column rather than a sentence. A table of matches is
+     read down the column, where the weekday and the spelt-out month are
+     width the numbers could be using. */
+  function shortDate(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso + 'T12:00:00');
+    if (isNaN(d)) return iso;
+    return d.getDate() + ' ' + MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getFullYear();
+  }
 
   function pct(part, whole) {
     if (!whole) return null;
@@ -449,11 +458,47 @@
             payload: row.payload || null
           };
         });
+    },
+
+    /* ---------- every signed-off report in a channel, in one pass ----------
+       The Data view adds up what analysts submitted, so it reads the same
+       payloads the match page does — all of them, rather than one request
+       per fixture.
+
+       Ordered by version ASCENDING and written into the map as it goes, so
+       the row that survives is the last one for that match: publishing again
+       adds a version, it does not overwrite, and the newest is the one the
+       club is being shown.
+
+       Chunked because the ids travel in the URL and a payload is a whole
+       match of events — twenty at a time keeps both the request line and the
+       response inside anything sensible. */
+    reports: function (matchUuids) {
+      var c = client();
+      var ids = (matchUuids || []).filter(Boolean);
+      if (!c || !ids.length) return Promise.resolve({});
+      var out = {}, chunks = [];
+      for (var i = 0; i < ids.length; i += 20) chunks.push(ids.slice(i, i + 20));
+      return chunks.reduce(function (p, chunk) {
+        return p.then(function () {
+          return c.from('match_reports')
+            .select('match_id,version,payload')
+            .in('match_id', chunk)
+            .order('version', { ascending: true })
+            .then(function (r) {
+              if (r.error) throw asError(r.error);
+              (r.data || []).forEach(function (row) {
+                if (row.payload) out[row.match_id] = row.payload;
+              });
+            });
+        });
+      }, Promise.resolve()).then(function () { return out; });
     }
   };
 
 
   API.monogram = monogram;
   API.dateLabel = dateLabel;
+  API.shortDate = shortDate;
   global.HNA = API;
 })(window);

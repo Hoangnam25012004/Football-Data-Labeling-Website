@@ -132,13 +132,19 @@ test('the view-s files are found in both layouts, without a build step', () => {
 
 test('shared.js is loaded before the view, and the view before the exports', () => {
   const fn=/function loadStatsView\(\)[\s\S]*?\n  \}/.exec(APPJS)[0];
-  const order=['shared.js','Stats/stats-view.js','Stats/report.js'];
+  const order=['loadShared','Stats/stats-view.js','Stats/report.js'];
   let at=-1;
   order.forEach(f=>{
     const i=fn.indexOf(f);
     ok(i>at,f+' is loaded after the one it depends on');
     at=i;
   });
+  // the Data view needs the same stat engine and none of the rest, so the
+  // file has ONE loader; two would be two version numbers to bump, and the
+  // one that was forgotten would fetch a second copy over the first
+  const sh=/function loadShared\(\)[\s\S]*?\n  \}/.exec(APPJS)[0];
+  ok(/shared\.js\?v=\d+/.test(sh),'loadShared is what names the file');
+  eq((APPJS.match(/shared\.js\?v=/g)||[]).length,1,'and it is named in one place only');
   ok(/async = false/.test(APPJS),'and the tags are ordered, not raced');
 });
 
