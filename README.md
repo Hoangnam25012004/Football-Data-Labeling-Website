@@ -117,6 +117,21 @@ again adds a version rather than overwriting one, so there is a record of what a
 club was shown and when, and the dialog refuses to look ready while the database
 is still behind the tab doing the tagging.
 
+**[`supabase/migrations/0017_public_channels.sql`](supabase/migrations/0017_public_channels.sql)
+is optional, and it is the one that gives data away.** It adds `clubs.is_public`,
+off for every channel until an admin of that channel turns it on under **Channel →
+Who can read this channel**. On, it means *public*, not unlisted: the anon key is
+committed here and served in the JavaScript of a static site, so anyone can query
+this database with it. What becomes readable is the whole signed-off report —
+every tagged event with its pitch coordinates, the line-ups, and the shirt numbers
+**and names** of the players, on both teams. Closing it again stops new readers; it
+does not take back what was already read.
+
+The trap it also closes: `match_stats` is a *view*, and a view in Postgres runs with
+its owner's privileges, so row-level security does not reach it. Anonymous access is
+revoked there and given a `public_match_stats` that does the filtering itself. The
+raw event stream is never opened to anyone.
+
 ## How the labeling app runs
 The whole app is the static file [`index.html`](index.html) — no backend required.
 It is hosted for free on **GitHub Pages** and served over HTTPS, so anyone with the

@@ -66,9 +66,16 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
 }
 .chan-sum b{color:var(--chalk); font-weight:700; font-variant-numeric:tabular-nums}
 .chan-sum .sep{color:var(--line)}
-.badge-seed{
-  border:1px solid var(--red); color:var(--red); border-radius:2px;
+.badge-public{
+  border:1px solid var(--amber); color:var(--amber); border-radius:2px;
   padding:2px 7px; font-size:9px; letter-spacing:.14em;
+}
+/* the public switch: what it says now, before what it would become */
+.pub-now{font-size:13.5px; color:var(--ash); margin:0 0 14px; max-width:64ch; line-height:1.6}
+.pub-now.on{color:var(--chalk)}
+.pub-now.on::before{
+  content:""; display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:var(--amber); margin-right:9px; vertical-align:middle;
 }
 
 /* ---------- body: sidebar + view ---------- */

@@ -63,12 +63,18 @@
       crest: x.crest_text || monogram(x.name),
       competition: x.competition || '', stage: x.stage || '',
       sport: x.sport || 'football', country: x.country || '',
+      isPublic: !!x.is_public,
       createdBy: x.created_by || null, createdAt: x.created_at || null,
       role: null
     };
   }
 
   var ROLE_ORDER = ['admin', 'analyst', 'viewer'];
+
+  /* Whether this browser is reading as a signed-out visitor. Set once the
+     session is known, and only used to pick which of the two stats views to
+     read — everything else is decided by row-level security on the server. */
+  var anonymous = true;
 
   /* Postgres speaks in error codes; these are the ones a person can act
      on. Anything else is passed through as it came, which is still more
@@ -134,8 +140,12 @@
         var c = client();
         if (!c) return Promise.resolve(null);
         return c.auth.getSession()
-          .then(function (r) { return (r && r.data && r.data.session) || null; })
-          .catch(function () { return null; });
+          .then(function (r) {
+            var s = (r && r.data && r.data.session) || null;
+            anonymous = !s;
+            return s;
+          })
+          .catch(function () { anonymous = true; return null; });
       },
       user: function () {
         return API.auth.session().then(function (s) { return s ? s.user : null; });
@@ -271,6 +281,20 @@
           });
       },
 
+      /* Open the channel to anyone, or close it again. Only an admin of the
+         channel gets past clubs_update, so the check is the database's, not
+         this button's — but the UI asks first, because what it publishes is
+         the whole report including the players' names. */
+      setPublic: function (clubId, on) {
+        var c = client();
+        if (!c) return Promise.reject(new Error('The Supabase client did not load.'));
+        return c.from('clubs').update({ is_public: !!on }).eq('id', clubId).select('*').single()
+          .then(function (r) {
+            if (r.error) throw asError(r.error);
+            return shapeClub(r.data);
+          });
+      },
+
       revokeInvite: function (inviteId) {
         var c = client();
         if (!c) return Promise.reject(new Error('The Supabase client did not load.'));
@@ -307,7 +331,10 @@
           if (r.error || !r.data || !r.data.length) return [];
           var rows = r.data;
           var ids = rows.map(function (m) { return m.id; });
-          return c.from('match_stats').select('*').in('match_id', ids)
+          /* match_stats is a view, so row-level security does not reach it and
+           an anonymous visitor is kept off it entirely (0017). The narrowed
+           one filters to public channels itself. */
+        return c.from(anonymous ? 'public_match_stats' : 'match_stats').select('*').in('match_id', ids)
             .then(function (s) { return shape(rows, (s && s.data) || []); })
             .catch(function () { return shape(rows, []); });
         })

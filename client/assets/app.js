@@ -34,7 +34,10 @@
 
     ready.then(function (user) {
       state.user = user;
-      if (!user) return [];
+      /* Signed out is no longer the end of it: a channel whose admin has made
+         it public is readable by anyone, so the list is asked for either way
+         and row-level security decides what comes back. */
+      if (!user) return window.HNA.clubs();
       /* An invite written before this person had an account only turns
          into a membership once they sign in, so it is claimed before the
          channel list is read — otherwise the channel they were invited
@@ -130,6 +133,7 @@
       bits.push('<span>GF <b>' + gf + '</b></span><span>GA <b>' + ga + '</b></span>');
       bits.push('<span>Pts <b>' + (w * 3 + d) + '</b></span>');
     }
+    if (ch.isPublic) bits.push('<span class="badge-public" title="Anyone can read this channel">Public</span>');
     box.innerHTML = bits.join('');
   }
 
@@ -231,7 +235,8 @@
   function noChannel() {
     if (!state.user) {
       var s = emptyState('Not signed in',
-        'Your club\'s matches, data and players live in a channel. Sign in to open yours.');
+        'Your club\'s matches, data and players live in a channel. Sign in to open yours — ' +
+        'or follow a link to one its admin has made public.');
       var a = el('a', 'btn btn-primary', 'Sign in');
       a.href = 'login.html';
       s.appendChild(a);
@@ -753,7 +758,8 @@
       b.innerHTML =
         '<span class="crest sm">' + esc(c.crest) + '</span>' +
         '<span class="cn">' + esc(c.name) + '<em>' + esc(roleLabel(c.role)) +
-          (c.country ? ' · ' + esc(c.country) : '') + '</em></span>' +
+          (c.country ? ' · ' + esc(c.country) : '') +
+          (c.isPublic ? ' · public' : '') + '</em></span>' +
         '<span class="cgo">›</span>';
       b.addEventListener('click', function () { location.hash = '#/channel/' + encodeURIComponent(c.slug); });
       list.appendChild(b);
@@ -800,8 +806,63 @@
         'Only an admin of this channel can invite people or change what they can see.'));
     }
 
+    /* ---- open to anyone, or not ----
+       Last on the page on purpose. It is the only control here that reaches
+       past the club, and the confirm spells out what goes with it rather
+       than asking "are you sure?". */
+    var publicCard = null;
+    if (isAdmin) {
+      publicCard = el('div', 'card');
+      body.appendChild(publicCard);
+      drawPublic();
+    } else if (ch.isPublic) {
+      body.appendChild(el('p', 'note',
+        'This channel is public: anyone can read its matches and analyses without an ' +
+        'account. Only an admin can close it again.'));
+    }
+
     drawMembers();
     if (isAdmin) drawInvites();
+
+    function drawPublic() {
+      var on = !!ch.isPublic;
+      publicCard.innerHTML =
+        '<p class="card-h">Who can read this channel ' +
+          '<span class="right">' + (on ? 'anyone' : 'members only') + '</span></p>' +
+        '<p class="pub-now' + (on ? ' on' : '') + '">' +
+          (on
+            ? 'Open to anyone. No account needed — the matches, the numbers and the full ' +
+              'analyses, including the players named in them.'
+            : 'Members only. Nobody outside the list above can open it.') +
+        '</p>' +
+        '<button class="btn ' + (on ? 'btn-ghost' : 'btn-primary') + '" type="button" id="pubGo">' +
+          (on ? 'Make it members only' : 'Make this channel public') +
+        '</button>' +
+        '<p class="note">Turning it off stops new readers. It does not take back what ' +
+          'somebody already read or saved.</p>';
+
+      publicCard.querySelector('#pubGo').addEventListener('click', function () {
+        var btn = publicCard.querySelector('#pubGo');
+        if (!on && !confirm(
+            'Make ' + ch.name + ' public?\n\n' +
+            'Anyone at all will be able to read it without an account:\n' +
+            '  · every published match and its score\n' +
+            '  · the full analysis of each — every tagged event and where on the pitch\n' +
+            '  · the line-ups, with the players\' shirt numbers AND NAMES\n' +
+            '  · the opposition in those matches, who did not agree to this\n\n' +
+            'You can close it again, but that does not take back what has already ' +
+            'been read or saved.')) return;
+        btn.disabled = true;
+        window.HNA.channels.setPublic(ch.id, !on).then(function (updated) {
+          ch.isPublic = updated.isPublic;
+          drawPublic();
+          renderShell();
+        }).catch(function (e) {
+          btn.disabled = false;
+          alert(e.message || String(e));
+        });
+      });
+    }
 
     function fail(card, title, err) {
       card.innerHTML = '<p class="card-h">' + title + '</p>' +
