@@ -9,6 +9,23 @@
 (function(){
 'use strict';
 
+/* ---- where the four values come from now ----
+   rows / meta / lineups / dur used to be globals on the Stats page, and the
+   seventy-one uses below read them straight. They live inside PTStats now, so
+   they are declared here and refreshed by sync() the moment an export starts.
+   Every helper below is an arrow function closing over these bindings, so it
+   sees the current match without any of those uses changing. */
+let rows=[], meta={home:'Home',away:'Away'},
+    lineups={home:{roster:[],xi:[],subs:[]},away:{roster:[],xi:[],subs:[]}},
+    dur={enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0};
+
+function sync(){
+  const d=window.PTStats&&window.PTStats.data&&window.PTStats.data();
+  if(!d)return false;
+  rows=d.rows||[]; meta=d.meta||meta; lineups=d.lineups||lineups; dur=d.dur||dur;
+  return true;
+}
+
 /* ---- palette: literal colours only — report pages are light-themed and must
    not inherit the app's dark CSS variables ---- */
 const C={
@@ -1142,6 +1159,7 @@ function gkPage(){
 
 /* ================= assembly + export ================= */
 function buildPages(host){
+  sync();
   ensureCss();
   const list=[
     ...timelinePages(),
@@ -1190,6 +1208,7 @@ function buildPages(host){
 let exporting=false;   // re-entry guard — the button shows live % progress while the export runs
 async function exportPdf(){
   if(exporting)return;
+  sync();
   if(!rows.length){alert('No data yet.');return;}
   exporting=true;
   const btn=$('expPdf'), orig=btn.textContent;
@@ -1221,6 +1240,11 @@ async function exportPdf(){
   }
 }
 
-$('expPdf').onclick=exportPdf;
-window.PTReport={buildPages,exportPdf};   // exposed for testing/debugging
+/* The button belongs to whichever page is hosting the view. On the Stats page
+   it is in the header and is there before this file runs; on the client site
+   PTStats renders it at mount time, which happens later — so binding is a
+   function the host can call again rather than something done once on load. */
+function bind(){const b=$('expPdf'); if(b)b.onclick=exportPdf; return !!b;}
+bind();
+window.PTReport={buildPages,exportPdf,bind};   // exposed for testing/debugging
 })();

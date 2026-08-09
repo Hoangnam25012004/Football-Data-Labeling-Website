@@ -307,9 +307,9 @@ test('every Stats-tab defensive category, take-on concern included, gets a repor
 });
 // DEF_CATS lives in the Stats page; lift it out so the two stay in step
 function statsDefCats(){
-  const src=fs.readFileSync(path.join(__dirname,'..','Stats','index.html'),'utf8');
+  const src=fs.readFileSync(path.join(__dirname,'..','Stats','stats-view.js'),'utf8');
   const ctx={};vm.createContext(ctx);
-  vm.runInContext(grabConst('DEF_CATS',src,'Stats/index.html')+'\n;globalThis.d=DEF_CATS;',ctx);
+  vm.runInContext(grabConst('DEF_CATS',src,'Stats/stats-view.js')+'\n;globalThis.d=DEF_CATS;',ctx);
   return ctx.d;
 }
 

@@ -17,7 +17,7 @@ const page=p=>fs.readFileSync(path.join(ROOT,p),'utf8');
 const APPJS=page('client/assets/app.js');
 const SUPA=page('client/assets/supa.js');
 const SHARED=page('shared.js');
-const STATS=page('Stats/index.html');
+const STATS=page('Stats/stats-view.js');
 /* comments are stripped before anything is extracted: a stray semicolon in
    one of them would otherwise end a statement halfway through */
 const bare=s=>s.replace(/--[^\n]*/g,'');

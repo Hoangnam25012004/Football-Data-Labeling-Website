@@ -406,7 +406,7 @@ test('the menu opens, closes, and gets out of the way', () => {
    person reading the source is not switching languages either. */
 test('and so is the rest of the site, file by file', () => {
   ['index.html','cloud-sync.js','auth.html','auth.js','shared.js','shared.css',
-   'Stats/index.html','Stats/report.js','Player-Lists/index.html'].forEach(f=>{
+   'Stats/index.html','Stats/stats-view.js','Stats/report.js','Player-Lists/index.html'].forEach(f=>{
     const lines=page(f).split(/\r?\n/);
     const bad=lines.map((l,i)=>VIETNAMESE.test(l)?(i+1)+': '+l.trim().slice(0,70):null).filter(Boolean);
     eq(bad.length,0,f+' has Vietnamese left —\n      '+bad.join('\n      '));

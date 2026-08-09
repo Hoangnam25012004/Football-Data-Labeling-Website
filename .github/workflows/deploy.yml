@@ -63,6 +63,7 @@ jobs:
           cp shared.js                  _site/tagger/shared.js
           cp pitchtagger_events.json    _site/tagger/pitchtagger_events.json || true
           cp Stats/index.html           _site/tagger/Stats/index.html
+          cp Stats/stats-view.js        _site/tagger/Stats/stats-view.js
           cp Stats/report.js            _site/tagger/Stats/report.js
           cp Player-Lists/index.html    _site/tagger/Player-Lists/index.html
 

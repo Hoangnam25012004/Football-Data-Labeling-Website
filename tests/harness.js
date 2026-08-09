@@ -163,14 +163,18 @@ function loadShared(store){
    injected as plain globals in place of the localStorage the real page reads.
    `state` -> {rows, meta, lineups, dur}; returns the requested names plus `holder`,
    the stand-in for #statsHolder that the render functions write into. */
-const STATS=fs.readFileSync(path.join(ROOT,'Stats','index.html'),'utf8');
+/* The Stats renderers moved out of the page and into Stats/stats-view.js, which
+   is where both the Stats page and the client site now mount them from. The
+   functions themselves did not change, so everything lifted below is lifted by
+   the same name out of the same lines — only the file they live in moved. */
+const STATS=fs.readFileSync(path.join(ROOT,'Stats','stats-view.js'),'utf8');
 function loadStats(state,names){
   const holder={innerHTML:''};
   const ctx={console,document:{getElementById:()=>holder},location:{hash:''},
     localStorage:{getItem:()=>null,setItem(){}}};
   vm.createContext(ctx);
-  const consts=(names.consts||[]).map(n=>grabConst(n,STATS,'Stats/index.html'));
-  const funcs=(names.funcs||[]).map(n=>grabFunction(n,STATS,'Stats/index.html'));
+  const consts=(names.consts||[]).map(n=>grabConst(n,STATS,'Stats/stats-view.js'));
+  const funcs=(names.funcs||[]).map(n=>grabFunction(n,STATS,'Stats/stats-view.js'));
   vm.runInContext([SHARED,
     'var rows='+JSON.stringify(state.rows||[])+';',
     'var meta='+JSON.stringify(state.meta||{home:'Home',away:'Away',sport:'football'})+';',
@@ -183,7 +187,7 @@ function loadStats(state,names){
     consts.join('\n'), funcs.join('\n'),
     ';globalThis.P={rows,meta,lineups,dur,'
       +(names.consts||[]).concat(names.funcs||[]).join(',')+'};'
-  ].join('\n'),ctx,{filename:'Stats/index.html-extract.js'});
+  ].join('\n'),ctx,{filename:'Stats/stats-view.js-extract.js'});
   return Object.assign({holder},ctx.P);
 }
 

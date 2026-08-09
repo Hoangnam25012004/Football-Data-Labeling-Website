@@ -15,7 +15,10 @@ const {test,eq,deepEq,ok,notOk}=require('./tiny-test');
 const S=loadShared();
 const G=S.GOAL_MAP;
 const ROOT=path.join(__dirname,'..');
-const STATS=fs.readFileSync(path.join(ROOT,'Stats','index.html'),'utf8');
+const STATS=fs.readFileSync(path.join(ROOT,'Stats','stats-view.js'),'utf8');
+/* the page itself, for the assertions about what it loads — the renderers moved
+   into stats-view.js, but the script tags that pull them in did not */
+const STATS_PAGE=fs.readFileSync(path.join(ROOT,'Stats','index.html'),'utf8');
 const REPORT=fs.readFileSync(path.join(ROOT,'Stats','report.js'),'utf8');
 
 /* ================= the drawing ================= */
@@ -147,7 +150,7 @@ test('a half that attacked the other way is turned around, not left mirrored', (
 
 test('the goal stands clear of the pitch, in that same svg', () => {
   const html=statsMap([SH({gXY:{x:50,y:50}})]);
-  const fn=grabFunction('shotMapHTML',STATS,'Stats/index.html');
+  const fn=grabFunction('shotMapHTML',STATS,'Stats/stats-view.js');
   // the frame is one path that starts at the mouth's bottom edge; the pitch's own top
   // edge — the goal line — is y=0, so the goal floating above it means a negative y
   const bottom=+/<path d="M [-\d.]+ ([-\d.]+) V/.exec(html)[1];
@@ -234,7 +237,7 @@ test('the Stats page maps a database row exactly as cloud-sync does', () => {
   // and the shooting map stayed empty however many had been tagged.
   const lift=(src,what)=>{const ctx={console};vm.createContext(ctx);
     vm.runInContext(grabFunction('dbToRow',src,what),ctx);return ctx.dbToRow;};
-  const stats=lift(STATS,'Stats/index.html');
+  const stats=lift(STATS,'Stats/stats-view.js');
   const cloud=lift(fs.readFileSync(path.join(ROOT,'cloud-sync.js'),'utf8'),'cloud-sync.js');
   const norm=o=>JSON.stringify(Object.keys(o).sort().reduce((a,k)=>(a[k]=o[k],a),{}));
   const row={id:'e1',t_seconds:12.5,team:'home',event_name:'goal',action_code:'ddd',
@@ -254,7 +257,7 @@ test('shared.js and report.js were cache-busted after being changed', () => {
   // mouth is an undefined function
   const pl=fs.readFileSync(path.join(ROOT,'Player-Lists','index.html'),'utf8');
   const v=s=>(/shared\.js\?v=(\d+)/.exec(s)||[])[1];
-  eq(v(STATS),v(pl),'both pages ask for the same shared.js');
-  ok(+v(STATS)>=16,'and it was bumped past the version that had no goal mouth');
-  ok(+(/report\.js\?v=(\d+)/.exec(STATS)||[])[1]>=28,'report.js too');
+  eq(v(STATS_PAGE),v(pl),'both pages ask for the same shared.js');
+  ok(+v(STATS_PAGE)>=16,'and it was bumped past the version that had no goal mouth');
+  ok(+(/report\.js\?v=(\d+)/.exec(STATS_PAGE)||[])[1]>=28,'report.js too');
 });

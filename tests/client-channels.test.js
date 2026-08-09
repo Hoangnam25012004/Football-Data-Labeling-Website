@@ -353,7 +353,7 @@ test('the code column is what the share link and the tagger both use', () => {
   // Stats/ and cloud-sync.js look a match up by the same 5-digit code, so the
   // slug the client builds has to be that code and not something of its own
   ok(/slug: String\(m\.code \|\| m\.id\)/.test(SUPA),'the slug is the share code');
-  const tagger=page('cloud-sync.js')+page('Stats/index.html');
+  const tagger=page('cloud-sync.js')+page('Stats/stats-view.js');
   ok(/\/\^\\d\{5\}\$\/\.test\([a-z]+\) \? 'code' : 'id'/.test(tagger)||
      /\/\^\\d\{5\}\$\/\.test\([a-z]+\)\?'code':'id'/.test(tagger),
      'and the tagger side resolves that same code column');

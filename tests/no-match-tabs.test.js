@@ -37,7 +37,7 @@ const seed=(stampedFor,openMatch)=>({
 function statsLineups(seeded){
   const ctx={console,document:{getElementById:()=>null},location:{hash:''},localStorage:store(seeded)};
   vm.createContext(ctx);
-  vm.runInContext([SHARED,grabConst('ourLineups',STATS,'Stats/index.html'),
+  vm.runInContext([SHARED,grabConst('ourLineups',STATS,'Stats/stats-view.js'),
                    ';globalThis.out=ourLineups();'].join('\n'),ctx,{filename:'stats-ourLineups.js'});
   return ctx.out;
 }
@@ -65,7 +65,7 @@ test('an unstamped store is not trusted on the strength of there being one', () 
 });
 
 /* ================= Stats says so, rather than showing leftovers ================= */
-const statsSrc=fs.readFileSync(path.join(ROOT,'Stats','index.html'),'utf8');
+const statsSrc=fs.readFileSync(path.join(ROOT,'Stats','stats-view.js'),'utf8');
 
 test('Stats shows a notice instead of another match\'s numbers', () => {
   ok(/id="noMatchMsg"/.test(statsSrc),'the notice exists');
