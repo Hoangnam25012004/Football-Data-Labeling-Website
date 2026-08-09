@@ -60,10 +60,12 @@ jobs:
           cp auth.js                    _site/tagger/auth.js
           cp auth.html                  _site/tagger/auth.html
           cp shared.css                 _site/tagger/shared.css
+          cp shared-page.css            _site/tagger/shared-page.css
           cp shared.js                  _site/tagger/shared.js
           cp pitchtagger_events.json    _site/tagger/pitchtagger_events.json || true
           cp Stats/index.html           _site/tagger/Stats/index.html
           cp Stats/stats-view.js        _site/tagger/Stats/stats-view.js
+          cp Stats/stats-view.css       _site/tagger/Stats/stats-view.css
           cp Stats/report.js            _site/tagger/Stats/report.js
           cp Player-Lists/index.html    _site/tagger/Player-Lists/index.html
 

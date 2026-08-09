@@ -19,10 +19,6 @@
   --danger:#f7506b; --warn:#f7b32f; --radius:10px;
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
-header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50}
-header h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.3px}
-header h1 span{color:var(--accent)}
 .back-link{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none}
 .back-link:hover{border-color:var(--accent);color:var(--accent)}
 .spacer{margin-left:auto}

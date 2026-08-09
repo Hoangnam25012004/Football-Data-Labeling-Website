@@ -1,0 +1,18 @@
+/* ============================================================
+   shared-page.css — the rules that dress a WHOLE PAGE of the
+   tagging app: the body, and the sticky header across the top.
+
+   They used to sit in shared.css, which was fine while only the
+   tagging app read that file. The client site loads shared.css now
+   as well, for the tokens and the component classes the Stats view
+   draws with — and a bare body/header rule arriving with them would
+   restyle the client shell: 13px Segoe UI over its own type scale,
+   and its header given the tagging app-s panel and sticky top.
+
+   Only Stats/ and Player-Lists/ load this. shared.css keeps the
+   tokens, and every class that belongs to a component.
+   ============================================================ */
+body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50}
+header h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.3px}
+header h1 span{color:var(--accent)}

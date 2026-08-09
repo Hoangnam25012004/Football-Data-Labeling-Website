@@ -187,9 +187,59 @@ test('the PDF button is bound when it exists, not assumed', () => {
   ok(/window\.PTReport=\{buildPages,exportPdf,bind\}/.test(REPORT),'and a host can bind again later');
 });
 
+/* ================= the CSS a second shell can survive ================= */
+const CSS=page('Stats/stats-view.css');
+const SHARED_CSS=page('shared.css');
+const PAGE_CSS=page('shared-page.css');
+
+/* every selector in a stylesheet, @media blocks flattened */
+function selectors(css){
+  const out=[];
+  css.replace(/\/\*[\s\S]*?\*\//g,'').replace(/@media[^{]*\{/g,'').split('}').forEach(b=>{
+    const s=b.split('{')[0];
+    if(!s||/^\s*@/.test(s))return;
+    s.split(',').forEach(x=>{x=x.trim(); if(x)out.push(x);});
+  });
+  return out;
+}
+/* a selector that starts with a bare tag name dresses whatever page it lands on */
+const bareTag=s=>/^[a-z][a-z0-9]*(\s|>|$|:)/i.test(s)&&!/^[.#]/.test(s);
+
+test('nothing the client will load reaches for a bare html, body or header', () => {
+  // the whole reason the split exists: shared.css used to carry
+  // body{font-size:13px} and a sticky header, and the client site loads
+  // shared.css now for the tokens the view draws with
+  [['shared.css',SHARED_CSS],['Stats/stats-view.css',CSS]].forEach(([name,src])=>{
+    const bleeds=selectors(src).filter(s=>bareTag(s)&&!/^\*|^:root/.test(s));
+    eq(bleeds.join(', '),'',name+' would restyle the shell of any page that loads it');
+  });
+});
+
+test('the page-level rules are still there, just somewhere only the tagger looks', () => {
+  const s=selectors(PAGE_CSS);
+  ['body','header','header h1','header h1 span'].forEach(sel=>
+    ok(s.includes(sel),'shared-page.css keeps '+sel));
+  ok(PAGE.includes('shared-page.css'),'Stats loads it');
+  ok(page('Player-Lists/index.html').includes('shared-page.css'),'and so does Player-Lists');
+});
+
+test('the two pages that share shared.css ask for the same copy of it', () => {
+  const v=s=>(/shared\.css\?v=(\d+)/.exec(s)||[])[1];
+  eq(v(PAGE),v(page('Player-Lists/index.html')),'bumped in step, or one page gets the old file');
+  ok(+v(PAGE)>=13,'and bumped, because the page rules left it');
+});
+
+test('the tokens the view draws with stayed in shared.css', () => {
+  // moving these out would leave every .stats-* class unthemed on the client
+  ok(/:root\{/.test(SHARED_CSS),'the token block is still there');
+  ['--bg','--panel','--ink','--mut','--accent','--home','--away'].forEach(t=>
+    ok(SHARED_CSS.includes(t+':'),'shared.css still defines '+t));
+});
+
 /* ================= shipping ================= */
-test('the new file is staged for GitHub Pages', () => {
-  ok(YML.includes('cp Stats/stats-view.js'),'deploy.yml copies it — without this it is a 404');
+test('the new files are staged for GitHub Pages', () => {
+  ['cp Stats/stats-view.js','cp Stats/stats-view.css','cp shared-page.css']
+    .forEach(line=>ok(YML.includes(line),'deploy.yml is missing: '+line));
 });
 
 test('the page asks for a fresh copy of what moved', () => {
