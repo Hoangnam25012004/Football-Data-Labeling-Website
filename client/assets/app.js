@@ -74,7 +74,10 @@
        for the last one rather than letting the Data view find it cached. */
     state.reports = null; state.reportsFor = null; reportJob = null;
     if (!ch) { state.matches = []; return Promise.resolve(); }
-    return window.HNA.matches(ch.id).then(function (rows) {
+    /* The channel's team code goes with the id: with one, which side of a
+       fixture is the club's own is answered by the match rather than by the
+       our_side somebody set on the tagging side. */
+    return window.HNA.matches(ch.id, ch.code).then(function (rows) {
       state.matches = rows || [];
     }).catch(function () { state.matches = []; });
   }
@@ -795,6 +798,7 @@
       return;
     }
     if (rest[0] === 'new') return renderChannelNew(view);
+    if (rest[0] && rest[1] === 'edit') return renderChannelEdit(view, decodeURIComponent(rest[0]));
     if (rest[0]) return renderChannelOne(view, decodeURIComponent(rest[0]));
     return renderChannelList(view);
   }
@@ -849,6 +853,86 @@
     return 'Member';
   }
 
+  /* ---------- Settings: edit, and delete ----------
+     Behind a menu rather than as two buttons on the heading: one of them
+     cannot be undone, and a control that deletes a club should not sit where
+     a thumb lands on the way to something else. */
+  function settingsMenu(ch) {
+    var wrap = el('span', 'menu-wrap');
+    var btn = el('button', 'btn btn-ghost menu-btn',
+      'Settings <span class="caret" aria-hidden="true">▼</span>');
+    btn.type = 'button';
+    btn.setAttribute('aria-haspopup', 'true');
+    btn.setAttribute('aria-expanded', 'false');
+
+    var menu = el('div', 'menu');
+    menu.setAttribute('role', 'menu');
+
+    var edit = el('button', 'menu-opt', 'Edit<em>Name, country, monogram, team code</em>');
+    edit.type = 'button';
+    edit.addEventListener('click', function () {
+      location.hash = '#/channel/' + encodeURIComponent(ch.slug) + '/edit';
+    });
+
+    var del = el('button', 'menu-opt danger', 'Delete<em>Remove this channel for everyone in it</em>');
+    del.type = 'button';
+    del.addEventListener('click', function () { deleteChannel(ch); });
+
+    menu.appendChild(edit);
+    menu.appendChild(del);
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = wrap.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    /* One document listener per menu, removed with the menu: the Channel view
+       is redrawn on every role change, and a listener left behind would keep
+       a detached node alive for the life of the page. */
+    var away = function () {
+      wrap.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      if (!wrap.isConnected) document.removeEventListener('click', away);
+    };
+    document.addEventListener('click', away);
+    return wrap;
+  }
+
+  /* Deleting is the one thing on this site that cannot be undone from it, so
+     the confirm spells out what goes and what does not, and asks for the name
+     to be typed rather than for a click that a reflex can supply. */
+  function deleteChannel(ch) {
+    var typed = prompt(
+      'Delete the channel ' + ch.name + '?\n\n' +
+      'This cannot be undone from here.\n\n' +
+      '  · everyone in it loses access immediately, including you\n' +
+      '  · its published matches and analyses stop belonging to any channel,\n' +
+      '    so nothing on this site can open them again\n' +
+      '  · the matches themselves stay in the database, on the labeling site,\n' +
+      '    and can be published to another channel\n\n' +
+      'Type the channel name to confirm:');
+    if (typed == null) return;                       // Cancel
+    if (typed.trim() !== ch.name) {
+      alert('That is not the channel name — nothing has been deleted.');
+      return;
+    }
+    window.HNA.channels.remove(ch.id).then(function () {
+      return window.HNA.clubs().then(function (clubs) {
+        state.channels = clubs || [];
+        /* Whatever is left, or nothing: the app has a state for no channel
+           and this is one of the ways into it. */
+        state.channel = state.channels[0] || null;
+        return loadMatches(state.channel).then(function () {
+          renderShell();
+          location.hash = '#/channel';
+          route();                                   // same hash when already there
+        });
+      });
+    }).catch(function (e) { alert(e.message || String(e)); });
+  }
+
   /* ---------- one channel: members and invites ---------- */
   function renderChannelOne(view, slug) {
     var ch = ownChannels().filter(function (c) { return c.slug === slug; })[0];
@@ -858,10 +942,16 @@
     back.addEventListener('click', function () { location.hash = '#/channel'; });
     view.appendChild(back);
 
-    view.appendChild(head(esc(ch.name),
-      roleLabel(ch.role) + ' · ' + (ch.sport || 'football') + (ch.country ? ' · ' + ch.country : '')));
-
     var isAdmin = ch.role === 'admin';
+    var h = head(esc(ch.name),
+      roleLabel(ch.role) + ' · ' + (ch.sport || 'football') + (ch.country ? ' · ' + ch.country : '') +
+      (ch.code ? ' · team ' + ch.code : ''));
+    if (isAdmin) {
+      var right = el('span', 'right');
+      right.appendChild(settingsMenu(ch));
+      h.appendChild(right);
+    }
+    view.appendChild(h);
     var body = el('div', 'dcol');
     view.appendChild(body);
 
@@ -1048,26 +1138,28 @@
     'Malaysia','Mexico','Netherlands','New Zealand','Norway','Philippines','Poland','Portugal','Singapore','Spain',
     'Sweden','Switzerland','Thailand','Turkey','United States','Uruguay'];
 
-  function renderChannelNew(view) {
-    var back = el('button', 'back', '&larr; All channels');
-    back.addEventListener('click', function () { location.hash = '#/channel'; });
-    view.appendChild(back);
-    view.appendChild(head('Create a new channel', 'One channel is one club'));
-
+  /* The one form. Creating a channel and editing one ask for the same five
+     things, so they are the same markup and the same wiring; only the button,
+     the heading and what happens on submit differ. Two copies of this drifted
+     apart the moment a field was added to one of them. */
+  function channelForm(view, opts) {
+    var v = opts.values || {};
     var card = el('div', 'card form-card');
     card.innerHTML =
-      '<form id="newChan">' +
+      '<form id="chanForm">' +
         '<div class="crest-pick"><span class="crest lg" id="crestPrev">···</span>' +
           '<span class="cp-note">The three letters shown wherever the club appears. ' +
           'Left alone, they are taken from the name.</span></div>' +
         '<div class="field"><label for="ncName">Channel name</label>' +
-          '<input id="ncName" placeholder="Enter club name" autocomplete="off" required></div>' +
+          '<input id="ncName" placeholder="Enter club name" autocomplete="off" required value="' +
+            esc(v.name || '') + '"></div>' +
         '<div class="f2">' +
           '<div class="field"><label for="ncSport">Sport</label>' +
             '<select id="ncSport">' + SPORTS.map(function (s) {
-              return '<option value="' + s[0] + '">' + s[1] + '</option>'; }).join('') + '</select></div>' +
+              return '<option value="' + s[0] + '"' + (v.sport === s[0] ? ' selected' : '') + '>' +
+                s[1] + '</option>'; }).join('') + '</select></div>' +
           '<div class="field"><label for="ncCountry">Country</label>' +
-            '<input id="ncCountry" list="countryList" value="Viet Nam" autocomplete="off">' +
+            '<input id="ncCountry" list="countryList" value="' + esc(v.country || 'Viet Nam') + '" autocomplete="off">' +
             '<datalist id="countryList">' + COUNTRIES.map(function (c) {
               return '<option value="' + esc(c) + '"></option>'; }).join('') + '</datalist></div>' +
         '</div>' +
@@ -1077,62 +1169,175 @@
            to the MATCH, which is where they are already read from: the fixture
            list shows each match's own, and the summary strip simply leaves the
            line out when the channel has none. */
-        '<div class="field"><label for="ncCrest">Monogram <span class="opt">optional</span></label>' +
-          '<input id="ncCrest" maxlength="4" placeholder="auto" autocomplete="off"></div>' +
+        '<div class="f2">' +
+          '<div class="field"><label for="ncCode">Team code <span class="opt">optional</span></label>' +
+            '<input id="ncCode" inputmode="numeric" maxlength="5" placeholder="5 digits" ' +
+              'autocomplete="off" value="' + esc(v.code || '') + '">' +
+            '<p class="field-note" id="ncCodeMsg">The code of this club’s team on the ' +
+              'labeling site. It is what tells a published match which of the two sides is yours.</p></div>' +
+          '<div class="field"><label for="ncCrest">Monogram <span class="opt">optional</span></label>' +
+            '<input id="ncCrest" maxlength="4" placeholder="auto" autocomplete="off" value="' +
+              esc(v.crest || '') + '"></div>' +
+        '</div>' +
         '<div class="form-end">' +
-          '<button class="btn btn-primary" type="submit" id="ncGo">Create channel</button>' +
+          '<button class="btn btn-primary" type="submit" id="ncGo">' + esc(opts.submit) + '</button>' +
+          (opts.cancel ? '<button class="btn btn-quiet" type="button" id="ncCancel">Cancel</button>' : '') +
           '<span class="form-msg" id="ncMsg"></span>' +
         '</div>' +
       '</form>';
     view.appendChild(card);
-    view.appendChild(el('p', 'note',
-      'Creating a channel makes you its admin. Matches reach it when an analyst points a tagged ' +
-      'match at it on the labeling site and marks it published.'));
+    view.appendChild(el('p', 'note', opts.note));
 
     var nameBox = card.querySelector('#ncName');
     var crestBox = card.querySelector('#ncCrest');
+    var codeBox = card.querySelector('#ncCode');
+    var codeMsg = card.querySelector('#ncCodeMsg');
     var prev = card.querySelector('#crestPrev');
+
     var sync = function () {
       var c = (crestBox.value || '').trim().toUpperCase();
       prev.textContent = c || (nameBox.value ? window.HNA.monogram(nameBox.value) : '···');
     };
     nameBox.addEventListener('input', sync);
     crestBox.addEventListener('input', sync);
+    sync();
 
-    card.querySelector('#newChan').addEventListener('submit', function (e) {
+    /* A code that names no team is refused by the database (0018), which is
+       the guarantee — but being told which team it IS before saving is what
+       makes a five-digit number something a person can check. */
+    var CODE_HELP = 'The code of this club’s team on the labeling site. It is what ' +
+      'tells a published match which of the two sides is yours.';
+    var lookupSeq = 0;
+    function lookup() {
+      var raw = (codeBox.value || '').trim();
+      var seq = ++lookupSeq;
+      if (!raw) { codeMsg.className = 'field-note'; codeMsg.textContent = CODE_HELP; return; }
+      if (!/^\d{5}$/.test(raw)) {
+        codeMsg.className = 'field-note';
+        codeMsg.textContent = 'A team code is 5 digits, like 10482.';
+        return;
+      }
+      codeMsg.className = 'field-note';
+      codeMsg.textContent = 'Looking that code up…';
+      window.HNA.teamByCode(raw).then(function (t) {
+        if (seq !== lookupSeq) return;             // a later keystroke has overtaken this
+        codeMsg.className = 'field-note' + (t ? ' ok' : ' err');
+        codeMsg.textContent = t
+          ? 'Matches ' + t.name + '. Published matches with this team on one side will read that side as yours.'
+          : 'No team on the labeling site has that code. Ask the analyst who tags your matches for it.';
+      }).catch(function () {
+        if (seq !== lookupSeq) return;
+        codeMsg.className = 'field-note';
+        codeMsg.textContent = 'That code could not be checked from here — it is still checked when you save.';
+      });
+    }
+    codeBox.addEventListener('input', lookup);
+    if (v.code) lookup();
+
+    if (opts.cancel) {
+      card.querySelector('#ncCancel').addEventListener('click', opts.cancel);
+    }
+
+    card.querySelector('#chanForm').addEventListener('submit', function (e) {
       e.preventDefault();
       var go = card.querySelector('#ncGo'), msg = card.querySelector('#ncMsg');
       go.disabled = true;
       msg.className = 'form-msg';
-      msg.textContent = 'Creating…';
-      window.HNA.channels.create({
+      msg.textContent = opts.busy;
+      opts.save({
         name: nameBox.value,
         crest: crestBox.value,
         sport: card.querySelector('#ncSport').value,
-        country: card.querySelector('#ncCountry').value
-      }).then(function (created) {
-        /* Re-read rather than trusting the row we just wrote: the role
-           comes from the membership the database made, not from here.
-           Matched on the slug, which this browser generated and which is
-           unique — the insert is not asked to return anything, so there is
-           no id to match on. See channels.create() for why. */
-        return window.HNA.clubs().then(function (clubs) {
-          state.channels = clubs || [];
-          var mine = state.channels.filter(function (c) { return c.slug === created.slug; })[0];
-          if (mine) {
-            state.channel = mine;
-            return loadMatches(mine).then(function () {
-              renderShell();
-              location.hash = '#/channel/' + encodeURIComponent(mine.slug);
-            });
-          }
-          location.hash = '#/channel';
-        });
+        country: card.querySelector('#ncCountry').value,
+        code: codeBox.value
       }).catch(function (err) {
         go.disabled = false;
         msg.className = 'form-msg err';
         msg.textContent = err.message || String(err);
       });
+    });
+  }
+
+  function renderChannelNew(view) {
+    var back = el('button', 'back', '&larr; All channels');
+    back.addEventListener('click', function () { location.hash = '#/channel'; });
+    view.appendChild(back);
+    view.appendChild(head('Create a new channel', 'One channel is one club'));
+
+    channelForm(view, {
+      submit: 'Create channel',
+      busy: 'Creating…',
+      note: 'Creating a channel makes you its admin. Matches reach it when an analyst points a tagged ' +
+            'match at it on the labeling site and marks it published.',
+      save: function (fields) {
+        return window.HNA.channels.create(fields).then(function (created) {
+          /* Re-read rather than trusting the row we just wrote: the role
+             comes from the membership the database made, not from here.
+             Matched on the slug, which this browser generated and which is
+             unique — the insert is not asked to return anything, so there is
+             no id to match on. See channels.create() for why. */
+          return window.HNA.clubs().then(function (clubs) {
+            state.channels = clubs || [];
+            var mine = state.channels.filter(function (c) { return c.slug === created.slug; })[0];
+            if (mine) {
+              state.channel = mine;
+              return loadMatches(mine).then(function () {
+                renderShell();
+                location.hash = '#/channel/' + encodeURIComponent(mine.slug);
+              });
+            }
+            location.hash = '#/channel';
+          });
+        });
+      }
+    });
+  }
+
+  /* ---------- editing one ----------
+     Same form, filled in. The slug is not among the fields: it is in every
+     link anyone has been sent to this channel, and renaming the club is not
+     a reason to break them. */
+  function renderChannelEdit(view, slug) {
+    var ch = ownChannels().filter(function (c) { return c.slug === slug; })[0];
+    if (!ch) { location.hash = '#/channel'; return; }
+    var backTo = function () { location.hash = '#/channel/' + encodeURIComponent(ch.slug); };
+
+    var back = el('button', 'back', '&larr; ' + esc(ch.name));
+    back.addEventListener('click', backTo);
+    view.appendChild(back);
+    view.appendChild(head('Channel settings', 'What this channel is called, and which team it is'));
+
+    if (ch.role !== 'admin') {
+      view.appendChild(emptyState('Not an admin of this channel',
+        'Only an admin can change a channel’s details. Ask whoever runs it.'));
+      return;
+    }
+
+    channelForm(view, {
+      values: ch,
+      submit: 'Save changes',
+      busy: 'Saving…',
+      cancel: backTo,
+      note: 'The channel’s web address does not change with its name — links already sent to ' +
+            'this channel go on working.',
+      save: function (fields) {
+        return window.HNA.channels.update(ch.id, fields).then(function () {
+          /* Re-read the list: the role comes from the membership, not from
+             the row that was just written. */
+          return window.HNA.clubs().then(function (clubs) {
+            state.channels = clubs || [];
+            var mine = state.channels.filter(function (c) { return c.id === ch.id; })[0];
+            if (state.channel && state.channel.id === ch.id) state.channel = mine || state.channel;
+            /* The team code may have changed which side is the club's, so the
+               matches are read again rather than reused. */
+            return loadMatches(state.channel).then(function () {
+              renderShell();
+              location.hash = '#/channel/' + encodeURIComponent((mine || ch).slug);
+              route();                              // same hash: nothing would redraw on its own
+            });
+          });
+        });
+      }
     });
   }
 

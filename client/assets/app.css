@@ -491,7 +491,11 @@ table.stbl tbody tr:last-child td{border-bottom:0}
 .inv .inv-r{margin-left:auto; font-family:var(--f-mono); font-size:10px; color:var(--ash-dim); letter-spacing:.08em; text-transform:uppercase}
 
 .form-card{max-width:640px}
-.form-card .f2{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:0 14px}
+.form-card .f2{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:0 14px; align-items:start}
+/* a .field is itself a grid, so a stretched one shares the extra height out
+   among its rows — which grew the Monogram box to match the Team code box
+   plus the note underneath it */
+.form-card .f2 .field{align-content:start}
 @media (max-width:560px){ .form-card .f2{grid-template-columns:minmax(0,1fr)} }
 .form-card .field label .opt{color:var(--ash-dim); letter-spacing:.06em; text-transform:none; opacity:.75}
 .form-card select{
@@ -499,6 +503,29 @@ table.stbl tbody tr:last-child td{border-bottom:0}
   padding:11px 12px; font-size:14px; font-family:var(--f-body); width:100%; cursor:pointer;
 }
 .form-card select:focus{outline:none; border-color:var(--red)}
+/* ---------- Settings menu on a channel ----------
+   The top bar's channel switcher is the same idea; it is not reused because
+   that one is wired to #chanWrap by id and there is only ever one of it. */
+.menu-wrap{position:relative; display:inline-flex}
+.menu-btn .caret{font-size:9px; margin-left:7px; color:var(--ash-dim); font-family:var(--f-body)}
+.menu{
+  display:none; position:absolute; top:calc(100% + 6px); right:0; z-index:30;
+  min-width:250px; padding:5px; background:var(--carbon); border:1px solid var(--line);
+  border-radius:3px; box-shadow:var(--shadow);
+}
+.menu-wrap.open .menu{display:block}
+.menu-opt{
+  display:block; width:100%; text-align:left; padding:9px 11px; border:0; border-radius:2px;
+  background:transparent; color:var(--ash); font:inherit; font-size:13.5px; cursor:pointer;
+}
+.menu-opt em{
+  display:block; font-style:normal; margin-top:3px;
+  font-family:var(--f-mono); font-size:9.5px; letter-spacing:.05em; color:var(--ash-dim);
+}
+.menu-opt:hover{background:color-mix(in srgb,var(--chalk) 6%, transparent); color:var(--chalk)}
+.menu-opt.danger:hover{background:color-mix(in srgb,var(--red) 14%, transparent); color:var(--red)}
+.menu-opt.danger:hover em{color:var(--red)}
+
 .crest-pick{display:flex; align-items:center; gap:14px; margin-bottom:22px}
 .crest.lg{width:52px; height:52px; border-radius:4px; font-size:15px}
 .cp-note{font-family:var(--f-mono); font-size:10px; color:var(--ash-dim); line-height:1.8; letter-spacing:.03em}
@@ -541,8 +568,12 @@ body.auth-page{display:grid; place-items:center; min-height:100vh; padding:24px}
   padding:11px 12px; font-size:14px; font-family:var(--f-body); width:100%;
 }
 .field input:focus{outline:none; border-color:var(--red)}
-/* the password rules, stated under the box rather than only on rejection */
+/* what a box wants, stated under it rather than only on rejection — the
+   password rules on the sign-in page, the team a code resolved to on the
+   channel form */
 .field-note{margin:0; font-family:var(--f-mono); font-size:10px; line-height:1.7; color:var(--ash-dim)}
+.field-note.ok{color:var(--green)}
+.field-note.err{color:var(--red)}
 .auth-card .btn{width:100%; justify-content:center; margin-top:6px}
 .msg{
   margin-top:16px; font-size:13px; padding:11px 13px; border-radius:2px;

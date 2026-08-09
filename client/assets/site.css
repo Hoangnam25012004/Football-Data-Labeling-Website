@@ -139,7 +139,12 @@ h3.display{font-size:clamp(20px,2.2vw,27px); line-height:1.08; letter-spacing:.0
   .nav-in.open .nav-links{display:flex}
   .nav-links a{padding:11px 0; font-size:15px; border-bottom:1px solid var(--line-soft)}
   .nav-links a::after{display:none}
-  .btn-quiet{display:none}
+  /* the Log in link, which the folded-out menu carries instead. Scoped to the
+     nav: unscoped it reached every .btn-quiet on the site, and the app's own
+     Cancel buttons vanished under 900px for a reason that has nothing to do
+     with them. The marketing header renders exactly as before — .nav-right is
+     where its only quiet button has always been. */
+  .nav-right .btn-quiet{display:none}
 }
 .nav-links .m-cta{display:none}
 @media (max-width:560px){

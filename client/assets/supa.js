@@ -75,10 +75,24 @@
       crest: x.crest_text || monogram(x.name),
       competition: x.competition || '', stage: x.stage || '',
       sport: x.sport || 'football', country: x.country || '',
+      /* the code of the team this channel IS (0018). Null until an admin
+         states it, and a match then falls back to our_side. */
+      code: x.code || null,
       isPublic: !!x.is_public,
       createdBy: x.created_by || null, createdAt: x.created_at || null,
       role: null
     };
+  }
+
+  /* A 5-digit team code, or null. Anything else is refused rather than
+     trimmed into shape: 0018 puts a foreign key on this column, and a
+     half-typed code should be a sentence here, not a constraint violation
+     from the far side. */
+  function teamCode(v) {
+    var s = String(v == null ? '' : v).trim();
+    if (!s) return null;
+    if (!/^\d{5}$/.test(s)) throw new Error('A team code is 5 digits, like 10482. Leave it blank if you do not have one.');
+    return s;
   }
 
   var ROLE_ORDER = ['admin', 'analyst', 'viewer'];
@@ -107,6 +121,11 @@
         ? 'The database would not let this account create a channel. Check that you are still signed in.'
         : 'Your account is not an admin of this channel.');
     if (code === '23505') return new Error('That already exists in this channel.');
+    /* 0018 puts a foreign key from clubs.code to teams.code, so a code that
+       names no team is refused by the database rather than saved and
+       silently ignored later. */
+    if (code === '23503' || /clubs_team_code_fk/.test(msg))
+      return new Error('No team on the labeling site has that code. Ask the analyst who tags your matches for it, or leave it blank.');
     if (/must keep at least one admin/i.test(msg))
       return new Error('A channel must keep at least one admin — make someone else an admin first.');
     return new Error(msg);
@@ -255,17 +274,22 @@
         if (!c) return Promise.reject(new Error('The Supabase client did not load.'));
         var name = String(fields.name || '').trim();
         if (!name) return Promise.reject(new Error('Give the channel a name.'));
-        var row = {
-          slug: slugify(name),
-          name: name,
-          crest_text: (fields.crest ? String(fields.crest).trim().toUpperCase() : monogram(name)).slice(0, 4),
-          sport: fields.sport || 'football',
-          country: fields.country || null
-          /* competition / stage are deliberately not set. They belong to a
-             match, not to a club — one club plays in several competitions, and
-             the columns stay on public.clubs only because channels seeded
-             before this still carry them. */
-        };
+        var row;
+        try {
+          row = {
+            slug: slugify(name),
+            name: name,
+            crest_text: (fields.crest ? String(fields.crest).trim().toUpperCase() : monogram(name)).slice(0, 4),
+            sport: fields.sport || 'football',
+            country: fields.country || null,
+            /* which team on the labeling site this channel is (0018) */
+            code: teamCode(fields.code)
+            /* competition / stage are deliberately not set. They belong to a
+               match, not to a club — one club plays in several competitions, and
+               the columns stay on public.clubs only because channels seeded
+               before this still carry them. */
+          };
+        } catch (e) { return Promise.reject(e); }
         /* No .select() on the way back, and that is the whole point.
            Adding one makes the statement INSERT ... RETURNING, and Postgres
            then requires the new row to satisfy the SELECT policy before it
@@ -288,9 +312,47 @@
           });
       },
 
-      /* Renaming and deleting a channel are not offered: 0014 leaves both
-         with its admins, but nothing in the UI asks for them yet, and an
-         API call no screen makes is an API call nobody has tried. */
+      /* ---------- changing one, and removing one ----------
+         0014 left both with a channel's admins and clubs_update /
+         clubs_delete are what decide, not these two functions.
+
+         The slug is deliberately not among the fields: it is in the URL of
+         every link anyone has ever been sent to this channel, and renaming a
+         club is not a reason to break them. */
+      update: function (clubId, fields) {
+        var c = client();
+        if (!c) return Promise.reject(new Error('The Supabase client did not load.'));
+        var name = String(fields.name || '').trim();
+        if (!name) return Promise.reject(new Error('Give the channel a name.'));
+        var row;
+        try {
+          row = {
+            name: name,
+            crest_text: (fields.crest ? String(fields.crest).trim().toUpperCase() : monogram(name)).slice(0, 4),
+            sport: fields.sport || 'football',
+            country: fields.country || null,
+            code: teamCode(fields.code)
+          };
+        } catch (e) { return Promise.reject(e); }
+        return c.from('clubs').update(row).eq('id', clubId).select('*').single()
+          .then(function (r) {
+            if (r.error) throw asError(r.error);
+            return shapeClub(r.data);
+          });
+      },
+
+      /* Nothing else goes with it. matches.club_id and match_reports.club_id
+         are both ON DELETE SET NULL (0013, 0016), so the matches and the
+         analyses survive in the database — they simply stop belonging to a
+         channel, and nothing on this site can reach them again. The screen
+         says so before it calls this. */
+      remove: function (clubId) {
+        var c = client();
+        if (!c) return Promise.reject(new Error('The Supabase client did not load.'));
+        return c.from('clubs').delete().eq('id', clubId)
+          .then(function (r) { if (r.error) throw asError(r.error); return true; });
+      },
+
       members: function (clubId) {
         var c = client();
         if (!c) return Promise.resolve([]);
@@ -390,8 +452,26 @@
       }
     },
 
-    /* ---------- matches in a channel ---------- */
-    matches: function (clubId) {
+    /* ---------- one team, by the code quoted to a club (0018) ----------
+       What the Create / Edit channel form calls to say WHICH team a typed
+       code is, before the channel is saved with it. */
+    teamByCode: function (code) {
+      var c = client();
+      var s = String(code == null ? '' : code).trim();
+      if (!c || !/^\d{5}$/.test(s)) return Promise.resolve(null);
+      return c.from('teams').select('id,name,short_name,code').eq('code', s).limit(1)
+        .then(function (r) {
+          if (r.error) throw asError(r.error);
+          var t = (r.data || [])[0];
+          return t ? { id: t.id, name: t.name, shortName: t.short_name || '', code: t.code } : null;
+        });
+    },
+
+    /* ---------- matches in a channel ----------
+       `clubCode` is the channel's own team code (0018). Given one, which side
+       of a fixture belongs to the client is answered by the match itself
+       rather than by our_side — see resolveSide(). Left out, nothing changes. */
+    matches: function (clubId, clubCode) {
       var c = client();
       if (!c) return Promise.resolve([]);
       return c.from('matches')
@@ -399,7 +479,7 @@
            match_code: that is the name of the trigger function that fills
            it in. Asking for a column that is not there fails the whole
            query, which is why this returned nothing at all. */
-        .select('id,code,home_name,away_name,home_score,away_score,kickoff,competition,stage,venue,our_side,published,lineups,config')
+        .select('id,code,home_name,away_name,home_score,away_score,kickoff,competition,stage,venue,our_side,published,lineups,config,home_team_id,away_team_id')
         .eq('club_id', clubId).eq('published', true)
         .order('kickoff', { ascending: true })
         .then(function (r) {
@@ -410,19 +490,60 @@
            an anonymous visitor is kept off it entirely (0017). The narrowed
            one filters to public channels itself. */
         return c.from(anonymous ? 'public_match_stats' : 'match_stats').select('*').in('match_id', ids)
-            .then(function (s) { return shape(rows, (s && s.data) || []); })
-            .catch(function () { return shape(rows, []); });
+            .then(function (s) {
+              return teamCodes(rows).then(function (byTeam) { return shape(rows, (s && s.data) || [], byTeam); });
+            })
+            .catch(function () { return shape(rows, [], {}); });
         })
         .catch(function () { return []; });
 
-      function shape(rows, statRows) {
+      /* team id -> its 5-digit code, for the matches just read. Skipped when
+         the channel has no code to compare against, and allowed to come back
+         empty: public.teams is `to authenticated`, so a signed-out visitor
+         reading a public channel gets nothing here and our_side answers, the
+         same as it always did. */
+      function teamCodes(rows) {
+        if (!clubCode) return Promise.resolve({});
+        var ids = [];
+        rows.forEach(function (m) {
+          if (m.home_team_id) ids.push(m.home_team_id);
+          if (m.away_team_id) ids.push(m.away_team_id);
+        });
+        if (!ids.length) return Promise.resolve({});
+        return c.from('teams').select('id,code').in('id', ids)
+          .then(function (r) {
+            var out = {};
+            ((r && r.data) || []).forEach(function (t) { if (t.code) out[t.id] = t.code; });
+            return out;
+          })
+          .catch(function () { return {}; });
+      }
+
+      /* Which side of this fixture is the client's.
+
+         our_side is set on the tagging side and defaults to 'home', with
+         nothing checking it against the channel a match was published to —
+         so where the channel names its team and the match names both teams,
+         the match is asked instead. Only an UNAMBIGUOUS answer wins: both
+         sides carrying the channel's code, or neither, leaves our_side alone
+         rather than guessing. */
+      function resolveSide(m, byTeam) {
+        var stored = m.our_side === 'away' ? 'away' : 'home';
+        if (!clubCode) return stored;
+        var h = byTeam[m.home_team_id], a = byTeam[m.away_team_id];
+        if (h === clubCode && a !== clubCode) return 'home';
+        if (a === clubCode && h !== clubCode) return 'away';
+        return stored;
+      }
+
+      function shape(rows, statRows, byTeam) {
         var byMatch = {};
         statRows.forEach(function (s) {
           byMatch[s.match_id] = byMatch[s.match_id] || {};
           byMatch[s.match_id][s.team] = s;
         });
         return rows.map(function (m) {
-          var side = m.our_side === 'away' ? 'away' : 'home';
+          var side = resolveSide(m, byTeam || {});
           var other = side === 'home' ? 'away' : 'home';
           var ourScore = side === 'home' ? m.home_score : m.away_score;
           var theirScore = side === 'home' ? m.away_score : m.home_score;

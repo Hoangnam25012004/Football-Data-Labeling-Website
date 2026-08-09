@@ -305,7 +305,7 @@ test('an address that is not an address never reaches the database', () => {
 test('the API offers exactly what a screen calls, and nothing spare', () => {
   const {api}=loadAPI(()=>({data:[],error:null}));
   const surface=Object.keys(api.channels).sort().join(',');
-  eq(surface,'claim,create,invite,invites,members,removeMember,revokeInvite,setPublic,setRole');
+  eq(surface,'claim,create,invite,invites,members,remove,removeMember,revokeInvite,setPublic,setRole,update');
   // every one of them is reached from a screen
   Object.keys(api.channels).forEach(fn=>{
     ok(new RegExp('channels\\.'+fn+'\\(').test(APPJS),'channels.'+fn+' is called by the app');
