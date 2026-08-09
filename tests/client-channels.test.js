@@ -28,7 +28,7 @@ const bare=s=>s.replace(/--[^\n]*/g,'');
 const viewBody=src=>/create or replace view public\.match_stats as([\s\S]*?);/.exec(bare(src))[1];
 
 /* ---------- a Supabase client that answers from a handler ---------- */
-function fakeDB(handler){
+function fakeDB(handler,session){
   const calls=[];
   function chain(state){
     const api={
@@ -56,14 +56,17 @@ function fakeDB(handler){
       delete(){return chain({table,op:'delete',filters:[]});}
     };},
     rpc(fn,args){return chain({table:null,op:'rpc',fn,args,filters:[]});},
-    auth:{getSession:()=>Promise.resolve({data:{session:null}})}
+    // a signed-in caller by default; clubs() needs an id to scope the
+    // membership read to. Pass null for a signed-out visitor.
+    auth:{getSession:()=>Promise.resolve({data:{session:session===undefined
+      ?{user:{id:'u1',email:'me@club.com'}}:session}})}
   };
   return {client,calls};
 }
 
 /* Load supa.js the way app.html does, against that client. */
-function loadAPI(handler){
-  const db=fakeDB(handler||(()=>({data:[],error:null})));
+function loadAPI(handler,session){
+  const db=fakeDB(handler||(()=>({data:[],error:null})),session);
   const win={supabase:{createClient:()=>db.client}};
   const ctx={console,window:win,URLSearchParams,Promise};
   vm.createContext(ctx);
@@ -135,18 +138,39 @@ const res={};
   api.channels.members('c1').then(m=>{res.members=m;},e=>{res.membersErr=e;});
 })();
 
-/* the channel list, with the caller's own role merged in */
+/* the channel list, with the caller's own role merged in.
+
+   club_members answers the way the database does: club_members_read lets a
+   member read EVERY membership row of a channel they are in, so an unfiltered
+   read gets somebody else's role too — and it is deliberately returned last,
+   which is what the old unfiltered loop kept. Drop the .eq('user_id') from
+   clubs() and the caller comes back a viewer. */
 (function(){
   const {api,calls}=loadAPI(s=>{
     if(s.table==='clubs') return {data:[
       {id:'c1',slug:'saint-lucia',name:'Saint Lucia',crest_text:'SLU',sport:'football',country:'Saint Lucia'},
       {id:'c9',slug:'other',name:'Other Club'}
     ],error:null};
-    if(s.table==='club_members') return {data:[{club_id:'c1',role:'admin'}],error:null};
+    if(s.table==='club_members'){
+      const all=[{club_id:'c1',user_id:'u1',role:'admin'},
+                 {club_id:'c1',user_id:'u2',role:'viewer'}];
+      const f=s.filters.filter(x=>x[1]==='user_id')[0];
+      return {data:f?all.filter(r=>r.user_id===f[2]):all,error:null};
+    }
     return {data:[],error:null};
   });
   res.clubCalls=calls;
   api.clubs().then(c=>{res.clubs=c;},e=>{res.clubsErr=e;});
+})();
+
+/* the same list for a signed-out visitor, who is reading a public channel */
+(function(){
+  const {api,calls}=loadAPI(s=>{
+    if(s.table==='clubs') return {data:[{id:'c1',slug:'open',name:'Open',is_public:true}],error:null};
+    return {data:[],error:null};
+  },null);
+  res.anonCalls=calls;
+  api.clubs().then(c=>{res.anonClubs=c;},e=>{res.anonErr=e;});
 })();
 
 /* the invite-claiming RPC is missing: the app must still open */
@@ -306,6 +330,28 @@ test('the channel list carries the role the caller holds in each', () => {
   eq(res.clubs.length,2);
   eq(res.clubs.filter(c=>c.slug==='saint-lucia')[0].role,'admin');
   eq(res.clubs.filter(c=>c.slug==='other')[0].role,null,'no membership row means no role');
+});
+
+test('and it is the CALLER-s role, not whichever member came back last', () => {
+  // club_members_read lets anyone in a channel read every membership row of it,
+  // so an unfiltered read answers with other people's roles as well and the last
+  // one wins — with no ORDER BY, an arbitrary one. An admin shown as a viewer
+  // loses the invite form and the public switch, both gated on this value.
+  const read=one(res.clubCalls,'club_members','select');
+  ok(read,'the membership read happened');
+  const f=read.filters.filter(x=>x[1]==='user_id')[0];
+  ok(f,'it is scoped to a user_id');
+  eq(f[2],'u1','and that user is the signed-in caller');
+  eq(res.clubs.filter(c=>c.slug==='saint-lucia')[0].role,'admin',
+     'the viewer row returned after it did not overwrite the answer');
+});
+
+test('a signed-out visitor gets channels with no role, and no membership read', () => {
+  // a public channel (0017) is readable without a session; there is no
+  // membership to look up and asking would only return nothing
+  eq(res.anonClubs.length,1,'the channel still comes back');
+  eq(res.anonClubs[0].role,null,'with no role');
+  notOk(one(res.anonCalls,'club_members'),'and club_members was never asked');
 });
 
 test('clubs is read with select(*) so a database without 0014 still answers', () => {

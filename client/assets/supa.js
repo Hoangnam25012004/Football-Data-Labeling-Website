@@ -177,21 +177,37 @@
     clubs: function () {
       var c = client();
       if (!c) return Promise.resolve([]);
-      return c.from('clubs').select('*').order('name')
-        .then(function (r) {
-          if (r.error || !r.data) return [];
-          var rows = r.data.map(shapeClub);
-          /* which of them the signed-in person administers */
-          return c.from('club_members').select('club_id,role')
-            .then(function (m) {
-              var role = {};
-              ((m && m.data) || []).forEach(function (x) { role[x.club_id] = x.role; });
-              rows.forEach(function (x) { x.role = role[x.id] || null; });
-              return rows;
-            })
-            .catch(function () { return rows; });
-        })
-        .catch(function () { return []; });
+      /* The session is read first because the membership query below needs
+         the caller's own id to filter on, and getting it wrong is not a
+         cosmetic matter — see the .eq() there. */
+      return API.auth.session().catch(function () { return null; }).then(function (s) {
+        var me = (s && s.user && s.user.id) || null;
+        return c.from('clubs').select('*').order('name')
+          .then(function (r) {
+            if (r.error || !r.data) return [];
+            var rows = r.data.map(shapeClub);
+            /* A signed-out visitor is reading a public channel (0017). They hold
+               no membership anywhere, so there is no role to look up and asking
+               would only return nothing. */
+            if (!me) return rows;
+            /* Which role THIS account holds in each of them. The .eq is not
+               optional: club_members_read lets anyone in a channel read every
+               membership row of that channel, so without it the answer includes
+               other people's roles — and the loop below keeps whichever arrived
+               last. There is no ORDER BY, so which one that is, is not defined.
+               An admin could be shown as a viewer and silently lose the invite
+               form and the public switch, both of which are gated on this. */
+            return c.from('club_members').select('club_id,role').eq('user_id', me)
+              .then(function (m) {
+                var role = {};
+                ((m && m.data) || []).forEach(function (x) { role[x.club_id] = x.role; });
+                rows.forEach(function (x) { x.role = role[x.id] || null; });
+                return rows;
+              })
+              .catch(function () { return rows; });
+          });
+      })
+      .catch(function () { return []; });
     },
 
     /* ---------- running a channel ----------
