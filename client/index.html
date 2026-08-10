@@ -193,6 +193,19 @@
 .cta h2{margin-inline:auto}
 .cta .lede{margin-inline:auto; text-align:center}
 .cta-btns{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:32px}
+/* mailto: opens nothing on a machine with no mail client registered, and there is
+   no way to detect that from here — so the address is also on the page, in the open. */
+.cta-mail{
+  margin:20px 0 0; font-family:var(--f-mono); font-size:12px; letter-spacing:.06em;
+  color:var(--ash-dim); display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap;
+}
+.mail-copy{
+  font:inherit; letter-spacing:inherit; color:var(--chalk); background:none; border:0;
+  border-bottom:1px dashed var(--line); padding:2px 0; cursor:pointer;
+  transition:color .2s, border-color .2s;
+}
+.mail-copy:hover{color:var(--red); border-bottom-color:var(--red)}
+.cta-mail .done{color:var(--red)}
 
 /* scroll reveals */
 .js .reveal{opacity:0; transform:translateY(20px)}
@@ -313,7 +326,7 @@
       <article class="step">
         <span class="step-n">01 — SEND FOOTAGE</span>
         <h3 class="display">You send the footage</h3>
-        <p>A fixed camera on the stand, a broadcast recording, even a phone on a tripod. If the whole pitch is in frame, we can work with it. Upload in the browser or drop a link.</p>
+        <p>Footage from your Veo, or a match already up on YouTube — those are the two we work from most. Anything else is fine as long as the whole pitch stays in frame. Send the file, or just send the link.</p>
       </article>
       <article class="step">
         <span class="step-n">02 — WE TAG IT</span>
@@ -551,6 +564,10 @@
       <a class="btn btn-primary" href="mailto:dnam2501@gmail.com?subject=Match%20analysis%20enquiry">Email us</a>
       <a class="btn btn-ghost" href="app.html">Open your channel</a>
     </div>
+    <p class="cta-mail">
+      <span id="mailHint">or write to</span>
+      <button type="button" class="mail-copy" id="mailCopy" data-mail="dnam2501@gmail.com">dnam2501@gmail.com</button>
+    </p>
   </div>
 </section>
 
@@ -621,6 +638,39 @@
         navIn.classList.remove('open');
         navToggle.setAttribute('aria-expanded', 'false');
       });
+    });
+  }
+
+  /* The address, for the visitor whose "Email us" click opened nothing. Clipboard
+     first; where that is refused (no permission, or an insecure context) fall back
+     to selecting the text so a plain Ctrl+C still works. */
+  var mailBtn = document.getElementById('mailCopy'), mailHint = document.getElementById('mailHint');
+  if (mailBtn && mailHint) {
+    var hintText = mailHint.textContent, hintTimer = null;
+    /* The hint carries the feedback, never the button: the fallback leaves the
+       address selected for Ctrl+C, and rewriting the button would drop that
+       selection on the floor. */
+    function say(msg) {
+      mailHint.textContent = msg;
+      mailHint.classList.add('done');
+      clearTimeout(hintTimer);
+      hintTimer = setTimeout(function () {
+        mailHint.textContent = hintText; mailHint.classList.remove('done');
+      }, 2400);
+    }
+    function selectAddress() {
+      var r = document.createRange(); r.selectNodeContents(mailBtn);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      say('press Ctrl+C —');
+    }
+    mailBtn.addEventListener('click', function () {
+      // rejected without a real user gesture, and on any insecure origin
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(mailBtn.dataset.mail)
+          .then(function () { say('copied —'); }, selectAddress);
+      } else {
+        selectAddress();
+      }
     });
   }
 
