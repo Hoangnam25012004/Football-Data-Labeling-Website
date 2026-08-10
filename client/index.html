@@ -103,20 +103,16 @@
 .strip-in{display:flex; align-items:center; gap:clamp(18px,3.4vw,44px); flex-wrap:wrap}
 .strip-lbl{font-family:var(--f-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--ash-dim); flex:none}
 .partner{
-  display:flex; align-items:center; gap:10px; color:var(--chalk); font-family:var(--f-display);
+  display:flex; align-items:center; gap:12px; color:var(--chalk); font-family:var(--f-display);
   font-stretch:87.5%; font-weight:700; text-transform:uppercase; letter-spacing:.07em; font-size:16px;
-  text-decoration:none; border:1px solid var(--line); padding:8px 15px; border-radius:2px;
+  text-decoration:none; border:1px solid var(--line); padding:8px 16px 8px 10px; border-radius:2px;
   transition:border-color .22s;
 }
-.partner::before{content:""; width:14px; height:14px; border-radius:50%; border:2px solid var(--red); flex:none}
+/* the club's real crest, not a stand-in mark. It is navy on a near-black strip,
+   so it keeps its own pale ring — no backing plate, which would read as a sticker. */
+.partner-crest{width:36px; height:36px; flex:none; display:block; object-fit:contain}
 .partner:hover{border-color:var(--red)}
 .partner small{font-family:var(--f-mono); font-size:9.5px; font-weight:400; letter-spacing:.1em; color:var(--ash-dim); text-transform:none}
-.ph-logo{
-  display:flex; align-items:center; gap:9px; color:var(--ash-dim); font-family:var(--f-display);
-  font-stretch:87.5%; font-weight:700; text-transform:uppercase; letter-spacing:.08em; font-size:14px;
-  opacity:.6; border:1px dashed var(--line); padding:7px 14px; border-radius:2px;
-}
-.ph-logo::before{content:""; width:14px; height:14px; border-radius:50%; border:1.5px dashed currentColor}
 
 .sec{padding:clamp(64px,8vw,120px) 0; position:relative}
 .sec-head{max-width:70ch; margin-bottom:clamp(34px,4.5vw,58px)}
@@ -187,16 +183,6 @@
 }
 .buy p{margin:0; color:var(--ash); font-size:14px; flex:1}
 .buy .btn{align-self:flex-start}
-
-.slot{
-  border:1px dashed var(--line); border-radius:3px; padding:clamp(26px,3vw,40px);
-  text-align:center; color:var(--ash-dim); background:var(--carbon);
-}
-.slot b{
-  display:block; font-family:var(--f-display); font-stretch:87.5%; text-transform:uppercase;
-  letter-spacing:.05em; color:var(--ash); font-size:16px; margin-bottom:8px;
-}
-.slot p{margin:0 auto; font-size:13px; max-width:56ch}
 
 .cta{position:relative; overflow:hidden; border-top:1px solid var(--line)}
 .cta::before{
@@ -306,11 +292,10 @@
   <div class="wrap strip-in">
     <span class="strip-lbl">Working with</span>
     <a class="partner" href="https://www.linkedin.com/company/hanley-town-football-club/" target="_blank" rel="noopener">
+      <img class="partner-crest" src="assets/hanley-town.png?v=1" width="36" height="36"
+           alt="" loading="lazy" decoding="async">
       Hanley Town FC <small>Stoke-on-Trent</small>
     </a>
-    <span class="ph-logo">Club slot</span>
-    <span class="ph-logo">Academy slot</span>
-    <span class="ph-logo">League slot</span>
   </div>
 </div>
 
@@ -361,7 +346,7 @@
         <div class="mod-ico"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 27h22"/><rect x="9" y="4" width="14" height="9" rx="1"/><path d="M9 8.5h14"/><path d="M12 24 20 12" stroke-dasharray="2 2"/><circle cx="12" cy="24" r="2"/><circle cx="20" cy="12" r="1.6" fill="currentColor"/></svg></div>
         <h3>Shot map</h3>
         <p>Every shot carries where it was struck from and where it crossed the line. The goal stands beside the pitch, so it reads as one thing: struck here, ended up there.</p>
-        <div class="tags"><span class="tag">goal_x / goal_y</span><span class="tag">xG</span></div>
+        <div class="tags"><span class="tag">goal_x / goal_y</span><span class="tag">on / off / blocked</span></div>
       </article>
       <article class="mod">
         <div class="mod-ico"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="9" r="2.6"/><circle cx="24" cy="8" r="2.6"/><circle cx="16" cy="17" r="2.6"/><circle cx="7" cy="24" r="2.6"/><circle cx="25" cy="24" r="2.6"/><path d="M10 10.5 14 15M22 10 18 15M14.5 19 9 22M17.5 19 23 22"/></svg></div>
@@ -372,8 +357,8 @@
       <article class="mod">
         <div class="mod-ico"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="16" cy="9" r="4.5"/><path d="M6 27c0-5.5 4.5-9 10-9s10 3.5 10 9"/><path d="M16 22v5" stroke-dasharray="2 2"/></svg></div>
         <h3>Player profile</h3>
-        <p>Per-90 numbers, a touch heat map for each half, and percentile ranks against every player we hold in the same position.</p>
-        <div class="tags"><span class="tag">per 90</span><span class="tag">percentile</span><span class="tag">season view</span></div>
+        <p>Every metric we count for that player, a touch heat map for each half, and a profile radar that puts the shape of their game on one picture.</p>
+        <div class="tags"><span class="tag">touch heat map</span><span class="tag">profile radar</span><span class="tag">season totals</span></div>
       </article>
       <article class="mod">
         <div class="mod-ico"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 3 27 7v9c0 7-5 11.5-11 13C10 27.5 5 23 5 16V7z"/><path d="M11 16.5 14.5 20 21 13"/></svg></div>
@@ -383,9 +368,9 @@
       </article>
       <article class="mod">
         <div class="mod-ico"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 4v16m0 0-5.5-5.5M16 20l5.5-5.5"/><path d="M5 22v4a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2v-4"/></svg></div>
-        <h3>Exports &amp; API</h3>
-        <p>XLSX, CSV and PDF to download. Or pull the raw events straight into whatever you already use, through a REST API and a webhook that fires when a match is signed off.</p>
-        <div class="tags"><span class="tag">XLSX</span><span class="tag">CSV</span><span class="tag">REST API</span></div>
+        <h3>Exports</h3>
+        <p>The whole match as one workbook: every event in match order, both squads' player stats, both passing matrices and the team comparison. XLSX for Excel, a CSV per sheet, PDF for the report itself.</p>
+        <div class="tags"><span class="tag">XLSX</span><span class="tag">CSV</span><span class="tag">PDF</span></div>
       </article>
     </div>
   </div>
@@ -446,37 +431,39 @@
       <p class="eyebrow">Raw data</p>
       <h2 class="display">You own the data,<br>not a screenshot of it</h2>
       <p class="lede">
-        Every event is a structured row. Whoever does your analysis pulls XLSX, CSV, or calls
-        the API directly — nobody has to retype numbers out of a PDF.
+        Every event is a structured row. Whoever does your analysis opens the workbook —
+        or one CSV per sheet — and works from exactly the numbers the report was built on.
+        Nobody has to retype anything out of a PDF.
       </p>
     </div>
     <div class="spec reveal">
       <div class="code">
-        <div class="code-h"><span style="color:var(--red)">●</span> GET /v1/matches/{id}/events</div>
-<pre><span class="c">// a shot on target, carrying where it crossed the line</span>
-{
-  <span class="k">"event_name"</span>:  <span class="s">"#shot on target"</span>,
-  <span class="k">"team"</span>:        <span class="s">"home"</span>,
-  <span class="k">"player_from"</span>: <span class="n">14</span>,
-  <span class="k">"x"</span>: <span class="n">78.4</span>,  <span class="k">"y"</span>: <span class="n">41.2</span>,      <span class="c">// where it was struck (0–100)</span>
-  <span class="k">"goal_x"</span>: <span class="n">31.0</span>, <span class="k">"goal_y"</span>: <span class="n">18.5</span>, <span class="c">// where it crossed the line</span>
-  <span class="k">"t_seconds"</span>: <span class="n">4034.2</span>,
-  <span class="k">"half"</span>: <span class="n">2</span>,
-  <span class="k">"attributes"</span>: { <span class="k">"body_part"</span>: <span class="s">"left_foot"</span> }
-}</pre>
+        <div class="code-h"><span style="color:var(--red)">●</span> events_1st_half.csv</div>
+<pre><span class="c">// one row of the workbook: a shot on target</span>
+<span class="k">no</span>              <span class="n">7</span>
+<span class="k">timecode</span>        <span class="s">12:04.65</span>
+<span class="k">match_seconds</span>   <span class="n">724.65</span>    <span class="c">// match clock, not video time</span>
+<span class="k">team_name</span>       <span class="s">Saint Lucia</span>
+<span class="k">event</span>           <span class="s">shot on target</span>
+<span class="k">player_from</span>     <span class="n">14</span>
+<span class="k">player_x</span>        <span class="n">78.4</span>      <span class="c">// where it was struck (0–100)</span>
+<span class="k">player_y</span>        <span class="n">41.2</span>
+<span class="k">player_to</span>       <span class="c">—         // a shot has no receiver</span>
+<span class="k">receiver_x</span>      <span class="c">—</span>
+<span class="k">receiver_y</span>      <span class="c">—</span></pre>
       </div>
       <div>
-        <p class="card-h" style="margin-bottom:12px">Event dictionary <span class="right">18 of 60+</span></p>
+        <p class="card-h" style="margin-bottom:12px">Event dictionary <span class="right">18 of 38</span></p>
         <div class="chips">
           <span class="tag">#pass success</span><span class="tag">#pass fail</span>
           <span class="tag">#cross success</span><span class="tag">#cross fail</span>
           <span class="tag">#shot on target</span><span class="tag">#shot off target</span>
-          <span class="tag">#goal</span><span class="tag">#shot blocked</span>
-          <span class="tag">#take-on</span><span class="tag">#step in</span>
-          <span class="tag">#tackle</span><span class="tag">#interception</span>
-          <span class="tag">#clearance</span><span class="tag">#aerial duel</span>
-          <span class="tag">#foul</span><span class="tag">#foul won</span>
-          <span class="tag">#offside</span><span class="tag">#substitution</span>
+          <span class="tag">#blocked shot</span><span class="tag">#goal</span>
+          <span class="tag">#assist</span><span class="tag">#key pass</span>
+          <span class="tag">#take-on success</span><span class="tag">#step in</span>
+          <span class="tag">#tackle success</span><span class="tag">#interception</span>
+          <span class="tag">#clearance</span><span class="tag">#aerial duel success</span>
+          <span class="tag">#foul</span><span class="tag">#offside</span>
         </div>
         <div class="card" style="margin-top:22px">
           <p class="card-h">Every row carries</p>
@@ -484,29 +471,16 @@
             <table class="dt">
               <thead><tr><th>Field</th><th>What it is</th></tr></thead>
               <tbody>
-                <tr><td class="mono" style="color:var(--rival)">event_name</td><td style="text-align:left;color:var(--ash)">What happened</td></tr>
-                <tr><td class="mono" style="color:var(--rival)">player_from / to</td><td style="text-align:left;color:var(--ash)">Who played it · who received it</td></tr>
-                <tr><td class="mono" style="color:var(--rival)">x, y / rx, ry</td><td style="text-align:left;color:var(--ash)">Both ends of the action</td></tr>
-                <tr><td class="mono" style="color:var(--rival)">t_seconds, half</td><td style="text-align:left;color:var(--ash)">Timestamp to the second</td></tr>
-                <tr><td class="mono" style="color:var(--rival)">attributes</td><td style="text-align:left;color:var(--ash)">Anything bespoke you ask us to track</td></tr>
+                <tr><td class="mono" style="color:var(--rival)">event</td><td style="text-align:left;color:var(--ash)">What happened</td></tr>
+                <tr><td class="mono" style="color:var(--rival)">player_from / player_to</td><td style="text-align:left;color:var(--ash)">Who played it · who received it</td></tr>
+                <tr><td class="mono" style="color:var(--rival)">player_x,y / receiver_x,y</td><td style="text-align:left;color:var(--ash)">Both ends of the action, 0–100</td></tr>
+                <tr><td class="mono" style="color:var(--rival)">timecode / match_seconds</td><td style="text-align:left;color:var(--ash)">Where in the match it happened</td></tr>
+                <tr><td class="mono" style="color:var(--rival)">team / team_name</td><td style="text-align:left;color:var(--ash)">Which side played it</td></tr>
               </tbody>
             </table>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-</section>
-
-<section class="sec" style="padding-top:0">
-  <div class="wrap reveal">
-    <div class="slot">
-      <b>Reserved for a client quote</b>
-      <p>
-        Replace this block with a real quote from Hanley Town — a named person, their role,
-        and the club crest. It is the most persuasive block on the page, so it stays empty
-        until there is something true to put in it.
-      </p>
     </div>
   </div>
 </section>
@@ -538,12 +512,12 @@
             <li>Match report (PDF &amp; web)</li>
             <li>Shot maps with goal-line placement</li>
             <li>Passing networks &amp; matrix</li>
-            <li>Player profiles &amp; percentile ranks</li>
+            <li>Player profiles &amp; profile radars</li>
             <li>Touch heat maps per half</li>
             <li>Defensive maps</li>
-            <li>Auto-cut clip library</li>
+            <li>Foul maps &amp; goalkeeper numbers</li>
+            <li>Match timeline &amp; starting formations</li>
             <li>XLSX / CSV / PDF exports</li>
-            <li>REST API &amp; webhooks</li>
             <li>Bespoke metrics on request</li>
           </ul>
         </div>
@@ -598,7 +572,7 @@
         <li><a href="#product">Match report</a></li>
         <li><a href="#product">Player profile</a></li>
         <li><a href="#product">Shot maps</a></li>
-        <li><a href="#data">API</a></li>
+        <li><a href="#data">Raw data</a></li>
       </ul></div>
       <div><h5>Platform</h5><ul>
         <li><a href="app.html">Your channel</a></li>
@@ -607,15 +581,14 @@
         <li><a href="#contact">Contact</a></li>
       </ul></div>
       <div><h5>Company</h5><ul>
-        <li><a href="#top">About</a></li>
-        <li><a href="#contact">Careers</a></li>
-        <li><a href="#top">Terms</a></li>
-        <li><a href="#top">Privacy</a></li>
+        <li><a href="#process">How it works</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="mailto:dnam2501@gmail.com">Email us</a></li>
       </ul></div>
     </div>
     <div class="foot-btm">
       <span>© 2026 HoangNam Analytics</span>
-      <span class="sp">Red #E0122B · Black #000000</span>
+      <span class="sp"><a href="mailto:dnam2501@gmail.com">dnam2501@gmail.com</a></span>
     </div>
   </div>
 </footer>
@@ -675,12 +648,14 @@
 
   /* hero clock + event feed */
   var feed = document.getElementById('feedList'), clock = document.getElementById('sbClock');
+  /* names here have to match the real event dictionary — this feed is the first
+     thing a visitor reads, and it is the same list the #data chips come from */
   var EVENTS = [
-    { ev: '#pass success', pl: '8 → 14' }, { ev: '#take-on', pl: '7' },
+    { ev: '#pass success', pl: '8 → 14' }, { ev: '#take-on success', pl: '7' },
     { ev: '#cross fail', pl: '2' }, { ev: '#interception', pl: '4' },
-    { ev: '#pass success', pl: '15 → 14' }, { ev: '#shot on target', pl: '14' },
-    { ev: '#goal', pl: '14', goal: true }, { ev: '#tackle', pl: '6' },
-    { ev: '#foul won', pl: '14' }, { ev: '#step in', pl: '13' },
+    { ev: '#key pass', pl: '15 → 14' }, { ev: '#shot on target', pl: '14' },
+    { ev: '#goal', pl: '14', goal: true }, { ev: '#tackle success', pl: '6' },
+    { ev: '#recovery', pl: '14' }, { ev: '#step in', pl: '13' },
     { ev: '#pass success', pl: '13 → 2' }, { ev: '#offside', pl: '20' }
   ];
   var sec = 67 * 60 + 14, idx = 0;
