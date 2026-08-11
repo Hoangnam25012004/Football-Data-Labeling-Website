@@ -9,8 +9,18 @@
 const fs=require('fs'), path=require('path'), vm=require('vm');
 
 const ROOT=path.join(__dirname,'..');
-const SRC=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
-const EVENTS=JSON.parse(fs.readFileSync(path.join(ROOT,'pitchtagger_events.json'),'utf8'));
+
+/* Every source this suite reads comes through here, with CRLF folded to LF.
+   Git stores these files with LF and normalises on commit, so CI always sees LF
+   — but core.autocrlf is on by default on Windows, and the working copy gets
+   CRLF written back into it the next time git touches a file. The tests match on
+   source SHAPE, and a pattern spanning two lines ("} \n    if") stops matching
+   the moment a \r slips in between. Reading through one door means the suite
+   sees what git sees, on every machine. */
+const readSrc=p=>fs.readFileSync(path.isAbsolute(p)?p:path.join(ROOT,p),'utf8').replace(/\r\n/g,'\n');
+
+const SRC=readSrc('index.html');
+const EVENTS=JSON.parse(readSrc('pitchtagger_events.json'));
 
 /* ---- source scanning: skip strings/comments so braces inside them don't count ---- */
 function skipQuoted(s,i){
@@ -137,8 +147,8 @@ function submitShot(app,raw,dots,spot){
 /* shared.js is the plain script both sub-pages load. It has no top-level side effects,
    so the whole file runs in a sandbox and hands back its helpers (const/let bindings
    are not context properties, hence the explicit re-export). */
-const SHARED=fs.readFileSync(path.join(ROOT,'shared.js'),'utf8');
-const CLOUD=fs.readFileSync(path.join(ROOT,'cloud-sync.js'),'utf8');
+const SHARED=readSrc('shared.js');
+const CLOUD=readSrc('cloud-sync.js');
 const SHARED_EXPORTS=['esc','squadOnPitch','squadNames','playerLabel','withSquad',
   'computeStats','sortedPlayers','newStat','statRow','sumTeam','passMatrix','pct',
   'blankTeamLU','blankLineups','zoneAt','EVENT_INC','STAT_HEADERS','STAT_GROUPS',
@@ -167,7 +177,7 @@ function loadShared(store){
    is where both the Stats page and the client site now mount them from. The
    functions themselves did not change, so everything lifted below is lifted by
    the same name out of the same lines — only the file they live in moved. */
-const STATS=fs.readFileSync(path.join(ROOT,'Stats','stats-view.js'),'utf8');
+const STATS=readSrc('Stats/stats-view.js');
 function loadStats(state,names){
   const holder={innerHTML:''};
   const ctx={console,document:{getElementById:()=>holder},location:{hash:''},
@@ -202,5 +212,5 @@ function fakeStorage(seed){
     snapshot:()=>Object.fromEntries(map)};
 }
 
-module.exports={makeApp,submit,submitShot,grabFunction,grabConst,loadShared,loadStats,fakeStorage,
+module.exports={makeApp,submit,submitShot,grabFunction,grabConst,loadShared,loadStats,fakeStorage,readSrc,
   SRC,SHARED,STATS,CLOUD,EVENTS};

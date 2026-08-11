@@ -6,9 +6,10 @@
    goes through. */
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk}=require('./tiny-test');
+const {readSrc}=require('./harness');
 
 const ROOT=path.join(__dirname,'..');
-const page=p=>fs.readFileSync(path.join(ROOT,p),'utf8');
+const page=readSrc;                       // CRLF-folded: see readSrc in harness.js
 const SQL=page('supabase/migrations/0017_public_channels.sql');
 const SUPA=page('client/assets/supa.js');
 const APPJS=page('client/assets/app.js');

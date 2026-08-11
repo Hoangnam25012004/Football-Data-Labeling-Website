@@ -251,18 +251,22 @@ table.stats .grp.g5{background:#331A1A;color:#F0CACA}
 .film-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
 .film-main{display:flex;flex-direction:column;gap:8px;min-width:0}
 
+/* no cursor:pointer — the surface takes no click, Space is play/pause */
 .film-stage{position:relative;aspect-ratio:16/9;background:#000;border:1px solid var(--line);
-  border-radius:10px;overflow:hidden;cursor:pointer}
+  border-radius:10px;overflow:hidden}
 .film-stage video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
 
 /* always present, so a caption arriving cannot shift the frame under the cursor */
 .film-cap{position:absolute;left:0;right:0;bottom:0;min-height:30px;display:flex;align-items:center;
   gap:6px;flex-wrap:wrap;padding:5px 10px;background:rgba(0,0,0,0.72);
   font-size:13px;font-weight:700;line-height:1.35;pointer-events:none;user-select:none}
+/* the side is on the number itself, in the caption and in the list alike: one
+   moment regularly holds both teams, and one colour across it would misattribute
+   the half of it that belongs to the other side */
 .fm-no{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;
   padding:0 5px;border-radius:5px;background:var(--home);color:var(--team-ink);
   font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}
-.film-cap.away .fm-no{background:var(--away)}
+.fm-no.away{background:var(--away)}
 .fm-ev{color:#39d98a;font-size:12.5px;font-weight:700}
 
 .film-bar{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--panel2);

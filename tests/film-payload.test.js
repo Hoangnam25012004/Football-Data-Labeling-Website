@@ -87,10 +87,26 @@ test('where it left off survives a redraw, but not a change of half', () => {
 });
 
 /* ================= the keys ================= */
-test('the arrow keys step the video, and nothing else does', () => {
+test('three keys drive the film, and nothing else does', () => {
   ok(/e\.key==='ArrowRight'\)filmSeekBy\(FILM_STEP\)/.test(filmKeys),'right goes forward');
   ok(/e\.key==='ArrowLeft'\)filmSeekBy\(-FILM_STEP\)/.test(filmKeys),'left goes back');
+  ok(/e\.key===' '\|\|e\.key==='Spacebar'\)filmToggle\(\)/.test(filmKeys),'space plays and pauses');
   ok(/else return;/.test(filmKeys),'any other key is left entirely alone');
+  // Space scrolls the page and the arrows walk a scroller — all three must be swallowed,
+  // but ONLY once one of them has been recognised, never before
+  ok(filmKeys.indexOf('else return;')<filmKeys.indexOf('e.preventDefault()'),
+     'the default is prevented after the key is claimed, not on every keystroke');
+});
+
+test('the video surface takes no click at all', () => {
+  // a stray click on the frame used to stop the match; the pointer lives over that
+  // frame while you read it, so play/pause moved to the keyboard entirely
+  notOk(/fmStage'\)\.onclick/.test(filmStart),'nothing is bound to the stage');
+  notOk(/fmVideo'\)\.onclick/.test(filmStart),'nor to the video node');
+  ok(/\$\('fmPlay'\)\.onclick=\(\)=>\{filmToggle\(\)/.test(filmStart),
+     'the button beside the bar is the only pointer route in');
+  ok(/\$\('fmPlay'\)\.blur\(\)/.test(filmStart),
+     'and it hands focus back, or the next Space would re-press it instead of playing');
 });
 
 test('the keys keep out of the way of the filters', () => {

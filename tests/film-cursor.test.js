@@ -4,8 +4,8 @@
    playback speed, so each one owns a stretch: FILM_LEAD before its own dot and
    FILM_HOLD after the last dot it has (the receiver's, on a pass). What this
    file guards is that the stretch is computed from the right two times, that the
-   set on screen is right at any moment, and that it is right after a tua lùi as
-   well as a play-through — the forward path walks a cursor, the backward one
+   set on screen is right at any moment, and that it is right after a seek back
+   as well as a play-through — the forward path walks a cursor, the backward one
    rebuilds, and the two must agree.
 
    Redrawing is expensive (the whole dot layer), so it must happen only when the
@@ -155,4 +155,48 @@ test('team and event narrow, an empty filter lets everything through', () => {
   eq(sandbox([],{team:'away',player:'',event:''}).filmMatches(ev(1,{team:'home'})),false);
   eq(sandbox([],{team:'',player:'',event:'goal'}).filmMatches(ev(1,{event:'pass success'})),false);
   eq(sandbox([],{team:'',player:'',event:''}).filmMatches(ev(1)),true);
+});
+
+/* ================= whose number is whose ================= */
+/* One moment on screen regularly holds both sides at once: a tackle that answers
+   the pass it broke up is two events, two teams, one caption. Colouring the strip
+   by "the last event's team" handed the tackle to whoever had just lost the ball,
+   which is the opposite of what the caption is for. The side now rides on each
+   number. */
+const chain=(()=>{
+  const ctx={console};
+  vm.createContext(ctx);
+  vm.runInContext([
+    "function esc(s){return String(s==null?'':s)}",
+    F('filmChainHTML'),';globalThis.C=filmChainHTML;'
+  ].join('\n'),ctx,{filename:'film.js'});
+  return ctx.C;
+})();
+const row=(team,from,event,to)=>({team:team,playerFrom:from,event:event,playerTo:to||''});
+
+test('a home number is home and an away number is away, in the same caption', () => {
+  const html=chain([row('away','14','pass success','13'),row('home','6','tackle success')]);
+  eq((html.match(/class="fm-no away"/g)||[]).length,2,'14 and 13 are the away side');
+  eq((html.match(/class="fm-no home"/g)||[]).length,1,'6 is not');
+  ok(html.indexOf('14')<html.indexOf('13'),'passer before receiver');
+  ok(html.indexOf('13')<html.indexOf('6'),'and the tackle after the pass it broke up');
+});
+
+test('a solo home event is white, a solo away event is yellow', () => {
+  ok(/class="fm-no home">4</.test(chain([row('home','4','clearance')])));
+  ok(/class="fm-no away">4</.test(chain([row('away','4','clearance')])));
+});
+
+test('the same shirt number on both sides is printed twice, not folded', () => {
+  // 13 recovering for one side then 13 receiving for the other is two players
+  const html=chain([row('home','13','recovery'),row('away','13','clearance')]);
+  eq((html.match(/class="fm-no /g)||[]).length,2,'both are named');
+  ok(/fm-no home">13</.test(html)&&/fm-no away">13</.test(html),'each in its own colour');
+});
+
+test('one player\'s run of events still prints his number once', () => {
+  const html=chain([row('home','13','recovery'),row('home','13','pass success','14')]);
+  eq((html.match(/class="fm-no /g)||[]).length,2,'13 once, then the receiver 14');
+  eq((html.match(/fm-ev/g)||[]).length,2,'both of his events');
+  ok(/fm-no home">14</.test(html),'the receiver takes the passer\'s side');
 });

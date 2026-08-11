@@ -11,10 +11,10 @@
    stand-in Supabase client the channel tests use. */
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk}=require('./tiny-test');
-const {grabFunction}=require('./harness');
+const {grabFunction,readSrc}=require('./harness');
 
 const ROOT=path.join(__dirname,'..');
-const page=p=>fs.readFileSync(path.join(ROOT,p),'utf8');
+const page=readSrc;                       // CRLF-folded: see readSrc in harness.js
 
 const SUPA=page('client/assets/supa.js');
 const APPJS=page('client/assets/app.js');

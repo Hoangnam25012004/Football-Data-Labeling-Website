@@ -1244,23 +1244,31 @@ function filmChoices(cues){
 
 /* The passer's number, then his events, then the receiver's — the same shape the
    events table in the tagging app prints, so a caption here reads as the row it
-   came from. */
+   came from.
+
+   Every number carries its OWN side's colour rather than the strip's. What is on
+   screen at one moment is regularly both teams at once — a tackle answering the
+   pass it broke up — and a single colour across the line would hand the tackle
+   to the side that had just lost the ball. Same reason a run stops at a change
+   of team: two players wearing 13 are two players, so the number is reprinted.  */
 function filmChainHTML(list){
   let html='',printed=null,i=0;
+  const chip=(n,team)=>`<span class="fm-no ${team==='away'?'away':'home'}">${esc(n)}</span>`;
   while(i<list.length){
-    const from=String(list[i].playerFrom||'');
-    const run=[]; while(i<list.length&&String(list[i].playerFrom||'')===from){run.push(list[i]);i++;}
-    if(from&&from!==printed){html+=(html?' ':'')+`<span class="fm-no">${esc(from)}</span>`;printed=from;}
+    const team=list[i].team, from=String(list[i].playerFrom||'');
+    const run=[];
+    while(i<list.length&&list[i].team===team&&String(list[i].playerFrom||'')===from){run.push(list[i]);i++;}
+    if(from&&team+':'+from!==printed){html+=(html?' ':'')+chip(from,team);printed=team+':'+from;}
     let to=null;
     run.forEach(r=>{html+=` <span class="fm-ev">#${esc(r.event)}</span>`; if(r.playerTo)to=String(r.playerTo);});
-    if(to){html+=` <span class="fm-no">${esc(to)}</span>`;printed=to;}
+    if(to){html+=' '+chip(to,team);printed=team+':'+to;}
   }
   return html;
 }
 
 function filmRowsHTML(cues){
   const html=cues.filter(c=>filmMatches(c.r)).map(c=>
-    `<div class="fm-row ${c.r.team==='away'?'away':'home'}" data-t="${c.t}">`
+    `<div class="fm-row" data-t="${c.t}">`
     +`<span class="fm-t">${filmClock(matchTime(c.t))}</span>`
     +`<span class="fm-lbl">${filmChainHTML([c.r])}</span></div>`).join('');
   return html||'<div class="fm-none">No events match this filter.</div>';
@@ -1345,8 +1353,12 @@ function filmStart(win,cues,src){
   v.addEventListener('seeked',()=>{if(mine()&&v.paused)filmFrame();});
   v.src=src;
 
-  $('fmPlay').onclick=filmToggle;
-  $('fmStage').onclick=filmToggle;
+  /* The video surface itself takes no click. Reading the frame means the pointer
+     is over it, and a stray click stopping the match mid-move is the one thing
+     that costs the viewer their place. Space does play/pause; the button beside
+     the bar is the mouse's way in, and it hands focus straight back so the next
+     Space is not swallowed re-pressing it. */
+  $('fmPlay').onclick=()=>{filmToggle();$('fmPlay').blur();};
 
   const track=$('fmTrack');
   const drop=e=>{
@@ -1380,11 +1392,13 @@ function filmStart(win,cues,src){
     if(!next)return;
     filmSeek(next.t-FILM_STEP);
     filmPlay();
+    $('fmNext').blur();
   };
 
-  /* ← / → step two seconds. Bound on the document, because with no native
-     controls there is nothing here to focus; taken off again by filmStop(), or
-     it would go on swallowing arrow keys long after Film has been left. */
+  /* ← / → step two seconds, Space plays and pauses. Bound on the document,
+     because with no native controls there is nothing here to focus; taken off
+     again by filmStop(), or Film would go on swallowing those keys — Space above
+     all — long after it has been left. */
   document.addEventListener('keydown',filmKeys);
 }
 
@@ -1406,8 +1420,9 @@ function filmKeys(e){
   if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||(t&&t.isContentEditable))return;
   if(e.key==='ArrowRight')filmSeekBy(FILM_STEP);
   else if(e.key==='ArrowLeft')filmSeekBy(-FILM_STEP);
+  else if(e.key===' '||e.key==='Spacebar')filmToggle();
   else return;
-  e.preventDefault();
+  e.preventDefault();          // Space would scroll the page, arrows the list
 }
 
 const filmEnd=()=>{const f=film,e=f.win.end;return isFinite(e)?e:(f.video.duration||f.win.start);};
@@ -1519,7 +1534,7 @@ function filmCaption(){
   if(!f.active.length){f.cap.className='film-cap';f.cap.innerHTML='';return;}
   const list=f.active.map(c=>c.r).slice()
     .sort((a,b)=>(a.t-b.t)||((a.ord||0)-(b.ord||0)));
-  f.cap.className='film-cap on '+(list[list.length-1].team==='away'?'away':'home');
+  f.cap.className='film-cap on';   // the side is on each number, not on the strip
   f.cap.innerHTML=filmChainHTML(list);
 }
 
