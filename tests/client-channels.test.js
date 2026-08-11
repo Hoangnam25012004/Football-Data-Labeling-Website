@@ -598,6 +598,24 @@ test('no monogram anywhere on the site — a club is its name', () => {
   ok(/crest_text/.test(SUPA),'the column is still written, so existing rows stay consistent');
 });
 
+test('the fixture on the Matches row is balanced either side of the score', () => {
+  const css=APPCSS.replace(/\s*\n\s*/g,'');
+  // left-aligning both put the home name a column's width from the score and
+  // the away name hard against it — 253px of gap on one side, 30 on the other
+  ok(/\.m-home\{[^}]*justify-content:flex-end/.test(css)&&/\.m-home\{[^}]*text-align:right/.test(css),
+     'home reads right, into the score');
+  ok(/\.m-away\{[^}]*justify-content:flex-start/.test(css)&&/\.m-away\{[^}]*text-align:left/.test(css),
+     'away reads left, out of it');
+  // the narrow layout stacks the fixture on its own line; it must not flip away
+  // back to the right, which would point both names the same way
+  const narrow=/@media \(max-width:820px\)\{[\s\S]*?\n\}/.exec(APPCSS)[0].replace(/\s*\n\s*/g,'');
+  ok(/\.m-away\{grid-area:away\}/.test(narrow),'and stays that way when the row folds');
+  // each heading over the edge its column reads from
+  const head=/list\.appendChild\(el\('div', 'mlist-h',[\s\S]*?\)\);/.exec(APPJS)[0];
+  ok(/style="text-align:right">Home/.test(head),'the Home heading ends where the home name ends');
+  ok(/<span>Away<\/span>/.test(head),'and Away starts where the away name starts');
+});
+
 /* ================= the match page ================= */
 test('a match is one page — the analysis, and the way back', () => {
   notOk(/matchHead/.test(APPJS),'no fixture heading repeating the row you came from');

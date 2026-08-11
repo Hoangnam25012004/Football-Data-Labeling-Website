@@ -174,8 +174,11 @@
        finished, who was away. Reading down a column then answers a question
        the old single cell could not — every home side, or every scoreline. */
     var list = el('div', 'mlist');
+    /* Each heading sits over the edge its column reads from: Home ends where the
+       home name ends, Away starts where the away name starts. */
     list.appendChild(el('div', 'mlist-h',
-      '<span>Date</span><span>Home</span><span style="text-align:center">Final score</span>' +
+      '<span>Date</span><span style="text-align:right">Home</span>' +
+      '<span style="text-align:center">Final score</span>' +
       '<span>Away</span><span style="text-align:right">Result</span>'));
 
     state.matches.forEach(function (m) {

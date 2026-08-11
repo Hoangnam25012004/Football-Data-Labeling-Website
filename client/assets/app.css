@@ -177,6 +177,12 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
 .m-team{display:flex; align-items:center; gap:9px; min-width:0; font-size:13.5px}
 .m-team .tn{color:var(--ash); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .m-team .tn.us{color:var(--chalk); font-weight:600}
+/* The home name reads right, into the score; the away name reads left, out of
+   it, so the fixture is balanced either side of the scoreline. Left-aligning
+   both put the home name a column's width away from the score and the away
+   name right against it. */
+.m-home{justify-content:flex-end; text-align:right}
+.m-away{justify-content:flex-start; text-align:left}
 .m-sc{display:flex; align-items:center; justify-content:center}
 .m-score{
   font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-weight:700; font-size:13px;
@@ -200,9 +206,11 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
   }
   .m-date{grid-area:date}
   .m-end{grid-area:end}
+  /* the score is the middle column of three, so the two names lean into it
+     here exactly as they do on the wide row */
   .m-home{grid-area:home}
   .m-sc{grid-area:score}
-  .m-away{grid-area:away; justify-content:flex-end; text-align:right}
+  .m-away{grid-area:away}
 }
 
 /* ---------- roster / contributor cards ---------- */
