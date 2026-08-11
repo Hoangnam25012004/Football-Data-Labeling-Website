@@ -1188,7 +1188,7 @@ const matchName=()=>(meta.home||'Home')+'_vs_'+(meta.away||'Away');
    play: the club's browser cannot reach the analyst's disk. Film says that
    plainly instead of offering a dead player.
    ========================================================================== */
-const FILM_LEAD=0.5;                               // a dot appears this long before its moment
+const FILM_LEAD=0.05;                              // an event lands this long before its moment
 const FILM_HOLD=2.5;                               // …and stays this long after the last one
 const FILM_STEP=2;                                 // what ← and → are worth
 let filmHalf=1;                                    // which window is showing
@@ -1589,9 +1589,18 @@ function filmMark(){
   f.curRow=sel;
   if(!sel)return;
   sel.classList.add('on');
-  const box=f.list, top=sel.offsetTop;
-  if(top<box.scrollTop||top+sel.offsetHeight>box.scrollTop+box.clientHeight)
-    box.scrollTop=top-box.clientHeight/2+sel.offsetHeight/2;
+  /* The moment being played goes to the TOP of the list, and everything after
+     it reads downwards — which is the question the list is there to answer.
+     Centring it, and only when it had already fallen off the edge, meant the
+     list sat still through a dozen events and then jumped half a screen.
+
+     Measured off the two rectangles rather than offsetTop: this scroller is
+     not a positioned element, so offsetTop is counted from whatever the host
+     page happens to have positioned above it, which is how the jump got its
+     size. clientTop takes the border off. Only reached when the lit row
+     changes, so the forced layout is a few times a second at most. */
+  const box=f.list;
+  box.scrollTop+=sel.getBoundingClientRect().top-box.getBoundingClientRect().top-box.clientTop;
 }
 
 /* cue index -> the row to light up for it: its own, or the nearest listed one

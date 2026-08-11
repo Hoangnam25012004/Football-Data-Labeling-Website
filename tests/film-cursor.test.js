@@ -55,7 +55,7 @@ test('a solo event runs from LEAD before to HOLD after its own moment', () => {
 test('a pass runs to HOLD after the RECEIVER, not the passer', () => {
   const P=sandbox([ev(200,{rt:203.4,playerTo:'3',rXY:{x:70,y:40}})]);
   const c=P.filmCues(WIN)[0];
-  eq(c.in,199.5);
+  eq(c.in,200-P.FILM_LEAD);
   eq(c.out,203.4+P.FILM_HOLD,'the ball has to arrive before the clock starts');
   eq(c.rt,203.4,'and the arrival time is kept, for the ball to run on');
 });
@@ -84,13 +84,14 @@ test('only events inside the window, and always in t order', () => {
 /* ================= playing forwards ================= */
 test('the active set is right as the clock runs on', () => {
   const P=sandbox([ev(200),ev(201),ev(400)]);
+  const L=P.FILM_LEAD, H=P.FILM_HOLD;
   const f=player(P,P.filmCues(WIN));
-  P.filmAdvance(150); eq(f.active.length,0,'nothing yet');
-  P.filmAdvance(199.6); eq(f.active.length,1,'the first is due');
-  P.filmAdvance(200.6); eq(f.active.length,2,'and the second');
-  P.filmAdvance(203.0); eq(f.active.length,1,'the first has had its hold');
-  P.filmAdvance(204.0); eq(f.active.length,0,'and so has the second');
-  P.filmAdvance(399.6); eq(f.active[0].t,400,'the next one arrives on its own');
+  P.filmAdvance(150);        eq(f.active.length,0,'nothing yet');
+  P.filmAdvance(200-L);      eq(f.active.length,1,'the first is due, a moment before its own time');
+  P.filmAdvance(201);        eq(f.active.length,2,'and the second');
+  P.filmAdvance(200+H+0.01); eq(f.active.length,1,'the first has had its hold');
+  P.filmAdvance(201+H+0.01); eq(f.active.length,0,'and so has the second');
+  P.filmAdvance(400-L);      eq(f.active[0].t,400,'the next one arrives on its own');
 });
 
 test('the cursor only ever moves forward while playing', () => {
@@ -103,13 +104,15 @@ test('the cursor only ever moves forward while playing', () => {
 
 test('a redraw happens when the set changes, and not otherwise', () => {
   const P=sandbox([ev(200)]);
+  const L=P.FILM_LEAD, H=P.FILM_HOLD;
   const f=player(P,P.filmCues(WIN));
   P.resetDraws();
-  P.filmAdvance(150); eq(P.draws(),0,'nothing on screen, nothing to draw');
-  P.filmAdvance(199.6); eq(P.draws(),1,'it arrives');
-  P.filmAdvance(200.1); eq(P.draws(),1,'…and holding it is free');
-  P.filmAdvance(201.0); eq(P.draws(),1);
-  P.filmAdvance(203.0); eq(P.draws(),2,'it leaves');
+  P.filmAdvance(150);        eq(P.draws(),0,'nothing on screen, nothing to draw');
+  P.filmAdvance(200-L);      eq(P.draws(),1,'it arrives');
+  P.filmAdvance(200.1);      eq(P.draws(),1,'…and holding it is free');
+  P.filmAdvance(201.0);      eq(P.draws(),1);
+  P.filmAdvance(200+H+0.01); eq(P.draws(),2,'it leaves');
+  void f;
 });
 
 /* ================= seeking backwards ================= */
@@ -119,10 +122,10 @@ test('a rewind rebuilds the same set a play-through would have reached', () => {
   const cues=P.filmCues(WIN);
 
   const a=player(P,cues);
-  [150,199.6,200.6,203,300,401,403,500].forEach(t=>P.filmAdvance(t));
+  [150,200,201.5,203,300,401,403,500].forEach(t=>P.filmAdvance(t));
   const b=player(P,P.filmCues(WIN));
-  P.filmRewind(200.6);
-  eq(b.active.map(c=>c.t).join(','),'200,201','back at 200.6, both are up');
+  P.filmRewind(201.5);
+  eq(b.active.map(c=>c.t).join(','),'200,201','back at 201.5, both are up');
   eq(b.cursor,2,'and the cursor sits after them');
 
   P.filmRewind(150);
@@ -264,4 +267,68 @@ test('ordering is a second view — it does not disturb the cues themselves', ()
 test('the caption reads the same entry back as one line', () => {
   const html=chain(ordered(ENTRY).map(c=>c.r));
   eq(html.replace(/<[^>]+>/g,''),'17 #recovery #cross success #key pass 14 #shot on target #right foot');
+});
+
+/* ================= how far ahead, and how the list follows ================= */
+test('an event lands a twentieth of a second before its own moment', () => {
+  // 2 #pass success 3 tagged at 1:03.05 is on screen, and lit in the list, at
+  // 1:03.00 — both read off the same cursor, so they can never disagree
+  eq(sandbox([]).FILM_LEAD,0.05);
+});
+
+/* filmMark scrolls by measuring two rectangles, so the stub is a real scroller:
+   a row sitting `d` below the list's content top reports a viewport position
+   that moves with scrollTop, exactly as the browser would. */
+const marker=(()=>{
+  const ctx={console};
+  vm.createContext(ctx);
+  vm.runInContext(['var film=null;',F('filmMark'),
+    ';globalThis.M={mark:filmMark,set:f=>{film=f}};'].join('\n'),ctx,{filename:'film.js'});
+  return ctx.M;
+})();
+const BOX_TOP=100, BORDER=1;
+function scroller(offsets){
+  const box={scrollTop:0,clientTop:BORDER,getBoundingClientRect:()=>({top:BOX_TOP})};
+  const rows=offsets.map(d=>{
+    const el={on:false,classList:{add(){el.on=true;},remove(){el.on=false;}},
+      getBoundingClientRect:()=>({top:BOX_TOP+BORDER+d-box.scrollTop})};
+    return el;});
+  return {box:box,rows:rows};
+}
+
+test('the moment being played is pulled to the TOP of the list', () => {
+  const {box,rows}=scroller([0,24,48,72,96]);
+  const f={cursor:3,rowFor:rows,list:box,curRow:null};
+  marker.set(f); marker.mark();
+  eq(box.scrollTop,48,'the third row now sits against the top edge');
+  ok(rows[2].on,'and it is the lit one');
+});
+
+test('it follows on every change, from wherever the list happens to be', () => {
+  const {box,rows}=scroller([0,24,48,72,96]);
+  const f={cursor:5,rowFor:rows,list:box,curRow:null};
+  marker.set(f); marker.mark();
+  eq(box.scrollTop,96,'straight to the last row');
+  f.cursor=2; marker.mark();
+  eq(box.scrollTop,24,'and back up when the video is seeked back');
+  ok(rows[1].on,'the earlier row is lit');
+  ok(!rows[4].on,'and the later one is not');
+});
+
+test('the same row twice does not re-scroll a list somebody is reading', () => {
+  const {box,rows}=scroller([0,24,48]);
+  const f={cursor:2,rowFor:rows,list:box,curRow:null};
+  marker.set(f); marker.mark();
+  eq(box.scrollTop,24);
+  box.scrollTop=999;                     // as if it had been scrolled by hand
+  marker.mark();
+  eq(box.scrollTop,999,'nothing moves until the lit row actually changes');
+});
+
+test('nothing lit before the first event, and nothing scrolls', () => {
+  const {box,rows}=scroller([0,24]);
+  marker.set({cursor:0,rowFor:rows,list:box,curRow:null});
+  marker.mark();
+  eq(box.scrollTop,0);
+  ok(!rows[0].on,'the first event has not come round yet');
 });
