@@ -1211,13 +1211,23 @@ function filmWindows(){
   return out;
 }
 
-/* Events inside one window, in CLOCK order, each with the stretch it owns and
-   its place in that order. This is the playhead's view and nothing else reorders
-   it: the cursor only works while `in` climbs. Anything tagged outside both
-   windows — before the kick-off, or during the interval — belongs to no half and
-   simply is not here. */
+/* The events of one half, in CLOCK order, each with the stretch it owns and its
+   place in that order. This is the playhead's view and nothing else reorders it:
+   the cursor only works while `in` climbs.
+
+   Which half an event is in is eventHalf()'s answer and not the playback bounds'.
+   The two are not the same question, and reading membership off the bounds lost
+   events: a dot placed as the ball was struck can land a fraction BEFORE the
+   kick-off boundary set afterwards — the opening pass of Saint Lucia v Barbados
+   sat at 517.09 against an h1Start of 517.25 — and matchTime() clamps anything
+   at or before the kick-off to 00:00.00. So the tagging table, Stats and the
+   exports all showed it at 00:00 in the first half, and only Film left it out.
+
+   The bounds go on doing what they are for: holding the player inside the half.
+   An event outside them is still listed, and seeking to it lands on the nearest
+   edge — which for a kick-off tagged early is the kick-off itself. */
 function filmCues(win){
-  return rows.filter(r=>r.t!=null&&+r.t>=win.start&&+r.t<=win.end)
+  return rows.filter(r=>r.t!=null&&(!win.half||eventHalf(r)===win.half))
     .sort((a,b)=>a.t-b.t)
     .map((r,i)=>{
       const t=+r.t, rt=(r.rt==null||!isFinite(+r.rt))?null:+r.rt;

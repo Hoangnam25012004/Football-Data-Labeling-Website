@@ -21,17 +21,22 @@ const F=n=>grabFunction(n,STATS,'Stats/stats-view.js');
 const ev=(t,o)=>Object.assign({id:'e'+t,t:t,rt:null,team:'home',event:'pass success',
   playerFrom:'2',playerTo:'',pXY:{x:50,y:50},rXY:null},o||{});
 
-function sandbox(rows,filter){
+/* dur matches WIN below: the first half runs 100..1000 on the file's own clock,
+   the second from 2000. eventHalf() reads it, and filmCues() now reads
+   eventHalf() rather than the playback bounds. */
+const DUR={enabled:true,halfLen:45,h1Start:100,h1End:1000,h2Start:2000,h2End:3000};
+function sandbox(rows,filter,dur){
   const ctx={console};
   vm.createContext(ctx);
   vm.runInContext([
     'var rows='+JSON.stringify(rows)+';',
+    'var dur='+JSON.stringify(dur||DUR)+';',
     'var filmFilter='+JSON.stringify(filter||{team:'',player:'',event:''})+';',
     'var film=null, draws=0;',
     'function filmDraw(){draws++;}',
     G('FILM_LEAD'),G('FILM_HOLD'),
-    F('filmCues'),F('filmMatches'),F('filmAdvance'),F('filmRewind'),
-    ';globalThis.P={filmCues,filmMatches,filmAdvance,filmRewind,FILM_LEAD,FILM_HOLD,',
+    F('eventHalf'),F('filmCues'),F('filmMatches'),F('filmAdvance'),F('filmRewind'),
+    ';globalThis.P={filmCues,filmMatches,filmAdvance,filmRewind,eventHalf,FILM_LEAD,FILM_HOLD,',
     '  setFilm:f=>{film=f},getFilm:()=>film,draws:()=>draws,resetDraws:()=>{draws=0}};'
   ].join('\n'),ctx,{filename:'film.js'});
   return ctx.P;
@@ -72,13 +77,45 @@ test('a receiver time that is not a number is treated as absent', () => {
   eq(c[0].rt,null); eq(c[1].rt,null);
 });
 
-/* ================= what belongs to the window ================= */
-test('only events inside the window, and always in t order', () => {
-  const P=sandbox([ev(500),ev(90),ev(1400),ev(150),ev(1000),ev(100)]);
-  const c=P.filmCues(WIN);
-  eq(c.map(x=>x.t).join(','),'100,150,500,1000','sorted, both boundaries inclusive');
-  notOk(c.some(x=>x.t===90),'before the kick-off: belongs to no half');
-  notOk(c.some(x=>x.t===1400),'and neither does the interval or what follows it');
+/* ================= what belongs to the half ================= */
+/* Which half an event is in is eventHalf()'s answer — the one every other tab
+   gives — and NOT the playback bounds'. Reading it off the bounds lost the
+   opening pass of a match: the dot goes down as the ball is struck, which can
+   land a fraction before the h1Start set afterwards, and matchTime() clamps
+   anything at or before the kick-off to 00:00.00. The tagging table, Stats and
+   the exports all showed it at 00:00 in the first half; only Film left it out. */
+test('the half owns its events, in t order', () => {
+  const P=sandbox([ev(500),ev(150),ev(2500),ev(1000),ev(100)]);
+  eq(P.filmCues(WIN).map(x=>x.t).join(','),'100,150,500,1000','sorted');
+  notOk(P.filmCues(WIN).some(x=>x.t===2500),'the second half is not this half');
+  eq(P.filmCues({half:2,start:2000,end:3000}).map(x=>x.t).join(','),'2500',
+     'and it is the second half that has it');
+});
+
+test('a kick-off tagged a fraction early is still in the first half', () => {
+  // the reported case to the hundredth: 517.09 against an h1Start of 517.25
+  const real={enabled:true,halfLen:45,h1Start:517.25,h1End:3341.96,h2Start:4249.34,h2End:7319.97};
+  const P=sandbox([ev(517.09),ev(520.84),ev(523.06)],null,real);
+  const c=P.filmCues({half:1,start:517.25,end:3341.96});
+  eq(c.length,3,'all three, including the one before the boundary');
+  eq(c[0].t,517.09,'and it leads the half, as its 00:00.00 timeline says it should');
+});
+
+test('an event tagged in the interval belongs where eventHalf puts it', () => {
+  // 1400 is past h1End and before h2Start; eventHalf calls it first-half, so the
+  // list says first-half too rather than losing it between the two
+  const P=sandbox([ev(150),ev(1400),ev(2500)]);
+  eq(P.filmCues(WIN).map(x=>x.t).join(','),'150,1400');
+});
+
+test('Full Match takes every event there is', () => {
+  const P=sandbox([ev(90),ev(500),ev(1400),ev(2500)]);
+  eq(P.filmCues({half:0,start:0,end:Infinity}).length,4,'no half named, nothing filtered');
+});
+
+test('an event with no time at all is still left out', () => {
+  const P=sandbox([Object.assign(ev(500),{t:null}),ev(600)]);
+  eq(P.filmCues(WIN).map(x=>x.t).join(','),'600');
 });
 
 /* ================= playing forwards ================= */
