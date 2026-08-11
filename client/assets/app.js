@@ -791,7 +791,7 @@
     loadOnce(r + 'Stats/stats-view.css?v=4', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
-      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=5'); })
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=6'); })
       .then(function () { return loadOnce(r + 'Stats/report.js?v=30'); });
   }
 

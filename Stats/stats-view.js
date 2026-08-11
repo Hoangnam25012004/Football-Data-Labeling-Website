@@ -1211,16 +1211,44 @@ function filmWindows(){
   return out;
 }
 
-/* Events inside one window, in t order, each with the stretch it owns. Anything
-   tagged outside both windows — before the kick-off, or during the interval —
-   belongs to no half and simply is not here. */
+/* Events inside one window, in CLOCK order, each with the stretch it owns and
+   its place in that order. This is the playhead's view and nothing else reorders
+   it: the cursor only works while `in` climbs. Anything tagged outside both
+   windows — before the kick-off, or during the interval — belongs to no half and
+   simply is not here. */
 function filmCues(win){
   return rows.filter(r=>r.t!=null&&+r.t>=win.start&&+r.t<=win.end)
     .sort((a,b)=>a.t-b.t)
-    .map(r=>{
+    .map((r,i)=>{
       const t=+r.t, rt=(r.rt==null||!isFinite(+r.rt))?null:+r.rt;
-      return {r:r,t:t,rt:rt,in:t-FILM_LEAD,out:Math.max(t,rt==null?t:rt)+FILM_HOLD};
+      return {i:i,r:r,t:t,rt:rt,in:t-FILM_LEAD,out:Math.max(t,rt==null?t:rt)+FILM_HOLD};
     });
+}
+
+/* …and the reading view: the order the analyst typed, not the order the dots
+   were placed.
+
+   One entry writes several rows, and each carries the time of ITS OWN dot — an
+   event tagged without one carries the moment Enter was pressed instead. Sorted
+   by t alone, "17 #recovery #cross success #key pass 14 #shot on target
+   #right foot" came back as key pass, recovery, cross success: the same touches,
+   in an order nobody typed and nobody can read.
+
+   So a chain (rows sharing a grp) moves as one block, sits at its earliest
+   touch, and keeps its typed order inside. Twin of the sort in renderTable() in
+   index.html — the events table has always read this way, and the two must not
+   drift. */
+function filmOrdered(cues){
+  const first={};
+  cues.forEach(c=>{const g=c.r.grp;
+    if(g!=null)first[g]=Math.min(c.t,first[g]==null?Infinity:first[g]);});
+  const keyT=c=>(c.r.grp!=null?first[c.r.grp]:c.t);
+  return cues.slice().sort((a,b)=>{
+    const ka=keyT(a),kb=keyT(b); if(ka!==kb)return ka-kb;
+    const ga=a.r.grp==null?'':String(a.r.grp), gb=b.r.grp==null?'':String(b.r.grp);
+    if(ga!==gb)return ga<gb?-1:1;                  // rows of one chain, together
+    return (a.r.ord||0)-(b.r.ord||0);              // and in the order they were typed
+  });
 }
 
 function filmMatches(r){
@@ -1267,8 +1295,8 @@ function filmChainHTML(list){
 }
 
 function filmRowsHTML(cues){
-  const html=cues.filter(c=>filmMatches(c.r)).map(c=>
-    `<div class="fm-row" data-t="${c.t}">`
+  const html=filmOrdered(cues).filter(c=>filmMatches(c.r)).map(c=>
+    `<div class="fm-row" data-t="${c.t}" data-i="${c.i}">`
     +`<span class="fm-t">${filmClock(matchTime(c.t))}</span>`
     +`<span class="fm-lbl">${filmChainHTML([c.r])}</span></div>`).join('');
   return html||'<div class="fm-none">No events match this filter.</div>';
@@ -1329,8 +1357,8 @@ function filmStart(win,cues,src){
   film={video:v,win:win,cues:cues,cursor:0,active:[],balls:[],last:-1,raf:0,tcTxt:'',
         dots:pitch?pitch.querySelector('#pv-dots'):null,
         cap:$('fmCap'),fill:$('fmFill'),knob:$('fmKnob'),tc:$('fmTc'),play:$('fmPlay'),
-        list:$('fmList'),rowEls:[],curRow:null};
-  film.rowEls=[].slice.call(film.list.querySelectorAll('.fm-row'));
+        list:$('fmList'),rowEls:[],rowFor:null,curRow:null};
+  filmIndexRows();
 
   // a redraw (a live event, a lineup edit) must not send the video back to the
   // kick-off; a change of half must
@@ -1532,8 +1560,7 @@ function filmBall(now){
 function filmCaption(){
   const f=film; if(!f||!f.cap)return;
   if(!f.active.length){f.cap.className='film-cap';f.cap.innerHTML='';return;}
-  const list=f.active.map(c=>c.r).slice()
-    .sort((a,b)=>(a.t-b.t)||((a.ord||0)-(b.ord||0)));
+  const list=filmOrdered(f.active).map(c=>c.r);   // read in the order it was typed
   f.cap.className='film-cap on';   // the side is on each number, not on the strip
   f.cap.innerHTML=filmChainHTML(list);
 }
@@ -1546,14 +1573,17 @@ function filmBar(now){
   const lbl=filmClock(matchTime(now))+' / '+filmClock(matchTime(end));
   if(lbl!==f.tcTxt){f.tc.textContent=lbl;f.tcTxt=lbl;}
   f.play.innerHTML=f.video.paused?'&#9654;':'&#10074;&#10074;';
-  filmMark(now);
+  filmMark();
 }
 
-function filmMark(now){
-  const f=film; let sel=null;
-  for(let i=0;i<f.rowEls.length;i++){
-    if(+f.rowEls[i].dataset.t<=now+FILM_LEAD)sel=f.rowEls[i]; else break;
-  }
+/* Which row is lit. The list reads in entry order, so it can run backwards in
+   time inside a chain — walking the rows and stopping at the first one past the
+   playhead would stop halfway through a move. The cursor already holds the
+   answer in clock terms (it advances on exactly `t - LEAD <= now`), and rowFor
+   turns that into a row, so this stays O(1) on a 1300-event half. */
+function filmMark(){
+  const f=film;
+  const sel=(f.cursor>0&&f.rowFor)?(f.rowFor[f.cursor-1]||null):null;
   if(sel===f.curRow)return;
   if(f.curRow)f.curRow.classList.remove('on');
   f.curRow=sel;
@@ -1564,12 +1594,23 @@ function filmMark(now){
     box.scrollTop=top-box.clientHeight/2+sel.offsetHeight/2;
 }
 
+/* cue index -> the row to light up for it: its own, or the nearest listed one
+   before it when a filter has hidden it. Built once per listing so the frame
+   loop is a lookup rather than a scan. */
+function filmIndexRows(){
+  const f=film;
+  f.rowEls=[].slice.call(f.list.querySelectorAll('.fm-row'));
+  const at={}; f.rowEls.forEach(el=>{at[+el.dataset.i]=el;});
+  const back=new Array(f.cues.length); let last=null;
+  for(let i=0;i<f.cues.length;i++){ if(at[i])last=at[i]; back[i]=last; }
+  f.rowFor=back; f.curRow=null;
+}
+
 function filmRelist(){
   const f=film; if(!f)return;
   f.list.innerHTML=filmRowsHTML(f.cues);
-  f.rowEls=[].slice.call(f.list.querySelectorAll('.fm-row'));
-  f.curRow=null;
-  filmMark(f.video.currentTime);
+  filmIndexRows();
+  filmMark();
 }
 
 

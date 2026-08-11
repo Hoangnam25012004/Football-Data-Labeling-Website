@@ -200,3 +200,68 @@ test('one player\'s run of events still prints his number once', () => {
   eq((html.match(/fm-ev/g)||[]).length,2,'both of his events');
   ok(/fm-no home">14</.test(html),'the receiver takes the passer\'s side');
 });
+
+/* ================= the order it was typed in ================= */
+/* One entry writes several rows and each carries the time of ITS OWN dot — an
+   event tagged without a dot carries the moment Enter was pressed. Sorted by t
+   alone, "17 #recovery #cross success #key pass 14 #shot on target #right foot"
+   came back as key pass, recovery, cross success: the same touches, in an order
+   nobody typed. A chain moves as one block now, at its earliest touch, in ord. */
+const ordered=(()=>{
+  const ctx={console};
+  vm.createContext(ctx);
+  vm.runInContext(F('filmOrdered')+';globalThis.O=filmOrdered;',ctx,{filename:'film.js'});
+  return ctx.O;
+})();
+// the entry from the report, with the dot times that scrambled it
+const cue=(t,grp,ord,event,from,to)=>({t:t,r:{grp:grp,ord:ord,event:event,team:'home',
+  playerFrom:from,playerTo:to||''}});
+const ENTRY=[
+  cue(35.9,'g1',2,'key pass','17'),          // no dot: carries the moment Enter was hit
+  cue(35.1,'g1',0,'recovery','17'),
+  cue(35.4,'g1',1,'cross success','17','14'),
+  cue(37.6,'g1',4,'right foot','14'),
+  cue(37.2,'g1',3,'shot on target','14')
+];
+const names=list=>list.map(c=>c.r.event).join(' | ');
+
+test('a chain reads in the order it was typed, not the order the dots landed', () => {
+  eq(names(ordered(ENTRY)),
+     'recovery | cross success | key pass | shot on target | right foot');
+});
+
+test('the clock still decides where the chain SITS', () => {
+  const before={t:20,r:{grp:null,ord:0,event:'throw-in',playerFrom:'3',playerTo:''}};
+  const after ={t:50,r:{grp:null,ord:0,event:'goal kick',playerFrom:'1',playerTo:''}};
+  eq(names(ordered([after].concat(ENTRY,[before]))),
+     'throw-in | recovery | cross success | key pass | shot on target | right foot | goal kick');
+});
+
+test('a chain is never split by a solo event that falls inside its span', () => {
+  // 36.5 sits between the chain's first touch and its last, but the block holds
+  const mid={t:36.5,r:{grp:null,ord:0,event:'foul',playerFrom:'8',playerTo:''}};
+  const out=names(ordered(ENTRY.concat([mid])));
+  ok(/recovery \| cross success \| key pass \| shot on target \| right foot/.test(out),
+     'the five stay contiguous: '+out);
+  ok(out.endsWith('| foul'),'and the loose event sorts after the block it interrupted');
+});
+
+test('two chains at the same instant stay whole rather than interleaving', () => {
+  const a=[{t:10,r:{grp:'aa',ord:0,event:'a1',playerFrom:'1',playerTo:''}},
+           {t:10,r:{grp:'aa',ord:1,event:'a2',playerFrom:'1',playerTo:''}}];
+  const b=[{t:10,r:{grp:'bb',ord:0,event:'b1',playerFrom:'2',playerTo:''}},
+           {t:10,r:{grp:'bb',ord:1,event:'b2',playerFrom:'2',playerTo:''}}];
+  eq(names(ordered([a[1],b[1],a[0],b[0]])),'a1 | a2 | b1 | b2');
+});
+
+test('ordering is a second view — it does not disturb the cues themselves', () => {
+  const src=ENTRY.slice();
+  const before=names(src);
+  ordered(src);
+  eq(names(src),before,'the array the cursor walks is left in clock order');
+});
+
+test('the caption reads the same entry back as one line', () => {
+  const html=chain(ordered(ENTRY).map(c=>c.r));
+  eq(html.replace(/<[^>]+>/g,''),'17 #recovery #cross success #key pass 14 #shot on target #right foot');
+});
