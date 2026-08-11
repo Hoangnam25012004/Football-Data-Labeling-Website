@@ -2204,6 +2204,17 @@ function submitEntry(){
   if(noPlayer){
     alert('#'+noPlayer.name+' needs a shirt number — type the player who did it (e.g. 2'
       +(noPlayer.key||'')+').');return}
+  /* …and the other way round: only a pass, a cross or a substitution hands the ball to a
+     named player. Anything else followed by a number used to take it as the receiver —
+     the parser falls back to the last key in the group when none of them transfers the
+     ball — so "9ddd*rf3" stored #goal's group-mate with player_to = 3 and a receiver dot,
+     which the heat map then counts as 3's touch and the report carries as a real pass
+     target. The number is somebody else's action: it needs an entry of its own. */
+  const cannotReceive=evs.find(e=>e.to&&!TRANSFER_EVENTS.has(e.name));
+  if(cannotReceive){
+    alert('#'+cannotReceive.name+' cannot be played to anyone — only a pass, a cross or a'
+      +' substitution takes the number that follows it. Tag what '+cannotReceive.to
+      +' did as its own entry.');return}
   // a successful pass/cross with nobody to receive it is the bug this rule exists for:
   // it used to be stored with rx,ry NULL, i.e. a completed pass to nowhere
   const noReceiver=evs.find(e=>NEEDS_RECEIVER.has(e.name)&&!e.to);

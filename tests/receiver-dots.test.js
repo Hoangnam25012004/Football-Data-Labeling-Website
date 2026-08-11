@@ -76,6 +76,57 @@ test('the active-event path is held to it too', () => {
   ok(!!ok2.rows[0].rXY,'rx,ry stored');
 });
 
+/* ================= refused: a receiver on an event that cannot have one =================
+   The mirror of the rule above. When a '*' group is followed by a number, parseChain hands
+   that number to the last event that TRANSFERS the ball — and, failing that, to the last
+   event in the group, whatever it is. So "9ddd*f3" stored #foul with player_to = 3 and a
+   receiver dot: a number the heat map counts as 3's touch and the report reads as a real
+   pass target. Only a pass, a cross or a substitution may be followed by a number. */
+test('an event that cannot be played to is refused the number that follows it', () => {
+  [['9ddd3','goal'],                  // a goal "scored to" the next player
+   ['1xx2','ground duel fail'],       // a lost duel "played to" the winner
+   ['13f*yc2','yellow card'],         // last in a '*' group, none of which transfers
+   ['9j*ddd3','goal']                 // …even with another non-transfer event ahead of it
+  ].forEach(([raw,name])=>{
+    [0,1,2,3].forEach(n=>{            // no number of dots buys its way past
+      const r=tag(raw,n);
+      eq(r.rows.length,0,raw+' with '+n+' dot(s) wrote nothing');
+      ok(r.alert.startsWith('#'+name+' cannot be played to anyone'),raw+': '+r.alert);
+    });
+  });
+});
+
+test('the message says whose action still needs an entry', () => {
+  ok(/Tag what 3 did as its own entry/.test(tag('9ddd3',2).alert));
+});
+
+test('a macro is held to it too — the shorthand cannot smuggle one in', () => {
+  const a=makeApp({state:{sport:'football',team:'home',rows:[],pendingDots:[],
+    macros:{football:[{key:'gr',events:['goal','foul']}]},
+    lineups:{home:{xi:[],subs:[],roster:[]},away:{xi:[],subs:[],roster:[]},history:[]},
+    duration:{enabled:false,h2Start:0},teamIds:{}}});
+  submit(a,'9gr3',dots(2));
+  eq(a.state.rows.length,0,'nothing written');
+  ok(/^#foul cannot be played to anyone/.test(a.log.alerts[0]),a.log.alerts[0]);
+});
+
+test('the active-event path is held to it as well', () => {
+  const r=tag('9 3',2,'goal');        // two numbers + an event that transfers nothing
+  eq(r.rows.length,0);
+  ok(/#goal cannot be played to anyone/.test(r.alert),r.alert);
+});
+
+test('a group that DOES transfer the ball is untouched', () => {
+  // the transfer event takes the number; its group-mates stay solo, exactly as before
+  const r=tag('1k*c2',2);
+  eq(r.alert,'');
+  deepEq(r.rows.map(x=>[x.event,x.playerFrom,x.playerTo].join('|')),
+    ['free-kick|1|','cross success|1|2']);
+  const s=tag('17j*c14dd',2);         // transfer in the middle of the group
+  eq(s.alert,'');
+  deepEq(s.rows.map(x=>x.playerTo),['','14','']);
+});
+
 /* ================= refused: a failed pass that can never get its dot ================= */
 test('a receiver-less failed pass buried mid-entry is refused', () => {
   const r=tag('1ss*ss2',2);
@@ -136,6 +187,10 @@ test('INVARIANT: every stored row has x,y — and every ball-moving one has rx,r
         ok(!!r.rXY,raw+' -> #'+r.event+' has rx,ry');
       if(['pass success','cross success'].includes(r.event))
         ok(!!r.playerTo,raw+' -> #'+r.event+' names its receiver');
+      // …and the other way round: a receiver on anything else is the row that must not exist
+      if(r.playerTo)
+        ok(TRANSFER.concat('substitution').includes(r.event),
+           raw+' -> #'+r.event+' must not carry a receiver');
     });
   });
   ok(checked>=18,'swept '+checked+' rows');
