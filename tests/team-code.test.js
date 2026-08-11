@@ -309,7 +309,8 @@ test('creating and editing a channel are the same form', () => {
   // and nothing builds a second copy of the fields
   eq((APPJS.match(/id="ncName"/g)||[]).length,1,'the markup exists once');
   const f=/function channelForm\(view, opts\)[\s\S]*?\n  \}/.exec(APPJS)[0];
-  ['ncName','ncSport','ncCountry','ncCode','ncCrest'].forEach(i=>ok(f.includes(i),f+' has '+i));
+  ['ncName','ncSport','ncCountry','ncCode'].forEach(i=>ok(f.includes(i),f+' has '+i));
+  notOk(/ncCrest|crestPrev/.test(f),'and no monogram field — nothing on the site shows one');
 });
 
 test('the code field is styled, and its answer is readable either way', () => {

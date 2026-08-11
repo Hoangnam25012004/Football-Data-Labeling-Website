@@ -201,13 +201,6 @@ table.dt tbody tr:hover{background:color-mix(in srgb,var(--chalk) 4%, transparen
   border:1px solid var(--line); padding:3px 7px; border-radius:2px;
 }
 
-.crest{
-  width:26px; height:26px; flex:none; border-radius:3px; display:grid; place-items:center;
-  font-family:var(--f-mono); font-size:9.5px; font-weight:700; background:var(--red); color:#fff;
-}
-.crest.sm{width:20px; height:20px; font-size:8px; border-radius:2px}
-.crest.opp{background:var(--carbon-2); color:var(--ash); border:1px solid var(--line)}
-
 .kpis{
   display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:1px;
   background:var(--line-soft); border:1px solid var(--line-soft); border-radius:3px;

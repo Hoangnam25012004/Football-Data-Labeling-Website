@@ -87,7 +87,6 @@
      --------------------------------------------------------- */
   function renderShell() {
     var ch = state.channel;
-    $('#chanCrest').textContent = ch ? ch.crest : '···';
     $('#chanName').textContent = ch ? ch.name : (state.user ? 'No channel' : 'Not signed in');
     $('#chanPublic').hidden = !(ch && ch.isPublic);
 
@@ -95,7 +94,6 @@
     menu.innerHTML = '';
     state.channels.forEach(function (c) {
       var b = el('button', 'chan-opt' + (c === ch ? ' on' : ''),
-        '<span class="crest sm' + (c === ch ? '' : ' opp') + '">' + esc(c.crest) + '</span>' +
         '<span>' + esc(c.name) + '<em>' + esc(c.country || 'channel') + '</em></span>');
       b.type = 'button';
       b.addEventListener('click', function () {
@@ -190,13 +188,11 @@
         '<span class="m-date">' + esc(m.dateLabel) + '<em>' + esc(m.venue || (ourHome ? 'Home' : 'Away')) +
           ' · Match ID ' + esc(m.id) + '</em></span>' +
         '<span class="m-team m-home">' +
-          '<span class="crest sm' + (ourHome ? '' : ' opp') + '">' + esc(m.home.crest) + '</span>' +
           '<span class="tn' + (ourHome ? ' us' : '') + '">' + esc(m.home.name) + '</span>' +
         '</span>' +
         '<span class="m-sc"><span class="m-score">' +
           num(m.home.score) + ' : ' + num(m.away.score) + '</span></span>' +
         '<span class="m-team m-away">' +
-          '<span class="crest sm' + (ourHome ? ' opp' : '') + '">' + esc(m.away.crest) + '</span>' +
           '<span class="tn' + (ourHome ? '' : ' us') + '">' + esc(m.away.name) + '</span>' +
         '</span>' +
         '<span class="m-end">' +
@@ -435,6 +431,9 @@
     });
     var avg = function (t) { return played.length ? Math.round(t / played.length * 10) / 10 : null; };
 
+    var cards = discipline(all);
+    /* Two rows of four on the one grid. The second row used to be three wide,
+       so nothing in it lined up with anything in the row above it. */
     var stat = el('div', 'card stat-card');
     stat.innerHTML =
       '<p class="card-h">Team stats <span class="right">' + esc(state.channel ? state.channel.name : '') + '</span></p>' +
@@ -444,7 +443,8 @@
       '<div class="tstats sec">' +
         tstat('Average goals scored', avg(gf)) +
         tstat('Average goals conceded', avg(ga)) +
-        tstat('Goal difference', (gf - ga > 0 ? '+' : '') + (gf - ga)) +
+        tstat('Yellow cards', cards.yellow) +
+        tstat('Red cards', cards.red) +
       '</div>';
     body.appendChild(stat);
     /* Both full width. The pitch that used to sit beside this one is gone, and
@@ -473,6 +473,30 @@
     body.appendChild(kpis);
   }
 
+  /* Cards are the one thing on the stats card that newStat() does not carry, so
+     they are counted off the rows instead — through shared.js's classifyCards(),
+     which is what the match timeline reads, so the campaign cannot disagree with
+     the match it came from. A second yellow IS a yellow and IS a sending-off, and
+     an explicit red tagged for that same dismissal is not a second red.
+
+     Null, not zero, while no analysis has been submitted: a channel with nothing
+     read yet has no discipline record, and 0 would claim it had a clean one. */
+  function discipline(matches) {
+    var y = 0, r = 0, seen = 0;
+    matches.forEach(function (m) {
+      var rep = (state.reports || {})[m.uuid];
+      if (!rep || !Array.isArray(rep.rows) || !rep.rows.length) return;
+      seen++;
+      window.classifyCards(rep.rows).forEach(function (kind, row) {
+        if (row.team !== m.side) return;             // the club's own side only
+        if (kind === 'yc') y++;
+        else if (kind === 'y2') { y++; r++; }        // the second yellow, and the red it is
+        else if (kind === 'rc') r++;
+      });
+    });
+    return seen ? { yellow: y, red: r } : { yellow: null, red: null };
+  }
+
   /* The last five, most recent first — the list is kept in kickoff order for
      the fixture list, which reads the other way round. */
   function recentResultsCard(played) {
@@ -484,20 +508,24 @@
       res.appendChild(el('p', 'note', 'No match in this channel has a final score yet.'));
       return res;
     }
+    /* Six cells, and the two ends are the same width, so the scoreline lands on
+       the middle of the row rather than wherever the date happened to push it.
+       The home name reads right, into the score; the away name reads left, out
+       of it — the fixture is one centred block either side of the result. */
     recent.forEach(function (m) {
       var b = el('button', 'rrow');
       b.type = 'button';
       b.innerHTML =
-        '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' +
-        '<span class="rt"><span class="crest sm' + (m.side === 'home' ? '' : ' opp') + '">' + esc(m.home.crest) + '</span>' +
-          '<span class="rn' + (m.side === 'home' ? ' us' : '') + '">' + esc(m.home.name) + '</span></span>' +
+        '<span class="rres"><span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span></span>' +
+        '<span class="rn rn-h' + (m.side === 'home' ? ' us' : '') + '">' + esc(m.home.name) + '</span>' +
         '<span class="rsc">' + num(m.home.score) + '</span>' +
         '<span class="rsc">' + num(m.away.score) + '</span>' +
-        '<span class="rt"><span class="crest sm' + (m.side === 'away' ? '' : ' opp') + '">' + esc(m.away.crest) + '</span>' +
-          '<span class="rn' + (m.side === 'away' ? ' us' : '') + '">' + esc(m.away.name) + '</span></span>' +
-        '<span class="rd">' + esc(window.HNA.shortDate(m.date)) + '</span>' +
-        '<span class="m-open" aria-hidden="true">' +
-          '<svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor"><path d="M1 0 9 5 1 10Z"/></svg>' +
+        '<span class="rn rn-a' + (m.side === 'away' ? ' us' : '') + '">' + esc(m.away.name) + '</span>' +
+        '<span class="rend">' +
+          '<span class="rd">' + esc(window.HNA.shortDate(m.date)) + '</span>' +
+          '<span class="m-open" aria-hidden="true">' +
+            '<svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor"><path d="M1 0 9 5 1 10Z"/></svg>' +
+          '</span>' +
         '</span>';
       b.addEventListener('click', function () { location.hash = '#/match/' + encodeURIComponent(m.slug || m.id); });
       rl.appendChild(b);
@@ -637,8 +665,7 @@
       var m = a.m;
       return '<tr data-go="' + esc(m.slug || m.id) + '">' +
         '<td class="c-date">' + esc(window.HNA.shortDate(m.date)) + '</td>' +
-        '<td class="c-opp"><span class="cop"><span class="crest sm opp">' +
-          esc(window.HNA.monogram(m.opponent)) + '</span><b>' + esc(m.opponent) + '</b>' +
+        '<td class="c-opp"><span class="cop"><b>' + esc(m.opponent) + '</b>' +
           '<em>' + (m.side === 'home' ? 'H' : 'A') + '</em></span></td>' +
         '<td class="c-res">' + (m.result ? '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' : '—') + '</td>' +
         '<td class="c-sc">' + num(a.gf) + ' : ' + num(a.ga) + '</td>' +
@@ -832,7 +859,6 @@
       var b = el('button', 'crow');
       b.type = 'button';
       b.innerHTML =
-        '<span class="crest sm">' + esc(c.crest) + '</span>' +
         '<span class="cn">' + esc(c.name) + '<em>' + esc(roleLabel(c.role)) +
           (c.country ? ' · ' + esc(c.country) : '') +
           (c.isPublic ? ' · public' : '') + '</em></span>' +
@@ -868,7 +894,7 @@
     var menu = el('div', 'menu');
     menu.setAttribute('role', 'menu');
 
-    var edit = el('button', 'menu-opt', 'Edit<em>Name, country, monogram, team code</em>');
+    var edit = el('button', 'menu-opt', 'Edit<em>Name, country, sport, team code</em>');
     edit.type = 'button';
     edit.addEventListener('click', function () {
       location.hash = '#/channel/' + encodeURIComponent(ch.slug) + '/edit';
@@ -1138,7 +1164,7 @@
     'Malaysia','Mexico','Netherlands','New Zealand','Norway','Philippines','Poland','Portugal','Singapore','Spain',
     'Sweden','Switzerland','Thailand','Turkey','United States','Uruguay'];
 
-  /* The one form. Creating a channel and editing one ask for the same five
+  /* The one form. Creating a channel and editing one ask for the same four
      things, so they are the same markup and the same wiring; only the button,
      the heading and what happens on submit differ. Two copies of this drifted
      apart the moment a field was added to one of them. */
@@ -1147,9 +1173,6 @@
     var card = el('div', 'card form-card');
     card.innerHTML =
       '<form id="chanForm">' +
-        '<div class="crest-pick"><span class="crest lg" id="crestPrev">···</span>' +
-          '<span class="cp-note">The three letters shown wherever the club appears. ' +
-          'Left alone, they are taken from the name.</span></div>' +
         '<div class="field"><label for="ncName">Channel name</label>' +
           '<input id="ncName" placeholder="Enter club name" autocomplete="off" required value="' +
             esc(v.name || '') + '"></div>' +
@@ -1169,16 +1192,11 @@
            to the MATCH, which is where they are already read from: the fixture
            list shows each match's own, and the summary strip simply leaves the
            line out when the channel has none. */
-        '<div class="f2">' +
-          '<div class="field"><label for="ncCode">Team code <span class="opt">optional</span></label>' +
-            '<input id="ncCode" inputmode="numeric" maxlength="5" placeholder="5 digits" ' +
-              'autocomplete="off" value="' + esc(v.code || '') + '">' +
-            '<p class="field-note" id="ncCodeMsg">The code of this club’s team on the ' +
-              'labeling site. It is what tells a published match which of the two sides is yours.</p></div>' +
-          '<div class="field"><label for="ncCrest">Monogram <span class="opt">optional</span></label>' +
-            '<input id="ncCrest" maxlength="4" placeholder="auto" autocomplete="off" value="' +
-              esc(v.crest || '') + '"></div>' +
-        '</div>' +
+        '<div class="field"><label for="ncCode">Team code <span class="opt">optional</span></label>' +
+          '<input id="ncCode" inputmode="numeric" maxlength="5" placeholder="5 digits" ' +
+            'autocomplete="off" value="' + esc(v.code || '') + '">' +
+          '<p class="field-note" id="ncCodeMsg">The code of this club’s team on the ' +
+            'labeling site. It is what tells a published match which of the two sides is yours.</p></div>' +
         '<div class="form-end">' +
           '<button class="btn btn-primary" type="submit" id="ncGo">' + esc(opts.submit) + '</button>' +
           (opts.cancel ? '<button class="btn btn-quiet" type="button" id="ncCancel">Cancel</button>' : '') +
@@ -1189,18 +1207,8 @@
     view.appendChild(el('p', 'note', opts.note));
 
     var nameBox = card.querySelector('#ncName');
-    var crestBox = card.querySelector('#ncCrest');
     var codeBox = card.querySelector('#ncCode');
     var codeMsg = card.querySelector('#ncCodeMsg');
-    var prev = card.querySelector('#crestPrev');
-
-    var sync = function () {
-      var c = (crestBox.value || '').trim().toUpperCase();
-      prev.textContent = c || (nameBox.value ? window.HNA.monogram(nameBox.value) : '···');
-    };
-    nameBox.addEventListener('input', sync);
-    crestBox.addEventListener('input', sync);
-    sync();
 
     /* A code that names no team is refused by the database (0018), which is
        the guarantee — but being told which team it IS before saving is what
@@ -1246,7 +1254,6 @@
       msg.textContent = opts.busy;
       opts.save({
         name: nameBox.value,
-        crest: crestBox.value,
         sport: card.querySelector('#ncSport').value,
         country: card.querySelector('#ncCountry').value,
         code: codeBox.value

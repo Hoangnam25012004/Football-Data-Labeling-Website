@@ -262,49 +262,66 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
 .dcol{display:flex; flex-direction:column; gap:14px; min-width:0}
 
 .stat-card{margin-bottom:14px}
-.tstats{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; background:var(--line-soft)}
-.tstats.sec{grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:1px}
-.tstat{background:var(--carbon-2); padding:12px 4px 12px 0}
+/* Both rows are the same four columns, so Average goals scored sits under Total
+   and every value below reads down a column. The second row asked for three and
+   nothing in it lined up with anything above it. */
+.tstats{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0 22px}
+.tstats.sec{margin-top:18px}
+.tstat{padding:2px 0 0; min-width:0}
+/* The rule belongs to the label, not to the cell: it stops at the column it
+   measures rather than running the width of the card. */
 .ts-l{
-  display:block; font-family:var(--f-mono); font-size:9.5px; letter-spacing:.12em;
-  text-transform:uppercase; color:var(--ash-dim); margin-bottom:7px; line-height:1.5;
+  display:block; font-size:12px; color:var(--ash); line-height:1.5;
+  padding-bottom:7px; margin-bottom:9px; border-bottom:1px solid var(--line);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .ts-v{
   display:block; font-family:var(--f-display); font-stretch:87.5%; font-weight:700;
   font-size:26px; line-height:1; font-variant-numeric:tabular-nums; color:var(--chalk);
 }
-@media (max-width:520px){ .tstats,.tstats.sec{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:520px){
+  .tstats{grid-template-columns:repeat(2,minmax(0,1fr)); row-gap:18px}
+  .tstats.sec{margin-top:18px}
+}
 
 /* one row per result: how it went, who played whom, what it finished, when.
    The home side reads left-to-right into the score and the away side out of
    it, so a column can be read down for every home team or every scoreline. */
 .res-card{margin-bottom:20px}
 .rlist{display:flex; flex-direction:column}
+/* The two end cells are the same width — the result on one, the date and the
+   chevron on the other — so the pair of scores lands on the middle of the row
+   and the fixture reads as one block centred on it, whatever the date says. */
 .rrow{
-  display:grid; grid-template-columns:22px minmax(0,1fr) 26px 26px minmax(0,1fr) auto 14px;
+  display:grid; grid-template-columns:92px minmax(0,1fr) 26px 26px minmax(0,1fr) 92px;
   gap:9px; align-items:center; width:100%; text-align:left; cursor:pointer;
   background:transparent; border:0; border-bottom:1px solid var(--line-soft);
   color:inherit; font:inherit; padding:10px 2px; transition:background .16s;
 }
 .rrow:last-child{border-bottom:0}
 .rrow:hover{background:color-mix(in srgb,var(--chalk) 4%, transparent)}
-.rrow .rt{display:flex; align-items:center; gap:8px; min-width:0}
-/* without this the name is a flex item at its content width and the crest,
-   not the ellipsis, is what the column gives its room to */
+.rrow .rres{display:flex; align-items:center}
+.rrow .rend{display:flex; align-items:center; justify-content:flex-end; gap:8px; min-width:0}
+/* min-width:0 is what lets a long club name ellipsis rather than push the
+   scoreline off the middle of the row */
 .rrow .rn{font-size:13px; color:var(--ash); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .rrow .rn.us{color:var(--chalk); font-weight:600}
+/* home reads right, into the score; away reads left, out of it */
+.rrow .rn-h{text-align:right}
+.rrow .rn-a{text-align:left}
 .rrow .rsc{
   font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-weight:700; font-size:12.5px;
   background:var(--carbon); border:1px solid var(--line); border-radius:2px;
   padding:2px 0; text-align:center; color:var(--chalk);
 }
 .rrow .rd{font-family:var(--f-mono); font-size:10px; color:var(--ash-dim); white-space:nowrap; letter-spacing:.04em}
-.rrow .m-open{opacity:0; transition:opacity .16s, border-color .16s, color .16s}
+.rrow .m-open{opacity:0; flex:none; transition:opacity .16s, border-color .16s, color .16s}
 .rrow:hover .m-open{opacity:1; border-color:var(--red); color:var(--red)}
 @media (max-width:640px){
-  .rrow{grid-template-columns:22px minmax(0,1fr) 24px 24px minmax(0,1fr) 16px}
+  /* the date goes, and with it the reason the end cells were 92px — they stay
+     equal to each other, which is what keeps the score centred */
+  .rrow{grid-template-columns:24px minmax(0,1fr) 24px 24px minmax(0,1fr) 24px; gap:7px}
   .rrow .rd{display:none}
-  .rrow .rt .crest{display:none}
 }
 
 /* ---------- Data: key players ----------
@@ -526,9 +543,6 @@ table.stbl tbody tr:last-child td{border-bottom:0}
 .menu-opt.danger:hover{background:color-mix(in srgb,var(--red) 14%, transparent); color:var(--red)}
 .menu-opt.danger:hover em{color:var(--red)}
 
-.crest-pick{display:flex; align-items:center; gap:14px; margin-bottom:22px}
-.crest.lg{width:52px; height:52px; border-radius:4px; font-size:15px}
-.cp-note{font-family:var(--f-mono); font-size:10px; color:var(--ash-dim); line-height:1.8; letter-spacing:.03em}
 .form-end{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:8px}
 .form-msg{font-family:var(--f-mono); font-size:11px; color:var(--ash-dim); letter-spacing:.04em}
 .form-msg.err{color:var(--red)}

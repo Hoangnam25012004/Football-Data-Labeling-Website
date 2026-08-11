@@ -578,7 +578,24 @@ test('the strip of running totals is gone from the bar', () => {
   notOk(/\.chan-sum/.test(APPCSS),'and its styling went with it');
   // the same numbers are still a section of their own, so nothing was lost
   ok(/tstat\('Total'/.test(APPJS)&&/tstat\('Win'/.test(APPJS),'Data still counts them');
-  ok(/Goal difference/.test(APPJS),'including the difference the strip used to show');
+  // the difference the strip used to show is on the Goals against tile now —
+  // the Team stats card gave its fourth slot to the discipline pair
+  ok(/goal difference/.test(APPJS),'and the difference is still stated somewhere');
+});
+
+test('no monogram anywhere on the site — a club is its name', () => {
+  const SITECSS=page('client/assets/site.css');
+  notOk(/class="crest/.test(APPJS),'no badge is drawn beside a team or a channel');
+  notOk(/chanCrest|crestPrev|ncCrest|crest-pick/.test(APPJS+APPHTML),
+        'the bar, the form preview and the field it previewed are all gone');
+  notOk(/\.crest[\s{,.:]/.test(APPCSS+SITECSS),'and their styling went with them');
+  // the names the badge sat beside are untouched — they were always the real label
+  ok(/esc\(m\.home\.name\)/.test(APPJS)&&/esc\(m\.away\.name\)/.test(APPJS),
+     'a fixture still says who played whom');
+  ok(/esc\(c\.name\)/.test(APPJS),'and the switcher still says which channel is open');
+  /* supa.js is left alone on purpose: clubs.crest_text is a database column with
+     rows already in it, and the seed writes one. Nothing READS it here any more. */
+  ok(/crest_text/.test(SUPA),'the column is still written, so existing rows stay consistent');
 });
 
 /* ================= the match page ================= */

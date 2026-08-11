@@ -11,6 +11,7 @@
    stand-in Supabase client the channel tests use. */
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk}=require('./tiny-test');
+const {grabFunction}=require('./harness');
 
 const ROOT=path.join(__dirname,'..');
 const page=p=>fs.readFileSync(path.join(ROOT,p),'utf8');
@@ -247,13 +248,65 @@ test('the Recent formation card is gone, and so is everything that drew it', () 
 test('the record, the last five, and the three key players', () => {
   ok(/tstat\('Total'/.test(overview)&&/tstat\('Win'/.test(overview)&&
      /tstat\('Draw'/.test(overview)&&/tstat\('Loss'/.test(overview),'the record');
-  ok(/Average goals scored/.test(overview)&&/Average goals conceded/.test(overview)&&
-     /Goal difference/.test(overview),'and what it came to per match');
+  ok(/Average goals scored/.test(overview)&&/Average goals conceded/.test(overview),
+     'and what it came to per match');
+  ok(/tstat\('Yellow cards'/.test(overview)&&/tstat\('Red cards'/.test(overview),
+     'and how the club behaved while it did');
+  notOk(/Goal difference/.test(overview),
+        'the difference is not a tile here — Goals against carries it');
   const rec=/function recentResultsCard\(played\)[\s\S]*?\n  \}/.exec(APPJS)[0];
   ok(/\.slice\(0, 5\)/.test(rec),'five results');
   ok(/\.reverse\(\)/.test(rec),'most recent first — the fixture list reads the other way round');
   const kp=/var KEY_PLAYERS = \[[\s\S]*?\];/.exec(APPJS)[0];
   ['Top Scorer','Top Assist','Top Key Pass'].forEach(t=>ok(kp.includes(t),kp+' has '+t));
+});
+
+/* The card counts are the one thing on that card newStat() does not carry, so
+   discipline() is EXECUTED rather than read: the 2nd-yellow rule is the whole
+   reason it goes through classifyCards() instead of counting rows itself. */
+function runDiscipline(reports, matches){
+  const ctx={console,document:{getElementById:()=>null},location:{hash:''},
+    localStorage:{getItem:()=>null,setItem(){}},window:{}};
+  vm.createContext(ctx);
+  vm.runInContext([SHARED,
+    'window.classifyCards=classifyCards;',
+    'var state={reports:'+JSON.stringify(reports)+'};',
+    grabFunction('discipline',APPJS,'client/assets/app.js'),
+    ';globalThis.out=discipline('+JSON.stringify(matches)+');'
+  ].join('\n'),ctx,{filename:'client/assets/app.js-discipline'});
+  return ctx.out;
+}
+
+test('the card counts say what the match timeline says', () => {
+  const rows=[
+    {t:10,team:'home',playerFrom:'7',event:'Yellow Card'},
+    {t:20,team:'home',playerFrom:'7',event:'Yellow Card'},
+    // the tagger logged the sending-off as well; it is the SAME dismissal
+    {t:21,team:'home',playerFrom:'7',event:'Red Card'},
+    {t:30,team:'home',playerFrom:'4',event:'Red Card'},   // a straight one
+    {t:40,team:'away',playerFrom:'9',event:'Yellow Card'} // not our club
+  ];
+  const got=runDiscipline({m1:{rows}},[{uuid:'m1',side:'home'}]);
+  eq(got.yellow,2,'both yellows count — the second is still a yellow');
+  eq(got.red,2,'the 2nd-yellow dismissal and the straight red, and the duplicate red once');
+});
+
+test('the card counts read the club\'s own side of the fixture', () => {
+  const rows=[
+    {t:10,team:'home',playerFrom:'7',event:'Yellow Card'},
+    {t:20,team:'away',playerFrom:'9',event:'Yellow Card'},
+    {t:30,team:'away',playerFrom:'9',event:'Red Card'}
+  ];
+  eq(runDiscipline({m1:{rows}},[{uuid:'m1',side:'away'}]).yellow,1,'away is ours here');
+  eq(runDiscipline({m1:{rows}},[{uuid:'m1',side:'home'}]).yellow,1,'and home when it is');
+});
+
+test('with nothing submitted the cards read — , not a clean sheet', () => {
+  const got=runDiscipline({},[{uuid:'m1',side:'home'}]);
+  eq(got.yellow,null,'0 would claim a discipline record the channel has not got');
+  eq(got.red,null);
+  // and a match whose report came back with no rows is the same as no report
+  eq(runDiscipline({m1:{rows:[]}},[{uuid:'m1',side:'home'}]).yellow,null);
 });
 
 test('a player is tallied under his name, not his shirt number', () => {
@@ -301,9 +354,39 @@ test('the frozen columns of the wide table give way on a phone', () => {
 test('the results row can shrink to its names rather than to nothing', () => {
   const css=APPCSS.replace(/\s*\n\s*/g,'');
   ok(/\.rrow \.rn\{[^}]*min-width:0/.test(css),
-     'without it the crest, not the ellipsis, takes the room');
+     'without it a long club name pushes the scoreline off the middle of the row');
   const rec=/function recentResultsCard\(played\)[\s\S]*?\n  \}/.exec(APPJS)[0];
   ok(/HNA\.shortDate/.test(rec),'and the date is the short one — the long one crowded the names out');
+});
+
+test('the fixture is centred on the row, at both widths', () => {
+  const css=APPCSS.replace(/\s*\n\s*/g,'');
+  const cols=s=>/grid-template-columns:([^;}]+)/.exec(s)[1].trim().split(/\s+/);
+  [['.rrow{', /\.rrow\{[^}]*\}/],
+   ['the phone row', /@media \(max-width:640px\)\{[\s\S]*?\.rrow\{[^}]*\}/]
+  ].forEach(([what,re])=>{
+    const c=cols(re.exec(css)[0]);
+    eq(c.length,6,what+' is six cells');
+    eq(c[0],c[5],what+': the two ends are equal, so the score lands on the middle');
+    eq(c[1],c[4],what+': and the names get the same room either side of it');
+  });
+  // the date is what made the right end wide; on a phone it goes and both ends shrink
+  ok(/@media \(max-width:640px\)\{[^@]*\.rrow \.rd\{display:none\}/.test(css),'the date goes narrow');
+  const rec=/function recentResultsCard\(played\)[\s\S]*?\n  \}/.exec(APPJS)[0];
+  ok(/class="rn rn-h/.test(rec)&&/class="rn rn-a/.test(rec),'the two names are told apart');
+  ok(/\.rrow \.rn-h\{text-align:right\}/.test(css)&&/\.rrow \.rn-a\{text-align:left\}/.test(css),
+     'home reads into the score, away reads out of it');
+  ok(/class="rend"/.test(rec)&&/\.rrow \.rend\{[^}]*justify-content:flex-end/.test(css),
+     'the date and the chevron share the end cell, so it is one width to balance');
+});
+
+test('the team stats card is two rows on one grid', () => {
+  const css=APPCSS.replace(/\s*\n\s*/g,'');
+  ok(/\.tstats\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/.test(css),'four columns');
+  notOk(/grid-template-columns/.test(/\.tstats\.sec\{([^}]*)\}/.exec(css)[1]),
+        'and the second row does not ask for its own — three under four lined up with nothing');
+  const sec=/'<div class="tstats sec">'([\s\S]*?)'<\/div>'/.exec(overview)[1];
+  eq((sec.match(/tstat\(/g)||[]).length,4,'four tiles for the four columns, so no hole is left');
 });
 
 /* ================= deploy ================= */
