@@ -189,10 +189,6 @@
   .evt.shot{background:#000;color:#f2f6fa;border:1px solid #454e5e;border-radius:4px;
             padding:0 5px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
   .pnum{font-weight:700;color:var(--ink)}
-  td.ed,.ed,.ed-ev{cursor:pointer}
-  td.ed:hover,.ed:hover,.ed-ev:hover{outline:1px dashed var(--accent);outline-offset:1px;border-radius:3px}
-  .cell-edit{width:58px;background:#000;border:1px solid var(--accent);color:var(--ink);border-radius:4px;padding:2px 4px;font-size:11px;text-align:center}
-  .cell-edit:focus{outline:none}
   /* video popped out to its own window: hide only the video + controls, keep the formation panel */
   body.video-popped .video-wrap{display:none}
   body.video-popped #controls{display:none!important}
@@ -2049,7 +2045,7 @@ function macroForKey(k){const m=curMacros().find(o=>o.key&&o.key===k);return m?m
    always wins, so adding a macro can never change what an existing key does; an unknown
    key (or a macro pointing at a deleted event) comes back with name:null, which is what
    parseChain reports as badKey. Each expanded event keeps its OWN hotkey, so the row's
-   action_code stays the event's code and double-click editing still round-trips. */
+   action_code stays the event's code and ✎ Edit still round-trips. */
 function expandKey(k){
   const direct=eventForKey(k);
   if(direct)return [{key:k,name:direct}];
@@ -2889,10 +2885,14 @@ function renderTable(){
     if(grpRows.length>1){
       combined=chainHTML(grpRows,evClass);
     }else{
-      // single event: "<player_from> <event> <player_to>", numbers/event editable by double-click
-      const pf=`<span class="pnum ed" data-edit="from" title="Double-click to edit">${r.playerFrom||'—'}</span>`;
-      const pt=r.playerTo?` <span class="pnum ed" data-edit="to" title="Double-click to edit">${r.playerTo}</span>`:'';
-      const evSpan=`<span class="evt ${evClass}${evtClass(r.event)} ed-ev" title="Double-click: type a hotkey to change the event">#${r.event}</span>`;
+      // single event: "<player_from> <event> <player_to>" — read-only, exactly like a chain.
+      // A row is corrected with ✎ Edit and nothing else: the cell editors that used to sit
+      // here could swap a number or an event NAME on their own, with no way to bring the
+      // dots along, so they could write shapes the entry box refuses (a #goal keeping the
+      // receiver of the pass it was renamed from). Edit re-tags the whole row instead.
+      const pf=`<span class="pnum">${r.playerFrom||'—'}</span>`;
+      const pt=r.playerTo?` <span class="pnum">${r.playerTo}</span>`:'';
+      const evSpan=`<span class="evt ${evClass}${evtClass(r.event)}">#${r.event}</span>`;
       combined=`${pf} ${evSpan}${pt}`;
     }
     const blank='<td class="blank"></td>';
@@ -2910,8 +2910,6 @@ function renderTable(){
       const idx=state.rows.indexOf(r);
       tr.querySelector('.edit').onclick=()=>startEdit(idx);
       tr.querySelector('.del').onclick=()=>deleteRows([r]);
-      tr.querySelectorAll('[data-edit]').forEach(td=>{td.ondblclick=()=>editPlayerCell(td,idx,td.dataset.edit)});
-      tr.querySelectorAll('.ed-ev').forEach(td=>{td.ondblclick=()=>editEventCell(td,idx)});
     }
     tb.appendChild(tr);
   }
@@ -2922,47 +2920,13 @@ function renderTable(){
 }
 $('halfSel').onchange=()=>{renderTable();refreshFormation();};   // half decides the attacking direction shown
 
-/* inline-edit a player number cell (double-click) */
-function editPlayerCell(td,idx,field){
-  const fkey=field==='from'?'playerFrom':'playerTo';
-  const row=state.rows[idx], cur=row[fkey]||'';
-  const inp=document.createElement('input');
-  inp.className='cell-edit'; inp.value=cur; inp.maxLength=4;
-  inp.onkeydown=e=>{e.stopPropagation();
-    if(e.key==='Enter'){e.preventDefault();inp.blur();}
-    else if(e.key==='Escape'){inp.value=cur;inp.blur();}};
-  let done=false;
-  inp.onblur=()=>{if(done)return;done=true;
-    row[fkey]=inp.value.trim(); renderTable();
-    window.Cloud&&window.Cloud.onLocalUpsert(row);};
-  td.textContent=''; td.appendChild(inp); inp.focus(); inp.select();
-}
-/* inline-edit an event cell by typing a hotkey (double-click) */
-function editEventCell(td,idx){
-  const r=state.rows[idx], cur=r.action||'';
-  const inp=document.createElement('input');
-  inp.className='cell-edit'; inp.value=cur; inp.maxLength=8; inp.placeholder='hotkey';
-  inp.onkeydown=e=>{e.stopPropagation();
-    if(e.key==='Enter'){e.preventDefault();inp.blur();}
-    else if(e.key==='Escape'){inp.value=cur;inp.blur();}};
-  let done=false;
-  inp.onblur=()=>{if(done)return;done=true;
-    const key=inp.value.trim().toLowerCase();
-    if(key && key!==cur){
-      const name=eventForKey(key);
-      // this cell swaps the NAME only — it can't invent the dots a ball-moving event is
-      // stored with, so renaming into one the row has no receiver for is refused rather
-      // than quietly writing rx,ry NULL to the database
-      if(!name){alert('No event is bound to hotkey "'+key+'".');}
-      else if(NEEDS_RECEIVER.has(name)&&(!r.rXY||!r.playerTo)){
-        alert('#'+name+' needs a receiver and a second dot — use ✎ Edit to re-tag the row.');}
-      else if(TRAILING_EXTRA_DOT.has(name)&&!r.rXY){
-        alert('#'+name+' needs the dot where the ball ended up — use ✎ Edit to re-tag the row.');}
-      else{r.event=name; r.action=key;}
-    }
-    renderTable(); window.Cloud&&window.Cloud.onLocalUpsert(r);};
-  td.textContent=''; td.appendChild(inp); inp.focus(); inp.select();
-}
+/* There were two inline cell editors here — double-click a shirt number, double-click an
+   event name and retype its hotkey. Both are gone. Each wrote straight to the row and
+   could not touch the dots, so either one could leave a shape submitEntry would refuse:
+   a receiver moved onto a player who never got the ball, or a #pass success renamed to
+   #goal while keeping the receiver and the rx,ry of the pass it used to be. ✎ Edit is
+   now the only way in — it reloads the syntax AND the dots, so every correction goes
+   back through the same rules the first tag did. */
 
 /* EXPORT */
 // events for one half (or all if half is falsy), sorted & renumbered

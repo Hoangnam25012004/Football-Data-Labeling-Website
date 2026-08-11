@@ -265,8 +265,10 @@ an event hotkey always winning over a macro that claims it, a macro left pointin
 deleted event being refused rather than half-applied, and the two tables staying separate);
 and what a stored row is allowed to carry — every event naming the player who did it,
 `#pass success`/`#cross success` naming the receiver whose dot fills `rx,ry`, `#pass fail`/
-`#cross fail` keeping their trailing extra dot, and the double-click event cell refusing to
-rename a row into a ball-moving event it has no receiver for; and the formation board —
+`#cross fail` keeping their trailing extra dot, only a pass, a cross or a substitution being
+allowed to take the number that follows it, and the events table offering no inline cell
+editor at all, so every correction goes back through ✎ Edit and the rules it re-runs; and
+the formation board —
 where an unknown position parks, that a squad added at once stacks there, and that a
 position cell spaces 1 to 4 dots evenly without pushing any of them into a neighbour, that
 the Formation modal tidies every period of the team on screen and leaves the other alone,

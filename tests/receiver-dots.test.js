@@ -11,9 +11,8 @@
      - #pass success / #cross success name the receiver    -> rx,ry from the receiver's dot
      - #pass fail / #cross fail keep the trailing extra dot, and must be last to get it
    Substitutions are in neither set and keep their own dot-optional rule. */
-const {makeApp,submit,grabFunction,grabConst,EVENTS}=require('./harness');
+const {makeApp,submit,grabFunction,SRC}=require('./harness');
 const {test,eq,deepEq,ok,notOk}=require('./tiny-test');
-const vm=require('vm');
 
 const TRANSFER=['pass success','pass fail','cross success','cross fail'];
 function app(active){
@@ -202,64 +201,35 @@ test('INVARIANT: nothing that would break it can be written at all', () => {
     [0,1,2,3].forEach(n=>eq(tag(raw,n).rows.length,0,raw+' + '+n+' dot(s)')));
 });
 
-/* ================= the double-click event cell ================= */
-// editEventCell swaps the NAME of an existing row; it cannot invent dots, so it must not be
-// able to rename a row into a ball-moving event it has no receiver for
-function cell(row){
-  const log={alerts:[],upserts:[],renders:0};
-  let inp=null;
-  const td={textContent:'',appendChild(n){inp=n}};
-  const ctx={console,log,
-    state:{sport:'football',rows:[row]},
-    curEvents:()=>EVENTS.football,
-    document:{createElement:()=>({value:'',className:'',style:{},focus(){},select(){}})},
-    renderTable(){log.renders++},
-    window:{Cloud:{onLocalUpsert:r=>log.upserts.push(r)}},
-    alert:m=>log.alerts.push(m),
-  };
-  vm.createContext(ctx);
-  vm.runInContext([grabConst('TRAILING_EXTRA_DOT'),grabConst('NEEDS_RECEIVER'),
-    grabFunction('eventForKey'),grabFunction('editEventCell')].join('\n'),ctx);
-  return {log,retype(key){ctx.editEventCell(td,0);inp.value=key;inp.onblur();}};
-}
-const oneDotRow=extra=>Object.assign(
-  {id:'r1',event:'foul',action:'f',playerFrom:'7',playerTo:'',pXY:{x:10,y:20},rXY:null},extra||{});
-
-test('a 1-dot row cannot be renamed into a successful pass', () => {
-  const row=oneDotRow(), c=cell(row);
-  c.retype('s');
-  eq(row.event,'foul','the row is left exactly as it was');
-  eq(row.action,'f');
-  ok(/#pass success needs a receiver and a second dot/.test(c.log.alerts[0]),c.log.alerts[0]);
+/* ================= ✎ Edit is the only way to change a row =================
+   Two inline cell editors used to live in the table: double-click a shirt number, and
+   double-click an event name to retype its hotkey. Each wrote straight to the row and
+   could not touch the dots, so either one could leave a shape submitEntry refuses — a
+   receiver on a player who never got the ball, or a #pass success renamed to #goal while
+   keeping the receiver and the rx,ry of the pass it used to be. They are gone. */
+test('the cell editors are gone from the source, both of them', () => {
+  notOk(/function editPlayerCell/.test(SRC),'the shirt-number editor');
+  notOk(/function editEventCell/.test(SRC),'the event-name editor');
+  notOk(/cell-edit/.test(SRC),'and the class they were styled with');
 });
 
-test('nor into a failed pass, which also needs its dot', () => {
-  const row=oneDotRow(), c=cell(row);
-  c.retype('ss');
-  eq(row.event,'foul');
-  ok(/#pass fail needs the dot where the ball ended up/.test(c.log.alerts[0]),c.log.alerts[0]);
+test('nothing in the events table listens for a double-click any more', () => {
+  const rt=grabFunction('renderTable');
+  notOk(/dblclick/.test(rt),'no handler is bound');
+  notOk(/data-edit|ed-ev/.test(rt),'and the cells it hooked onto are not marked up');
+  // the period-time chip in the Formation modal is a different feature and stays
+  ok(/ondblclick/.test(grabFunction('renderFmModal')),'the Formation modal keeps its own');
 });
 
-test('a row that HAS both is free to become one', () => {
-  const row=oneDotRow({playerTo:'9',rXY:{x:80,y:40}}), c=cell(row);
-  c.retype('s');
-  eq(row.event,'pass success','allowed — the receiver and the dot are both there');
-  eq(row.action,'s');
-  eq(c.log.alerts.length,0);
+test('a single row renders the same read-only markup a chain does', () => {
+  const rt=grabFunction('renderTable');
+  ok(/<span class="pnum">\$\{r\.playerFrom/.test(rt),'the player number is a plain span');
+  ok(/<span class="evt \$\{evClass\}\$\{evtClass\(r\.event\)\}">/.test(rt),'so is the event');
+  notOk(/Double-click/.test(rt),'and nothing invites one');
 });
 
-test('renaming between ordinary events is untouched', () => {
-  const row=oneDotRow(), c=cell(row);
-  c.retype('yc');
-  eq(row.event,'yellow card');
-  eq(row.action,'yc');
-  eq(c.log.alerts.length,0,'no new obstacle in the way of a normal correction');
-  ok(c.log.upserts.length>0,'and it still syncs');
-});
-
-test('an unknown hotkey still says so', () => {
-  const row=oneDotRow(), c=cell(row);
-  c.retype('zzz');
-  eq(row.event,'foul');
-  ok(/No event is bound to hotkey "zzz"/.test(c.log.alerts[0]),c.log.alerts[0]);
+test('✎ Edit and × are still wired to every row', () => {
+  const rt=grabFunction('renderTable');
+  ok(/startEditGroup\(grpRows\)/.test(rt)&&/startEdit\(idx\)/.test(rt),'both edit paths');
+  ok(/deleteRows\(grpRows\)/.test(rt)&&/deleteRows\(\[r\]\)/.test(rt),'and both delete paths');
 });
