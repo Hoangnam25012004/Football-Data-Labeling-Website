@@ -1261,10 +1261,12 @@ function filmCues(win){
     const last=Math.max.apply(null,list.map(lastDot));
     /* Two kinds of entry, and they want opposite things.
 
-       A MOVE unfolds — a pass has a dot at each end, and the entry is on screen
-       for the flight between them. It lets go a twentieth of a second BEFORE the
-       last dot, so the strip is already clear as the ball arrives and the next
-       touch is not read over the top of the one that set it up.
+       A MOVE unfolds — a pass has a dot at each end, always: the tagging app
+       refuses a pass or cross until its receiver dot exists (NEEDS_RECEIVER and
+       TRAILING_EXTRA_DOT in index.html), so the flight is never zero-length. The
+       entry is on screen for that flight and lets go a twentieth of a second
+       BEFORE the last dot, so the strip is already clear as the ball arrives and
+       the next touch is not read over the top of the one that set it up.
 
        A MOMENT is one instant: a clearance, an aerial duel, a substitution. It
        has no span to be read in at all, so the same rule would put it on screen

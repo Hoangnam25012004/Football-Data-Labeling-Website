@@ -8,8 +8,8 @@
     "sha256": "384f94936120e8ee"
   },
   "Stats/stats-view.js": {
-    "v": 11,
-    "sha256": "294dfa77d52118c9"
+    "v": 12,
+    "sha256": "b2496c303ad7c190"
   },
   "auth.js": {
     "v": 1,
@@ -20,8 +20,8 @@
     "sha256": "9af2fd31132f9b70"
   },
   "client/assets/app.js": {
-    "v": 24,
-    "sha256": "30c484410ceb1d4c"
+    "v": 25,
+    "sha256": "c440824497d80985"
   },
   "client/assets/hanley-town.png": {
     "v": 1,

@@ -405,10 +405,14 @@ test('an entry with a span is a move; one without is a moment', () => {
   ok(c[2].out>c[2].in,'…which is the point: at -0.05 it would never be drawn at all');
 });
 
-test('a pass whose receiver dot was never placed is a moment, not a zero-length move', () => {
-  // playerTo names a receiver but no dot was put down, so there is nothing to
-  // run to and nothing to be read during
-  const P=sandbox([ev(200,{event:'pass fail',playerTo:'9'})]);
+test('a substitution names a player with no dot to run to, and is a moment', () => {
+  /* The one event that carries a playerTo without a receiver dot: playerTo is
+     the man coming ON, not somebody the ball was played to. Every pass and cross
+     is refused by the tagging app until its receiver dot exists — NEEDS_RECEIVER
+     and TRAILING_EXTRA_DOT in index.html, guarded by receiver-dots.test.js — and
+     across both reports in the channel not one of the 1529 pass/cross events is
+     missing one. So a substitution has no span, and is held like any moment. */
+  const P=sandbox([ev(200,{event:'substitution',playerFrom:'17',playerTo:'12'})]);
   const c=P.filmCues(WIN)[0];
   eq(c.out,200+P.FILM_HOLD);
   ok(c.out>c.in,'it is on screen at all, which is what matters');
