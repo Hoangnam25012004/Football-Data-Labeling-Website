@@ -140,6 +140,72 @@ test('a macro ending in a failed pass asks for the opponent-recovery dot', () =>
   eq(b.log.alerts.length,0);
 });
 
+/* ================= ✎ Edit hands back the long form =================
+   A macro is shorthand for typing, so the entry box must never show it back: ✎ on a row
+   tagged with "2xxaa" opens "2xx*aa" — the events those rows actually are. */
+const DUEL_TACKLE=[{key:'xxaa',events:['ground duel fail','tackle fail']}];
+
+test('a macro key in an entry is written out as the events it stands for', () => {
+  const a=app(DUEL_TACKLE);
+  eq(a.expandMacros('2xxaa'),'2xx*aa');
+  eq(a.expandMacros('2XXAA'),'2xx*aa','typed in upper case, same answer');
+  eq(app(RECOVERY_PASS).expandMacros('1qs2'),'1qq*s2');
+});
+
+test('an entry with no macro in it comes back character for character', () => {
+  const a=app(DUEL_TACKLE);
+  ['1s2','1s2s3s4','1xx*aa','1k*c2','38sub6*27sub43','9',''].forEach(s=>
+    eq(a.expandMacros(s),s,s||'(empty)'));
+  eq(app([]).expandMacros('2xxaa'),'2xxaa','no macros at all -> nothing to expand');
+});
+
+test('what a macro cannot claim is left exactly as typed', () => {
+  // 's' is #pass success: the event hotkey wins at tagging time, so rewriting it here
+  // would put a different entry in the box than the one that made the rows
+  eq(app([{key:'s',events:['recovery','foul']}]).expandMacros('1s2'),'1s2');
+  // a macro pointing at an event that no longer exists: leaving it alone keeps the
+  // "No event is bound to hotkey" complaint pointing at the key the user knows
+  eq(app([{key:'qz',events:['recovery','no such event']}]).expandMacros('1qz2'),'1qz2');
+});
+
+test('✎ Edit on a macro chain opens its long form, dots and all', () => {
+  const a=app(DUEL_TACKLE);
+  submit(a,'2xxaa',[{x:40,y:55,t:612.4}]);
+  eq(a.state.rows.length,2);
+  a.startEditGroup(a.state.rows.slice());
+  eq(a.$('playerInput').value,'2xx*aa','not the shorthand that was typed');
+  eq(a.state.editingGroup,a.state.rows[0].grp,'and it is the chain that is being edited');
+  deepEq(a.state.pendingDots,[{x:40,y:55,t:612.4}],'the touch dot is back');
+});
+
+test('submitting that long form re-tags exactly the same rows', () => {
+  const a=app(DUEL_TACKLE);
+  submit(a,'2xxaa',[{x:40,y:55,t:612.4}]);
+  const before=a.state.rows.map(r=>[r.event,r.action,r.playerFrom,r.playerTo,r.t].join('|'));
+  a.startEditGroup(a.state.rows.slice());
+  submit(a,a.$('playerInput').value,a.state.pendingDots);
+  eq(a.log.alerts.length,0,'no complaint');
+  eq(a.state.rows.length,2,'still two rows, the old ones replaced');
+  deepEq(a.state.rows.map(r=>[r.event,r.action,r.playerFrom,r.playerTo,r.t].join('|')),before);
+  deepEq(a.state.rows.map(r=>r.raw),['2xx*aa','2xx*aa'],'stored as what was submitted');
+});
+
+test('a chain that never held a macro is edited exactly as before', () => {
+  const a=app(DUEL_TACKLE);          // macros exist, this entry just uses none of them
+  submit(a,'1k*c2',[{x:10,y:20,t:3},{x:30,y:40,t:4}]);
+  a.startEditGroup(a.state.rows.slice());
+  eq(a.$('playerInput').value,'1k*c2');
+});
+
+test('a single row is still rebuilt from its own event code', () => {
+  // one row, one event: the box is built from playerFrom+action+playerTo, which is
+  // already the event's own hotkey — a one-event macro was never shown back either
+  const a=app([{key:'u',events:['substitution']}]);
+  submit(a,'1s2',[{x:10,y:20,t:1},{x:30,y:40,t:2}]);
+  a.startEdit(0);
+  eq(a.$('playerInput').value,'1s2');
+});
+
 /* ================= the macro table's own rules ================= */
 // the modal's helpers run against stubs: no DOM, no localStorage
 function ui(macros,events){

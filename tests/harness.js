@@ -65,7 +65,7 @@ const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
   'GOAL_SPOT_EVENTS','GOAL_VIEW','goalCapture',
   'scrollToRow','editPrevTeam'];
 const FUNCS=['fmt','parseTime','eventHalf','matchTime','zoneAt','eventForKey',
-  'macroForKey','expandKey','parseChain','goalToPct','goalFromPct','goalBallSVG',
+  'macroForKey','expandKey','expandMacros','parseChain','goalToPct','goalFromPct','goalBallSVG',
   'openGoalCapture','closeGoalCapture',
   'effectiveLU','planSubGroup','swapInSnapshot','applySubGroup','subSideEffects',
   'removeSubSideEffects','shiftSubRowsWithPeriod','applyRedCard','redSideEffects',

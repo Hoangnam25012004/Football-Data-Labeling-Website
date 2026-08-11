@@ -2059,6 +2059,25 @@ function expandKey(k){
       return ev?{key:ev.key||k,name:ev.name}:{key:k,name:null};});
   return [{key:k,name:null}];
 }
+/* the same entry written out long-hand: every macro key becomes the events it stands for,
+   each with its OWN hotkey, '*'-separated — "2xxaa" -> "2xx*aa". A macro is shorthand for
+   typing and nothing else, so ✎ Edit hands back the long form: the box then says exactly
+   what the rows say, and re-submitting it tags the same events whether or not the macro
+   is still around. Everything else comes back character for character — a number, an
+   event hotkey (which beats a macro of the same name, so it must not be rewritten), and
+   a macro pointing at a deleted event, left as typed so the entry still names that key
+   as the broken one. The key runs found here are parseChain's: it matches [a-z*]+ and
+   splits on '*', which is every maximal run of letters. */
+function expandMacros(raw){
+  return String(raw||'').replace(/[a-z]+/gi,tok=>{
+    const k=tok.toLowerCase();
+    if(eventForKey(k))return tok;
+    const names=macroForKey(k);
+    if(!names||!names.length)return tok;
+    const keys=names.map(n=>{const ev=curEvents().find(o=>o.name===n);return ev&&ev.key?ev.key:''});
+    return keys.every(Boolean)?keys.join('*'):tok;
+  });
+}
 
 /* ===== SYNTAX — chains of events in one entry =====
    "1s2"        one pass 1->2 (classic)
@@ -2736,8 +2755,9 @@ function startEdit(idx){
   state.editingId=row.id;
   setTeam(row.team);
   state.activeEvent=row.event; renderEvents(); updateBanner();  // keyless re-submit keeps this event
-  // reconstruct the syntax (e.g. "1s2"); fall back to the stored raw input
-  const syntax=((row.playerFrom||'')+(row.action||'')+(row.playerTo||''))||row.raw||'';
+  // reconstruct the syntax (e.g. "1s2"); fall back to the stored raw input, written out
+  // long-hand so a macro comes back as the events it stands for (see expandMacros)
+  const syntax=((row.playerFrom||'')+(row.action||'')+(row.playerTo||''))||expandMacros(row.raw)||'';
   $('playerInput').value=syntax;
   // restore the dots (keep their original timeline)
   state.pendingDots=[
@@ -2758,7 +2778,9 @@ function startEditGroup(grpRows){
   if(!state.editingId&&!state.editingGroup)editPrevTeam=state.team;
   state.editingId=null; state.editingGroup=grpRows[0].grp;
   setTeam(grpRows[0].team);
-  $('playerInput').value=grpRows[0].raw||'';
+  // the chain as typed, with any macro written out long-hand ("2xxaa" -> "2xx*aa"): the
+  // box has to show the events the rows actually are, not the shorthand that made them
+  $('playerInput').value=expandMacros(grpRows[0].raw||'');
   // rebuild the ordered touch dots. Multiple rows can point at the SAME physical
   // touch dot — consecutive chain rows (row N's receiver IS row N+1's player), and
   // also several solo '*' events sharing one player's dot with a transfer row's
