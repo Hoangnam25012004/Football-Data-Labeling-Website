@@ -39,11 +39,12 @@ function sandbox(rows,filter,dur){
     'var filmFilter='+JSON.stringify(filter||{team:'',player:'',event:''})+';',
     'var film=null, draws=0;',
     'function filmDraw(){draws++;}',
-    G('FILM_LEAD'),G('FILM_HOLD'),
+    G('FILM_LEAD'),G('FILM_HOLD'),G('FILM_HOLD_MOVE'),
     F('eventHalf'),F('filmCues'),F('filmMatches'),G('filmCueMatches'),
     F('filmAdvance'),F('filmRewind'),
     ';globalThis.P={filmCues,filmMatches,filmCueMatches,filmAdvance,filmRewind,eventHalf,',
-    '  FILM_LEAD,FILM_HOLD,setFilm:f=>{film=f},draws:()=>draws,resetDraws:()=>{draws=0}};'
+    '  FILM_LEAD,FILM_HOLD,FILM_HOLD_MOVE,',
+    '  setFilm:f=>{film=f},draws:()=>draws,resetDraws:()=>{draws=0}};'
   ].join('\n'),ctx,{filename:'film.js'});
   return ctx.P;
 }
@@ -75,7 +76,7 @@ test('the cue starts at its earliest dot and ends after its last', () => {
   const c=P.filmCues(WIN)[0];
   eq(c.t,112.0,'the earliest touch is where it sits on the clock');
   eq(c.in,112.0-P.FILM_LEAD);
-  eq(c.out,113.1+P.FILM_HOLD,'the receiver dot is the last one, so the hold runs from it');
+  eq(c.out,113.1+P.FILM_HOLD_MOVE,'a move lets go just before its last dot — here the receiver');
 });
 
 test('a row with no grp is a chain of itself', () => {
@@ -118,7 +119,7 @@ test('a chain reads in the order it was typed, not the order the dots landed', (
   const c=sandbox(ENTRY_17.slice()).filmCues(WIN)[0];
   eq(names(c),'recovery | cross success | key pass | shot on target | right foot');
   eq(c.t,135.1,'and sits at the earliest touch in it');
-  eq(c.out,137.6+0.05,'ending after the last');
+  eq(c.out,137.6-0.05,'and lets go just before the last');
 });
 
 test('the clock still decides where a chain sits among everything else', () => {
@@ -185,27 +186,27 @@ test('a row with no time at all is still left out', () => {
 /* The hold is a twentieth of a second, so a one-touch entry owns a tenth of a
    second around its dot and no more. What spans is a move: a chain is up from
    its first touch to its last. */
-test('the active set is right as the clock runs on', () => {
-  const P=sandbox([ev(200),ev(201),ev(400)]);
+test('a moment holds, then goes', () => {
+  const P=sandbox([ev(200),ev(300),ev(400)]);
   const L=P.FILM_LEAD, H=P.FILM_HOLD;
   const f=player(P,P.filmCues(WIN));
   P.filmAdvance(150);        eq(f.active.length,0,'nothing yet');
   P.filmAdvance(200-L);      eq(f.active.length,1,'the first is due, a moment before its own time');
-  P.filmAdvance(200+H+0.01); eq(f.active.length,0,'and gone a moment after it');
-  P.filmAdvance(201-L);      eq(f.active.length,1,'the second, on its own');
-  P.filmAdvance(201+H+0.01); eq(f.active.length,0);
+  P.filmAdvance(200+H-0.01); eq(f.active.length,1,'and stays up for most of a second');
+  P.filmAdvance(200+H);      eq(f.active.length,0,'then goes');
+  P.filmAdvance(300-L);      eq(f.active.length,1,'the second, on its own');
   P.filmAdvance(400-L);      eq(f.active[0].t,400,'and the third when its turn comes');
 });
 
-test('a whole move is up for as long as the move lasts', () => {
+test('a move is up for the flight, and clear before the ball lands', () => {
   const P=sandbox(ENTRY_6.slice());
-  const L=P.FILM_LEAD, H=P.FILM_HOLD;
+  const L=P.FILM_LEAD, M=P.FILM_HOLD_MOVE;
   const f=player(P,P.filmCues(WIN));
   P.filmAdvance(112-L);        eq(f.active.length,1,'the recovery starts it');
   eq(names(f.active[0]),'recovery | pass success','and the pass is up with it from the first frame');
   P.filmAdvance(112.5);        eq(f.active.length,1,'still up while the ball travels');
-  P.filmAdvance(113.1);        eq(f.active.length,1,'arriving');
-  P.filmAdvance(113.1+H+0.01); eq(f.active.length,0,'and away a moment after it lands');
+  P.filmAdvance(113.1+M-0.01); eq(f.active.length,1,'still up as it closes in');
+  P.filmAdvance(113.1+M);      eq(f.active.length,0,'and clear a twentieth of a second before it lands');
 });
 
 test('the cursor only ever moves forward while playing', () => {
@@ -254,15 +255,15 @@ test('a rewind rebuilds the same set a play-through would have reached', () => {
 
 test('a rewind lands mid-move with the whole move still up', () => {
   const P=sandbox(ENTRY_6.slice());
-  const H=P.FILM_HOLD;
+  const M=P.FILM_HOLD_MOVE;
   const f=player(P,P.filmCues(WIN));
   P.filmRewind(112.6);
   eq(f.active.length,1,'the ball is in the air');
   eq(names(f.active[0]),'recovery | pass success','and the touch that started it is still written');
-  P.filmRewind(113.1+H-0.01);
-  eq(f.active.length,1,'still up, a hair before it runs out');
-  P.filmRewind(113.1+H+0.01);
-  eq(f.active.length,0,'and gone once it does');
+  P.filmRewind(113.1+M-0.01);
+  eq(f.active.length,1,'still up, a hair before it lets go');
+  P.filmRewind(113.1+M);
+  eq(f.active.length,0,'and clear before the ball lands');
 });
 
 /* ================= the filter takes whole entries ================= */
@@ -380,10 +381,37 @@ test('nothing active leaves the strip blank, not half-drawn', () => {
 });
 
 /* ================= how far ahead, and how the list follows ================= */
-test('an event lands a twentieth of a second either side of its dots', () => {
+test('the three numbers the window is made of', () => {
   const P=sandbox([]);
-  eq(P.FILM_LEAD,0.05);
-  eq(P.FILM_HOLD,0.05);
+  eq(P.FILM_LEAD,0.05,'everything lands a twentieth of a second early');
+  eq(P.FILM_HOLD,0.95,'a moment is held for most of a second after it');
+  eq(P.FILM_HOLD_MOVE,-0.05,'a move lets go a twentieth of a second before its last dot');
+});
+
+/* The line between the two, drawn on the span rather than on the shape of the
+   entry. A move tagged with both its dots on one frame has no flight to show
+   either, and would be on screen for a negative length of time. */
+test('an entry with a span is a move; one without is a moment', () => {
+  const P=sandbox([
+    ev(200,{grp:'m',ord:0,event:'pass success',playerTo:'3',rt:201.4}),   // a real flight
+    ev(300,{grp:'i',ord:0,event:'tackle success'}),                      // one instant
+    ev(400,{grp:'i2',ord:0,event:'ground duel success'}),                // …typed together,
+    ev(400,{grp:'i2',ord:1,event:'recovery'})                            //    both on one frame
+  ]);
+  const c=P.filmCues(WIN);
+  eq(c[0].out,201.4+P.FILM_HOLD_MOVE,'the pass lets go before the ball arrives');
+  eq(c[1].out,300+P.FILM_HOLD,'the tackle is held');
+  eq(c[2].out,400+P.FILM_HOLD,'and so is a two-touch entry with no span to show');
+  ok(c[2].out>c[2].in,'…which is the point: at -0.05 it would never be drawn at all');
+});
+
+test('a pass whose receiver dot was never placed is a moment, not a zero-length move', () => {
+  // playerTo names a receiver but no dot was put down, so there is nothing to
+  // run to and nothing to be read during
+  const P=sandbox([ev(200,{event:'pass fail',playerTo:'9'})]);
+  const c=P.filmCues(WIN)[0];
+  eq(c.out,200+P.FILM_HOLD);
+  ok(c.out>c.in,'it is on screen at all, which is what matters');
 });
 
 /* filmMark scrolls by measuring two rectangles, so the stub is a real scroller:

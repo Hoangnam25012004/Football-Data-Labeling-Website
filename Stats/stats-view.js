@@ -1188,8 +1188,9 @@ const matchName=()=>(meta.home||'Home')+'_vs_'+(meta.away||'Away');
    play: the club's browser cannot reach the analyst's disk. Film says that
    plainly instead of offering a dead player.
    ========================================================================== */
-const FILM_LEAD=0.05;                              // an event lands this long before its moment
-const FILM_HOLD=0.05;                              // …and leaves this long after its last dot
+const FILM_LEAD=0.05;                              // an entry lands this long before its first dot
+const FILM_HOLD=0.95;                              // a moment holds this long after its only one
+const FILM_HOLD_MOVE=-0.05;                        // a move lets go this long BEFORE its last
 const FILM_STEP=2;                                 // what ← and → are worth
 let filmHalf=1;                                    // which window is showing
 let film=null;                                     // the live player, while Film is on screen
@@ -1257,8 +1258,25 @@ function filmCues(win){
   return chains.map(list=>{
     list.sort((a,b)=>(a.ord||0)-(b.ord||0));
     const t=Math.min.apply(null,list.map(r=>+r.t));
+    const last=Math.max.apply(null,list.map(lastDot));
+    /* Two kinds of entry, and they want opposite things.
+
+       A MOVE unfolds — a pass has a dot at each end, and the entry is on screen
+       for the flight between them. It lets go a twentieth of a second BEFORE the
+       last dot, so the strip is already clear as the ball arrives and the next
+       touch is not read over the top of the one that set it up.
+
+       A MOMENT is one instant: a clearance, an aerial duel, a substitution. It
+       has no span to be read in at all, so the same rule would put it on screen
+       for zero seconds and it would never be drawn. It holds instead.
+
+       The test is the span itself rather than the shape of the entry: a move
+       tagged with both its dots on one frame has nothing to show either, and a
+       moment is a moment however many touches were typed into it. On the two
+       matches in the channel that splits 584 moves from 370 moments, and the
+       shortest move still runs for a tenth of a second. */
     return {rows:list,t:t,in:t-FILM_LEAD,
-            out:Math.max.apply(null,list.map(lastDot))+FILM_HOLD};
+            out:last+(last>t?FILM_HOLD_MOVE:FILM_HOLD)};
   }).sort((a,b)=>{
     if(a.t!==b.t)return a.t-b.t;
     const ga=String(a.rows[0].grp||''), gb=String(b.rows[0].grp||'');
