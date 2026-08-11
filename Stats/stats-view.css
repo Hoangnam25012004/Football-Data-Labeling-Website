@@ -237,3 +237,72 @@ table.stats .grp.g5{background:#331A1A;color:#F0CACA}
 .gf-snm{padding:0 7px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gf-snm:empty{display:none}
 .gf-bempty{font-size:11px;color:var(--mut)}
+
+/* ============================================================
+   Film — the video, the pitch and the events, on one clock.
+
+   The stage is sized by aspect ratio rather than by height: this
+   view is mounted inside two different shells (the Stats page's
+   flex column, the client site's article width) and neither can
+   be asked for a viewport height without upsetting the other.
+   ============================================================ */
+.film{display:flex;flex-direction:column;gap:12px}
+.film-halves{justify-content:center}
+.film-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
+.film-main{display:flex;flex-direction:column;gap:8px;min-width:0}
+
+.film-stage{position:relative;aspect-ratio:16/9;background:#000;border:1px solid var(--line);
+  border-radius:10px;overflow:hidden;cursor:pointer}
+.film-stage video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+
+/* always present, so a caption arriving cannot shift the frame under the cursor */
+.film-cap{position:absolute;left:0;right:0;bottom:0;min-height:30px;display:flex;align-items:center;
+  gap:6px;flex-wrap:wrap;padding:5px 10px;background:rgba(0,0,0,0.72);
+  font-size:13px;font-weight:700;line-height:1.35;pointer-events:none;user-select:none}
+.fm-no{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;
+  padding:0 5px;border-radius:5px;background:var(--home);color:var(--team-ink);
+  font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}
+.film-cap.away .fm-no{background:var(--away)}
+.fm-ev{color:#39d98a;font-size:12.5px;font-weight:700}
+
+.film-bar{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--panel2);
+  border:1px solid var(--line);border-radius:8px}
+.fm-play{flex:none;width:28px;height:26px;background:var(--panel);border:1px solid var(--line);
+  color:var(--ink);border-radius:6px;cursor:pointer;font-size:11px;line-height:1}
+.fm-play:hover{border-color:var(--accent)}
+.fm-track{position:relative;flex:1;height:16px;cursor:pointer;touch-action:none}
+.fm-rail{position:absolute;left:0;right:0;top:6px;height:4px;border-radius:2px;background:var(--line)}
+.fm-fill{position:absolute;left:0;width:0;top:6px;height:4px;border-radius:2px;background:var(--accent)}
+.fm-knob{position:absolute;left:0;top:8px;width:11px;height:11px;border-radius:50%;
+  background:var(--accent);transform:translate(-50%,-50%);pointer-events:none}
+.fm-tc{flex:none;color:var(--mut);font-size:11.5px;font-variant-numeric:tabular-nums}
+
+.film-side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.film-pitch{position:relative;width:100%;aspect-ratio:105/68;border-radius:8px;overflow:hidden;
+  border:1px solid var(--line)}
+.film-filters{display:flex;flex-wrap:wrap;gap:6px}
+.fm-sel{flex:1 1 92px;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  border-radius:6px;padding:4px 6px;font-size:11.5px;font-weight:600;cursor:pointer}
+.fm-sel:focus{outline:none;border-color:var(--accent)}
+.fm-next{flex:none;width:32px;background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  border-radius:6px;cursor:pointer;font-size:12px}
+.fm-next:hover{border-color:var(--accent)}
+
+.film-list{max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel2)}
+.fm-row{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;
+  padding:5px 9px;border-bottom:1px solid var(--line);cursor:pointer;font-size:12px}
+.fm-row:last-child{border-bottom:0}
+.fm-row:hover{background:#1F171933}
+.fm-row.on{background:#2A1519;box-shadow:inset 2px 0 0 var(--accent)}
+.fm-row .fm-no{min-width:18px;height:18px;font-size:11px}
+.fm-row .fm-ev{font-size:11.5px}
+.fm-t{color:var(--mut);font-size:11px;font-variant-numeric:tabular-nums}
+.fm-lbl{display:flex;align-items:center;gap:5px;flex-wrap:wrap;overflow:hidden}
+.fm-none{padding:14px;text-align:center;color:var(--mut);font-size:12px}
+
+@media (max-width:900px){
+  .film-grid{grid-template-columns:minmax(0,1fr)}
+  .film-pitch{max-width:520px;margin:0 auto}
+  .film-list{max-height:260px}
+}

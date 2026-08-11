@@ -785,10 +785,10 @@
   function loadStatsView() {
     var r = taggerRoot();
     loadOnce(r + 'shared.css?v=13', 'css');
-    loadOnce(r + 'Stats/stats-view.css?v=2', 'css');
+    loadOnce(r + 'Stats/stats-view.css?v=3', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
-      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=3'); })
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=4'); })
       .then(function () { return loadOnce(r + 'Stats/report.js?v=30'); });
   }
 

@@ -80,6 +80,9 @@ const STAT_CATS={
    they share the side picker and the category tabs and differ only in what they
    render underneath. */
 function renderStats(){
+  // Film holds a video, an animation loop and a document listener. Whatever is
+  // about to be drawn, none of that may survive the redraw.
+  filmStop();
   /* No open match -> the notice, not the last match's leftovers. The stores are shared by
      every match this browser has opened, so with none open there is nothing here that can
      be said to belong to anything. A #match= link loads over the cloud and sets meta.matchId
@@ -93,7 +96,9 @@ function renderStats(){
   $('viewOverallBtn').className=statView==='overall'?'act-gen':'';
   $('viewDashBtn').className=statView==='dashboard'?'act-gen':'';
   $('viewStatsBtn').className=statView==='stats'?'act-gen':'';
-  const perTeam=statView!=='overall';
+  // a host whose header predates Film simply has no button to light up
+  if($('viewFilmBtn'))$('viewFilmBtn').className=statView==='film'?'act-gen':'';
+  const perTeam=statView!=='overall'&&statView!=='film';
   $('teamToggle').style.display=perTeam?'flex':'none';
   $('catToggle').style.display=perTeam?'flex':'none';
   $('statHomeBtn').className=statTeam==='home'?'act-home':'';
@@ -102,6 +107,7 @@ function renderStats(){
   $('statAwayBtn').textContent=meta.away;
   document.querySelectorAll('#catToggle button').forEach(b=>b.className=b.dataset.cat===statCat?'act-gen':'');
   const holder=$('statsHolder');
+  if(statView==='film'){renderFilm(holder);return;}
   if(!perTeam){renderGeneral();return;}
   // the whole matchday squad, not just the players who happened to be tagged: a
   // substitute who came on without touching the ball still gets his (zero) row
@@ -1163,6 +1169,395 @@ function teamStatsSheet(){
   return ws;
 }
 const matchName=()=>(meta.home||'Home')+'_vs_'+(meta.away||'Away');
+
+
+/* ============================================================================
+   Film — the tagged match played back over the video it was tagged against.
+
+   Nothing is cut. The four Duration boundaries already describe both halves in
+   the video file's own clock, so a half is a WINDOW the player is held inside:
+   currentTime is clamped to it, and the bar underneath is drawn in match time
+   rather than file time. One object in storage, two halves on screen.
+
+   The overlay is driven by a cursor walking the events in t order. Each event
+   holds the screen for a stretch rather than a frame — half a second before its
+   dot and two and a half after the last one — because one frame at playback
+   speed is not long enough to read.
+
+   A match tagged from a local file has no shared URL and so has nothing to
+   play: the club's browser cannot reach the analyst's disk. Film says that
+   plainly instead of offering a dead player.
+   ========================================================================== */
+const FILM_LEAD=0.5;                               // a dot appears this long before its moment
+const FILM_HOLD=2.5;                               // …and stays this long after the last one
+const FILM_STEP=2;                                 // what ← and → are worth
+let filmHalf=1;                                    // which window is showing
+let film=null;                                     // the live player, while Film is on screen
+let filmResume=null;                               // {half,t} — a redraw must not rewind the video
+let filmFilter={team:'',player:'',event:''};
+let videoSrc=null;                                 // {url}: frozen in the report, or the match row
+
+const filmClock=t=>fmt(Math.max(0,t)).slice(0,5);   // mm:ss — centiseconds are noise here
+
+/* A half is a window only when its two boundaries make one. h1Start is allowed
+   to be 0: a file that opens on the kick-off is the ordinary case, not a value
+   somebody forgot, so the test is always on the pair and never on the start. */
+function filmWindows(){
+  const d=dur, out=[];
+  const s1=+d.h1Start||0, e1=+d.h1End||0, s2=+d.h2Start||0, e2=+d.h2End||0;
+  if(e1>s1)out.push({half:1,label:'1st Half',start:s1,end:e1});
+  if(s2>0&&e2>s2)out.push({half:2,label:'2nd Half',start:s2,end:e2});
+  if(!out.length)out.push({half:0,label:'Full Match',start:0,end:Infinity});
+  return out;
+}
+
+/* Events inside one window, in t order, each with the stretch it owns. Anything
+   tagged outside both windows — before the kick-off, or during the interval —
+   belongs to no half and simply is not here. */
+function filmCues(win){
+  return rows.filter(r=>r.t!=null&&+r.t>=win.start&&+r.t<=win.end)
+    .sort((a,b)=>a.t-b.t)
+    .map(r=>{
+      const t=+r.t, rt=(r.rt==null||!isFinite(+r.rt))?null:+r.rt;
+      return {r:r,t:t,rt:rt,in:t-FILM_LEAD,out:Math.max(t,rt==null?t:rt)+FILM_HOLD};
+    });
+}
+
+function filmMatches(r){
+  const f=filmFilter;
+  if(f.team&&r.team!==f.team)return false;
+  if(f.event&&r.event!==f.event)return false;
+  if(f.player&&String(r.playerFrom||'').trim()!==f.player
+             &&String(r.playerTo||'').trim()!==f.player)return false;
+  return true;
+}
+
+function filmChoices(cues){
+  const players={},events={};
+  cues.forEach(c=>{
+    [c.r.playerFrom,c.r.playerTo].forEach(n=>{n=String(n==null?'':n).trim(); if(n)players[n]=1;});
+    if(c.r.event)events[c.r.event]=1;
+  });
+  return {players:Object.keys(players).sort((a,b)=>(+a||0)-(+b||0)),
+          events:Object.keys(events).sort()};
+}
+
+/* The passer's number, then his events, then the receiver's — the same shape the
+   events table in the tagging app prints, so a caption here reads as the row it
+   came from. */
+function filmChainHTML(list){
+  let html='',printed=null,i=0;
+  while(i<list.length){
+    const from=String(list[i].playerFrom||'');
+    const run=[]; while(i<list.length&&String(list[i].playerFrom||'')===from){run.push(list[i]);i++;}
+    if(from&&from!==printed){html+=(html?' ':'')+`<span class="fm-no">${esc(from)}</span>`;printed=from;}
+    let to=null;
+    run.forEach(r=>{html+=` <span class="fm-ev">#${esc(r.event)}</span>`; if(r.playerTo)to=String(r.playerTo);});
+    if(to){html+=` <span class="fm-no">${esc(to)}</span>`;printed=to;}
+  }
+  return html;
+}
+
+function filmRowsHTML(cues){
+  const html=cues.filter(c=>filmMatches(c.r)).map(c=>
+    `<div class="fm-row ${c.r.team==='away'?'away':'home'}" data-t="${c.t}">`
+    +`<span class="fm-t">${filmClock(matchTime(c.t))}</span>`
+    +`<span class="fm-lbl">${filmChainHTML([c.r])}</span></div>`).join('');
+  return html||'<div class="fm-none">No events match this filter.</div>';
+}
+
+function filmHTML(wins,win,cues,choices){
+  const halves=wins.length>1
+    ? '<div class="half-toggle film-halves">'+wins.map(w=>
+        `<button type="button" class="${w.half===win.half?'on':''}" data-half="${w.half}">${w.label}</button>`
+      ).join('')+'</div>'
+    : '';
+  const pick=(id,all,list,val)=>`<select class="fm-sel" id="${id}"><option value="">${all}</option>`
+    +list.map(v=>`<option value="${esc(v)}"${v===val?' selected':''}>${esc(v)}</option>`).join('')+'</select>';
+  return `<div class="film">${halves}<div class="film-grid">`
+    +'<div class="film-main">'
+      +'<div class="film-stage" id="fmStage">'
+        +'<video id="fmVideo" playsinline preload="metadata"></video>'
+        +'<div class="film-cap" id="fmCap"></div>'
+      +'</div>'
+      +'<div class="film-bar">'
+        +'<button type="button" class="fm-play" id="fmPlay">&#9654;</button>'
+        +'<div class="fm-track" id="fmTrack"><div class="fm-rail"></div>'
+          +'<div class="fm-fill" id="fmFill"></div><div class="fm-knob" id="fmKnob"></div></div>'
+        +'<span class="fm-tc" id="fmTc">00:00 / 00:00</span>'
+      +'</div>'
+    +'</div>'
+    +'<div class="film-side">'
+      +`<div class="film-pitch" id="fmPitch">${pitchSVG(meta.sport||'football')}</div>`
+      +'<div class="film-filters">'
+        +`<select class="fm-sel" id="fmTeam"><option value="">Both teams</option>`
+        +`<option value="home"${filmFilter.team==='home'?' selected':''}>${esc(meta.home)}</option>`
+        +`<option value="away"${filmFilter.team==='away'?' selected':''}>${esc(meta.away)}</option></select>`
+        +pick('fmPlayer','All players',choices.players,filmFilter.player)
+        +pick('fmEvent','All events',choices.events,filmFilter.event)
+        +'<button type="button" class="fm-next" id="fmNext" title="Next clip">&#9197;</button>'
+      +'</div>'
+      +`<div class="film-list" id="fmList">${filmRowsHTML(cues)}</div>`
+    +'</div></div></div>';
+}
+
+function renderFilm(holder){
+  const src=(videoSrc&&videoSrc.url)||'';
+  if(!src){
+    holder.innerHTML='<div class="stats-empty">No video for this match.</div>';
+    return;
+  }
+  const wins=filmWindows();
+  if(!wins.some(w=>w.half===filmHalf))filmHalf=wins[0].half;
+  const win=wins.filter(w=>w.half===filmHalf)[0];
+  const cues=filmCues(win);
+  holder.innerHTML=filmHTML(wins,win,cues,filmChoices(cues));
+  filmStart(win,cues,src);
+}
+
+function filmStart(win,cues,src){
+  const v=$('fmVideo'); if(!v)return;
+  const pitch=$('fmPitch');
+  film={video:v,win:win,cues:cues,cursor:0,active:[],balls:[],last:-1,raf:0,tcTxt:'',
+        dots:pitch?pitch.querySelector('#pv-dots'):null,
+        cap:$('fmCap'),fill:$('fmFill'),knob:$('fmKnob'),tc:$('fmTc'),play:$('fmPlay'),
+        list:$('fmList'),rowEls:[],curRow:null};
+  film.rowEls=[].slice.call(film.list.querySelectorAll('.fm-row'));
+
+  // a redraw (a live event, a lineup edit) must not send the video back to the
+  // kick-off; a change of half must
+  const resume=(filmResume&&filmResume.half===win.half
+    &&filmResume.t>=win.start&&filmResume.t<=win.end)?filmResume.t:win.start;
+  filmResume=null;
+
+  /* Every handler below asks first whether this video is still THE video. A
+     switch of half replaces the node, and the one being thrown away goes on
+     firing pause and seeked on its way out — unguarded, those late events would
+     reach in and stop the loop of the player that had just replaced it. */
+  const mine=()=>!!film&&film.video===v;
+  v.addEventListener('loadedmetadata',()=>{if(mine())filmSeek(resume);});
+  v.addEventListener('play',()=>{if(mine())filmLoop();});
+  v.addEventListener('pause',()=>{
+    if(!mine())return;
+    if(film.raf)cancelAnimationFrame(film.raf);
+    film.raf=0; filmFrame();
+  });
+  v.addEventListener('seeked',()=>{if(mine()&&v.paused)filmFrame();});
+  v.src=src;
+
+  $('fmPlay').onclick=filmToggle;
+  $('fmStage').onclick=filmToggle;
+
+  const track=$('fmTrack');
+  const drop=e=>{
+    const box=track.getBoundingClientRect(); if(!box.width||!film)return;
+    const k=Math.min(1,Math.max(0,(e.clientX-box.left)/box.width));
+    filmSeek(win.start+k*(filmEnd()-win.start));
+  };
+  track.addEventListener('pointerdown',e=>{
+    e.preventDefault(); track.setPointerCapture(e.pointerId); drop(e);
+    const move=ev=>drop(ev);
+    const up=()=>{track.removeEventListener('pointermove',move);track.removeEventListener('pointerup',up);};
+    track.addEventListener('pointermove',move); track.addEventListener('pointerup',up);
+  });
+
+  document.querySelectorAll('.film-halves button').forEach(b=>b.onclick=()=>{
+    const h=+b.dataset.half;
+    if(h!==filmHalf){filmHalf=h;renderStats();}
+  });
+
+  const setFilter=(key,el)=>{el.onchange=()=>{filmFilter[key]=el.value;filmRelist();};};
+  setFilter('team',$('fmTeam')); setFilter('player',$('fmPlayer')); setFilter('event',$('fmEvent'));
+
+  // delegated once, so relisting under a new filter leaves it wired
+  film.list.onclick=e=>{
+    const row=e.target&&e.target.closest?e.target.closest('.fm-row'):null;
+    if(row)filmSeek(+row.dataset.t);
+  };
+  $('fmNext').onclick=()=>{
+    if(!film)return;
+    const next=film.cues.filter(c=>filmMatches(c.r)&&c.t>film.video.currentTime+0.25)[0];
+    if(!next)return;
+    filmSeek(next.t-FILM_STEP);
+    filmPlay();
+  };
+
+  /* ← / → step two seconds. Bound on the document, because with no native
+     controls there is nothing here to focus; taken off again by filmStop(), or
+     it would go on swallowing arrow keys long after Film has been left. */
+  document.addEventListener('keydown',filmKeys);
+}
+
+/* Everything Film holds open — the fetch, the loop, the document listener —
+   let go of. Called before every redraw and by destroy(), so leaving the view
+   by any route leaves nothing behind. */
+function filmStop(){
+  const f=film; if(!f)return;
+  filmResume={half:f.win.half,t:(f.video&&f.video.currentTime)||0};
+  if(f.raf)cancelAnimationFrame(f.raf);
+  document.removeEventListener('keydown',filmKeys);
+  try{f.video.pause();f.video.removeAttribute('src');f.video.load();}catch(e){}
+  film=null;
+}
+
+function filmKeys(e){
+  if(!film||e.altKey||e.ctrlKey||e.metaKey)return;
+  const t=e.target,tag=(t&&t.tagName)||'';
+  if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||(t&&t.isContentEditable))return;
+  if(e.key==='ArrowRight')filmSeekBy(FILM_STEP);
+  else if(e.key==='ArrowLeft')filmSeekBy(-FILM_STEP);
+  else return;
+  e.preventDefault();
+}
+
+const filmEnd=()=>{const f=film,e=f.win.end;return isFinite(e)?e:(f.video.duration||f.win.start);};
+function filmSeek(t){
+  const f=film; if(!f)return;
+  f.video.currentTime=Math.min(filmEnd(),Math.max(f.win.start,t));
+  if(f.video.paused)filmFrame();
+}
+function filmSeekBy(d){if(film)filmSeek(film.video.currentTime+d);}
+function filmPlay(){const p=film&&film.video.play();if(p&&p.catch)p.catch(()=>{});}
+function filmToggle(){
+  const f=film; if(!f||!f.video.src)return;
+  f.video.paused?filmPlay():f.video.pause();
+}
+
+function filmLoop(){if(!film)return;filmFrame();film.raf=requestAnimationFrame(filmLoop);}
+
+/* One frame: hold the player inside the window, move the cursor, then paint.
+   The dots are only rebuilt when the set of live events changes; the ball and
+   the bar move every frame, by attribute. */
+function filmFrame(){
+  const f=film; if(!f)return;
+  const v=f.video, now=v.currentTime;
+  if(now>filmEnd()+0.05){v.pause();v.currentTime=filmEnd();return;}
+  if(now<f.win.start-0.05){v.currentTime=f.win.start;return;}
+  if(now<f.last)filmRewind(now); else filmAdvance(now);
+  f.last=now;
+  filmBall(now);
+  filmBar(now);
+}
+
+function filmAdvance(now){
+  const f=film; let moved=false;
+  while(f.cursor<f.cues.length&&f.cues[f.cursor].in<=now){f.active.push(f.cues[f.cursor++]);moved=true;}
+  const keep=f.active.filter(c=>c.out>now);
+  if(keep.length!==f.active.length){f.active=keep;moved=true;}
+  if(moved)filmDraw();
+}
+function filmRewind(now){
+  const f=film; let i=0;
+  while(i<f.cues.length&&f.cues[i].in<=now)i++;
+  f.cursor=i;
+  f.active=f.cues.slice(0,i).filter(c=>c.out>now);
+  filmDraw();
+}
+
+const SVGNS='http://www.w3.org/2000/svg';
+function filmDot(x,y,no,col,r){
+  const g=document.createElementNS(SVGNS,'g');
+  const c=document.createElementNS(SVGNS,'circle');
+  c.setAttribute('cx',x.toFixed(1)); c.setAttribute('cy',y.toFixed(1)); c.setAttribute('r',r);
+  c.setAttribute('fill',col); c.setAttribute('stroke','#000000'); c.setAttribute('stroke-width',2);
+  g.appendChild(c);
+  const n=String(no==null?'':no).trim();
+  if(n){
+    const t=document.createElementNS(SVGNS,'text');
+    t.setAttribute('x',x.toFixed(1)); t.setAttribute('y',(y+r*0.37).toFixed(1));
+    t.setAttribute('text-anchor','middle'); t.setAttribute('font-size',Math.round(r*1.05));
+    t.setAttribute('font-weight','800'); t.setAttribute('fill','#14100F');
+    t.textContent=n; g.appendChild(t);
+  }
+  return g;
+}
+
+function filmDraw(){
+  const f=film; if(!f)return;
+  filmCaption();
+  if(!f.dots)return;
+  const d=PITCH_DIMS[meta.sport]||PITCH_DIMS.football;
+  const R=Math.round(d.h*0.028);
+  f.dots.textContent=''; f.balls=[];
+  f.active.forEach(c=>{
+    const r=c.r, col=r.team==='away'?'#FFFF66':'#EEEEEE';
+    const p=r.pXY?{x:r.pXY.x/100*d.w,y:r.pXY.y/100*d.h}:null;
+    const q=r.rXY?{x:r.rXY.x/100*d.w,y:r.rXY.y/100*d.h}:null;
+    if(p&&q){
+      const ln=document.createElementNS(SVGNS,'line');
+      ln.setAttribute('x1',p.x.toFixed(1)); ln.setAttribute('y1',p.y.toFixed(1));
+      ln.setAttribute('x2',q.x.toFixed(1)); ln.setAttribute('y2',q.y.toFixed(1));
+      ln.setAttribute('stroke',col); ln.setAttribute('stroke-width',4);
+      ln.setAttribute('stroke-opacity','0.6'); ln.setAttribute('stroke-dasharray','14 9');
+      f.dots.appendChild(ln);
+    }
+    if(p)f.dots.appendChild(filmDot(p.x,p.y,r.playerFrom,col,R));
+    if(q)f.dots.appendChild(filmDot(q.x,q.y,r.playerTo,col,R));
+    // the ball only runs where there are two dots and two times to run between
+    if(p&&q&&c.rt!=null&&c.rt>c.t){
+      const b=document.createElementNS(SVGNS,'circle');
+      b.setAttribute('r',Math.round(R*0.45)); b.setAttribute('fill','#f7b32f');
+      b.setAttribute('stroke','#14100F'); b.setAttribute('stroke-width',2);
+      f.dots.appendChild(b);
+      f.balls.push({el:b,x1:p.x,y1:p.y,x2:q.x,y2:q.y,t0:c.t,t1:c.rt});
+    }
+  });
+  filmBall(f.video.currentTime);
+}
+
+function filmBall(now){
+  const f=film; if(!f)return;
+  f.balls.forEach(b=>{
+    const k=Math.min(1,Math.max(0,(now-b.t0)/Math.max(0.001,b.t1-b.t0)));
+    b.el.setAttribute('cx',(b.x1+(b.x2-b.x1)*k).toFixed(1));
+    b.el.setAttribute('cy',(b.y1+(b.y2-b.y1)*k).toFixed(1));
+  });
+}
+
+function filmCaption(){
+  const f=film; if(!f||!f.cap)return;
+  if(!f.active.length){f.cap.className='film-cap';f.cap.innerHTML='';return;}
+  const list=f.active.map(c=>c.r).slice()
+    .sort((a,b)=>(a.t-b.t)||((a.ord||0)-(b.ord||0)));
+  f.cap.className='film-cap on '+(list[list.length-1].team==='away'?'away':'home');
+  f.cap.innerHTML=filmChainHTML(list);
+}
+
+function filmBar(now){
+  const f=film, end=filmEnd(), span=Math.max(0.001,end-f.win.start);
+  const k=Math.min(1,Math.max(0,(now-f.win.start)/span))*100;
+  f.fill.style.width=k.toFixed(3)+'%';
+  f.knob.style.left=k.toFixed(3)+'%';
+  const lbl=filmClock(matchTime(now))+' / '+filmClock(matchTime(end));
+  if(lbl!==f.tcTxt){f.tc.textContent=lbl;f.tcTxt=lbl;}
+  f.play.innerHTML=f.video.paused?'&#9654;':'&#10074;&#10074;';
+  filmMark(now);
+}
+
+function filmMark(now){
+  const f=film; let sel=null;
+  for(let i=0;i<f.rowEls.length;i++){
+    if(+f.rowEls[i].dataset.t<=now+FILM_LEAD)sel=f.rowEls[i]; else break;
+  }
+  if(sel===f.curRow)return;
+  if(f.curRow)f.curRow.classList.remove('on');
+  f.curRow=sel;
+  if(!sel)return;
+  sel.classList.add('on');
+  const box=f.list, top=sel.offsetTop;
+  if(top<box.scrollTop||top+sel.offsetHeight>box.scrollTop+box.clientHeight)
+    box.scrollTop=top-box.clientHeight/2+sel.offsetHeight/2;
+}
+
+function filmRelist(){
+  const f=film; if(!f)return;
+  f.list.innerHTML=filmRowsHTML(f.cues);
+  f.rowEls=[].slice.call(f.list.querySelectorAll('.fm-row'));
+  f.curRow=null;
+  filmMark(f.video.currentTime);
+}
+
+
 /* The toolbar. Bound by mount(), because the buttons belong to whichever page
    is hosting the view — the Stats page keeps them in its own header, the client
    site gets the set this file renders. Same ids either way. */
@@ -1189,6 +1584,7 @@ function bindControls(){
   $('viewOverallBtn').onclick=()=>{statView='overall';renderStats();};
   $('viewDashBtn').onclick=()=>{statView='dashboard';renderStats();};
   $('viewStatsBtn').onclick=()=>{statView='stats';renderStats();};
+  if($('viewFilmBtn'))$('viewFilmBtn').onclick=()=>{statView='film';renderStats();};
   $('statHomeBtn').onclick=()=>{statTeam='home';renderStats();};
   $('statAwayBtn').onclick=()=>{statTeam='away';renderStats();};
   document.querySelectorAll('#catToggle button').forEach(b=>b.onclick=()=>{statCat=b.dataset.cat;renderStats();});
@@ -1257,6 +1653,8 @@ async function statsCloud(){
       if(row.config&&Object.keys(row.config).length)
         dur=Object.assign({enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0},row.config);
       if(row.lineups&&row.lineups.home&&row.lineups.away)lineups=row.lineups;
+      // the shared video, if the match has one — a local-file match has null here
+      videoSrc=row.video_url?{url:row.video_url}:null;
     };
     applyMatch(match);
     // page through ALL events — a single select caps at 1000 rows
@@ -1303,6 +1701,7 @@ const CHROME =
       '<button id="viewOverallBtn" type="button">Overall</button>'+
       '<button id="viewDashBtn" type="button">Dashboard</button>'+
       '<button id="viewStatsBtn" type="button">Stats</button>'+
+      '<button id="viewFilmBtn" type="button">Film</button>'+
     '</div>'+
     '<div class="exports pt-exports">'+
       '<button id="expXlsx" type="button">&#11015; XLSX</button>'+
@@ -1330,6 +1729,9 @@ function loadLocal(){
   meta=loadMeta();
   lineups=ourLineups();
   dur=loadJSON(PT_KEYS.duration,blankDur());
+  // the tagging tab holds its video in the page, never in a store — a shared URL
+  // only reaches this page through the cloud (statsCloud) or a published report
+  videoSrc=null;
 }
 
 /* A published report, as Submit Analysis froze it. Missing parts fall back to
@@ -1340,6 +1742,11 @@ function setData(d){
   meta=Object.assign(blankMeta(),d.meta||{});
   lineups=(d.lineups&&d.lineups.home&&d.lineups.away)?d.lineups:blankLineups();
   dur=Object.assign(blankDur(),d.dur||{});
+  // a report published before Film carries no video block, and a match tagged
+  // from a local file carries none either — both land here as nothing to play
+  videoSrc=(d.video&&d.video.url)?{url:d.video.url}:null;
+  // the filters and the resume point belonged to the match being handed away
+  filmHalf=1; filmFilter={team:'',player:'',event:''}; filmResume=null;
 }
 
 function mount(el,data,options){
@@ -1366,9 +1773,11 @@ function update(data){
 }
 
 function destroy(){
+  filmStop();
   if(root)root.innerHTML='';
   root=null; opts={}; mounted=false;
   rows=[]; meta=blankMeta(); lineups=blankLineups(); dur=blankDur();
+  videoSrc=null; filmHalf=1; filmFilter={team:'',player:'',event:''}; filmResume=null;
   return API;
 }
 

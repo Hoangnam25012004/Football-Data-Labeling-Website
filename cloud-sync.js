@@ -422,7 +422,7 @@ const CONFIG = {
     return all;
   }
 
-  /* The four things Stats renders from, and nothing else. Scores, kick-off and
+  /* The five things Stats renders from, and nothing else. Scores, kick-off and
      competition stay on public.matches — the client site already reads those. */
   async function buildReport() {
     if (!connected || !matchId) throw new Error('Open a match on the cloud first.');
@@ -445,6 +445,19 @@ const CONFIG = {
         lineups: (m.lineups && m.lineups.home && m.lineups.away) ? m.lineups : null,
         dur: Object.assign({ enabled: false, halfLen: 45, h1Start: 0, h1End: 0, h2Start: 0, h2End: 0 },
                            m.config || {}),
+        /* The video the tags were placed against, frozen beside the mapping that
+           carves it into halves. Read live instead and one re-upload would leave
+           every t pointing at the wrong moment of a different file — silently,
+           because the overlay would still draw, just in the wrong places.
+
+           A match tagged from a local file has no shared URL, so it gets none:
+           the club's browser cannot reach the analyst's disk, and Film says so
+           rather than showing a dead player. */
+        video: m.video_url
+          ? { url: m.video_url, frozenAt: new Date().toISOString(),
+              kind: (CONFIG.R2 && CONFIG.R2.publicBase &&
+                     String(m.video_url).indexOf(CONFIG.R2.publicBase) === 0) ? 'r2' : 'url' }
+          : null,
         rows: stored.map(dbToRow)
       }
     };
