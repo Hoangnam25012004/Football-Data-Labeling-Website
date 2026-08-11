@@ -1226,39 +1226,44 @@ function filmWindows(){
    The bounds go on doing what they are for: holding the player inside the half.
    An event outside them is still listed, and seeking to it lands on the nearest
    edge — which for a kick-off tagged early is the kick-off itself. */
+/* A cue is an ENTRY, not an event.
+
+   "6 #recovery #pass success 15" is one thing that happened and one thing typed,
+   and the tagging table has always shown it on one line. Film used to break it
+   into a row per event, which read as two unrelated touches by the same player
+   and, once the hold came down to a twentieth of a second, flickered between
+   them instead of showing the move.
+
+   So the rows born of one entry — the ones sharing a grp — become one cue,
+   held in the order they were typed. The cue starts at its earliest dot and
+   ends after its last, so the whole move is up for as long as it is happening.
+   A row with no grp is a chain of one.
+
+   Sorting by the chain's earliest touch is what puts it in the reading order
+   too: each row of an entry carries the time of ITS OWN dot, and an event
+   tagged without one carries the moment Enter was pressed, so per-row times run
+   backwards inside a move. Twin of the sort in renderTable() in index.html —
+   the two must not drift. */
 function filmCues(win){
-  return rows.filter(r=>r.t!=null&&(!win.half||eventHalf(r)===win.half))
-    .sort((a,b)=>a.t-b.t)
-    .map((r,i)=>{
-      const t=+r.t, rt=(r.rt==null||!isFinite(+r.rt))?null:+r.rt;
-      return {i:i,r:r,t:t,rt:rt,in:t-FILM_LEAD,out:Math.max(t,rt==null?t:rt)+FILM_HOLD};
-    });
-}
-
-/* …and the reading view: the order the analyst typed, not the order the dots
-   were placed.
-
-   One entry writes several rows, and each carries the time of ITS OWN dot — an
-   event tagged without one carries the moment Enter was pressed instead. Sorted
-   by t alone, "17 #recovery #cross success #key pass 14 #shot on target
-   #right foot" came back as key pass, recovery, cross success: the same touches,
-   in an order nobody typed and nobody can read.
-
-   So a chain (rows sharing a grp) moves as one block, sits at its earliest
-   touch, and keeps its typed order inside. Twin of the sort in renderTable() in
-   index.html — the events table has always read this way, and the two must not
-   drift. */
-function filmOrdered(cues){
-  const first={};
-  cues.forEach(c=>{const g=c.r.grp;
-    if(g!=null)first[g]=Math.min(c.t,first[g]==null?Infinity:first[g]);});
-  const keyT=c=>(c.r.grp!=null?first[c.r.grp]:c.t);
-  return cues.slice().sort((a,b)=>{
-    const ka=keyT(a),kb=keyT(b); if(ka!==kb)return ka-kb;
-    const ga=a.r.grp==null?'':String(a.r.grp), gb=b.r.grp==null?'':String(b.r.grp);
-    if(ga!==gb)return ga<gb?-1:1;                  // rows of one chain, together
-    return (a.r.ord||0)-(b.r.ord||0);              // and in the order they were typed
+  const byGrp={}, chains=[];
+  rows.filter(r=>r.t!=null&&(!win.half||eventHalf(r)===win.half)).forEach(r=>{
+    const g=r.grp;
+    if(g==null){chains.push([r]);return;}
+    if(!byGrp[g]){byGrp[g]=[];chains.push(byGrp[g]);}
+    byGrp[g].push(r);
   });
+  const lastDot=r=>{const rt=(r.rt==null||!isFinite(+r.rt))?null:+r.rt;
+    return Math.max(+r.t,rt==null?+r.t:rt);};
+  return chains.map(list=>{
+    list.sort((a,b)=>(a.ord||0)-(b.ord||0));
+    const t=Math.min.apply(null,list.map(r=>+r.t));
+    return {rows:list,t:t,in:t-FILM_LEAD,
+            out:Math.max.apply(null,list.map(lastDot))+FILM_HOLD};
+  }).sort((a,b)=>{
+    if(a.t!==b.t)return a.t-b.t;
+    const ga=String(a.rows[0].grp||''), gb=String(b.rows[0].grp||'');
+    return ga<gb?-1:ga>gb?1:0;                     // two entries at one instant stay whole
+  }).map((c,i)=>{c.i=i;return c;});
 }
 
 function filmMatches(r){
@@ -1269,13 +1274,15 @@ function filmMatches(r){
              &&String(r.playerTo||'').trim()!==f.player)return false;
   return true;
 }
+// an entry is shown whole or not at all: one touch of #2 brings the move with it
+const filmCueMatches=c=>c.rows.some(filmMatches);
 
 function filmChoices(cues){
   const players={},events={};
-  cues.forEach(c=>{
-    [c.r.playerFrom,c.r.playerTo].forEach(n=>{n=String(n==null?'':n).trim(); if(n)players[n]=1;});
-    if(c.r.event)events[c.r.event]=1;
-  });
+  cues.forEach(c=>c.rows.forEach(r=>{
+    [r.playerFrom,r.playerTo].forEach(n=>{n=String(n==null?'':n).trim(); if(n)players[n]=1;});
+    if(r.event)events[r.event]=1;
+  }));
   return {players:Object.keys(players).sort((a,b)=>(+a||0)-(+b||0)),
           events:Object.keys(events).sort()};
 }
@@ -1304,11 +1311,12 @@ function filmChainHTML(list){
   return html;
 }
 
+// one line per entry, exactly as the tagging table prints it
 function filmRowsHTML(cues){
-  const html=filmOrdered(cues).filter(c=>filmMatches(c.r)).map(c=>
+  const html=cues.filter(filmCueMatches).map(c=>
     `<div class="fm-row" data-t="${c.t}" data-i="${c.i}">`
     +`<span class="fm-t">${filmClock(matchTime(c.t))}</span>`
-    +`<span class="fm-lbl">${filmChainHTML([c.r])}</span></div>`).join('');
+    +`<span class="fm-lbl">${filmChainHTML(c.rows)}</span></div>`).join('');
   return html||'<div class="fm-none">No events match this filter.</div>';
 }
 
@@ -1426,7 +1434,7 @@ function filmStart(win,cues,src){
   };
   $('fmNext').onclick=()=>{
     if(!film)return;
-    const next=film.cues.filter(c=>filmMatches(c.r)&&c.t>film.video.currentTime+0.25)[0];
+    const next=film.cues.filter(c=>filmCueMatches(c)&&c.t>film.video.currentTime+0.25)[0];
     if(!next)return;
     filmSeek(next.t-FILM_STEP);
     filmPlay();
@@ -1532,8 +1540,11 @@ function filmDraw(){
   const d=PITCH_DIMS[meta.sport]||PITCH_DIMS.football;
   const R=Math.round(d.h*0.028);
   f.dots.textContent=''; f.balls=[];
-  f.active.forEach(c=>{
-    const r=c.r, col=r.team==='away'?'#FFFF66':'#EEEEEE';
+  // an entry is one cue, so the whole move's dots stand together for as long as
+  // the move lasts — the same dots that were on the pitch while it was tagged
+  f.active.forEach(c=>c.rows.forEach(r=>{
+    const rt=(r.rt==null||!isFinite(+r.rt))?null:+r.rt;
+    const col=r.team==='away'?'#FFFF66':'#EEEEEE';
     const p=r.pXY?{x:r.pXY.x/100*d.w,y:r.pXY.y/100*d.h}:null;
     const q=r.rXY?{x:r.rXY.x/100*d.w,y:r.rXY.y/100*d.h}:null;
     if(p&&q){
@@ -1547,14 +1558,14 @@ function filmDraw(){
     if(p)f.dots.appendChild(filmDot(p.x,p.y,r.playerFrom,col,R));
     if(q)f.dots.appendChild(filmDot(q.x,q.y,r.playerTo,col,R));
     // the ball only runs where there are two dots and two times to run between
-    if(p&&q&&c.rt!=null&&c.rt>c.t){
+    if(p&&q&&rt!=null&&rt>+r.t){
       const b=document.createElementNS(SVGNS,'circle');
       b.setAttribute('r',Math.round(R*0.45)); b.setAttribute('fill','#f7b32f');
       b.setAttribute('stroke','#14100F'); b.setAttribute('stroke-width',2);
       f.dots.appendChild(b);
-      f.balls.push({el:b,x1:p.x,y1:p.y,x2:q.x,y2:q.y,t0:c.t,t1:c.rt});
+      f.balls.push({el:b,x1:p.x,y1:p.y,x2:q.x,y2:q.y,t0:+r.t,t1:rt});
     }
-  });
+  }));
   filmBall(f.video.currentTime);
 }
 
@@ -1577,8 +1588,10 @@ function filmBall(now){
 function filmCaption(){
   const f=film; if(!f||!f.cap)return;
   if(!f.active.length){f.cap.className='film-cap';f.cap.innerHTML='';return;}
-  const list=filmOrdered(f.active).map(c=>c.r);   // read in the order it was typed
-  const side=t=>filmChainHTML(list.filter(r=>r.team===t));
+  // the cues are already in entry order, and each holds its rows in typed order
+  const side=t=>{const out=[];
+    f.active.forEach(c=>c.rows.forEach(r=>{if(r.team===t)out.push(r);}));
+    return filmChainHTML(out);};
   f.cap.className='film-cap on';   // the colour is on each number, not on the strip
   // both sides are always written, empty or not: with two children the strip's
   // space-between is what pins each of them to its own edge
