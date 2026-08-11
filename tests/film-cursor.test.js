@@ -119,16 +119,30 @@ test('an event with no time at all is still left out', () => {
 });
 
 /* ================= playing forwards ================= */
+/* The hold is a twentieth of a second, so a one-player event owns a tenth of a
+   second either side of its dot and no more. Two of them a second apart are
+   never up together; the only thing that spans is a pass, whose window is the
+   flight of the ball. */
 test('the active set is right as the clock runs on', () => {
   const P=sandbox([ev(200),ev(201),ev(400)]);
   const L=P.FILM_LEAD, H=P.FILM_HOLD;
   const f=player(P,P.filmCues(WIN));
   P.filmAdvance(150);        eq(f.active.length,0,'nothing yet');
   P.filmAdvance(200-L);      eq(f.active.length,1,'the first is due, a moment before its own time');
-  P.filmAdvance(201);        eq(f.active.length,2,'and the second');
-  P.filmAdvance(200+H+0.01); eq(f.active.length,1,'the first has had its hold');
-  P.filmAdvance(201+H+0.01); eq(f.active.length,0,'and so has the second');
-  P.filmAdvance(400-L);      eq(f.active[0].t,400,'the next one arrives on its own');
+  P.filmAdvance(200+H+0.01); eq(f.active.length,0,'and gone a moment after it');
+  P.filmAdvance(201-L);      eq(f.active.length,1,'the second, on its own');
+  P.filmAdvance(201+H+0.01); eq(f.active.length,0);
+  P.filmAdvance(400-L);      eq(f.active[0].t,400,'and the third when its turn comes');
+});
+
+test('a pass is up for as long as the ball is in the air', () => {
+  const P=sandbox([ev(200,{rt:203,playerTo:'3',rXY:{x:70,y:40}})]);
+  const L=P.FILM_LEAD, H=P.FILM_HOLD;
+  const f=player(P,P.filmCues(WIN));
+  P.filmAdvance(200-L);      eq(f.active.length,1,'struck');
+  P.filmAdvance(201.5);      eq(f.active.length,1,'still travelling');
+  P.filmAdvance(203);        eq(f.active.length,1,'arriving');
+  P.filmAdvance(203+H+0.01); eq(f.active.length,0,'and away a moment after it lands');
 });
 
 test('the cursor only ever moves forward while playing', () => {
@@ -146,9 +160,11 @@ test('a redraw happens when the set changes, and not otherwise', () => {
   P.resetDraws();
   P.filmAdvance(150);        eq(P.draws(),0,'nothing on screen, nothing to draw');
   P.filmAdvance(200-L);      eq(P.draws(),1,'it arrives');
-  P.filmAdvance(200.1);      eq(P.draws(),1,'…and holding it is free');
-  P.filmAdvance(201.0);      eq(P.draws(),1);
-  P.filmAdvance(200+H+0.01); eq(P.draws(),2,'it leaves');
+  P.filmAdvance(200);        eq(P.draws(),1,'…and holding it is free');
+  P.filmAdvance(200+H-0.01); eq(P.draws(),1);
+  // out is exclusive: it is already gone AT out, not a moment after
+  P.filmAdvance(200+H);      eq(P.draws(),2,'it leaves');
+  P.filmAdvance(300);        eq(P.draws(),2,'and an empty pitch stays empty');
   void f;
 });
 
@@ -158,12 +174,18 @@ test('a rewind rebuilds the same set a play-through would have reached', () => {
   const P=sandbox(rows);
   const cues=P.filmCues(WIN);
 
+  const L=P.FILM_LEAD;
   const a=player(P,cues);
   [150,200,201.5,203,300,401,403,500].forEach(t=>P.filmAdvance(t));
   const b=player(P,P.filmCues(WIN));
-  P.filmRewind(201.5);
-  eq(b.active.map(c=>c.t).join(','),'200,201','back at 201.5, both are up');
-  eq(b.cursor,2,'and the cursor sits after them');
+
+  P.filmRewind(201);
+  eq(b.cursor,2,'the cursor sits after everything already due at 201');
+  eq(b.active.map(c=>c.t).join(','),'201','and only the one still inside its window is up');
+
+  P.filmRewind(200-L);
+  eq(b.active.map(c=>c.t).join(','),'200','back to the moment the first one lands');
+  eq(b.cursor,1);
 
   P.filmRewind(150);
   eq(b.active.length,0,'before anything was tagged');
@@ -173,14 +195,15 @@ test('a rewind rebuilds the same set a play-through would have reached', () => {
 
 test('a rewind lands mid-pass with the pass still up', () => {
   const P=sandbox([ev(402,{rt:404,playerTo:'3',rXY:{x:70,y:40}})]);
+  const H=P.FILM_HOLD;
   const f=player(P,P.filmCues(WIN));
   P.filmRewind(403);
   eq(f.active.length,1,'the ball is in the air');
-  // it arrived at 404, so the hold runs out at 406.5 — not at 404 + 2.5 from t
-  P.filmRewind(406.4);
-  eq(f.active.length,1,'still held, nearly 2.5s after it arrived');
-  P.filmRewind(406.6);
-  eq(f.active.length,0,'and gone once the hold is up');
+  // the hold runs from the RECEIVER's dot at 404, not from the passer's at 402
+  P.filmRewind(404+H-0.01);
+  eq(f.active.length,1,'still up, a hair before it runs out');
+  P.filmRewind(404+H+0.01);
+  eq(f.active.length,0,'and gone once it does');
 });
 
 /* ================= the filter (list + Next clip only) ================= */
@@ -307,10 +330,13 @@ test('the caption reads the same entry back as one line', () => {
 });
 
 /* ================= how far ahead, and how the list follows ================= */
-test('an event lands a twentieth of a second before its own moment', () => {
+test('an event lands a twentieth of a second either side of its dots', () => {
   // 2 #pass success 3 tagged at 1:03.05 is on screen, and lit in the list, at
-  // 1:03.00 — both read off the same cursor, so they can never disagree
-  eq(sandbox([]).FILM_LEAD,0.05);
+  // 1:03.00 — both read off the same cursor, so they can never disagree — and
+  // it is gone a twentieth of a second after the last dot it has
+  const P=sandbox([]);
+  eq(P.FILM_LEAD,0.05);
+  eq(P.FILM_HOLD,0.05);
 });
 
 /* filmMark scrolls by measuring two rectangles, so the stub is a real scroller:
@@ -368,4 +394,66 @@ test('nothing lit before the first event, and nothing scrolls', () => {
   marker.mark();
   eq(box.scrollTop,0);
   ok(!rows[0].on,'the first event has not come round yet');
+});
+
+/* ================= the strip under the frame, split by side ================= */
+/* A moment regularly holds both teams, and side by side the line had to be read
+   before it was clear which half of it was whose. Home is written from the left
+   edge, away from the right, so the edge answers that first. Nothing here
+   consults a direction of attack: the pitch beside it is untouched. */
+const caption=(()=>{
+  const ctx={console};
+  vm.createContext(ctx);
+  vm.runInContext([
+    "function esc(s){return String(s==null?'':s)}",
+    'var film=null;',
+    F('filmOrdered'),F('filmChainHTML'),F('filmCaption'),
+    ';globalThis.CAP=active=>{const cap={className:"",innerHTML:""};',
+    '  film={active:active,cap:cap}; filmCaption(); return cap;};'
+  ].join('\n'),ctx,{filename:'film.js'});
+  return ctx.CAP;
+})();
+const sideCue=(team,from,event,to)=>({t:1,r:{team:team,grp:null,ord:0,
+  event:event,playerFrom:from,playerTo:to||''}});
+const halves=html=>{
+  const parts=html.split('<span class="fm-side away">');
+  return {home:parts[0]||'', away:parts[1]||''};
+};
+
+test('both teams in one moment land on opposite edges', () => {
+  const cap=caption([sideCue('away','14','pass success','13'),sideCue('home','6','tackle success')]);
+  const {home,away}=halves(cap.innerHTML);
+  ok(/fm-side home/.test(home),'the home half is written first, so it sits left');
+  ok(/#tackle success/.test(home),'and holds the tackle');
+  notOk(/#pass success/.test(home),'and nothing of the other side');
+  ok(/#pass success/.test(away),'the away half holds the pass');
+  ok(/>14</.test(away)&&/>13</.test(away),'both of its numbers');
+  notOk(/>6</.test(away),'and none of theirs');
+});
+
+test('the numbers keep their own colours inside each half', () => {
+  const cap=caption([sideCue('away','14','pass success','13'),sideCue('home','6','tackle success')]);
+  ok(/class="fm-no home">6</.test(cap.innerHTML),'6 is white');
+  ok(/class="fm-no away">14</.test(cap.innerHTML),'14 is yellow');
+});
+
+test('one side alone still writes both halves, so it keeps its own edge', () => {
+  const cap=caption([sideCue('away','4','clearance')]);
+  ok(/<span class="fm-side home"><\/span>/.test(cap.innerHTML),
+     'the empty home half is still there — space-between needs two children');
+  ok(/fm-side away">[\s\S]*4/.test(cap.innerHTML),'and the away half carries the event');
+});
+
+test('a run of one team reads as one chain on its own side', () => {
+  const cap=caption([sideCue('home','13','recovery'),sideCue('home','13','pass success','14')]);
+  const {home,away}=halves(cap.innerHTML);
+  eq((home.match(/fm-no/g)||[]).length,2,'13 once, then the receiver 14');
+  eq((home.match(/fm-ev/g)||[]).length,2,'both of his events');
+  eq((away.match(/fm-ev/g)||[]).length,0,'the away half is empty');
+});
+
+test('nothing active leaves the strip blank, not half-drawn', () => {
+  const cap=caption([]);
+  eq(cap.innerHTML,'');
+  eq(cap.className,'film-cap','and unlit');
 });

@@ -1189,7 +1189,7 @@ const matchName=()=>(meta.home||'Home')+'_vs_'+(meta.away||'Away');
    plainly instead of offering a dead player.
    ========================================================================== */
 const FILM_LEAD=0.05;                              // an event lands this long before its moment
-const FILM_HOLD=2.5;                               // …and stays this long after the last one
+const FILM_HOLD=0.05;                              // …and leaves this long after its last dot
 const FILM_STEP=2;                                 // what ← and → are worth
 let filmHalf=1;                                    // which window is showing
 let film=null;                                     // the live player, while Film is on screen
@@ -1567,12 +1567,23 @@ function filmBall(now){
   });
 }
 
+/* The strip under the frame reads as two halves: home from the left edge, away
+   from the right. A moment regularly holds both teams — a tackle answering the
+   pass it broke up — and side-by-side they had to be read before it was clear
+   which was whose. Split, the edge answers that before the words are read.
+
+   Nothing to do with the pitch beside it: the dots stay where they were tagged,
+   in the video's own frame, and no direction of attack is consulted here. */
 function filmCaption(){
   const f=film; if(!f||!f.cap)return;
   if(!f.active.length){f.cap.className='film-cap';f.cap.innerHTML='';return;}
   const list=filmOrdered(f.active).map(c=>c.r);   // read in the order it was typed
-  f.cap.className='film-cap on';   // the side is on each number, not on the strip
-  f.cap.innerHTML=filmChainHTML(list);
+  const side=t=>filmChainHTML(list.filter(r=>r.team===t));
+  f.cap.className='film-cap on';   // the colour is on each number, not on the strip
+  // both sides are always written, empty or not: with two children the strip's
+  // space-between is what pins each of them to its own edge
+  f.cap.innerHTML='<span class="fm-side home">'+side('home')+'</span>'
+                 +'<span class="fm-side away">'+side('away')+'</span>';
 }
 
 function filmBar(now){

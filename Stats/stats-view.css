@@ -258,8 +258,13 @@ table.stats .grp.g5{background:#331A1A;color:#F0CACA}
 
 /* always present, so a caption arriving cannot shift the frame under the cursor */
 .film-cap{position:absolute;left:0;right:0;bottom:0;min-height:30px;display:flex;align-items:center;
-  gap:6px;flex-wrap:wrap;padding:5px 10px;background:rgba(0,0,0,0.72);
+  justify-content:space-between;gap:16px;padding:5px 10px;background:rgba(0,0,0,0.72);
   font-size:13px;font-weight:700;line-height:1.35;pointer-events:none;user-select:none}
+/* which team did what, answered by the edge it is written from, before the words
+   are read: home from the left, away from the right. Both halves are always in
+   the markup — space-between needs two children to have two edges to pin to. */
+.fm-side{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.fm-side.away{justify-content:flex-end;text-align:right}
 /* the side is on the number itself, in the caption and in the list alike: one
    moment regularly holds both teams, and one colour across it would misattribute
    the half of it that belongs to the other side */
