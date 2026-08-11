@@ -175,9 +175,56 @@ test('a host with no chrome of its own is given the same ids', () => {
 
 /* ================= the PDF export follows the view ================= */
 test('report.js reads the four values back out of the view', () => {
-  ok(/window\.PTStats&&window\.PTStats\.data/.test(REPORT),'it asks PTStats for them');
+  ok(/const d=S&&S\.data&&S\.data\(\)/.test(REPORT),'it asks PTStats for them');
+  ok(/const S=window\.PTStats/.test(REPORT),'and PTStats is the only place it looks');
   ok(/function buildPages\(host\)\{\n\s*sync\(\);/.test(REPORT),'and refreshes before building a page');
-  ok(/async function exportPdf\(\)\{[\s\S]{0,60}sync\(\);/.test(REPORT),'and before an export');
+  ok(/async function exportPdf\(\)\{[\s\S]{0,300}?try\{sync\(\);\}/.test(REPORT),
+     'and before an export, inside a catch — an async reject there is a silent no-op');
+});
+
+/* ---- the helpers, which is the half that was missing ----
+   report.js was written against the Stats page's inline script and calls a
+   dozen of its functions by bare name. Wrapping that script into a module
+   left every one of them undefined, and a ⭳ PDF click threw "matchTime is
+   not defined" before a single page was built. Both halves of the handover
+   are checked, because either one alone brings it straight back. */
+test('and the helpers it calls but does not define', () => {
+  const {PTStats}=load();
+  const names=/const HELPER_NAMES=\[([\s\S]*?)\];/.exec(REPORT);
+  ok(names,'report.js lists the names it needs');
+  const wanted=names[1].match(/'([^']+)'/g).map(s=>s.slice(1,-1));
+  ok(wanted.length>=12,'sanity: there are a good few — found '+wanted.length);
+  wanted.forEach(n=>ok(PTStats.helpers&&PTStats.helpers[n]!=null,
+    'PTStats.helpers.'+n+' is missing — every call site of it throws'));
+  ok(/\(\{matchTime,eventHalf/.test(REPORT),'and sync() binds them, not just the four values');
+});
+
+test('a view too old to hand them over says so, rather than failing per call site', () => {
+  // a stale stats-view.js out of the browser cache is exactly how this happens,
+  // and "matchTime is not a function" names neither the cause nor the cure
+  const fn=/function sync\(\)\{[\s\S]*?\n\}/.exec(REPORT)[0];
+  ok(/gone\.length\)throw new Error/.test(fn),'it throws once, up front');
+  ok(/reload the page/.test(fn),'saying what to do about it');
+  ok(/gone\.join/.test(fn),'and which names were missing');
+});
+
+test('a mounted report builds every page of the PDF', () => {
+  /* The end-to-end the two tests above exist to protect: no html2canvas and no
+     jsPDF — those are CDN libraries and a browser — but everything up to them,
+     which is all of the report's own code. A name it cannot reach throws here
+     exactly as it threw in the browser. */
+  const {PTStats,document,ctx}=load();
+  ctx.alert=m=>{throw new Error('unexpected alert: '+m);};
+  PTStats.mount(document.getElementById('host'),REPORT_PAYLOAD,{});
+  vm.runInContext(REPORT,ctx,{filename:'Stats/report.js'});
+
+  const host=document.createElement('host');
+  const pages=ctx.window.PTReport.buildPages(host);
+  ok(pages.length>=20,'a full report is a couple of dozen pages — got '+pages.length);
+  const html=pages.map(p=>p.innerHTML).join('');
+  ok(html.length>20000,'and they carry something — got '+html.length+' chars');
+  ok(/Saint Lucia/.test(html)&&/Barbados/.test(html),'both sides are named');
+  ok(/1 <span[^>]*>–<\/span> 0/.test(html),'and the header carries the score the view worked out');
 });
 
 test('the PDF button is bound when it exists, not assumed', () => {
@@ -233,7 +280,10 @@ test('both hosts of the view ask for the same copy of it', () => {
   // the Stats page loads it with a tag, the client site injects it from app.js —
   // bump one and not the other and the two sites run different shooting layouts
   const APP=page('client/assets/app.js');
-  ['stats-view.js','stats-view.css'].forEach(f=>{
+  // report.js is in that list because the helpers it needs are handed over by
+  // stats-view.js: one host on the old pair and the new report.js is a ⭳ PDF
+  // that throws, which is the shape of the bug that put them there
+  ['stats-view.js','stats-view.css','report.js'].forEach(f=>{
     const re=new RegExp(f.replace('.','\\.')+'\\?v=(\\d+)');
     const inPage=(re.exec(PAGE)||[])[1], inApp=(re.exec(APP)||[])[1];
     ok(inPage,'Stats/index.html versions '+f);
@@ -267,7 +317,9 @@ test('the new files are staged for GitHub Pages', () => {
 
 test('the page asks for a fresh copy of what moved', () => {
   ok(/report\.js\?v=(\d+)/.test(PAGE),'report.js is versioned');
-  ok(+(/report\.js\?v=(\d+)/.exec(PAGE)[1])>=29,'and bumped, because sync() changed it');
+  ok(+(/report\.js\?v=(\d+)/.exec(PAGE)[1])>=30,'and bumped, because sync() changed again');
+  ok(/stats-view\.js\?v=(\d+)/.test(PAGE),'stats-view.js is versioned');
+  ok(+(/stats-view\.js\?v=(\d+)/.exec(PAGE)[1])>=3,'and bumped with it — it is the half that hands the helpers over');
 });
 
 test('the view no longer lives in the page', () => {

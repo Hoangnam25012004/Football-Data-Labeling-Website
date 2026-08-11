@@ -19,10 +19,33 @@ let rows=[], meta={home:'Home',away:'Away'},
     lineups={home:{roster:[],xi:[],subs:[]},away:{roster:[],xi:[],subs:[]}},
     dur={enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0};
 
+/* ...and the twelve helpers this file CALLS but does not define — the minute a
+   video time falls in, which half an event is in, the score, the attacking
+   direction and the five drawing helpers the Stats tab already had. They were
+   globals for the same reason the four values above were, and went the same
+   way when the page became a module: a ⭳ PDF click threw "matchTime is not
+   defined" and no page was built. Declared here and bound by sync() from
+   PTStats.helpers, so the ninety-odd call sites below still read as bare
+   names and none of them changed. */
+let matchTime, eventHalf, teamGoals, attackDir, dirArrowSVG, arcPath,
+    touchPoints, drawHeat, passTypeData, pdWindows, matchName, DEF_CATS;
+const HELPER_NAMES=['matchTime','eventHalf','teamGoals','attackDir','dirArrowSVG',
+  'arcPath','touchPoints','drawHeat','passTypeData','pdWindows','matchName','DEF_CATS'];
+
 function sync(){
-  const d=window.PTStats&&window.PTStats.data&&window.PTStats.data();
+  const S=window.PTStats;
+  const d=S&&S.data&&S.data();
   if(!d)return false;
   rows=d.rows||[]; meta=d.meta||meta; lineups=d.lineups||lineups; dur=d.dur||dur;
+  /* A stats-view.js older than this file has no helpers to give — a stale copy
+     out of the browser cache is exactly how that happens. Say which names are
+     missing rather than letting the first call site fail as "not a function". */
+  const h=S.helpers||{};
+  const gone=HELPER_NAMES.filter(n=>h[n]==null);
+  if(gone.length)throw new Error('the Stats view is out of date — reload the page ('
+    +gone.join(', ')+' missing)');
+  ({matchTime,eventHalf,teamGoals,attackDir,dirArrowSVG,arcPath,
+    touchPoints,drawHeat,passTypeData,pdWindows,matchName,DEF_CATS}=h);
   return true;
 }
 
@@ -1208,7 +1231,11 @@ function buildPages(host){
 let exporting=false;   // re-entry guard — the button shows live % progress while the export runs
 async function exportPdf(){
   if(exporting)return;
-  sync();
+  /* Before the guard is set and the button is taken over: sync() is the one
+     step that can fail with nothing built yet, and an async function that
+     rejects here would do it silently. */
+  try{sync();}
+  catch(e){console.error('PDF export failed:',e);alert('PDF export failed: '+((e&&e.message)||e));return;}
   if(!rows.length){alert('No data yet.');return;}
   exporting=true;
   const btn=$('expPdf'), orig=btn.textContent;

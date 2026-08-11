@@ -1391,7 +1391,26 @@ window.setHeatHalf=setHeatHalf; window.setOthCat=setOthCat;
 window.defHover=defHover;       window.distHover=distHover;
 window.heatHover=heatHover;     window.shotHover=shotHover;
 
+/* ---- the twelve names Stats/report.js calls but does not define ----
+   The report was written when this file WAS the Stats page's inline script and
+   these were plain globals it could reach. Wrapping the file up left every one
+   of them undefined on the far side, which is the "matchTime is not defined"
+   a ⭳ PDF click threw — on this page and on the client site alike.
+
+   Handed over rather than published to window: the module still does not leak
+   (the test above reads that list back), and report.js binds them in its own
+   sync(), beside the four values it already takes from data(). They read this
+   closure's rows / lineups / dur, which is the match the view is drawing —
+   the same match report.js synced from, so the two cannot disagree. */
+const HELPERS={
+  matchTime:matchTime, eventHalf:eventHalf, teamGoals:teamGoals,
+  attackDir:attackDir, dirArrowSVG:dirArrowSVG, arcPath:arcPath,
+  touchPoints:touchPoints, drawHeat:drawHeat, passTypeData:passTypeData,
+  pdWindows:pdWindows, matchName:matchName, DEF_CATS:DEF_CATS
+};
+
 const API={mount:mount,update:update,destroy:destroy,data:data,
-  render:renderStats,isMounted:function(){return mounted;},schema:1};
+  render:renderStats,isMounted:function(){return mounted;},
+  helpers:HELPERS,schema:1};
 return API;
 })();
