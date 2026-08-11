@@ -479,12 +479,23 @@
            match_code: that is the name of the trigger function that fills
            it in. Asking for a column that is not there fails the whole
            query, which is why this returned nothing at all. */
-        .select('id,code,home_name,away_name,home_score,away_score,kickoff,competition,stage,venue,our_side,published,lineups,config,home_team_id,away_team_id')
+        /* `match_date` is 0011's column — the one the tagging app writes. It
+           travels beside 0013's `kickoff` rather than instead of it, so the
+           seeded channel keeps the date it was given. */
+        .select('id,code,home_name,away_name,home_score,away_score,kickoff,match_date,competition,stage,venue,our_side,published,lineups,config,home_team_id,away_team_id')
         .eq('club_id', clubId).eq('published', true)
         .order('kickoff', { ascending: true })
         .then(function (r) {
           if (r.error || !r.data || !r.data.length) return [];
-          var rows = r.data;
+          /* Postgres sorted on kickoff alone, which leaves every match this
+             site tagged in whatever order it came back in. Order on the date
+             actually shown; undated matches keep to the end, where a fixture
+             with nothing to place it belongs. */
+          var rows = r.data.slice().sort(function (a, b) {
+            var x = a.kickoff || a.match_date || '', y = b.kickoff || b.match_date || '';
+            if (!x !== !y) return x ? -1 : 1;
+            return x < y ? -1 : (x > y ? 1 : 0);
+          });
           var ids = rows.map(function (m) { return m.id; });
           /* match_stats is a view, so row-level security does not reach it and
            an anonymous visitor is kept off it entirely (0017). The narrowed
@@ -536,6 +547,27 @@
         return stored;
       }
 
+      /* ---- the final score ----
+         matches.home_score / away_score are filled in by the seed and by
+         anyone editing the row by hand. Nothing in the tagging app writes
+         them: Submit Analysis freezes a report, it does not put a scoreline
+         on the fixture. So on a real channel both were null and every row
+         read "– : –" however many goals had been tagged — and with no score
+         there was no W/D/L either, which left Data's record, its goals for
+         and against and its Recent results empty as well.
+
+         The goals are already in hand. match_stats is a per-team rollup of
+         the events and this call has just fetched it. A column that IS set
+         still wins: a scoreline someone typed in is a correction, and being
+         overruled by a rollup is what makes a correction pointless. */
+      function goalsOf(st, team) {
+        if (st[team]) return +st[team].goals || 0;
+        /* A side that was never tagged has no row of its own. The match still
+           has one for the other side, so nothing was tagged FOR this one and
+           0 is the answer; with neither side there, nothing is known. */
+        return (st.home || st.away) ? 0 : null;
+      }
+
       function shape(rows, statRows, byTeam) {
         var byMatch = {};
         statRows.forEach(function (s) {
@@ -545,21 +577,29 @@
         return rows.map(function (m) {
           var side = resolveSide(m, byTeam || {});
           var other = side === 'home' ? 'away' : 'home';
-          var ourScore = side === 'home' ? m.home_score : m.away_score;
-          var theirScore = side === 'home' ? m.away_score : m.home_score;
+          var st = byMatch[m.id] || {};
+          var homeScore = m.home_score != null ? m.home_score : goalsOf(st, 'home');
+          var awayScore = m.away_score != null ? m.away_score : goalsOf(st, 'away');
+          var ourScore = side === 'home' ? homeScore : awayScore;
+          var theirScore = side === 'home' ? awayScore : homeScore;
           var result = null;
           if (ourScore != null && theirScore != null) {
             result = ourScore > theirScore ? 'W' : (ourScore < theirScore ? 'L' : 'D');
           }
-          var st = byMatch[m.id] || {};
+          /* kickoff is 0013's column and is what the seeded channel sets;
+             match_date is 0011's, and is the one the tagging app's create-match
+             dialog has always written. Reading only the first is why a match
+             tagged on this site said "Date not set" no matter what date the
+             analyst entered. Both, newest column first. */
+          var played = m.kickoff || m.match_date || null;
           return {
             id: m.code || m.id,
             uuid: m.id,
             slug: String(m.code || m.id),
-            date: m.kickoff,
-            dateLabel: dateLabel(m.kickoff),
-            home: { name: m.home_name, crest: monogram(m.home_name), score: m.home_score },
-            away: { name: m.away_name, crest: monogram(m.away_name), score: m.away_score },
+            date: played,
+            dateLabel: dateLabel(played),
+            home: { name: m.home_name, crest: monogram(m.home_name), score: homeScore },
+            away: { name: m.away_name, crest: monogram(m.away_name), score: awayScore },
             side: side,
             result: result,
             opponent: side === 'home' ? m.away_name : m.home_name,

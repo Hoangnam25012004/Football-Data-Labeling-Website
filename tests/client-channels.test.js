@@ -204,6 +204,64 @@ const res={};
   api.matches('c1').then(m=>{res.matches=m;},e=>{res.matchErr=e;});
 })();
 
+/* A match as the tagging app actually leaves one: no scoreline on the row and
+   no kickoff, because nothing over there writes either — the date went in as
+   0011's match_date and the goals are in the events. Two matches, so the
+   ordering has something to do; m3 is the one with no date at all. */
+(function(){
+  const {api,calls}=loadAPI(s=>{
+    if(s.table==='matches') return {data:[
+      {id:'m3',code:'44686',home_name:'C',away_name:'D',
+       home_score:null,away_score:null,kickoff:null,match_date:null,
+       our_side:'home',published:true},
+      {id:'m2',code:'44685',home_name:'Stafford Town FC U18',away_name:'Hanley Town FC',
+       home_score:null,away_score:null,kickoff:null,match_date:'2026-08-09',
+       our_side:'away',published:true}
+    ],error:null};
+    /* either name: which of the two views is read is decided by the session,
+       and public-channels.test.js is where that choice is checked */
+    if(/match_stats$/.test(s.table||'')) return {data:[
+      {match_id:'m2',team:'home',goals:1,shots:6,events_tagged:400},
+      {match_id:'m2',team:'away',goals:3,shots:9,events_tagged:520},
+      /* m3 was tagged for one side only — the other has no row at all */
+      {match_id:'m3',team:'home',goals:0,shots:2,events_tagged:80}
+    ],error:null};
+    return {data:[],error:null};
+  });
+  res.taggedCalls=calls;
+  api.matches('c1').then(m=>{res.tagged=m;},e=>{res.taggedErr=e;});
+})();
+
+/* the same two matches, with a scoreline typed onto the row by hand */
+(function(){
+  const {api}=loadAPI(s=>{
+    if(s.table==='matches') return {data:[{
+      id:'m2',code:'44685',home_name:'Stafford Town FC U18',away_name:'Hanley Town FC',
+      home_score:2,away_score:3,kickoff:null,match_date:'2026-08-09',
+      our_side:'away',published:true
+    }],error:null};
+    if(/match_stats$/.test(s.table||'')) return {data:[
+      {match_id:'m2',team:'home',goals:1,shots:6,events_tagged:400},
+      {match_id:'m2',team:'away',goals:3,shots:9,events_tagged:520}
+    ],error:null};
+    return {data:[],error:null};
+  });
+  api.matches('c1').then(m=>{res.corrected=m;},e=>{res.correctedErr=e;});
+})();
+
+/* a match nobody has tagged: published, but not one event on it */
+(function(){
+  const {api}=loadAPI(s=>{
+    if(s.table==='matches') return {data:[{
+      id:'m4',code:'44687',home_name:'E',away_name:'F',
+      home_score:null,away_score:null,kickoff:null,match_date:'2026-08-10',
+      our_side:'home',published:true
+    }],error:null};
+    return {data:[],error:null};
+  });
+  api.matches('c1').then(m=>{res.untagged=m;},e=>{res.untaggedErr=e;});
+})();
+
 /* ================= creating a channel ================= */
 test('creating a channel writes one clubs row, and the caller never sets the role', () => {
   const ins=one(res.createCalls,'clubs','insert');
@@ -368,6 +426,55 @@ test('a match brings the starting XI of the channel-s own side', () => {
   ok(/lineups/.test(one(res.matchCalls,'matches','select').cols),'lineups is asked for');
   eq(res.matches[0].lineup.xi.length,1,'the home XI, because our_side is home');
   eq(res.matches[0].lineup.dir,'lr');
+});
+
+/* ================= the score and the date on a real fixture =================
+   Nothing in the tagging app writes matches.home_score / away_score, and the
+   date it does write is 0011's match_date while this file was reading only
+   0013's kickoff. So every fixture a club had tagged read "Date not set" and
+   "– : –", and with no score there was no W/D/L — which took Data's record,
+   its goals for and against and its Recent results down with it. */
+test('a fixture with no scoreline on the row still shows the goals that were tagged', () => {
+  notOk(res.taggedErr,'the call resolved');
+  const m=res.tagged.filter(x=>x.id==='44685')[0];
+  ok(m,'the match came back');
+  eq(m.home.score,1,'home goals off match_stats');
+  eq(m.away.score,3,'away goals off match_stats');
+  eq(m.result,'W','and the club is the away side, so 3–1 is a win');
+});
+
+test('a scoreline someone typed in is not overruled by the rollup', () => {
+  // the columns are there to be corrected in; a derived figure winning would
+  // make the correction pointless
+  const m=res.corrected[0];
+  eq(m.home.score,2,'the row said 2, not the 1 the events add up to');
+  eq(m.away.score,3);
+  eq(m.result,'W');
+});
+
+test('a side that was never tagged is 0, and a match nobody tagged has no score', () => {
+  const m3=res.tagged.filter(x=>x.id==='44686')[0];
+  eq(m3.home.score,0,'the side with a row');
+  eq(m3.away.score,0,'and the side without one — the match WAS tagged, just not for them');
+  eq(m3.result,'D');
+  const m4=res.untagged[0];
+  eq(m4.home.score,null,'no stats at all is not 0–0');
+  eq(m4.result,null,'and a match with no score has no result');
+});
+
+test('the date the tagging app writes is the date the channel shows', () => {
+  ok(/match_date/.test(one(res.taggedCalls,'matches','select').cols),'match_date is asked for');
+  const m=res.tagged.filter(x=>x.id==='44685')[0];
+  eq(m.date,'2026-08-09','it falls back to match_date where kickoff is empty');
+  eq(m.dateLabel,'Sunday, 9 August 2026','and the row says so rather than "Date not set"');
+  const m3=res.tagged.filter(x=>x.id==='44686')[0];
+  eq(m3.dateLabel,'Date not set','a match with neither still says so');
+});
+
+test('and the list is ordered by it, with the undated ones last', () => {
+  // Postgres ordered on kickoff alone, which left everything tagged here in
+  // whatever order it came back in — m3 arrived first and stayed first
+  eq(res.tagged.map(m=>m.id).join(','),'44685,44686');
 });
 
 /* ================= the columns actually exist =================
