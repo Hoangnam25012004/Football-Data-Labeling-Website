@@ -246,6 +246,26 @@ EDITORS.forEach(where=>{
   });
 });
 
+/* Every square on the board, both ways round, in both editors — the turn is only right
+   if it is right everywhere. A square keeps its position through the turn because the
+   zone map rotates by exactly the same amount; the staging squares keep their blank for
+   the same reason, swapping with each other rather than with a position. This is what
+   the mirror could never do: it got every lettered square off the centre row wrong. */
+test('every square on the board keeps its position through a turn', ()=>{
+  EDITORS.forEach(where=>['lr','rl'].forEach(dir=>{
+    for(let row=0;row<3;row++)for(let col=0;col<6;col++){
+      const p=cell(row,col), before=S.zoneAt(p.x,p.y,dir);
+      const lu=squad(dir,dir==='lr'?'rl':'lr');
+      lu.home.xi=[{no:'7',x:p.x,y:p.y,pos:before}];
+      const {ctx}=editor(where,lu);
+      ctx.luSwitchDir();
+      const x=ctx.lineups.home.xi[0], at=where+' '+dir+' ['+row+','+col+']';
+      eq(x.pos,before,at+': the same position after the turn');
+      eq(S.zoneAt(x.x,x.y,ctx.lineups.home.dir),before,at+': and the square he stands in agrees');
+    }
+  }));
+});
+
 /* A player ticked into the squad but not yet placed parks on the staging square beside
    his OWN keeper, and the two sides' staging squares sit in opposite corners. A turn is
    the rotation that carries each side's square onto itself; the old mirror walked a home
