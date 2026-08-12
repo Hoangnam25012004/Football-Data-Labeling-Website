@@ -428,22 +428,39 @@ function luDrag(dot,x){
     document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
   };
 }
+/* Turning a side round is a 180° ROTATION, not a mirror: both axes flip, exactly as
+   swapping ends at half-time does on the tagging tab. The zone map rotates with the
+   direction, so flipping x alone walked every wide player across to the other flank —
+   a right-back came back from the switch as a left-back. */
+function turnXI(xi,dir){
+  (xi||[]).forEach(x=>{x.x=100-x.x; x.y=100-x.y; x.pos=zoneAt(x.x,x.y,dir);});
+}
 /* Attacking direction belongs to the FIXTURE, not to one side: two teams cannot both
    attack the same goal, so the two are always opposites. Switching therefore turns the
    side on screen round AND points the other side the other way — before this only the
    side being looked at turned, and the pair could be left attacking the same end.
    A side already facing the right way is left where it is, which is also how a pair
    that drifted into agreeing comes back apart on the first switch.
+   Everything that side holds on the board turns with it: the starting XI and its own
+   formation snapshots (substitutions, red cards, manual saves) — one set of coordinates,
+   read back through the side's CURRENT dir, so they cannot be turned separately. Leaving
+   the snapshots behind stood the goalkeeper in the opponents' box from the first
+   substitution on, on the tagging pitch, in Formation by time, on Stats and in the report.
    (Twin of the one in index.html — keep the two in step.) */
-function faceTeam(t,dir){
+function faceTeam(lu,team,dir){
+  const t=lu&&lu[team];
   if(!t||t.dir===dir)return;
   t.dir=dir;
-  (t.xi||[]).forEach(x=>{x.x=100-x.x; x.pos=zoneAt(x.x,x.y,dir);});
+  turnXI(t.xi,dir);
+  ((lu.history||[]).filter(h=>h&&h.team===team)).forEach(h=>{
+    turnXI(h.xi,dir);
+    if(h.offSpot){h.offSpot.x=100-h.offSpot.x; h.offSpot.y=100-h.offSpot.y;}
+  });
 }
 function luSwitchDir(){
   const dir=teamLU().dir==='rl'?'lr':'rl';
-  faceTeam(lineups[lineupTeam],dir);
-  faceTeam(lineups[lineupTeam==='away'?'home':'away'],dir==='lr'?'rl':'lr');
+  faceTeam(lineups,lineupTeam,dir);
+  faceTeam(lineups,lineupTeam==='away'?'home':'away',dir==='lr'?'rl':'lr');
   save();renderLineup();
 }
 
