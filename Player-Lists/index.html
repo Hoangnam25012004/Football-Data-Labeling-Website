@@ -428,8 +428,24 @@ function luDrag(dot,x){
     document.addEventListener('pointermove',move); document.addEventListener('pointerup',up);
   };
 }
-function luSwitchDir(){const t=teamLU(); t.dir=t.dir==='rl'?'lr':'rl';
-  t.xi.forEach(x=>{x.x=100-x.x; x.pos=zoneAt(x.x,x.y,t.dir);}); save();renderLineup();}
+/* Attacking direction belongs to the FIXTURE, not to one side: two teams cannot both
+   attack the same goal, so the two are always opposites. Switching therefore turns the
+   side on screen round AND points the other side the other way — before this only the
+   side being looked at turned, and the pair could be left attacking the same end.
+   A side already facing the right way is left where it is, which is also how a pair
+   that drifted into agreeing comes back apart on the first switch.
+   (Twin of the one in index.html — keep the two in step.) */
+function faceTeam(t,dir){
+  if(!t||t.dir===dir)return;
+  t.dir=dir;
+  (t.xi||[]).forEach(x=>{x.x=100-x.x; x.pos=zoneAt(x.x,x.y,dir);});
+}
+function luSwitchDir(){
+  const dir=teamLU().dir==='rl'?'lr':'rl';
+  faceTeam(lineups[lineupTeam],dir);
+  faceTeam(lineups[lineupTeam==='away'?'home':'away'],dir==='lr'?'rl':'lr');
+  save();renderLineup();
+}
 
 function renderLineup(){
   // no open match -> show the notice instead of the editor

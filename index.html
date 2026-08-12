@@ -1142,8 +1142,24 @@ function addLuPlayer(){const no=$('luNo').value.trim(); if(!no)return; const t=t
   if(t.roster.some(p=>p.no===no)){alert('No. '+no+' already exists.');return;}
   t.roster.push({no,name:$('luName').value.trim()});
   $('luNo').value='';$('luName').value=''; saveLineups();renderLineup(); $('luNo').focus();}
-function luSwitchDir(){const t=teamLU(); t.dir=t.dir==='rl'?'lr':'rl';
-  t.xi.forEach(x=>{x.x=100-x.x; x.pos=zoneAt(x.x,x.y,t.dir);}); saveLineups();renderLineup();}
+/* Attacking direction belongs to the FIXTURE, not to one side: two teams cannot both
+   attack the same goal, so the two are always opposites. Switching therefore turns the
+   side on screen round AND points the other side the other way — before this only the
+   side being looked at turned, and the pair could be left attacking the same end.
+   A side already facing the right way is left where it is, which is also how a pair
+   that drifted into agreeing comes back apart on the first switch.
+   (Twin of the one in Player-Lists/index.html — keep the two in step.) */
+function faceTeam(t,dir){
+  if(!t||t.dir===dir)return;
+  t.dir=dir;
+  (t.xi||[]).forEach(x=>{x.x=100-x.x; x.pos=zoneAt(x.x,x.y,dir);});
+}
+function luSwitchDir(){
+  const dir=teamLU().dir==='rl'?'lr':'rl';
+  faceTeam(state.lineups[lineupTeam],dir);
+  faceTeam(state.lineups[lineupTeam==='away'?'home':'away'],dir==='lr'?'rl':'lr');
+  saveLineups();renderLineup();
+}
 /* formation overlay on the main video frame (read-only, both teams).
    A lineup belongs to one match — without an open match the pitch stays empty.
    Attacking direction: half 1 uses the direction set in Player lists; half 2
