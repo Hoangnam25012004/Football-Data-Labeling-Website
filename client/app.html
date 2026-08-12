@@ -6,7 +6,7 @@
 <title>Channel — HoangNam Analytics</title>
 <meta name="description" content="Match data, reports and players for your club.">
 <link rel="stylesheet" href="assets/site.css?v=3">
-<link rel="stylesheet" href="assets/app.css?v=12">
+<link rel="stylesheet" href="assets/app.css?v=13">
 </head>
 <body class="app">
 
@@ -39,18 +39,38 @@
 
 
 <div class="app-body">
-  <nav class="side" aria-label="Sections">
-    <div class="side-grp">Menu</div>
-    <a href="#/home" data-view="home" class="on"><i></i> Home</a>
-    <a href="#/channel" data-view="channel"><i></i> Channel</a>
-    <a href="#/data" data-view="data"><i></i> Data</a>
+  <nav class="side" id="side" aria-label="Sections">
+    <!-- The rail pulls in to a strip of icons and back out again. Narrowed,
+         a name is only its mark, so every entry carries one. -->
+    <div class="side-grp">
+      <span class="side-grp-t">Menu</span>
+      <button class="side-pull" id="railToggle" type="button" aria-controls="side" aria-expanded="true">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M11.5 1.8v10.4"/><path class="pull-chev" d="M8 3.5 4.5 7 8 10.5"/>
+        </svg>
+      </button>
+    </div>
+    <a href="#/home" data-view="home" class="on"><i>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M2.2 6.6 8 2.1l5.8 4.5V13a.9.9 0 0 1-.9.9H3.1a.9.9 0 0 1-.9-.9Z"/><path d="M6.3 13.9V8.9h3.4v5"/>
+      </svg></i><span>Home</span></a>
+    <a href="#/channel" data-view="channel"><i>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+        <path d="M6.1 2.2 4.6 13.8M11.4 2.2 9.9 13.8M2.4 5.8h11.2M1.9 10.2h11.2"/>
+      </svg></i><span>Channel</span></a>
+    <a href="#/data" data-view="data"><i>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+        <path d="M2.4 13.6h11.2"/><path d="M4.4 11.5V7.2M8 11.5V3.1M11.6 11.5V8.9"/>
+      </svg></i><span>Data</span></a>
 
     <!-- pinned to the bottom of the rail; the only link on it that
          leaves the app, so it is a plain href and not a route -->
     <div class="side-foot">
-      <a class="side-out" href="https://hoangnam25012004.github.io/Football-Data-Labeling-Website/index.html">
-        <i></i> About Hoang Nam
-      </a>
+      <a class="side-out" href="https://hoangnam25012004.github.io/Football-Data-Labeling-Website/index.html"><i>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.1"/><path d="M8 7.3v4"/><path d="M8 4.8h.01"/>
+        </svg></i><span>About Hoang Nam</span></a>
     </div>
   </nav>
   <main class="view" id="view">
@@ -60,6 +80,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supa.js?v=13"></script>
-<script src="assets/app.js?v=25"></script>
+<script src="assets/app.js?v=26"></script>
 </body>
 </html>

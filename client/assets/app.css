@@ -101,8 +101,16 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
 }
 
 /* ---------- body: sidebar + view ---------- */
-.app-body{display:grid; grid-template-columns:196px minmax(0,1fr); flex:1; min-height:0}
-@media (max-width:860px){ .app-body{grid-template-columns:minmax(0,1fr)} }
+/* One number is the whole rail, so pulling it in is a change to --rail and
+   nothing else: the track, the labels and the padding all read from it. */
+body.app{--rail:196px}
+body.app.rail-in{--rail:56px}
+.app-body{
+  display:grid; grid-template-columns:var(--rail) minmax(0,1fr); flex:1; min-height:0;
+  transition:grid-template-columns .24s cubic-bezier(.2,.7,.2,1);
+}
+@media (max-width:860px){ .app-body{grid-template-columns:minmax(0,1fr); transition:none} }
+@media (prefers-reduced-motion:reduce){ .app-body{transition:none} }
 
 /* A column, so the one link that leaves the app can sit at the foot of
    the rail however short the page above it is. */
@@ -110,23 +118,38 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
   border-right:1px solid var(--line); padding:16px 0; background:var(--carbon);
   align-self:start; position:sticky; top:57px;
   display:flex; flex-direction:column; min-height:calc(100vh - 57px);
+  overflow-x:hidden;                       /* the label is clipped, not wrapped, on the way in */
 }
 .side-foot{margin-top:auto; padding-top:16px; border-top:1px solid var(--line-soft)}
 .side-out{color:var(--ash-dim)}
 .side-out:hover{color:var(--chalk)}
+/* The word Menu and the handle that pulls the rail share a line; pulled in,
+   the word goes and the handle takes the middle. Both are stated before the
+   860px block, which takes the whole line away with the rail it belongs to. */
+.side-grp{
+  display:flex; align-items:center; gap:8px;
+  font-family:var(--f-mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--ash-dim); padding:14px 12px 7px 18px;
+}
+.side-grp-t{flex:1; min-width:0; overflow:hidden}
+.side-pull{
+  flex:none; width:24px; height:24px; padding:0; display:grid; place-items:center;
+  background:transparent; border:1px solid transparent; border-radius:2px;
+  color:var(--ash-dim); cursor:pointer; transition:color .18s, border-color .18s, background .18s;
+}
+.side-pull svg{width:14px; height:14px; display:block; transition:transform .24s cubic-bezier(.2,.7,.2,1)}
+.side-pull:hover{color:var(--chalk); border-color:var(--line); background:var(--carbon-2)}
 @media (max-width:860px){
   .side{
     position:static; border-right:0; border-bottom:1px solid var(--line);
     flex-direction:row; align-items:center; min-height:0;
     gap:4px; overflow-x:auto; padding:10px var(--gut);
   }
+  /* the handle goes with it: a row across the top has no width to give back */
   .side-grp{display:none}
   .side-foot{margin-top:0; margin-left:auto; padding-top:0; border-top:0; flex:none}
 }
-.side-grp{
-  font-family:var(--f-mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
-  color:var(--ash-dim); padding:14px 18px 7px;
-}
+
 .side a{
   display:flex; align-items:center; gap:10px; padding:9px 18px; font-size:13.5px;
   color:var(--ash); text-decoration:none; border-left:2px solid transparent;
@@ -134,10 +157,29 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
 }
 .side a:hover{color:var(--chalk); background:color-mix(in srgb,var(--chalk) 4%, transparent)}
 .side a.on{color:var(--chalk); border-left-color:var(--red); background:color-mix(in srgb,var(--red) 10%, transparent)}
-.side a i{width:6px; height:6px; border-radius:1px; background:currentColor; opacity:.55; flex:none}
+/* Every entry carries its own mark, because pulled in the mark is all there is */
+.side a i{width:18px; height:18px; flex:none; display:block; opacity:.72}
+.side a i svg{width:18px; height:18px; display:block}
+.side a.on i, .side a:hover i{opacity:1}
+.side a span{min-width:0; overflow:hidden; text-overflow:ellipsis}
 @media (max-width:860px){
   .side a{border-left:0; border-bottom:2px solid transparent; padding:8px 12px; border-radius:2px}
   .side a.on{border-left:0; border-bottom-color:var(--red)}
+}
+
+/* ---------- the rail pulled in ----------
+   Only where there is a rail to pull. Below 860px it is already a row across
+   the top with no width to give back, so a state left over from a desktop
+   visit must not reach it and strip the names off it. */
+@media (min-width:861px){
+  body.rail-in .side-grp{padding-left:0; padding-right:0; justify-content:center}
+  body.rail-in .side-grp-t{display:none}
+  /* the chevron points the way the rail will go next */
+  body.rail-in .side-pull svg{transform:scaleX(-1)}
+  /* centred rather than padded, so the mark stays on the middle of the strip
+     whatever the mark's own size is */
+  body.rail-in .side a{padding-left:0; padding-right:0; gap:0; justify-content:center}
+  body.rail-in .side a span{display:none}
 }
 
 .view{padding:clamp(18px,2.6vw,28px) var(--gut) 64px; min-width:0}
@@ -158,14 +200,23 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
 /* ---------- match list ---------- */
 .mlist{display:flex; flex-direction:column}
 /* Date, home, score, away, result — five columns, so a scoreline sits under
-   the words that name it and each side can be read straight down. */
+   the words that name it and each side can be read straight down.
+
+   The five read as a mirror about the score: date and result are the same
+   track, home and away are the same track. That is what puts the scoreline on
+   the middle of the row rather than 143px right of it, which is where a fixed
+   92px result column left it — and with the fixture off centre, the void after
+   the date came out half as wide again as the one before the result. */
+.mlist-h,.mrow{
+  --m-cols:minmax(150px,1.1fr) minmax(140px,1.3fr) 96px minmax(140px,1.3fr) minmax(150px,1.1fr);
+}
 .mlist-h{
-  display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(140px,1.3fr) 96px minmax(140px,1.3fr) 92px;
+  display:grid; grid-template-columns:var(--m-cols);
   gap:14px; padding:0 4px 10px; border-bottom:1px solid var(--line);
   font-family:var(--f-mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--ash-dim);
 }
 .mrow{
-  display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(140px,1.3fr) 96px minmax(140px,1.3fr) 92px;
+  display:grid; grid-template-columns:var(--m-cols);
   gap:14px; align-items:center; padding:14px 4px; border-bottom:1px solid var(--line-soft);
   cursor:pointer; transition:background .18s; text-align:left; width:100%;
   background:transparent; border-left:0; border-right:0; border-top:0; color:inherit; font:inherit;

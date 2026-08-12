@@ -1368,6 +1368,52 @@
     return el('div', 'state', '<b>' + esc(title) + '</b><p>' + esc(body) + '</p>');
   }
   /* ---------------------------------------------------------
+     The rail's width
+
+     Pulled in, the rail is a strip of marks and the view gets the width back;
+     pulled out, it names its sections. Which of the two it is outlives the
+     page, so it is answered from storage before anything is drawn — restoring
+     it after DOMContentLoaded would paint the wide rail first and snap.
+     --------------------------------------------------------- */
+  var RAIL_KEY = 'hna.rail';
+  /* Under 861px the rail is a row across the top of the page with no width to
+     give back, so there is nothing to pull in and no name to move into a
+     tooltip. Same breakpoint as the stylesheet's. */
+  var railWide = window.matchMedia('(min-width:861px)');
+
+  function setRail(pulledIn) {
+    document.body.classList.toggle('rail-in', pulledIn);
+    var b = $('#railToggle');
+    if (b) {
+      b.setAttribute('aria-expanded', pulledIn ? 'false' : 'true');
+      b.title = pulledIn ? 'Widen the menu' : 'Narrow the menu';
+      b.setAttribute('aria-label', b.title);
+    }
+    /* Pulled in, an entry's name is only in its tooltip. Pulled out — or on a
+       phone, where it was never taken away — the name is right there, and a
+       tooltip repeating it is noise. */
+    var named = pulledIn && railWide.matches;
+    document.querySelectorAll('.side a > span').forEach(function (s) {
+      if (named) s.parentNode.title = s.textContent.trim();
+      else s.parentNode.removeAttribute('title');
+    });
+    try { localStorage.setItem(RAIL_KEY, pulledIn ? 'in' : 'out'); } catch (e) {}
+  }
+  function restoreRail() {
+    var saved = null;
+    try { saved = localStorage.getItem(RAIL_KEY); } catch (e) {}
+    setRail(saved === 'in');
+  }
+  /* crossing the breakpoint with the rail pulled in changes whether the names
+     are on screen, so the tooltips are worked out again */
+  railWide.addEventListener('change', function () {
+    setRail(document.body.classList.contains('rail-in'));
+  });
+  /* runs as the script does, not on DOMContentLoaded: the rail is already
+     parsed by here, and this lands before the first paint */
+  restoreRail();
+
+  /* ---------------------------------------------------------
      Wiring
      --------------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', function () {
@@ -1377,6 +1423,11 @@
       wrap.classList.toggle('open');
     });
     document.addEventListener('click', function () { wrap.classList.remove('open'); });
+
+    var pull = $('#railToggle');
+    if (pull) pull.addEventListener('click', function () {
+      setRail(!document.body.classList.contains('rail-in'));
+    });
 
     $('#signOut').addEventListener('click', function () {
       window.HNA.auth.signOut().then(function () { location.href = 'login.html'; });

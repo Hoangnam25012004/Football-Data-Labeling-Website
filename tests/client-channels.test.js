@@ -599,8 +599,25 @@ test('no monogram anywhere on the site — a club is its name', () => {
   ok(/crest_text/.test(SUPA),'the column is still written, so existing rows stay consistent');
 });
 
-test('the fixture on the Matches row is balanced either side of the score', () => {
+/* The five tracks read as a mirror about the score. A fixed 92px result column
+   against a 1.1fr date column was not one, and it put the scoreline 143px right
+   of the middle of the row: the void after the date came out half as wide again
+   as the void before the result, which is the lopsidedness you could see. */
+test('the Matches row is a mirror about the score, so the scoreline is centred', () => {
   const css=APPCSS.replace(/\s*\n\s*/g,'');
+  const cols=/--m-cols:([^;}]+)/.exec(css);
+  ok(cols,'the five tracks are named once, for the heading and the rows alike');
+  // minmax(a,b) has a comma in it, so the tracks are split on the top level only
+  const tracks=cols[1].trim().split(/\s+(?![^(]*\))/);
+  eq(tracks.length,5,'date, home, score, away, result');
+  eq(tracks[0],tracks[4],'date and result are the same track');
+  eq(tracks[1],tracks[3],'home and away are the same track');
+  ok(/^\d+px$/.test(tracks[2]),'and the score is a fixed width in the middle of them');
+  // both the heading and the rows have to read from it, or they drift apart
+  ok(/\.mlist-h,\.mrow\{--m-cols:/.test(css),'the heading and the row take the same tracks');
+  ok((css.match(/grid-template-columns:var\(--m-cols\)/g)||[]).length===2,
+     'and neither states its own');
+
   // left-aligning both put the home name a column's width from the score and
   // the away name hard against it — 253px of gap on one side, 30 on the other
   ok(/\.m-home\{[^}]*justify-content:flex-end/.test(css)&&/\.m-home\{[^}]*text-align:right/.test(css),
@@ -657,6 +674,62 @@ test('only the routed links are hijacked, so About navigates normally', () => {
   ok(/querySelectorAll\('\.side a\[data-view\]'\)[\s\S]{0,200}preventDefault/.test(APPJS),
      'the click handler is bound to [data-view] only');
   notOk(/querySelectorAll\('\.side a'\)/.test(APPJS),'and never to every link on the rail');
+});
+
+/* ---- the rail's width ---- */
+test('the rail pulls in to a strip of marks and back out again', () => {
+  const css=APPCSS.replace(/\s*\n\s*/g,'');
+  // one number drives the track, so the two states cannot disagree about it
+  const out=/body\.app\{--rail:(\d+)px\}/.exec(css), inn=/body\.app\.rail-in\{--rail:(\d+)px\}/.exec(css);
+  ok(out&&inn,'both widths are stated as --rail');
+  ok(+inn[1]<+out[1],'pulled in is the narrower of the two');
+  ok(/\.app-body\{[^}]*grid-template-columns:var\(--rail\)/.test(css),
+     'and the grid track is that number, not a second copy of it');
+  ok(/\.app-body\{[^}]*transition:grid-template-columns/.test(css),'the width slides rather than jumps');
+
+  // the handle
+  ok(/id="railToggle"/.test(APPHTML),'there is a handle on the rail');
+  ok(/aria-controls="side"/.test(APPHTML)&&/id="side"/.test(APPHTML),'it says what it opens');
+  ok(/setRail\(!document\.body\.classList\.contains\('rail-in'\)\)/.test(APPJS),'clicking it flips the state');
+  ok(/aria-expanded'?,\s*pulledIn \? 'false' : 'true'/.test(APPJS),'and the button says which way it is');
+
+  // pulled in, a name is only its mark — so every entry has to carry one
+  ['data-view="home"','data-view="channel"','data-view="data"','class="side-out"'].forEach(sel=>{
+    const a=new RegExp('<a[^>]*'+sel.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'[^>]*>([\\s\\S]*?)</a>').exec(APPHTML);
+    ok(a,sel+' is on the rail');
+    ok(a&&/<i>[\s\S]*<svg/.test(a[1]),sel+' carries a mark of its own');
+    ok(a&&/<span>[^<]+<\/span>/.test(a[1]),sel+' keeps its name in a span, so it can be taken away');
+  });
+  ok(/body\.rail-in \.side a span\{display:none\}/.test(css),'pulled in, the names go');
+  ok(/if \(named\) s\.parentNode\.title/.test(APPJS),'and the name moves into the tooltip');
+});
+
+test('the pulled-in rail is a desktop state only, and it outlives the page', () => {
+  const css=APPCSS.replace(/\s*\n\s*/g,'');
+  /* Under 861px the rail is already a row across the top with no width to give
+     back. A state left over from a desktop visit must not reach it and strip
+     the names off it, so every rail-in rule sits behind the same query. */
+  const wide=/@media \(min-width:861px\)\{[\s\S]*?\n\}/.exec(APPCSS);
+  ok(wide,'there is a min-width:861px block');
+  ok(wide&&/body\.rail-in \.side a span\{display:none\}/.test(wide[0]),'the names are taken away inside it');
+  ok(wide&&!/body\.rail-in \.side/.test(APPCSS.replace(wide[0],'')),
+     'and no rail-in rule for the rail is left outside it');
+  ok(/railWide *= *window\.matchMedia\('\(min-width:861px\)'\)/.test(APPJS),
+     'the script reads the same breakpoint, so the tooltips follow the names');
+  // the handle disappears with the rail it belongs to
+  ok(/@media \(max-width:860px\)\{[\s\S]*?\.side-grp\{display:none\}/.test(APPCSS),
+     'the MENU line, and the handle on it, are gone on a phone');
+  ok(APPCSS.indexOf('.side-grp{\n  display:flex')<APPCSS.indexOf('.side-grp{display:none}'),
+     'and stated before that, or display:flex would win it back');
+
+  ok(/localStorage\.setItem\(RAIL_KEY/.test(APPJS)&&/localStorage\.getItem\(RAIL_KEY/.test(APPJS),
+     'which way the rail is set outlives the page');
+  ok(/try \{ localStorage/.test(APPJS),'and storage being refused is not fatal');
+  /* restored as the script runs, not on DOMContentLoaded: waiting would paint
+     the wide rail first and snap it in */
+  const wiring=APPJS.indexOf("document.addEventListener('DOMContentLoaded'");
+  ok(APPJS.indexOf('\n  restoreRail();')<wiring&&APPJS.indexOf('\n  restoreRail();')>0,
+     'and restored before the wiring, so the page never paints the other one');
 });
 
 test('the foot is pinned to the bottom on the rail and folded away on a phone', () => {
