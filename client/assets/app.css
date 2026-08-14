@@ -57,14 +57,6 @@ body.app{display:flex; flex-direction:column; min-height:100vh}
   .app-top .brand-name{display:none}
 }
 
-/* Sits beside the channel name in the bar, because an open channel has to
-   say so where nobody can scroll past it. */
-.badge-public{
-  border:1px solid var(--amber); color:var(--amber); border-radius:2px;
-  padding:2px 7px; font-size:9px; letter-spacing:.14em; flex:none;
-  font-family:var(--f-mono); text-transform:uppercase; align-self:center;
-}
-.badge-public[hidden]{display:none}
 /* the public switch: the control IS the state, so it is read before the
    sentence underneath rather than after it */
 .pub-switch{display:flex; align-items:center; gap:13px; margin:0 0 14px}

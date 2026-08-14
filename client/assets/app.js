@@ -88,7 +88,6 @@
   function renderShell() {
     var ch = state.channel;
     $('#chanName').textContent = ch ? ch.name : (state.user ? 'No channel' : 'Not signed in');
-    $('#chanPublic').hidden = !(ch && ch.isPublic);
 
     var menu = $('#chanMenu');
     menu.innerHTML = '';
