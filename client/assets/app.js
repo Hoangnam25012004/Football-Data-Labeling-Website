@@ -353,9 +353,9 @@
   /* The same four category chips on both tables — the columns underneath them
      are the same four subjects either way. `base` is what a click lands on, so
      Team Data keeps its own route and a player keeps his. */
-  function catTabs(cat, base) {
+  function catTabs(cat, base, tabs) {
     var bar = el('div', 'dsubs');
-    TD_TABS.forEach(function (t) {
+    (tabs || TD_TABS).forEach(function (t) {
       var b = el('button', 'chip' + (t[0] === cat ? ' on' : ''), t[1]);
       b.type = 'button';
       b.addEventListener('click', function () { location.hash = (base || '#/data/team/') + t[0]; });
@@ -417,7 +417,12 @@
          both are pure functions of the report and neither writes to it.
          `mins` is null for a match nobody entered a line-up for. */
       mins: window.playedMinutes(rep.lineups || {}, rep.dur || {}, m.side, rep.rows),
-      cards: playerCards(rep.rows, m.side)
+      cards: playerCards(rep.rows, m.side),
+      /* Which squad entries name a players row, so the 14 of one window and the
+         9 of the next can be recognised as one man; and who kept goal, with what
+         went in past him while he was on the pitch. */
+      ids: window.squadIds(rep.lineups || {}, m.side),
+      gk: gkFigures(rep.rows, rep.lineups || {}, m.side)
     };
   }
   function aggregates() {
@@ -737,6 +742,34 @@
     return out;
   }
 
+  /* What a keeper's match came to, for each shirt that kept goal in it:
+     {conceded, clean, known}, all three summable so a campaign is the sum.
+
+     Conceded is what ended up in our net while HE was on the pitch — their
+     goals and our own goals alike, which is the reading teamGoals() takes for
+     a scoreline. Asking shared.js who was on at the moment of each goal is
+     what makes a keeper swapped at half-time, a keeper sent off, and a goal
+     tagged out of order all come out right without a case for any of them.
+
+     `known: 1` says the line-ups could answer at all; a match with none has no
+     keeper in it and no entry here, and the columns read "—" rather than 0. */
+  function gkFigures(rows, lineups, team) {
+    var keepers = window.gkShirts(lineups, team), out = {};
+    if (!keepers.size) return out;
+    keepers.forEach(function (no) { out[no] = { conceded: 0, clean: 0, known: 1 }; });
+    var opp = team === 'home' ? 'away' : 'home';
+    rows.forEach(function (r) {
+      var e = String(r.event == null ? '' : r.event).trim().toLowerCase();
+      var against = (r.team === opp && e === 'goal') ||
+                    (r.team === team && (e === 'own goal' || e === 'own-goal'));
+      if (!against) return;
+      var on = window.onPitchAt(lineups, team, +r.t || 0);
+      keepers.forEach(function (no) { if (on.has(no)) out[no].conceded++; });
+    });
+    keepers.forEach(function (no) { if (!out[no].conceded) out[no].clean = 1; });
+    return out;
+  }
+
   /* Add a run of stat objects up into one. Starts from shared.js's own zero
      row, so every percentage in PLAYER_CATS comes out as one ratio of the
      totals rather than as a mean of per-match ratios. totalOf() above does the
@@ -748,12 +781,44 @@
     return t;
   }
 
-  /* Every player of the club's own side, across every submitted match.
+  /* A name met alongside a players row anywhere in the campaign IS that row
+     everywhere: a squad entry carries the pid and the name on one line, so one
+     match picked from the team's list is enough to place the man in every other
+     match where somebody typed his name by hand.
 
-     Tallied under his NAME where the squad gives one, exactly as the Key
-     Players cards do it: a shirt number moves between windows, a name does
-     not. The rule is written out again rather than shared, because
-     playerTally() is where a test reads it from.
+     A name that has been seen against TWO pids is left alone. Quietly merging
+     two people is the worst kind of wrong there is here, because every figure
+     still adds up — it is simply somebody else's. */
+  function aliasMap(aggs) {
+    var seen = {};
+    aggs.forEach(function (a) {
+      Object.keys(a.ids || {}).forEach(function (no) {
+        var nm = (a.names[no] || '').toLowerCase(), pid = a.ids[no];
+        if (!nm || !pid) return;
+        (seen[nm] = seen[nm] || {})[pid] = 1;
+      });
+    });
+    var out = {};
+    Object.keys(seen).forEach(function (nm) {
+      var pids = Object.keys(seen[nm]);
+      if (pids.length === 1) out['n:' + nm] = 'p:' + pids[0];
+    });
+    return out;
+  }
+
+  /* Every player of the club's own side, across every submitted match — and a
+     player is a PERSON, not a shirt. A call-up renumbers a squad, so the same
+     man is 14 in one window and 9 in the next; nothing below shows a number for
+     him, because a number is a fact about a match rather than about him.
+
+     Three keys, best first:
+
+       p:<uuid>  the players row the squad entry was picked from. Survives a
+                 changed number and a changed spelling alike.
+       n:<name>  no players row, but a name — and no two players share one.
+       #<shirt>  a match with no squad list at all. Merged with nobody: a bare
+                 number is the one thing that cannot be trusted to mean the same
+                 man in the next match.
 
      Who counts as having appeared: everyone playedMinutes() found on the pitch
      — the starting XI, every later formation snapshot, everyone brought on —
@@ -765,27 +830,28 @@
      Nothing here writes to a stat object it did not make: `a.players` is the
      same object the Key Players cards read. */
   function playerIndex(aggs) {
-    var by = {}, order = [];
+    var alias = aliasMap(aggs), by = {}, order = [];
     aggs.forEach(function (a) {
       var seen = {};
       var add = function (raw) {
         var no = String(raw == null ? '' : raw).trim();
         if (!no || seen[no]) return;                  // one row per man per match
         seen[no] = 1;
-        var nm = a.names[no] || '';
-        var key = nm ? 'n:' + nm.toLowerCase() : '#' + no;
+        var nm = a.names[no] || '', pid = (a.ids || {})[no] || '';
+        var key = pid ? 'p:' + pid : (nm ? 'n:' + nm.toLowerCase() : '#' + no);
+        key = alias[key] || key;
         var p = by[key];
         if (!p) {
-          p = by[key] = { key: key, name: nm || playerLabel(a.names, no), no: no, matches: [] };
+          p = by[key] = { key: key, name: nm || playerLabel(a.names, no), matches: [] };
           order.push(p);
         }
-        p.no = no;                                    // the most recent shirt he wore
         if (nm) p.name = nm;
         p.matches.push({
           m: a.m, gf: a.gf, ga: a.ga,
           stat: a.players[no] || window.newStat(),
           mins: (a.mins && a.mins[no]) || null,
-          cards: (a.cards && a.cards[no]) || { y: 0, r: 0 }
+          cards: (a.cards && a.cards[no]) || { y: 0, r: 0 },
+          gk: (a.gk && a.gk[no]) || null
         });
       };
       Object.keys(a.mins || {}).forEach(add);
@@ -805,10 +871,19 @@
       p.cards = p.matches.reduce(function (c, r) {
         return { y: c.y + r.cards.y, r: c.r + r.cards.r };
       }, { y: 0, r: 0 });
+      /* A keeper keeps goal. One match in the GK square settles it for the
+         campaign: the position a man is picked in does not move about the way
+         his number does, and a board an analyst never tidied is not evidence
+         that he played somewhere else that week. */
+      p.gk = p.matches.some(function (r) { return r.gk; });
+      p.gkTotal = p.matches.reduce(function (g, r) {
+        return r.gk ? { conceded: g.conceded + r.gk.conceded, clean: g.clean + r.gk.clean,
+                        known: g.known + r.gk.known } : g;
+      }, { conceded: 0, clean: 0, known: 0 });
     });
 
     return order.sort(function (x, y) {
-      return y.min - x.min || y.apps - x.apps || (+x.no || 999) - (+y.no || 999);
+      return y.min - x.min || y.apps - x.apps || x.name.localeCompare(y.name);
     });
   }
 
@@ -827,9 +902,19 @@
   /* shared.js may not have loaded — sectionCols() takes the same precaution.
      A column set that is not there draws an empty table, not an exception. */
   function catCols(cat) {
+    if (cat === 'goalkeeping') return (typeof GK_COLS === 'undefined') ? [] : GK_COLS;
     var C = (typeof PLAYER_CATS === 'undefined') ? null : PLAYER_CATS;
     return (C && C[cat]) || [];
   }
+
+  /* A keeper reads the same four subjects as everyone else with one swapped:
+     his shots are a column of zeroes for ever, and what belongs in their place
+     is what happened at the other end. Derived from TD_TABS rather than written
+     out again, so the three he shares stay the three everybody else has. */
+  var GK_TABS = TD_TABS.map(function (t) {
+    return t[0] === 'shooting' ? ['goalkeeping', 'Goalkeeping'] : t;
+  });
+  var tabsFor = function (who) { return who.gk ? GK_TABS : TD_TABS; };
 
   /* A campaign total in the same three readings the Stats tab gives one match:
      "—" where no line-up ever named him, a leading "~" where any of the
@@ -865,23 +950,62 @@
     renderPlayerProfile(body, who, people, rest[2]);
   }
 
-  /* ---------- the list ---------- */
-  var PL_COLS = [
+  /* ---------- the list ----------
+     Two sets of columns, because two jobs. Goals and Key Passes say nothing
+     about a goalkeeper, and what does say something — what he kept out and what
+     went past him — says nothing about anybody else. */
+  var PL_OUT = [
     ['Apps',       function (p) { return p.apps; }],
     ['Minutes',    function (p) { return minsTotal(p); }],
     ['Goals',      function (p) { return p.total.goals; }],
     ['Assists',    function (p) { return p.total.assists; }],
     ['Key Passes', function (p) { return p.total.keyPasses; }]
   ];
+  var PL_GK = [
+    ['Apps',         function (p) { return p.apps; }],
+    ['Minutes',      function (p) { return minsTotal(p); }],
+    ['Saves',        function (p) { return p.total.saves; }],
+    ['Conceded',     function (p) { return gkCell(p, 'conceded'); }],
+    ['Save Rate',    function (p) { return gkCell(p, 'rate'); }],
+    ['Clean Sheets', function (p) { return gkCell(p, 'clean'); }]
+  ];
+  /* Nothing the line-ups could not answer is ever shown as 0: a keeper whose
+     matches carry no formation board has no goals-conceded record, and 0 would
+     claim he had a spotless one. */
+  function gkCell(p, which) {
+    var g = p.gkTotal;
+    if (!g.known) return '—';
+    if (which === 'conceded') return g.conceded;
+    if (which === 'clean') return g.clean;
+    return pct(p.total.saves, p.total.saves + g.conceded);
+  }
 
   function renderPlayerList(body, people) {
-    var head = '<th class="c-no">No</th><th class="c-pl">Player</th>' +
-      PL_COLS.map(function (c) { return '<th>' + esc(c[0]) + '</th>'; }).join('');
+    var out = people.filter(function (p) { return !p.gk; });
+    var keepers = people.filter(function (p) { return p.gk; });
+    if (out.length) body.appendChild(playerTable('Outfield players', out, PL_OUT));
+    /* A channel whose boards nobody has placed a keeper on gets no second
+       section: an empty table under a heading reads as data that is missing,
+       when the truth is that nothing was ever claimed. */
+    if (keepers.length) body.appendChild(playerTable('Goalkeepers', keepers, PL_GK));
+    body.appendChild(el('p', 'note',
+      'Everyone who took the pitch in a submitted match, most minutes first. A substitute who ' +
+      'was named but never came on is not an appearance and is not listed. Shirt numbers are ' +
+      'not shown: they belong to a match rather than to a player, and a squad is renumbered ' +
+      'between windows.'));
+  }
+
+  function playerTable(title, people, cols) {
+    var sec = el('div', 'pl-sec');
+    sec.appendChild(el('p', 'card-h', esc(title) +
+      '<span class="right">' + people.length + '</span>'));
+
+    var head = '<th class="c-pl">Player</th>' +
+      cols.map(function (c) { return '<th>' + esc(c[0]) + '</th>'; }).join('');
     var rows = people.map(function (p) {
       return '<tr data-who="' + esc(encodeURIComponent(p.key)) + '">' +
-        '<td class="c-no">' + esc(p.no) + '</td>' +
         '<td class="c-pl"><b>' + esc(p.name) + '</b></td>' +
-        PL_COLS.map(function (c) { return '<td>' + esc(String(c[1](p))) + '</td>'; }).join('') +
+        cols.map(function (c) { return '<td>' + esc(String(c[1](p))) + '</td>'; }).join('') +
         '</tr>';
     }).join('');
 
@@ -893,15 +1017,14 @@
       var tr = e.target.closest ? e.target.closest('tr[data-who]') : null;
       if (tr) location.hash = '#/data/player/' + tr.getAttribute('data-who');
     });
-    body.appendChild(wrap);
-    body.appendChild(el('p', 'note',
-      'Everyone who took the pitch in a submitted match, most minutes first. A substitute who ' +
-      'was named but never came on is not an appearance and is not listed.'));
+    sec.appendChild(wrap);
+    return sec;
   }
 
   /* ---------- one player ---------- */
   function renderPlayerProfile(body, who, people, wanted) {
-    var cat = TD_TABS.some(function (t) { return t[0] === wanted; }) ? wanted : 'shooting';
+    var tabs = tabsFor(who);
+    var cat = tabs.some(function (t) { return t[0] === wanted; }) ? wanted : tabs[0][0];
 
     var back = el('button', 'back', '&larr; All players');
     back.addEventListener('click', function () { location.hash = '#/data/player'; });
@@ -910,29 +1033,42 @@
     body.appendChild(playerHead(who, people, cat));
 
     var kpis = el('div', 'kpis six');
+    /* The first two tiles are the same job for anybody. The other four are the
+       job he actually did: a keeper's goals, assists and key passes are three
+       zeroes that will never be anything else, and the tile they make room for
+       is the one thing only he can answer for. */
     kpis.innerHTML =
       kpi('Appearances', who.apps, who.apps === 1 ? 'match played' : 'matches played') +
       kpi('Minutes', minsTotal(who), 'on the pitch') +
-      kpi('Goals', who.total.goals, 'in this channel') +
-      kpi('Assists', who.total.assists, 'in this channel') +
-      kpi('Key Passes', who.total.keyPasses, 'shots created') +
-      kpi('Cards', who.cards.y + 'Y · ' + who.cards.r + 'R', 'yellow and red');
+      (who.gk
+        ? kpi('Saves', who.total.saves, 'shots kept out') +
+          kpi('Conceded', gkCell(who, 'conceded'), 'while he was on') +
+          kpi('Save Rate', gkCell(who, 'rate'), 'of the shots on target he faced') +
+          kpi('Clean Sheets', gkCell(who, 'clean'), 'matches without conceding')
+        : kpi('Goals', who.total.goals, 'in this channel') +
+          kpi('Assists', who.total.assists, 'in this channel') +
+          kpi('Key Passes', who.total.keyPasses, 'shots created') +
+          kpi('Cards', who.cards.y + 'Y · ' + who.cards.r + 'R', 'yellow and red'));
     body.appendChild(kpis);
 
-    body.appendChild(catTabs(cat, '#/data/player/' + encodeURIComponent(who.key) + '/'));
+    body.appendChild(catTabs(cat, '#/data/player/' + encodeURIComponent(who.key) + '/', tabs));
     body.appendChild(playerMatchTable(who, cat));
   }
 
-  /* Name, shirt, and the way to another player without going back for him.
+  /* Name, role, and the way to another player without going back for him.
      The dropdown is the channel Settings menu's, down to taking its document
      listener off with it: this view is redrawn on every category click, and a
      listener left behind would keep a detached node alive for the life of the
      page. */
   function playerHead(who, people, cat) {
     var card = el('div', 'card pl-head');
+    /* No shirt number anywhere on this card. He wore whichever one the squad
+       was numbered with that week, and a single one printed beside his name
+       reads as a property of the man. The role is not like that — a keeper
+       keeps goal — so that is what is worth a badge. */
     var id = el('div', 'pl-id',
-      '<span class="pl-shirt">' + esc(who.no) + '</span>' +
-      '<span class="pl-nm">' + esc(who.name) + '</span>');
+      '<span class="pl-nm">' + esc(who.name) + '</span>' +
+      (who.gk ? '<span class="pl-role">GK</span>' : ''));
 
     var wrap = el('span', 'menu-wrap');
     var btn = el('button', 'btn btn-ghost menu-btn',
@@ -945,13 +1081,17 @@
     menu.setAttribute('role', 'menu');
     people.forEach(function (p) {
       var o = el('button', 'menu-opt' + (p.key === who.key ? ' on' : ''),
-        esc(p.name) + '<em>' + esc(p.no) + ' · ' + p.apps + (p.apps === 1 ? ' match' : ' matches') +
+        esc(p.name) + (p.gk ? ' <span class="pl-role sm">GK</span>' : '') +
+        '<em>' + p.apps + (p.apps === 1 ? ' match' : ' matches') +
         ' · ' + esc(minsTotal(p)) + '</em>');
       o.type = 'button';
-      /* the category he was being read in is kept — comparing two players on
-         Defensive should not drop back to Shooting halfway */
+      /* The category he was being read in is kept — comparing two players on
+         Defensive should not drop back to Shooting halfway. Crossing between a
+         keeper and an outfielder is the one case it cannot be: their first tab
+         is a different tab, so that lands on his own, whichever it is. */
       o.addEventListener('click', function () {
-        location.hash = '#/data/player/' + encodeURIComponent(p.key) + '/' + cat;
+        var keep = tabsFor(p).some(function (t) { return t[0] === cat; }) ? cat : tabsFor(p)[0][0];
+        location.hash = '#/data/player/' + encodeURIComponent(p.key) + '/' + keep;
       });
       menu.appendChild(o);
     });
@@ -978,7 +1118,10 @@
       esc(who.apps + (who.apps === 1 ? ' appearance' : ' appearances')) + ' · ' +
       esc(minsTotal(who)) + ' · ' +
       esc(window.HNA.shortDate(first.m.date)) +
-      (last !== first ? ' → ' + esc(window.HNA.shortDate(last.m.date)) : '')));
+      (last !== first ? ' → ' + esc(window.HNA.shortDate(last.m.date)) : '') +
+      /* a keeper's four tiles are all about the goal, so his booking record has
+         nowhere else to go — and a card record is not something to drop */
+      (who.gk ? ' · ' + who.cards.y + 'Y · ' + who.cards.r + 'R' : '')));
     return card;
   }
 
@@ -987,6 +1130,13 @@
      Possession — a team measure — given over to Minutes Played. */
   function playerMatchTable(who, cat) {
     var cols = catCols(cat);
+    /* The goalkeeping columns take a second argument — what went in past him
+       that match, which his own stat row cannot carry. Everything else takes
+       the stat row alone, exactly as the Stats tab feeds it. */
+    var gkView = cat === 'goalkeeping';
+    var NOGK = { conceded: 0, clean: 0, known: 0 };
+    var cell = function (c, s, g) { return c[1](s, gkView ? (g || NOGK) : undefined); };
+
     var head = '<th class="c-date">Date</th><th class="c-opp">vs</th>' +
       '<th class="c-res">Result</th><th class="c-sc">Score</th><th>Minutes Played</th>' +
       cols.map(function (c) { return '<th>' + esc(c[0]) + '</th>'; }).join('');
@@ -1000,7 +1150,7 @@
         '<td class="c-res">' + (m.result ? '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' : '—') + '</td>' +
         '<td class="c-sc">' + num(r.gf) + ' : ' + num(r.ga) + '</td>' +
         minsOne(r.mins) +
-        cols.map(function (c) { return '<td>' + esc(String(c[1](r.stat))) + '</td>'; }).join('') +
+        cols.map(function (c) { return '<td>' + esc(String(cell(c, r.stat, r.gk))) + '</td>'; }).join('') +
         '</tr>';
     }).join('');
 
@@ -1011,7 +1161,7 @@
         (who.apps === 1 ? ' match' : ' matches') + '</b></span></td>' +
       '<td class="c-res"></td><td class="c-sc"></td>' +
       '<td>' + esc(minsTotal(who)) + '</td>' +
-      cols.map(function (c) { return '<td>' + esc(String(c[1](who.total))) + '</td>'; }).join('') +
+      cols.map(function (c) { return '<td>' + esc(String(cell(c, who.total, who.gkTotal))) + '</td>'; }).join('') +
       '</tr>';
 
     var wrap = el('div', 'stbl-wrap');
@@ -1113,7 +1263,7 @@
      sake of a table it does not draw. Same URL as the line below, so whichever
      view is opened first is the one that pays for it. */
   function loadShared() {
-    return loadOnce(taggerRoot() + 'shared.js?v=20');
+    return loadOnce(taggerRoot() + 'shared.js?v=21');
   }
 
   /* Pulled in the first time someone opens a match's stats, not on every page

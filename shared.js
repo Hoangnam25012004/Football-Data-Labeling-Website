@@ -294,6 +294,25 @@ const PLAYER_CATS={
     ['Fouls',s=>s.fouls],['Fouls Won',s=>s.foulsWon],['Offsides',s=>s.offsides],['Saves',s=>s.saves]]
 };
 
+/* ---- and the goalkeeper's own, which the four above cannot hold ----
+   Two arguments, not one. Everything past Saves needs the match around him: newStat()
+   counts what a player DID, and a goal conceded is something that happened to the team
+   behind him. `g` is {conceded, clean, known} — every field of it adds up, so a whole
+   campaign is these same functions run on the summed pair, and Save Rate comes out as
+   one ratio of the totals rather than a mean of per-match ratios.
+
+   `known` counts the matches whose line-ups could answer the question at all. 0 means
+   nothing can be said, and "—" is what says so — never 0, which would claim a clean
+   sheet nobody recorded. */
+const GK_COLS=[
+  ['Saves',          (s,g)=>s.saves],
+  ['Conceded',       (s,g)=>g.known?g.conceded:'—'],
+  ['On Target Faced',(s,g)=>g.known?s.saves+g.conceded:'—'],
+  ['Save Rate',      (s,g)=>g.known?pct(s.saves,s.saves+g.conceded):'—'],
+  ['Clean Sheets',   (s,g)=>g.known?g.clean:'—'],
+  ['Goal Kicks',     (s,g)=>s.goalKicks]
+];
+
 /* ---- shots + body part (Event List) ----
    Every shot attempt is one of these events. The body part it was taken with is a
    separate event tagged in the SAME chain entry ("2 free-kick shot-on-target left-foot"),
@@ -422,6 +441,31 @@ function squadNames(lineups,team){
     if(k&&p&&p.name)m[k]=String(p.name).trim();});
   return m;
 }
+/* shirt number -> the players row this squad entry was picked from, where there is one.
+   The twin of squadNames(): the same roster, its other column. It is what says that the
+   14 of one window and the 9 of the next are the same man — a call-up renumbers a squad,
+   and a shirt number is a fact about a match rather than about a person. A squad typed
+   in by hand instead of picked from the team's list carries no pid and answers nothing,
+   which is why nothing may depend on this alone. */
+function squadIds(lineups,team){
+  const m={}, lu=(lineups&&lineups[team])||null; if(!lu)return m;
+  (lu.roster||[]).forEach(p=>{const k=String(p&&p.no==null?'':p.no).trim();
+    if(k&&p&&p.pid)m[k]=String(p.pid);});
+  return m;
+}
+/* Which shirt numbers kept goal, for one side of one match: the GK square of the
+   formation board, read off the starting XI and off every later snapshot, so a keeper
+   who came on from the bench counts as well. FORMATION_GRID holds exactly one such
+   square and every dot's `pos` is written from it (zoneAt), so this is where the analyst
+   PUT somebody — not a guess about who stood deepest. */
+function gkShirts(lineups,team){
+  const out=new Set(), lu=(lineups&&lineups[team])||null; if(!lu)return out;
+  const take=xi=>(xi||[]).forEach(p=>{if(p&&p.pos==='GK'){
+    const k=String(p.no==null?'':p.no).trim(); if(k)out.add(k);}});
+  take(lu.xi);
+  ((lineups&&lineups.history)||[]).filter(h=>h&&h.team===team).forEach(h=>take(h.xi));
+  return out;
+}
 // label for a shirt number: the registered name, else the old "Player 7" placeholder
 const playerLabel=(names,no)=>{const k=String(no==null?'':no).trim();
   if(!k)return '';
@@ -523,6 +567,21 @@ function playedMinutes(lineups,dur,team,rows){
     out[no]={sec,h1,h2,exact,sentOff:iv[no].some(s=>s.red),
       min:sec>0?Math.max(1,Math.round(sec/60)):(played?1:0)};
   });
+  return out;
+}
+
+/* Who was on the pitch for `team` at video-second t. lineups.history is a list of whole
+   SNAPSHOTS rather than of changes, so the answer is the last one taken before that
+   moment — the reading effectiveLU() takes in the tagging app and playedMinutes() takes
+   above. It is what turns "a goal went in" into "a goal went in past THIS keeper", and
+   it needs no special case for a substitution, a sending-off or a swap tagged out of
+   order: whatever produced the snapshot, the snapshot is the answer. */
+function onPitchAt(lineups,team,t){
+  const out=new Set(), lu=(lineups&&lineups[team])||null; if(!lu)return out;
+  const hist=((lineups&&lineups.history)||[]).filter(h=>h&&h.team===team&&h.xi&&(+h.t||0)<=t)
+    .slice().sort((a,b)=>(+a.t||0)-(+b.t||0));
+  const xi=hist.length?hist[hist.length-1].xi:(lu.xi||[]);
+  (xi||[]).forEach(p=>{const k=String(p&&p.no==null?'':p.no).trim(); if(k)out.add(k);});
   return out;
 }
 

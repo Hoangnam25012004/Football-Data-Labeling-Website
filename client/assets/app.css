@@ -471,17 +471,13 @@ table.stbl thead .c-sc{
 }
 table.stbl tbody tr:last-child td{border-bottom:0}
 
-/* Player Data's list freezes the same way, on its own two columns: the shirt
-   and the name are what tells you whose row you are reading once the stats
-   have scrolled the rest of it out of sight. */
-table.stbl .c-no{
-  position:sticky; left:0; z-index:2; text-align:right; width:58px; min-width:58px;
-  font-family:var(--f-mono); font-size:11px; color:var(--ash-dim);
-}
-table.stbl .c-pl{position:sticky; left:58px; z-index:2; text-align:left; min-width:168px}
-table.stbl thead .c-no, table.stbl thead .c-pl{z-index:4}
-table.stbl tbody .c-no, table.stbl tbody .c-pl{background:var(--carbon-2)}
-table.stbl tbody tr:hover .c-no, table.stbl tbody tr:hover .c-pl{background:#1A1516}
+/* Player Data's list freezes the same way, on the one column that says whose
+   row you are reading — his name. There is no shirt column beside it: a number
+   belongs to a match, not to a man, and a squad is renumbered between windows. */
+table.stbl .c-pl{position:sticky; left:0; z-index:2; text-align:left; min-width:184px}
+table.stbl thead .c-pl{z-index:4}
+table.stbl tbody .c-pl{background:var(--carbon-2)}
+table.stbl tbody tr:hover .c-pl{background:#1A1516}
 table.stbl .c-pl::after{content:""; position:absolute; top:0; right:0; bottom:0; width:1px; background:var(--line)}
 table.stbl .c-pl b{font-weight:600; color:var(--chalk)}
 table.stbl tbody tr[data-who]{cursor:pointer}
@@ -502,19 +498,25 @@ table.stbl tfoot .c-opp{position:sticky; left:104px; z-index:2; text-align:left;
    shirt and name alike */
 @media (max-width:720px){
   table.stbl .c-date, table.stbl .c-opp{position:static}
-  table.stbl .c-no, table.stbl .c-pl{position:static}
+  table.stbl .c-pl{position:static}
   table.stbl tfoot .c-date, table.stbl tfoot .c-opp{position:static}
   table.stbl .c-opp::after, table.stbl .c-pl::after{display:none}
 }
 
+/* the two halves of the list, each under its own heading */
+.pl-sec{margin-bottom:20px}
+.pl-sec .card-h{margin-bottom:9px}
+
 /* ---------- one player ---------- */
 .pl-head{margin-bottom:14px}
 .pl-id{display:flex; align-items:center; gap:13px; flex-wrap:wrap}
-.pl-shirt{
-  width:38px; height:38px; flex:none; border-radius:50%; background:var(--red); color:#fff;
-  display:flex; align-items:center; justify-content:center;
-  font-family:var(--f-display); font-stretch:87.5%; font-weight:700; font-size:15px;
+/* the one thing about a player that does not change from week to week — his
+   number does, which is why there is no badge carrying one */
+.pl-role{
+  flex:none; font-family:var(--f-mono); font-size:9.5px; letter-spacing:.14em;
+  color:var(--amber); border:1px solid var(--amber); border-radius:2px; padding:2px 6px;
 }
+.pl-role.sm{font-size:8.5px; padding:1px 4px; letter-spacing:.1em; margin-left:6px}
 .pl-nm{
   font-family:var(--f-display); font-stretch:87.5%; font-weight:700; font-size:23px;
   color:var(--chalk); letter-spacing:-.01em; min-width:0;
