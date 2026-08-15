@@ -79,12 +79,19 @@ test('a red card for a bench player leaves the pitch untouched', ()=>{
   eq(xiOf(a,3700).length,11);
 });
 
-test('a red card with no starting XI records the event and leaves the formation alone', ()=>{
+/* Was: "a red card with no starting XI records the event and leaves the formation alone".
+   The shirt-number gate reversed that rule (docs/entry-number-gate-design.md §5.1): a side
+   whose line-up was never submitted is not tagged at all, because there is nothing to
+   check the number against and no board to draw. */
+test('a red card with no line-up submitted is refused — nothing recorded', ()=>{
   const a=app(null,3600);
   a.state.lineups.home.xi=[];
   card(a,'13rc');
-  eq(a.state.rows.length,1);
+  eq(a.state.rows.length,0,'the event is not recorded either');
   eq(a.state.lineups.history.length,0);
+  eq(a.log.alerts.length,1,'the tagger is told, once');
+  ok(/no line-up in the tagging tab yet/.test(a.log.alerts[0]),a.log.alerts[0]);
+  ok(/⇪ Submit home/.test(a.log.alerts[0]),'and which button to press');
 });
 
 test('the same player red-carded twice never creates a second snapshot', ()=>{

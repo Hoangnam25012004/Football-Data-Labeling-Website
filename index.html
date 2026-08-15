@@ -1189,6 +1189,19 @@ function renderFormationMain(){
     if(el)el.innerHTML='<span class="fm-sub-empty">No match open — use ☁ Cloud to create or join one, and the line-ups will appear here.</span>';
     return;
   }
+  /* A side whose line-up was never submitted gets NO board — not an empty pitch, which
+     reads as "this team has nobody on it" and looks the same as a formation that failed
+     to load. Returning here means no dots and no attacking-direction label are drawn,
+     exactly the way the no-match branch above already behaves. The entry box refuses this
+     side for as long as this is on screen (see checkEntryNumbers), so the two always say
+     the same thing. MAX_SAFE_INTEGER is the same "latest period" stand-in used below. */
+  if(!squadAt(state.team,Number.MAX_SAFE_INTEGER).on.length){
+    const none=$('fmSubs');
+    if(none)none.innerHTML='<span class="fm-sub-empty">'+escHtml(sideName(state.team))
+      +' has no line-up yet — open Player lists and press ⇪ Submit '+state.team+'.'
+      +' Tagging is closed for this side until then.</span>';
+    return;
+  }
   const flip=+($('halfSel')&&$('halfSel').value||1)===2;   // teams swap ends at half-time
   // only the SELECTED team's formation is shown (Home / Away segment above the entry box),
   // as effective at the current video time (substitution snapshots switch it live)
@@ -2259,6 +2272,32 @@ function submitEntry(){
   if(strandedFail){
     alert('#'+strandedFail.name+' with no receiver has to be the last event in the entry'
       +' — it takes the extra dot where the ball ended up.');return}
+  // Rows this entry replaces, captured BEFORE they are dropped/overwritten: a substitution
+  // or a red card among them owns a formation snapshot that has to be rolled back, or a
+  // re-tag would stack a second snapshot on top of the wrong one it was meant to fix.
+  // Read here, ahead of the shirt-number gate, because the gate has to judge this entry
+  // against the board WITHOUT its own footprint — see gateHistory().
+  const replaced=state.editingGroup
+      ? state.rows.filter(r=>r.grp===state.editingGroup)
+      : (state.editingId?state.rows.filter(r=>r.id===state.editingId):[]);
+  const replacedSubs=replaced.filter(r=>r.event==='substitution')
+    .map(r=>({event:r.event,team:r.team,t:r.t,playerFrom:r.playerFrom,playerTo:r.playerTo}));
+  const replacedReds=replaced.filter(r=>r.event==='red card')
+    .map(r=>({event:r.event,team:r.team,t:r.t,playerFrom:r.playerFrom}));
+  /* ===== the shirt number has to be one this side HAS, at this moment =====
+     Ordered with the other structural checks and AHEAD of the dot count, for the reason
+     the comment above already gives: the structural reason must win over "Check the
+     dots". Telling a tagger to place a dot for a player who is not on the pitch sends
+     them the wrong way, and they would only meet the real message on the second Enter.
+     Nothing below this line has run: no row is written, no snapshot is touched, the goal
+     mouth does not open, and planSubGroup is not consulted. The entry text and the dots
+     are left exactly as they were, which is what makes the fix a retype and not a redo. */
+  const bad=checkEntryNumbers(state.team,evs,dots,gateHistory(replacedSubs,replacedReds));
+  if(bad){
+    alert(numberGateMessage(state.team,bad));
+    selectEntryNumber(bad.idx);
+    return;
+  }
   // only substitutions are dot-free; every other event (cards included) is placed on the
   // pitch — a card's dot marks where the card was shown / the foul that earned it happened
   if(allSubs){
@@ -2291,16 +2330,6 @@ function submitEntry(){
   // 1s2s3), or re-editing an existing chain — deletes the old row(s) and creates the new
   // batch fresh (a chain can't map onto one row / keep a single id).
   const editInPlace=state.editingId&&evs.length===1;
-  // Rows this entry replaces, captured BEFORE they are dropped/overwritten: a substitution
-  // or a red card among them owns a formation snapshot that has to be rolled back, or a
-  // re-tag would stack a second snapshot on top of the wrong one it was meant to fix.
-  const replaced=state.editingGroup
-      ? state.rows.filter(r=>r.grp===state.editingGroup)
-      : (state.editingId?state.rows.filter(r=>r.id===state.editingId):[]);
-  const replacedSubs=replaced.filter(r=>r.event==='substitution')
-    .map(r=>({event:r.event,team:r.team,t:r.t,playerFrom:r.playerFrom,playerTo:r.playerTo}));
-  const replacedReds=replaced.filter(r=>r.event==='red card')
-    .map(r=>({event:r.event,team:r.team,t:r.t,playerFrom:r.playerFrom}));
   // Substitutions rewrite the formation, so the WHOLE entry is vetted before a single row
   // is written: one impossible pair aborts the entry instead of quietly landing a snapshot
   // that ignores it, and a pair typed back-to-front is corrected here — in the event row
@@ -2405,6 +2434,144 @@ function effectiveLU(team,t,hist0){
   const last=hist[hist.length-1];
   return last?{xi:last.xi,subs:last.subs,dir:lu.dir,roster:lu.roster}
              :{xi:lu.xi,subs:lu.subs,dir:lu.dir,roster:lu.roster};
+}
+/* ===== SHIRT-NUMBER GATE =====
+   A tagged number has to be a number the side actually has on the board at that moment.
+   The board is not one list: it starts as the XI and bench that Submit home / Submit away
+   published, and every substitution and every red card appends a snapshot to
+   lineups.history — so who is available is a step function of match time. effectiveLU()
+   above already reads that step function (the pitch panel draws from it), and this gate
+   owns no state of its own: it asks the same question the panel asks.
+
+   ONE side is ever consulted — the side being tagged. A number the opponent happens to
+   have is not a special case: it is simply a number this side does not have, and it is
+   refused in exactly those words. Nothing here may read the other team's board. */
+
+/* The three events a number may carry while standing OFF the pitch. A substitution names
+   one player coming off and one coming on by definition; a card can be shown to somebody
+   on the bench. Everything else is a touch of the ball, and a touch needs a body on the
+   grass. All three still have to be numbers the side HAS — that check has no exceptions. */
+const OFF_PITCH_OK=new Set(['substitution','yellow card','red card']);
+
+const sideName=t=>t==='home'?($('homeName').value||'Home'):($('awayName').value||'Away');
+
+// what one side has at time t: on the pitch, on the bench, and the two together
+function squadAt(team,t,hist0){
+  const eff=effectiveLU(team,t,hist0);
+  const norm=v=>String(v==null?'':v).trim();
+  const on=(eff.xi||[]).map(x=>norm(x&&x.no)).filter(Boolean);
+  const bench=(eff.subs||[]).map(norm).filter(Boolean);
+  return {on,bench,all:on.concat(bench.filter(n=>!on.includes(n)))};
+}
+/* Touch k of an entry is dot k — parseChain numbers them in the order the numbers were
+   typed, and submitEntry stores each row against its own dot's time. So each number is
+   judged at ITS OWN moment. The anchor is the fallback: this gate runs BEFORE the dot
+   count is vetted, on purpose, so an entry can legitimately reach it a dot short. */
+const entryAnchor=dots=>dots.length?Math.min(...dots.map(d=>d.t))
+                                   :(video.src?video.currentTime:0);
+/* The board an entry is judged against is the board WITHOUT its own footprint. A row
+   being re-edited has already put a snapshot into lineups.history — a substitution left
+   its outgoing player on the bench, a red card took the carded player off the board
+   entirely — and judging "13qq" against a history that still holds its own sending-off
+   would refuse the very row being fixed.
+   Both helpers return a FILTERED VIEW of the same array, so the snapshots kept by both
+   are the ones neither of them rolled back. null = "use the live history" (the common
+   case: a fresh entry, nothing being replaced). */
+function gateHistory(subRows,redRows){
+  if(!(subRows||[]).length&&!(redRows||[]).length)return null;
+  const keepS=subSideEffects(subRows).hist, keepR=redSideEffects(redRows).hist;
+  return keepS.filter(h=>keepR.includes(h));
+}
+/* -> null when every number in the entry is one this side has, at the moment it is
+   claimed to have happened; else the FIRST offender in typing order, with everything the
+   message needs. Reads only — nothing here writes, saves or syncs. */
+function checkEntryNumbers(team,evs,dots,hist0){
+  const anchor=entryAnchor(dots);
+  /* No match open: ⇪ Submit does not exist yet (Player lists disables it and refuses to
+     write a draft without a matchId), so demanding one would lock the app with no way
+     out. Nothing is synced anywhere without a match either. The gate stays out. */
+  if(!state.teamIds.matchId)return null;
+  /* A match IS open and this side has no board: its line-up was never submitted. Nothing
+     is tagged for this side until it is — the alternative is a whole half of events
+     attributed to shirt numbers nobody has vouched for, tagged in the belief that the
+     app was checking them. renderFormationMain() says the same thing on the panel. */
+  const seed=squadAt(team,anchor,hist0);
+  if(!seed.on.length)return {kind:'no-lineup',no:null,idx:null,t:anchor,sq:seed};
+
+  // every number this entry names, once per position it was typed at, in typing order
+  const spots=[];
+  evs.forEach(e=>{
+    if(e.from)spots.push({no:String(e.from).trim(),idx:e.fromIdx,ev:e.name});
+    if(e.to)  spots.push({no:String(e.to).trim(),  idx:e.toIdx,  ev:e.name});
+  });
+  const seen=new Set();
+  for(let i=0;i<spots.length;i++){
+    const s=spots[i];
+    // a '*' group repeats the same player on the same touch ("1xx*aa") — judge it once
+    const k=s.no+'@'+s.idx; if(seen.has(k))continue; seen.add(k);
+    const t=(s.idx!=null&&dots[s.idx]&&dots[s.idx].t!=null)?dots[s.idx].t:anchor;
+    const sq=squadAt(team,t,hist0);
+    if(!sq.all.includes(s.no)){
+      /* The side does not have this number. A sending-off is asked about FIRST, because
+         it is the one way a number leaves the board altogether: applyRedCard drops the
+         man from the XI and deliberately does NOT put him on the bench, so by the time
+         we get here he looks exactly like a number that never existed. He is not, and
+         "was sent off at 67:40" is a far better answer than "is not in the formation".
+         Cards are refused here too — a man already sent off cannot collect another. */
+      const red=(hist0||state.lineups.history||[])
+        .filter(h=>h.team===team&&h.off!=null&&numEq(h.off,s.no)&&h.t<=t)
+        .sort((a,b)=>a.t-b.t).pop();
+      if(red)return {no:s.no,kind:'sent-off',redT:red.t,t,sq,idx:s.idx,ev:s.ev};
+      return {no:s.no,kind:'unknown',redT:null,t,sq,idx:s.idx,ev:s.ev};
+    }
+    // it has the number, but not on the grass, and this event needs a body there
+    if(!sq.on.includes(s.no)&&!OFF_PITCH_OK.has(s.ev))
+      return {no:s.no,kind:'bench',redT:null,t,sq,idx:s.idx,ev:s.ev};
+  }
+  return null;
+}
+/* Everything needed to fix the entry without looking anywhere else: what is wrong, and
+   what the board actually holds at that moment. `team` is the side being tagged, and it
+   is the ONLY side this function reads. */
+function numberGateMessage(team,b){
+  const at=fmt(matchTime(b.t));
+  /* Nothing was submitted for this side: there is no board to print, so this message says
+     what to do instead of what is wrong. The button is named exactly as Player lists
+     labels it, because that is the next thing the tagger has to find. */
+  if(b.kind==='no-lineup')
+    return sideName(team)+' has no line-up in the tagging tab yet, so nothing can be'
+      +' tagged for this side.\n\nOpen Player lists, pick the starting XI and the'
+      +' substitutes, then press ⇪ Submit '+team+'.\n\nNothing was recorded.';
+  let head;
+  if(b.kind==='unknown')
+    head='No.'+b.no+' is not in '+sideName(team)+'’s formation.';
+  else if(b.kind==='sent-off')
+    head='No.'+b.no+' was sent off at '+fmt(matchTime(b.redT))
+        +' and is not on the pitch at '+at+'.';
+  else
+    head='No.'+b.no+' is on the bench at '+at+', not on the pitch. If they came on, tag'
+        +' the substitution first (e.g. 7sub'+b.no+'), then tag this event.';
+  return head
+    +'\n\nOn the pitch at '+at+':   '+b.sq.on.join('  ')
+    +(b.sq.bench.length?'\nOn the bench:   '+b.sq.bench.join('  '):'')
+    +'\n\nNothing was recorded — correct the number in the entry box.';
+}
+/* Put the caret on the offending number so the fix is a retype, not a hunt. Touch index k
+   is the k-th run of digits in the entry — parseChain counts them in exactly that order —
+   and the box holds the raw text, which may carry leading blanks the parser trimmed away,
+   hence `pad`. Guarded by document.hasFocus() for the same reason the focus() at the end
+   of submitEntry is: when the entry was typed from the popped-out video window, focusing
+   the main input would yank focus out of the window the tagger is watching. */
+function selectEntryNumber(idx){
+  if(!document.hasFocus())return;
+  const PI=$('playerInput');
+  PI.focus();
+  if(idx==null)return;
+  const v=PI.value, trimmed=v.trim(), pad=v.indexOf(trimmed), re=/\d+/g;
+  let m,k=0;
+  while((m=re.exec(trimmed))!==null){
+    if(k++===idx){try{PI.setSelectionRange(pad+m.index,pad+m.index+m[0].length);}catch(e){}return;}
+  }
 }
 /* Vet a whole entry's substitution pairs against the XI in effect at t0 BEFORE anything
    is written. Every pair has to take one player OFF the pitch and bring one ON:

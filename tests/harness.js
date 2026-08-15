@@ -73,13 +73,16 @@ function grabConst(name,src,what){
 const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
   'TRANSFER_EVENTS','TRAILING_EXTRA_DOT','NEEDS_RECEIVER','newId','SHOT_EVENTS','evtClass',
   'GOAL_SPOT_EVENTS','GOAL_VIEW','goalCapture',
+  'OFF_PITCH_OK','sideName','entryAnchor',
   'scrollToRow','editPrevTeam'];
 const FUNCS=['fmt','parseTime','eventHalf','matchTime','zoneAt','eventForKey',
   'macroForKey','expandKey','expandMacros','parseChain','goalToPct','goalFromPct','goalBallSVG',
   'openGoalCapture','closeGoalCapture',
   'effectiveLU','planSubGroup','swapInSnapshot','applySubGroup','subSideEffects',
   'removeSubSideEffects','shiftSubRowsWithPeriod','applyRedCard','redSideEffects',
-  'removeRedSideEffects','submitEntry','chainHTML','deleteRows','startEdit','startEditGroup'];
+  'removeRedSideEffects','submitEntry','chainHTML','deleteRows','startEdit','startEditGroup',
+  // the shirt-number gate: entries are refused before anything is written
+  'squadAt','gateHistory','checkEntryNumbers','numberGateMessage','selectEntryNumber'];
 
 /* ---- a fresh sandbox per test, so no scenario can leak into the next ---- */
 function makeApp(opts){

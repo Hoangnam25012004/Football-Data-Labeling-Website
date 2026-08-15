@@ -342,13 +342,18 @@ test('the away side keeps its own formation history', ()=>{
   ok(onPitch(a,3500,'19')&&!onPitch(a,3500,'14'));
 });
 
-test('subs are still tagged when no starting XI has been entered', ()=>{
+/* Was: "subs are still tagged when no starting XI has been entered". The shirt-number gate
+   reversed that rule (docs/entry-number-gate-design.md §5.1): a side whose line-up was
+   never submitted is not tagged at all — an entry it cannot check is an entry it refuses. */
+test('subs are refused when no line-up has been submitted', ()=>{
   const a=app(null,3000);
   a.state.lineups.home.xi=[];
   submit(a,'7sub3');
-  eq(a.state.rows.length,1,'the event is recorded');
-  eq(a.state.lineups.history.length,0,'but there is no formation to change');
-  eq(a.log.alerts.length,0,'and the tagger is not blocked');
+  eq(a.state.rows.length,0,'nothing is recorded');
+  eq(a.state.lineups.history.length,0,'and no formation period');
+  notOk(a.state.lineups.home.subHistory&&a.state.lineups.home.subHistory.length,'no minutes either');
+  eq(a.log.alerts.length,1,'the tagger is told, once');
+  ok(/⇪ Submit home/.test(a.log.alerts[0]),a.log.alerts[0]);
 });
 
 test('shirt numbers with stray spaces still match', ()=>{
