@@ -36,7 +36,7 @@ function sandbox(rows,filter,dur){
   vm.runInContext([
     'var rows='+JSON.stringify(rows)+';',
     'var dur='+JSON.stringify(dur||DUR)+';',
-    'var filmFilter='+JSON.stringify(filter||{team:'',player:'',event:''})+';',
+    'var filmFilter='+JSON.stringify(filter||{team:[],player:[],event:[]})+';',
     'var film=null, draws=0;',
     'function filmDraw(){draws++;}',
     G('FILM_LEAD'),G('FILM_HOLD'),G('FILM_HOLD_MOVE'),
@@ -267,23 +267,60 @@ test('a rewind lands mid-move with the whole move still up', () => {
 });
 
 /* ================= the filter takes whole entries ================= */
+/* The filter is three LISTS, and the empty one is "all" — see filmFilter. */
+const FILT=o=>Object.assign({team:[],player:[],event:[]},o||{});
+
 test('the filter matches on either end of a pass', () => {
-  const P=sandbox([],{team:'',player:'3',event:''});
+  const P=sandbox([],FILT({player:['3']}));
   ok(P.filmMatches(ev(1,{playerFrom:'3'})),'the passer');
   ok(P.filmMatches(ev(1,{playerFrom:'2',playerTo:'3'})),'and the receiver');
   notOk(P.filmMatches(ev(1,{playerFrom:'2',playerTo:'9'})),'nobody else');
 });
 
 test('team and event narrow, an empty filter lets everything through', () => {
-  eq(sandbox([],{team:'away',player:'',event:''}).filmMatches(ev(1,{team:'home'})),false);
-  eq(sandbox([],{team:'',player:'',event:'goal'}).filmMatches(ev(1,{event:'pass success'})),false);
-  eq(sandbox([],{team:'',player:'',event:''}).filmMatches(ev(1)),true);
+  eq(sandbox([],FILT({team:['away']})).filmMatches(ev(1,{team:'home'})),false);
+  eq(sandbox([],FILT({event:['goal']})).filmMatches(ev(1,{event:'pass success'})),false);
+  eq(sandbox([],FILT()).filmMatches(ev(1)),true);
+});
+
+/* ================= several at once, which is why it is a slicer ================= */
+test('any one of the picked numbers is a match, and nobody else', () => {
+  const P=sandbox([],FILT({player:['9','14']}));
+  ok(P.filmMatches(ev(1,{playerFrom:'9'})),'the first');
+  ok(P.filmMatches(ev(1,{playerFrom:'2',playerTo:'14'})),'the second, at the far end');
+  notOk(P.filmMatches(ev(1,{playerFrom:'2',playerTo:'7'})),'and nobody who was not picked');
+});
+
+test('several events, and several teams, read the same way', () => {
+  const P=sandbox([],FILT({event:['goal','shot on target']}));
+  ok(P.filmMatches(ev(1,{event:'goal'})));
+  ok(P.filmMatches(ev(1,{event:'shot on target'})));
+  notOk(P.filmMatches(ev(1,{event:'pass success'})));
+  const T=sandbox([],FILT({team:['home','away']}));
+  ok(T.filmMatches(ev(1,{team:'home'}))&&T.filmMatches(ev(1,{team:'away'})),
+     'both sides picked is both sides shown — the same answer the empty list gives');
+});
+
+test('the three lists narrow together, not in turn', () => {
+  const P=sandbox([],FILT({team:['home'],player:['9'],event:['goal']}));
+  ok(P.filmMatches(ev(1,{team:'home',playerFrom:'9',event:'goal'})),'all three');
+  notOk(P.filmMatches(ev(1,{team:'away',playerFrom:'9',event:'goal'})),'wrong side');
+  notOk(P.filmMatches(ev(1,{team:'home',playerFrom:'8',event:'goal'})),'wrong number');
+  notOk(P.filmMatches(ev(1,{team:'home',playerFrom:'9',event:'foul'})),'wrong event');
+});
+
+test('an unnumbered end never matches a picked number', () => {
+  // '' is not offered as an option, but a row can carry it: a clearance with no
+  // receiver must not fall through on the emptiness of the far end
+  const P=sandbox([],FILT({player:['9']}));
+  notOk(P.filmMatches(ev(1,{playerFrom:'',playerTo:''})),'neither end named');
+  ok(P.filmMatches(ev(1,{playerFrom:'9',playerTo:''})),'the named end still counts');
 });
 
 test('one touch inside an entry brings the whole move with it', () => {
   // filtering to #15, who only appears as the receiver of the second touch: the
   // recovery that set it up comes too, or the row would read as half a move
-  const P=sandbox(ENTRY_6.slice(),{team:'',player:'15',event:''});
+  const P=sandbox(ENTRY_6.slice(),FILT({player:['15']}));
   const cues=P.filmCues(WIN);
   ok(P.filmCueMatches(cues[0]),'the entry matches');
   eq(names(cues[0]),'recovery | pass success','and it is still whole');
@@ -291,7 +328,7 @@ test('one touch inside an entry brings the whole move with it', () => {
 });
 
 test('an entry nobody in it matches is left out', () => {
-  const P=sandbox(ENTRY_6.slice(),{team:'',player:'99',event:''});
+  const P=sandbox(ENTRY_6.slice(),FILT({player:['99']}));
   notOk(P.filmCueMatches(P.filmCues(WIN)[0]));
 });
 

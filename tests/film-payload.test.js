@@ -93,8 +93,11 @@ test('three keys drive the film, and nothing else does', () => {
   ok(/e\.key===' '\|\|e\.key==='Spacebar'\)filmToggle\(\)/.test(filmKeys),'space plays and pauses');
   ok(/else return;/.test(filmKeys),'any other key is left entirely alone');
   // Space scrolls the page and the arrows walk a scroller — all three must be swallowed,
-  // but ONLY once one of them has been recognised, never before
-  ok(filmKeys.indexOf('else return;')<filmKeys.indexOf('e.preventDefault()'),
+  // but ONLY once one of them has been recognised, never before.
+  // Read off the ladder itself rather than off the whole function: the slicer guard
+  // above it claims Escape, and swallows that one on its own account.
+  const ladder=filmKeys.slice(filmKeys.indexOf("e.key==='ArrowRight'"));
+  ok(ladder.indexOf('else return;')<ladder.indexOf('e.preventDefault()'),
      'the default is prevented after the key is claimed, not on every keystroke');
 });
 

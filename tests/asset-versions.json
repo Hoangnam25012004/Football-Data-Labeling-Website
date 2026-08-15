@@ -4,12 +4,12 @@
     "sha256": "9a72daeb2b7b3f41"
   },
   "Stats/stats-view.css": {
-    "v": 5,
-    "sha256": "384f94936120e8ee"
+    "v": 6,
+    "sha256": "cf2989865e41d5e9"
   },
   "Stats/stats-view.js": {
-    "v": 14,
-    "sha256": "1e69dc5d6d1e421d"
+    "v": 15,
+    "sha256": "e95c770e1e10e8d9"
   },
   "auth.js": {
     "v": 1,
@@ -21,7 +21,7 @@
   },
   "client/assets/app.js": {
     "v": 31,
-    "sha256": "2e0fcd8c5e7aa541"
+    "sha256": "3565056d34ef46e5"
   },
   "client/assets/hanley-town.png": {
     "v": 1,

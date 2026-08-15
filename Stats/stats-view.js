@@ -1198,7 +1198,14 @@ const FILM_STEP=2;                                 // what ← and → are worth
 let filmHalf=1;                                    // which window is showing
 let film=null;                                     // the live player, while Film is on screen
 let filmResume=null;                               // {half,t} — a redraw must not rewind the video
-let filmFilter={team:'',player:'',event:''};
+/* Three LISTS, not three values. A slicer narrows to "9 and 14", which a select
+   could not say at all, and the empty list is what "all" is spelt as — so a
+   filter nobody has touched costs the matcher one length check per row.
+
+   Every option ticked is the same answer as none, and it is normalised back to
+   the empty list when it happens: one spelling for one meaning, so the button
+   label and the All box never have to agree about two of them. */
+let filmFilter={team:[],player:[],event:[]};
 let videoSrc=null;                                 // {url}: frozen in the report, or the match row
 
 const filmClock=t=>fmt(Math.max(0,t)).slice(0,5);   // mm:ss — centiseconds are noise here
@@ -1291,10 +1298,14 @@ function filmCues(win){
 
 function filmMatches(r){
   const f=filmFilter;
-  if(f.team&&r.team!==f.team)return false;
-  if(f.event&&r.event!==f.event)return false;
-  if(f.player&&String(r.playerFrom||'').trim()!==f.player
-             &&String(r.playerTo||'').trim()!==f.player)return false;
+  if(f.team.length&&f.team.indexOf(r.team)<0)return false;
+  if(f.event.length&&f.event.indexOf(r.event)<0)return false;
+  if(f.player.length){
+    // an unnumbered end is not a match for anybody: '' is never offered as an
+    // option, but a row can carry it, and it must not pass on emptiness alone
+    const from=String(r.playerFrom||'').trim(), to=String(r.playerTo||'').trim();
+    if((!from||f.player.indexOf(from)<0)&&(!to||f.player.indexOf(to)<0))return false;
+  }
   return true;
 }
 // an entry is shown whole or not at all: one touch of #2 brings the move with it
@@ -1343,14 +1354,73 @@ function filmRowsHTML(cues){
   return html||'<div class="fm-none">No events match this filter.</div>';
 }
 
+/* The three slicers, each as {key, all, many, opts}.
+
+   The options are the half's own — its teams, the numbers that touched the ball
+   in it, the events tagged in it — UNION whatever is currently picked. The union
+   is what keeps the state honest across a change of half: filter to #9, move to
+   a half he did not play, and without it the button would read "9" over a panel
+   in which nothing was ticked. With it, the pick is visible and can be undone
+   where it was made. Nothing is silently dropped either way — a filter matching
+   no event in this half says so in the list, which is the truthful answer. */
+function filmSlicers(choices){
+  const picked=k=>filmFilter[k]||[];
+  const union=(list,sel)=>list.concat(sel.filter(v=>list.indexOf(v)<0));
+  const plain=v=>({v:v,lbl:v});
+  return [
+    {key:'team',all:'Both teams',many:'teams',
+     opts:[{v:'home',lbl:meta.home||'Home'},{v:'away',lbl:meta.away||'Away'}]},
+    {key:'player',all:'All players',many:'players',
+     opts:union(choices.players,picked('player')).sort((a,b)=>(+a||0)-(+b||0)).map(plain)},
+    {key:'event',all:'All events',many:'events',
+     opts:union(choices.events,picked('event')).sort().map(plain)}
+  ];
+}
+
+/* What the closed button says: the all-label for none, the option's own words
+   for one, a count for several. "3 players" rather than "9, 14, 22" — the column
+   is 340px wide and a list of numbers would be cut off mid-answer, while the
+   panel below spells it out in full the moment it is opened. */
+function filmSlicerLabel(s){
+  const sel=filmFilter[s.key]||[];
+  if(!sel.length)return s.all;
+  if(sel.length>1)return sel.length+' '+s.many;
+  const hit=s.opts.filter(o=>o.v===sel[0])[0];
+  return String(hit?hit.lbl:sel[0]);
+}
+
+/* A real checkbox per option, so the browser gives the ticking, the focus ring
+   and the keyboard for free — and so filmKeys sees an INPUT and keeps its hands
+   off Space. The all-label and the plural ride on the element: relabelling after
+   a tick reads them back rather than rebuilding the panel, which would shut it
+   between two ticks and defeat the whole point of a slicer. */
+function filmSlicerHTML(s){
+  const sel=filmFilter[s.key]||[];
+  const opt=(attr,lbl,on,cls)=>`<label class="fm-sl-opt${cls||''}">`
+    +`<input type="checkbox" ${attr}${on?' checked':''}>`
+    +`<span class="fm-sl-txt">${esc(lbl)}</span></label>`;
+  // the button is 97px and the label is cut with an ellipsis in it, so the title
+  // carries the same words in full — and is moved on with them, never left
+  // saying "All players" over a button that now reads "2 players"
+  const now=filmSlicerLabel(s);
+  return `<div class="fm-slicer" data-key="${s.key}"`
+    +` data-all="${esc(s.all)}" data-many="${esc(s.many)}">`
+    +`<button type="button" class="fm-sl-btn" aria-expanded="false"`
+      +` title="${esc(now)}">`
+      +`<span class="fm-sl-lbl">${esc(now)}</span>`
+      +'<span class="fm-sl-mark">&#9662;</span></button>'
+    +'<div class="fm-sl-panel" hidden>'
+      +opt('data-all="1"',s.all,!sel.length,' all')
+      +s.opts.map(o=>opt(`value="${esc(o.v)}"`,o.lbl,sel.indexOf(o.v)>=0)).join('')
+    +'</div></div>';
+}
+
 function filmHTML(wins,win,cues,choices){
   const halves=wins.length>1
     ? '<div class="half-toggle film-halves">'+wins.map(w=>
         `<button type="button" class="${w.half===win.half?'on':''}" data-half="${w.half}">${w.label}</button>`
       ).join('')+'</div>'
     : '';
-  const pick=(id,all,list,val)=>`<select class="fm-sel" id="${id}"><option value="">${all}</option>`
-    +list.map(v=>`<option value="${esc(v)}"${v===val?' selected':''}>${esc(v)}</option>`).join('')+'</select>';
   return `<div class="film">${halves}<div class="film-grid">`
     +'<div class="film-main">'
       +'<div class="film-stage" id="fmStage">'
@@ -1367,11 +1437,7 @@ function filmHTML(wins,win,cues,choices){
     +'<div class="film-side">'
       +`<div class="film-pitch" id="fmPitch">${pitchSVG(meta.sport||'football')}</div>`
       +'<div class="film-filters">'
-        +`<select class="fm-sel" id="fmTeam"><option value="">Both teams</option>`
-        +`<option value="home"${filmFilter.team==='home'?' selected':''}>${esc(meta.home)}</option>`
-        +`<option value="away"${filmFilter.team==='away'?' selected':''}>${esc(meta.away)}</option></select>`
-        +pick('fmPlayer','All players',choices.players,filmFilter.player)
-        +pick('fmEvent','All events',choices.events,filmFilter.event)
+        +filmSlicers(choices).map(filmSlicerHTML).join('')
         +'<button type="button" class="fm-next" id="fmNext" title="Next clip">&#9197;</button>'
       +'</div>'
       +`<div class="film-list" id="fmList">${filmRowsHTML(cues)}</div>`
@@ -1447,8 +1513,8 @@ function filmStart(win,cues,src){
     if(h!==filmHalf){filmHalf=h;renderStats();}
   });
 
-  const setFilter=(key,el)=>{el.onchange=()=>{filmFilter[key]=el.value;filmRelist();};};
-  setFilter('team',$('fmTeam')); setFilter('player',$('fmPlayer')); setFilter('event',$('fmEvent'));
+  filmBindSlicers();
+  document.addEventListener('click',filmDocClick);
 
   // delegated once, so relisting under a new filter leaves it wired
   film.list.onclick=e=>{
@@ -1479,13 +1545,115 @@ function filmStop(){
   filmResume={half:f.win.half,t:(f.video&&f.video.currentTime)||0};
   if(f.raf)cancelAnimationFrame(f.raf);
   document.removeEventListener('keydown',filmKeys);
+  document.removeEventListener('click',filmDocClick);
   try{f.video.pause();f.video.removeAttribute('src');f.video.load();}catch(e){}
   film=null;
+}
+
+/* ---- the slicers ----
+
+   One open at a time. The side column is 340px and a panel is up to 230 of them
+   tall: two open at once would cover the list the filter is being read against,
+   and on a narrow screen the filters wrap onto two lines where the second panel
+   would land on top of the first. */
+function filmSlicerOpen(sl,on){
+  document.querySelectorAll('.fm-slicer').forEach(o=>{
+    const want=!!on&&o===sl;
+    o.classList.toggle('open',want);
+    o.querySelector('.fm-sl-panel').hidden=!want;
+    o.querySelector('.fm-sl-btn').setAttribute('aria-expanded',want?'true':'false');
+    if(want)filmSlicerFit(o);
+  });
+}
+
+/* A squad's worth of checkboxes hanging out of the flow, over a scroller with a
+   bottom edge of its own — .stats-wrap, which both hosts wrap the view in. At
+   1280x720 there are 157px between the filters and that edge and the panel wants
+   230, so the last few numbers landed past it, reachable only by scrolling the
+   whole Stats area to get at them.
+
+   So it is cut to the room there is on the way open. The panel is already an
+   internal scroller, so what does not fit scrolls inside it — which is the same
+   gesture, in the same place, rather than flipping the panel above the button
+   and moving the options out from under the pointer between two ticks. */
+const FILM_SL_MAX=230, FILM_SL_MIN=96;
+function filmSlicerFit(sl){
+  const p=sl.querySelector('.fm-sl-panel');
+  const b=sl.querySelector('.fm-sl-btn').getBoundingClientRect();
+  let edge=window.innerHeight||0;
+  // the nearest ancestor that clips, if one is nearer than the window
+  for(let n=sl.parentNode;n&&n.nodeType===1&&n!==document.body;n=n.parentNode){
+    if(getComputedStyle(n).overflowY!=='visible'){
+      edge=Math.min(edge,n.getBoundingClientRect().bottom);
+      break;
+    }
+  }
+  p.style.maxHeight=Math.max(FILM_SL_MIN,Math.min(FILM_SL_MAX,edge-b.bottom-10))+'px';
+}
+
+// the ticks and the button label, read back off the DOM after a change: the
+// panel is never rebuilt while it is open, or it would close under the pointer
+function filmSyncSlicer(sl){
+  const sel=filmFilter[sl.dataset.key]||[];
+  let one=null;
+  sl.querySelectorAll('.fm-sl-opt input').forEach(b=>{
+    if(b.dataset.all==='1'){b.checked=!sel.length;return;}
+    b.checked=sel.indexOf(b.value)>=0;
+    if(sel.length===1&&b.value===sel[0])one=b;
+  });
+  const txt=!sel.length?sl.dataset.all
+    :sel.length>1?sel.length+' '+sl.dataset.many
+    :(one?one.parentNode.textContent.trim():String(sel[0]));
+  sl.querySelector('.fm-sl-lbl').textContent=txt;
+  sl.querySelector('.fm-sl-btn').title=txt;
+}
+
+/* Bound once per render, on the elements filmHTML just wrote. Relisting under a
+   new pick replaces the LIST only, so these survive it. */
+function filmBindSlicers(){
+  document.querySelectorAll('.fm-slicer').forEach(sl=>{
+    const key=sl.dataset.key;
+    sl.querySelector('.fm-sl-btn').onclick=()=>
+      filmSlicerOpen(sl,!sl.classList.contains('open'));
+    const boxes=[].slice.call(sl.querySelectorAll('.fm-sl-opt input[value]'));
+    sl.querySelectorAll('.fm-sl-opt input').forEach(box=>{
+      box.onchange=()=>{
+        let next=[];
+        if(box.dataset.all!=='1'){
+          next=(filmFilter[key]||[]).slice();
+          const at=next.indexOf(box.value);
+          if(box.checked){if(at<0)next.push(box.value);}
+          else if(at>=0)next.splice(at,1);
+          // all of them is none of them: normalised, so there is one state to read
+          if(next.length>=boxes.length)next=[];
+        }
+        filmFilter[key]=next;                // All is the empty list, unticking it a no-op
+        filmSyncSlicer(sl);
+        filmRelist();
+      };
+    });
+  });
+}
+
+// anywhere but inside a slicer shuts them — including the video, the list and
+// the half toggle, each of which is a deliberate move away from filtering
+function filmDocClick(e){
+  const t=e.target;
+  if(t&&t.closest&&t.closest('.fm-slicer'))return;
+  filmSlicerOpen(null,false);
 }
 
 function filmKeys(e){
   if(!film||e.altKey||e.ctrlKey||e.metaKey)return;
   const t=e.target,tag=(t&&t.tagName)||'';
+  /* A slicer owns the keyboard while the focus is in it: Escape shuts it, and
+     everything else is the browser's — Space above all, which has to tick the
+     box under the cursor or press the button rather than start the video. No
+     preventDefault on that path, or the button would stop opening. */
+  if(t&&t.closest&&t.closest('.fm-slicer')){
+    if(e.key==='Escape'){filmSlicerOpen(null,false);e.preventDefault();}
+    return;
+  }
   if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||(t&&t.isContentEditable))return;
   if(e.key==='ArrowRight')filmSeekBy(FILM_STEP);
   else if(e.key==='ArrowLeft')filmSeekBy(-FILM_STEP);
@@ -1868,7 +2036,7 @@ function setData(d){
   // from a local file carries none either — both land here as nothing to play
   videoSrc=(d.video&&d.video.url)?{url:d.video.url}:null;
   // the filters and the resume point belonged to the match being handed away
-  filmHalf=1; filmFilter={team:'',player:'',event:''}; filmResume=null;
+  filmHalf=1; filmFilter={team:[],player:[],event:[]}; filmResume=null;
 }
 
 function mount(el,data,options){
@@ -1899,7 +2067,7 @@ function destroy(){
   if(root)root.innerHTML='';
   root=null; opts={}; mounted=false;
   rows=[]; meta=blankMeta(); lineups=blankLineups(); dur=blankDur();
-  videoSrc=null; filmHalf=1; filmFilter={team:'',player:'',event:''}; filmResume=null;
+  videoSrc=null; filmHalf=1; filmFilter={team:[],player:[],event:[]}; filmResume=null;
   return API;
 }
 

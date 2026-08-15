@@ -290,9 +290,40 @@ table.stats .grp.g5{background:#331A1A;color:#F0CACA}
 .film-pitch{position:relative;width:100%;aspect-ratio:105/68;border-radius:8px;overflow:hidden;
   border:1px solid var(--line)}
 .film-filters{display:flex;flex-wrap:wrap;gap:6px}
-.fm-sel{flex:1 1 92px;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--ink);
-  border-radius:6px;padding:4px 6px;font-size:11.5px;font-weight:600;cursor:pointer}
-.fm-sel:focus{outline:none;border-color:var(--accent)}
+/* A slicer, not a select: several numbers at once is the whole point, so the
+   panel is a list of checkboxes that STAYS OPEN while they are ticked. It hangs
+   out of the flow over the list below — nothing between here and .film clips,
+   and the z-index carries it over the scroller, which is not positioned. */
+.fm-slicer{position:relative;flex:1 1 92px;min-width:0}
+.fm-sl-btn{display:flex;align-items:center;gap:4px;width:100%;background:var(--panel);
+  border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:4px 6px;
+  font-size:11.5px;font-weight:600;cursor:pointer;text-align:left}
+.fm-sl-btn:hover,.fm-slicer.open .fm-sl-btn{border-color:var(--accent)}
+.fm-sl-btn:focus{outline:none;border-color:var(--accent)}
+/* the label is the one thing allowed to shrink: a long team or event name is cut
+   with an ellipsis rather than pushing the caret off the end of the button */
+.fm-sl-lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fm-sl-mark{flex:none;color:var(--mut);font-size:9px;line-height:1}
+/* max-height is the starting point only: filmSlicerFit() cuts it to the room
+   between the button and whatever edge is nearer, every time it opens */
+.fm-sl-panel{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);min-width:132px;
+  max-height:230px;overflow-y:auto;padding:3px;background:var(--panel);
+  border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 22px rgba(0,0,0,0.45)}
+.fm-sl-panel[hidden]{display:none}
+/* The panel is wider than its button whenever min-width bites — "pass success"
+   does not fit in 99px. It grows rightwards from left:0, so the LAST slicer,
+   which sits hard against the right edge of the column, grows the other way
+   instead: at 375px the events panel was landing on the edge of the screen. */
+.film-filters .fm-slicer:last-of-type .fm-sl-panel{left:auto;right:0}
+.fm-sl-opt{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;
+  cursor:pointer;font-size:11.5px;font-weight:600;color:var(--ink);user-select:none}
+.fm-sl-opt:hover{background:#1F171933}
+.fm-sl-opt input{flex:none;width:13px;height:13px;margin:0;cursor:pointer;accent-color:var(--accent)}
+.fm-sl-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* All sits above the rule, and stays put while the options under it scroll past */
+.fm-sl-opt.all{position:sticky;top:0;z-index:1;background:var(--panel);
+  border-bottom:1px solid var(--line);border-radius:4px 4px 0 0}
+.fm-sl-opt.all:hover{background:var(--panel2)}
 .fm-next{flex:none;width:32px;background:var(--panel);border:1px solid var(--line);color:var(--ink);
   border-radius:6px;cursor:pointer;font-size:12px}
 .fm-next:hover{border-color:var(--accent)}
