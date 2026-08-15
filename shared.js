@@ -260,6 +260,40 @@ function statRow(no,s){return[no,s.goals,s.assists,s.totalShots,s.shotsOn,s.shot
 function sortedPlayers(P){return Object.keys(P).sort((a,b)=>{const na=+a,nb=+b;
   if(!isNaN(na)&&!isNaN(nb))return na-nb; return a.localeCompare(b);});}
 
+/* ---- the player table, cut into the four tabs it is read in ----
+   The wide STAT_HEADERS row split by subject: Defensive = Defensive + Duels,
+   Other = Set Pieces + Discipline. Two places draw from this and neither owns
+   it — the Stats tab's per-player table for one match (Stats/stats-view.js),
+   and a player's whole campaign on the client site's Data page. Kept here so
+   they cannot drift: a column added for one of them appears in both.
+
+   Each column is [label, fn] and fn takes ONE stat object, so it works the same
+   on a match's figures and on figures added up over a season — which is what
+   makes the percentages come out as a ratio of the totals rather than as a mean
+   of per-match ratios. */
+const PLAYER_CATS={
+  shooting:[
+    ['Goals',s=>s.goals],['Assists',s=>s.assists],['Key Passes',s=>s.keyPasses],
+    ['Total Shots',s=>s.totalShots],['Shots On Target',s=>s.shotsOn],['Shots Off Target',s=>s.shotsOff],
+    ['Blocked Shots',s=>s.shotsBlocked],['Miss Shots',s=>s.missShots],
+    ['Shooting Accuracy',s=>pct(s.shotsOn,s.totalShots)]],
+  distribution:[
+    ['Passes',s=>s.passes],['Passes Completed',s=>s.passesComp],['Pass Accuracy',s=>pct(s.passesComp,s.passes)],
+    ['Crosses',s=>s.crosses],['Crosses Completed',s=>s.crossesComp],['Cross Accuracy',s=>pct(s.crossesComp,s.crosses)],
+    ['Take-ons',s=>s.takeOns],['Take-ons Won',s=>s.takeOnsWon],['Take-on Success',s=>pct(s.takeOnsWon,s.takeOns)],
+    ['Step-ins',s=>s.stepIns]],
+  defensive:[
+    ['Tackles',s=>s.tackles],['Tackles Won',s=>s.tacklesWon],['Tackle Success',s=>pct(s.tacklesWon,s.tackles)],
+    ['Interceptions',s=>s.interceptions],['Clearances',s=>s.clearances],['Blocks',s=>s.blocks],['Recoveries',s=>s.recoveries],
+    ['Ground Duels',s=>s.groundDuels],['Ground Duels Won',s=>s.groundDuelsWon],
+    ['Aerial Duels',s=>s.aerialDuels],['Aerial Duels Won',s=>s.aerialDuelsWon],
+    ['Take-on Concerns',s=>s.takeOnConcerns],['Mistakes',s=>s.mistakes]],
+  other:[
+    ['Corners',s=>s.corners],['Free-kicks',s=>s.freeKicks],['Penalty Kicks',s=>s.penalties],
+    ['Throw-ins',s=>s.throwIns],['Goal Kicks',s=>s.goalKicks],
+    ['Fouls',s=>s.fouls],['Fouls Won',s=>s.foulsWon],['Offsides',s=>s.offsides],['Saves',s=>s.saves]]
+};
+
 /* ---- shots + body part (Event List) ----
    Every shot attempt is one of these events. The body part it was taken with is a
    separate event tagged in the SAME chain entry ("2 free-kick shot-on-target left-foot"),

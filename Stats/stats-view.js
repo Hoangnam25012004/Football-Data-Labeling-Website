@@ -47,29 +47,11 @@ let heatHalf=0;   // touch heatmap half filter: 0 = both halves
 let distCat='passes', distHalf=0;   // the distribution map: which action, and which half
 
 /* per-category column sets — the wide table split into 4 tabs.
-   Defensive = Defensive + Duels; Other = Set Pieces + Discipline. */
-const STAT_CATS={
-  shooting:[
-    ['Goals',s=>s.goals],['Assists',s=>s.assists],['Key Passes',s=>s.keyPasses],
-    ['Total Shots',s=>s.totalShots],['Shots On Target',s=>s.shotsOn],['Shots Off Target',s=>s.shotsOff],
-    ['Blocked Shots',s=>s.shotsBlocked],['Miss Shots',s=>s.missShots],
-    ['Shooting Accuracy',s=>pct(s.shotsOn,s.totalShots)]],
-  distribution:[
-    ['Passes',s=>s.passes],['Passes Completed',s=>s.passesComp],['Pass Accuracy',s=>pct(s.passesComp,s.passes)],
-    ['Crosses',s=>s.crosses],['Crosses Completed',s=>s.crossesComp],['Cross Accuracy',s=>pct(s.crossesComp,s.crosses)],
-    ['Take-ons',s=>s.takeOns],['Take-ons Won',s=>s.takeOnsWon],['Take-on Success',s=>pct(s.takeOnsWon,s.takeOns)],
-    ['Step-ins',s=>s.stepIns]],
-  defensive:[
-    ['Tackles',s=>s.tackles],['Tackles Won',s=>s.tacklesWon],['Tackle Success',s=>pct(s.tacklesWon,s.tackles)],
-    ['Interceptions',s=>s.interceptions],['Clearances',s=>s.clearances],['Blocks',s=>s.blocks],['Recoveries',s=>s.recoveries],
-    ['Ground Duels',s=>s.groundDuels],['Ground Duels Won',s=>s.groundDuelsWon],
-    ['Aerial Duels',s=>s.aerialDuels],['Aerial Duels Won',s=>s.aerialDuelsWon],
-    ['Take-on Concerns',s=>s.takeOnConcerns],['Mistakes',s=>s.mistakes]],
-  other:[
-    ['Corners',s=>s.corners],['Free-kicks',s=>s.freeKicks],['Penalty Kicks',s=>s.penalties],
-    ['Throw-ins',s=>s.throwIns],['Goal Kicks',s=>s.goalKicks],
-    ['Fouls',s=>s.fouls],['Fouls Won',s=>s.foulsWon],['Offsides',s=>s.offsides],['Saves',s=>s.saves]]
-};
+   The definition moved down into shared.js as PLAYER_CATS, because the client
+   site's Player Data page draws a player's whole campaign from the same four
+   sets and shared.js is the one file both pages load. Nothing else changed:
+   this is the same array, under the name this file has always called it. */
+const STAT_CATS=PLAYER_CATS;
 
 /* Three views of the open match, picked by the top row of buttons:
      Overall    both sides at once — the summary timeline, the starting formations

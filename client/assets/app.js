@@ -72,7 +72,7 @@
   function loadMatches(ch) {
     /* A different channel is a different campaign: drop what was added up
        for the last one rather than letting the Data view find it cached. */
-    state.reports = null; state.reportsFor = null; reportJob = null;
+    state.reports = null; state.reportsFor = null; reportJob = null; playerJob = null;
     if (!ch) { state.matches = []; return Promise.resolve(); }
     /* The channel's team code goes with the id: with one, which side of a
        fixture is the club's own is answered by the match rather than by the
@@ -274,16 +274,18 @@
   /* ---------------------------------------------------------
      View: data (campaign aggregates)
 
-     Two sections behind one heading:
+     Three sections behind one heading:
 
-       Overview   what the campaign came to — the record, the last five
-                  results, who put the numbers on the board
-       Team Data  one row per match, four categories of columns
+       Overview     what the campaign came to — the record, the last five
+                    results, who put the numbers on the board
+       Team Data    one row per match, four categories of columns
+       Player Data  the same reports cut by the man rather than by the match
 
-     Both are worked out from the reports Submit Analysis froze, through the
-     same computeStats()/sumTeam()/TEAM_SECTIONS shared.js gives the match
-     page. That is the whole point: a figure here and the same figure on the
-     match page come out of one implementation, so they cannot drift apart.
+     All three are worked out from the reports Submit Analysis froze, through
+     the same computeStats()/sumTeam()/TEAM_SECTIONS/PLAYER_CATS shared.js
+     gives the match page. That is the whole point: a figure here and the same
+     figure on the match page come out of one implementation, so they cannot
+     drift apart.
 
      Which section is open lives in the hash — #/data/team/defensive is a
      link somebody can send — so route() redraws on a tab click and the
@@ -303,11 +305,15 @@
     var rest = location.hash.replace(/^#\/?/, '').split('/').slice(1);
     var onTeam = rest[0] === 'team';
     var cat = onTeam && TD_TABS.some(function (t) { return t[0] === rest[1]; }) ? rest[1] : 'shooting';
+    /* Player Data carries two more segments — which player, then which
+       category — so it reads its own, and Team Data's line above is left to
+       mean exactly what it always meant. */
+    var onPlayer = rest[0] === 'player';
 
-    /* No strapline: the two tabs under the title say what the page is, and
+    /* No strapline: the tabs under the title say what the page is, and
        head() draws nothing where there is nothing to say. */
     view.appendChild(head('Data'));
-    view.appendChild(dataTabs(onTeam));
+    view.appendChild(dataTabs(onPlayer ? 'player' : onTeam ? 'team' : 'overview'));
 
     if (!state.matches.length) {
       view.appendChild(emptyState('Nothing to add up yet',
@@ -323,7 +329,8 @@
     dataSource().then(function () {
       if (!body.parentNode) return;              // someone navigated on while this loaded
       body.innerHTML = '';
-      if (onTeam) renderTeamData(body, cat); else renderOverview(body);
+      if (onPlayer) renderPlayerData(body, rest);
+      else if (onTeam) renderTeamData(body, cat); else renderOverview(body);
     }).catch(function (e) {
       if (!body.parentNode) return;
       body.innerHTML = '';
@@ -332,10 +339,10 @@
     });
   }
 
-  function dataTabs(onTeam) {
+  function dataTabs(open) {
     var bar = el('div', 'dtabs');
-    [['overview', 'Overview'], ['team', 'Team Data']].forEach(function (t) {
-      var b = el('button', 'dtab' + ((t[0] === 'team') === !!onTeam ? ' on' : ''), t[1]);
+    [['overview', 'Overview'], ['team', 'Team Data'], ['player', 'Player Data']].forEach(function (t) {
+      var b = el('button', 'dtab' + (t[0] === open ? ' on' : ''), t[1]);
       b.type = 'button';
       b.addEventListener('click', function () { location.hash = '#/data/' + t[0]; });
       bar.appendChild(b);
@@ -343,12 +350,15 @@
     return bar;
   }
 
-  function catTabs(cat) {
+  /* The same four category chips on both tables — the columns underneath them
+     are the same four subjects either way. `base` is what a click lands on, so
+     Team Data keeps its own route and a player keeps his. */
+  function catTabs(cat, base) {
     var bar = el('div', 'dsubs');
     TD_TABS.forEach(function (t) {
       var b = el('button', 'chip' + (t[0] === cat ? ' on' : ''), t[1]);
       b.type = 'button';
-      b.addEventListener('click', function () { location.hash = '#/data/team/' + t[0]; });
+      b.addEventListener('click', function () { location.hash = (base || '#/data/team/') + t[0]; });
       bar.appendChild(b);
     });
     return bar;
@@ -400,7 +410,14 @@
       us: window.sumTeam(rep.rows, m.side),
       them: window.sumTeam(rep.rows, other),
       players: window.computeStats(rep.rows, m.side),
-      names: window.squadNames(rep.lineups || {}, m.side)
+      names: window.squadNames(rep.lineups || {}, m.side),
+      /* Who was on the pitch and for how long, and who was booked — the two
+         things a player's own page needs that a team total cannot carry.
+         Read here, where a match is reduced once, rather than in the view:
+         both are pure functions of the report and neither writes to it.
+         `mins` is null for a match nobody entered a line-up for. */
+      mins: window.playedMinutes(rep.lineups || {}, rep.dur || {}, m.side, rep.rows),
+      cards: playerCards(rep.rows, m.side)
     };
   }
   function aggregates() {
@@ -691,6 +708,323 @@
   }
 
   /* ---------------------------------------------------------
+     View: Player Data — one player, the whole campaign
+
+     The same reports the two sections above add up, cut by the man rather than
+     by the match. The columns are shared.js's own PLAYER_CATS: the very four
+     sets the Stats tab draws a single match's player table from, so a figure
+     here and the same figure there come out of one implementation.
+
+     Which player and which category are in the hash —
+     #/data/player/n%3Aelva/defensive is a link somebody can send.
+     --------------------------------------------------------- */
+
+  /* Cards are the one thing newStat() does not carry, so they are counted off
+     the rows through shared.js's classifyCards() — the same reading the match
+     timeline and the Overview's discipline() take, so a player's two yellows
+     and his club's card count cannot tell different stories. */
+  function playerCards(rows, team) {
+    var out = {};
+    window.classifyCards(rows).forEach(function (kind, row) {
+      if (row.team !== team) return;                  // the club's own side only
+      var no = String(row.playerFrom == null ? '' : row.playerFrom).trim();
+      if (!no) return;
+      var c = out[no] || (out[no] = { y: 0, r: 0 });
+      if (kind === 'yc') c.y++;
+      else if (kind === 'y2') { c.y++; c.r++; }       // the second yellow, and the red it is
+      else if (kind === 'rc') c.r++;
+    });
+    return out;
+  }
+
+  /* Add a run of stat objects up into one. Starts from shared.js's own zero
+     row, so every percentage in PLAYER_CATS comes out as one ratio of the
+     totals rather than as a mean of per-match ratios. totalOf() above does the
+     same for the two team columns; it takes aggregates rather than stats,
+     which is why this sits beside it rather than inside it. */
+  function sumStats(list) {
+    var t = window.newStat();
+    list.forEach(function (s) { for (var k in t) t[k] += (s[k] || 0); });
+    return t;
+  }
+
+  /* Every player of the club's own side, across every submitted match.
+
+     Tallied under his NAME where the squad gives one, exactly as the Key
+     Players cards do it: a shirt number moves between windows, a name does
+     not. The rule is written out again rather than shared, because
+     playerTally() is where a test reads it from.
+
+     Who counts as having appeared: everyone playedMinutes() found on the pitch
+     — the starting XI, every later formation snapshot, everyone brought on —
+     plus everyone with a tagged event. An unused substitute is in neither,
+     which is the point: he did not appear. A match whose report carries no
+     line-up has no minutes at all, so its players come from the events alone
+     and read "—" for minutes, exactly as they do on the Stats tab.
+
+     Nothing here writes to a stat object it did not make: `a.players` is the
+     same object the Key Players cards read. */
+  function playerIndex(aggs) {
+    var by = {}, order = [];
+    aggs.forEach(function (a) {
+      var seen = {};
+      var add = function (raw) {
+        var no = String(raw == null ? '' : raw).trim();
+        if (!no || seen[no]) return;                  // one row per man per match
+        seen[no] = 1;
+        var nm = a.names[no] || '';
+        var key = nm ? 'n:' + nm.toLowerCase() : '#' + no;
+        var p = by[key];
+        if (!p) {
+          p = by[key] = { key: key, name: nm || playerLabel(a.names, no), no: no, matches: [] };
+          order.push(p);
+        }
+        p.no = no;                                    // the most recent shirt he wore
+        if (nm) p.name = nm;
+        p.matches.push({
+          m: a.m, gf: a.gf, ga: a.ga,
+          stat: a.players[no] || window.newStat(),
+          mins: (a.mins && a.mins[no]) || null,
+          cards: (a.cards && a.cards[no]) || { y: 0, r: 0 }
+        });
+      };
+      Object.keys(a.mins || {}).forEach(add);
+      Object.keys(a.players).forEach(add);
+    });
+
+    order.forEach(function (p) {
+      p.apps = p.matches.length;
+      /* The minutes SHOWN, added up — so the total under the column is what
+         the eye gets adding the column itself. Re-deriving it from the raw
+         seconds would be a truer number and a worse one: it can land a minute
+         off what is on the screen above it. */
+      p.min = p.matches.reduce(function (n, r) { return n + (r.mins ? r.mins.min : 0); }, 0);
+      p.timed = p.matches.some(function (r) { return r.mins; });
+      p.exact = p.matches.every(function (r) { return r.mins && r.mins.exact; });
+      p.total = sumStats(p.matches.map(function (r) { return r.stat; }));
+      p.cards = p.matches.reduce(function (c, r) {
+        return { y: c.y + r.cards.y, r: c.r + r.cards.r };
+      }, { y: 0, r: 0 });
+    });
+
+    return order.sort(function (x, y) {
+      return y.min - x.min || y.apps - x.apps || (+x.no || 999) - (+y.no || 999);
+    });
+  }
+
+  /* Built once per channel and kept, like the reports it is built from: the
+     category chips and the player dropdown redraw from what is already here.
+     loadMatches() drops it when the channel changes. */
+  var playerJob = null;
+  function playerList() {
+    var ch = state.channel;
+    if (playerJob && playerJob.forChannel === ch.id) return playerJob.list;
+    var list = playerIndex(aggregates());
+    playerJob = { forChannel: ch.id, list: list };
+    return list;
+  }
+
+  /* shared.js may not have loaded — sectionCols() takes the same precaution.
+     A column set that is not there draws an empty table, not an exception. */
+  function catCols(cat) {
+    var C = (typeof PLAYER_CATS === 'undefined') ? null : PLAYER_CATS;
+    return (C && C[cat]) || [];
+  }
+
+  /* A campaign total in the same three readings the Stats tab gives one match:
+     "—" where no line-up ever named him, a leading "~" where any of the
+     matches had no Duration boundaries and the video's own clock stood in. */
+  function minsTotal(p) {
+    if (!p.timed) return '—';
+    return (p.exact ? '' : '~') + p.min + "'";
+  }
+  /* and one match's cell, which is minsCell() in Stats/stats-view.js, cell for
+     cell — same mark, same tooltip, same empty */
+  function minsOne(mn) {
+    if (!mn) return '<td>—</td>';
+    var title = mn.exact ? '1st ' + Math.round(mn.h1 / 60) + "' · 2nd " + Math.round(mn.h2 / 60) + "'"
+                         : 'approximate — the match duration has not been set';
+    return '<td title="' + esc(title) + '">' + (mn.exact ? '' : '~') + mn.min + "'</td>";
+  }
+
+  function renderPlayerData(body, rest) {
+    var people = playerList();
+    if (!people.length) {
+      body.appendChild(emptyState('No submitted analysis to read',
+        'These players come from what an analyst sends over with Submit Analysis. Once a match ' +
+        'in this channel has been submitted, everyone who played in it is listed here.'));
+      return;
+    }
+    var key = rest[1] ? decodeURIComponent(rest[1]) : '';
+    var who = key ? people.filter(function (p) { return p.key === key; })[0] : null;
+    /* A link made in another channel, or before a squad gave this shirt a
+       name. Back to the list rather than to a blank page — and replaced, so
+       Back does not walk straight into the same dead key again. */
+    if (key && !who) { location.replace('#/data/player'); return; }
+    if (!who) return renderPlayerList(body, people);
+    renderPlayerProfile(body, who, people, rest[2]);
+  }
+
+  /* ---------- the list ---------- */
+  var PL_COLS = [
+    ['Apps',       function (p) { return p.apps; }],
+    ['Minutes',    function (p) { return minsTotal(p); }],
+    ['Goals',      function (p) { return p.total.goals; }],
+    ['Assists',    function (p) { return p.total.assists; }],
+    ['Key Passes', function (p) { return p.total.keyPasses; }]
+  ];
+
+  function renderPlayerList(body, people) {
+    var head = '<th class="c-no">No</th><th class="c-pl">Player</th>' +
+      PL_COLS.map(function (c) { return '<th>' + esc(c[0]) + '</th>'; }).join('');
+    var rows = people.map(function (p) {
+      return '<tr data-who="' + esc(encodeURIComponent(p.key)) + '">' +
+        '<td class="c-no">' + esc(p.no) + '</td>' +
+        '<td class="c-pl"><b>' + esc(p.name) + '</b></td>' +
+        PL_COLS.map(function (c) { return '<td>' + esc(String(c[1](p))) + '</td>'; }).join('') +
+        '</tr>';
+    }).join('');
+
+    var wrap = el('div', 'stbl-wrap');
+    wrap.innerHTML = '<table class="stbl"><thead><tr>' + head + '</tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>';
+    /* One listener rather than one per row, as the match table does it */
+    wrap.addEventListener('click', function (e) {
+      var tr = e.target.closest ? e.target.closest('tr[data-who]') : null;
+      if (tr) location.hash = '#/data/player/' + tr.getAttribute('data-who');
+    });
+    body.appendChild(wrap);
+    body.appendChild(el('p', 'note',
+      'Everyone who took the pitch in a submitted match, most minutes first. A substitute who ' +
+      'was named but never came on is not an appearance and is not listed.'));
+  }
+
+  /* ---------- one player ---------- */
+  function renderPlayerProfile(body, who, people, wanted) {
+    var cat = TD_TABS.some(function (t) { return t[0] === wanted; }) ? wanted : 'shooting';
+
+    var back = el('button', 'back', '&larr; All players');
+    back.addEventListener('click', function () { location.hash = '#/data/player'; });
+    body.appendChild(back);
+
+    body.appendChild(playerHead(who, people, cat));
+
+    var kpis = el('div', 'kpis six');
+    kpis.innerHTML =
+      kpi('Appearances', who.apps, who.apps === 1 ? 'match played' : 'matches played') +
+      kpi('Minutes', minsTotal(who), 'on the pitch') +
+      kpi('Goals', who.total.goals, 'in this channel') +
+      kpi('Assists', who.total.assists, 'in this channel') +
+      kpi('Key Passes', who.total.keyPasses, 'shots created') +
+      kpi('Cards', who.cards.y + 'Y · ' + who.cards.r + 'R', 'yellow and red');
+    body.appendChild(kpis);
+
+    body.appendChild(catTabs(cat, '#/data/player/' + encodeURIComponent(who.key) + '/'));
+    body.appendChild(playerMatchTable(who, cat));
+  }
+
+  /* Name, shirt, and the way to another player without going back for him.
+     The dropdown is the channel Settings menu's, down to taking its document
+     listener off with it: this view is redrawn on every category click, and a
+     listener left behind would keep a detached node alive for the life of the
+     page. */
+  function playerHead(who, people, cat) {
+    var card = el('div', 'card pl-head');
+    var id = el('div', 'pl-id',
+      '<span class="pl-shirt">' + esc(who.no) + '</span>' +
+      '<span class="pl-nm">' + esc(who.name) + '</span>');
+
+    var wrap = el('span', 'menu-wrap');
+    var btn = el('button', 'btn btn-ghost menu-btn',
+      'Player <span class="caret" aria-hidden="true">▼</span>');
+    btn.type = 'button';
+    btn.setAttribute('aria-haspopup', 'true');
+    btn.setAttribute('aria-expanded', 'false');
+
+    var menu = el('div', 'menu');
+    menu.setAttribute('role', 'menu');
+    people.forEach(function (p) {
+      var o = el('button', 'menu-opt' + (p.key === who.key ? ' on' : ''),
+        esc(p.name) + '<em>' + esc(p.no) + ' · ' + p.apps + (p.apps === 1 ? ' match' : ' matches') +
+        ' · ' + esc(minsTotal(p)) + '</em>');
+      o.type = 'button';
+      /* the category he was being read in is kept — comparing two players on
+         Defensive should not drop back to Shooting halfway */
+      o.addEventListener('click', function () {
+        location.hash = '#/data/player/' + encodeURIComponent(p.key) + '/' + cat;
+      });
+      menu.appendChild(o);
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var open = wrap.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    var away = function () {
+      wrap.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      if (!wrap.isConnected) document.removeEventListener('click', away);
+    };
+    document.addEventListener('click', away);
+
+    id.appendChild(wrap);
+    card.appendChild(id);
+
+    var first = who.matches[0], last = who.matches[who.matches.length - 1];
+    card.appendChild(el('p', 'pl-meta',
+      esc(who.apps + (who.apps === 1 ? ' appearance' : ' appearances')) + ' · ' +
+      esc(minsTotal(who)) + ' · ' +
+      esc(window.HNA.shortDate(first.m.date)) +
+      (last !== first ? ' → ' + esc(window.HNA.shortDate(last.m.date)) : '')));
+    return card;
+  }
+
+  /* One row per match he played in, most recent first, then what the whole
+     campaign came to in the foot. The five fixed columns are Team Data's, with
+     Possession — a team measure — given over to Minutes Played. */
+  function playerMatchTable(who, cat) {
+    var cols = catCols(cat);
+    var head = '<th class="c-date">Date</th><th class="c-opp">vs</th>' +
+      '<th class="c-res">Result</th><th class="c-sc">Score</th><th>Minutes Played</th>' +
+      cols.map(function (c) { return '<th>' + esc(c[0]) + '</th>'; }).join('');
+
+    var rows = who.matches.slice().reverse().map(function (r) {
+      var m = r.m;
+      return '<tr data-go="' + esc(m.slug || m.id) + '">' +
+        '<td class="c-date">' + esc(window.HNA.shortDate(m.date)) + '</td>' +
+        '<td class="c-opp"><span class="cop"><b>' + esc(m.opponent) + '</b>' +
+          '<em>' + (m.side === 'home' ? 'H' : 'A') + '</em></span></td>' +
+        '<td class="c-res">' + (m.result ? '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' : '—') + '</td>' +
+        '<td class="c-sc">' + num(r.gf) + ' : ' + num(r.ga) + '</td>' +
+        minsOne(r.mins) +
+        cols.map(function (c) { return '<td>' + esc(String(c[1](r.stat))) + '</td>'; }).join('') +
+        '</tr>';
+    }).join('');
+
+    /* The totals are the column functions run on the summed stat, not the
+       summed cells: a percentage of the campaign is one ratio of its totals. */
+    var foot = '<tr><td class="c-date">Total</td>' +
+      '<td class="c-opp"><span class="cop"><b>' + who.apps +
+        (who.apps === 1 ? ' match' : ' matches') + '</b></span></td>' +
+      '<td class="c-res"></td><td class="c-sc"></td>' +
+      '<td>' + esc(minsTotal(who)) + '</td>' +
+      cols.map(function (c) { return '<td>' + esc(String(c[1](who.total))) + '</td>'; }).join('') +
+      '</tr>';
+
+    var wrap = el('div', 'stbl-wrap');
+    wrap.innerHTML = '<table class="stbl"><thead><tr>' + head + '</tr></thead>' +
+      '<tbody>' + rows + '</tbody><tfoot>' + foot + '</tfoot></table>';
+    wrap.addEventListener('click', function (e) {
+      var tr = e.target.closest ? e.target.closest('tr[data-go]') : null;
+      if (tr) location.hash = '#/match/' + encodeURIComponent(tr.getAttribute('data-go'));
+    });
+    return wrap;
+  }
+
+  /* ---------------------------------------------------------
      View: players
      --------------------------------------------------------- */
   function renderPlayers(view) {
@@ -772,14 +1106,14 @@
     return loaded[url];
   }
 
-  /* The stat engine on its own: computeStats, sumTeam, TEAM_SECTIONS, pct.
-     The Data view needs those and nothing else — no spreadsheet library, no
-     renderers, and none of the tagging app's stylesheets, which would land
-     their own :root on this page for the sake of a table it does not draw.
-     Same URL as the line below, so whichever view is opened first is the one
-     that pays for it. */
+  /* The stat engine on its own: computeStats, sumTeam, playedMinutes,
+     TEAM_SECTIONS, PLAYER_CATS, pct. The Data view needs those and nothing
+     else — no spreadsheet library, no renderers, and none of the tagging
+     app's stylesheets, which would land their own :root on this page for the
+     sake of a table it does not draw. Same URL as the line below, so whichever
+     view is opened first is the one that pays for it. */
   function loadShared() {
-    return loadOnce(taggerRoot() + 'shared.js?v=19');
+    return loadOnce(taggerRoot() + 'shared.js?v=20');
   }
 
   /* Pulled in the first time someone opens a match's stats, not on every page
@@ -790,7 +1124,7 @@
     loadOnce(r + 'Stats/stats-view.css?v=5', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
-      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=13'); })
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=14'); })
       .then(function () { return loadOnce(r + 'Stats/report.js?v=31'); });
   }
 
