@@ -264,7 +264,9 @@ test('T14c · nothing in the gate can reach across to the other side', () => {
      (`h.team===team` is fine and expected: that is filtering the shared history down to
      the side it WAS given.) Nor may it index state.lineups itself: the one road to a
      board is effectiveLU(team,…), which can only return the side it is asked for. */
-  ['squadAt','checkEntryNumbers','numberGateMessage'].forEach(name=>{
+  /* squadIn is where squadAt's body went when the analysis gate needed a pure twin of
+     it; scanning only the wrapper would leave the rule guarding an empty room. */
+  ['squadIn','squadAt','checkEntryNumbers','numberGateMessage'].forEach(name=>{
     const body=grabFunction(name);
     notOk(/'home'|"home"|'away'|"away"/.test(body),name+' names no side');
     notOk(/state\.lineups\[/.test(body),name+' reads no board directly');

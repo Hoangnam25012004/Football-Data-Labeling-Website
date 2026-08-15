@@ -74,15 +74,23 @@ const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
   'TRANSFER_EVENTS','TRAILING_EXTRA_DOT','NEEDS_RECEIVER','newId','SHOT_EVENTS','evtClass',
   'GOAL_SPOT_EVENTS','GOAL_VIEW','goalCapture',
   'OFF_PITCH_OK','sideName','entryAnchor',
-  'scrollToRow','editPrevTeam'];
-const FUNCS=['fmt','parseTime','eventHalf','matchTime','zoneAt','eventForKey',
+  'scrollToRow','editPrevTeam',
+  // the analysis gate: the seven rules a match passes before it can be published
+  'anKey','DUEL_MIRRORS','DUEL_TOTALS','SPOT_REQUIRED','AN_ORDER','AN_SPOT_MAX',
+  'SNAP_WINDOW','DUEL_PAIR_WINDOW','anStamp','anSide','anDur','sumOf','inMouth','anShort'];
+const FUNCS=['fmt','parseTime','eventHalfIn','eventHalf','matchTimeIn','matchTime',
+  'matchClockPartsIn','fmtMatchClockIn','zoneAt','eventForKey',
   'macroForKey','expandKey','expandMacros','parseChain','goalToPct','goalFromPct','goalBallSVG',
   'openGoalCapture','closeGoalCapture',
-  'effectiveLU','planSubGroup','swapInSnapshot','applySubGroup','subSideEffects',
+  'effectiveLUIn','effectiveLU','planSubGroup','swapInSnapshot','applySubGroup','subSideEffects',
   'removeSubSideEffects','shiftSubRowsWithPeriod','applyRedCard','redSideEffects',
   'removeRedSideEffects','submitEntry','chainHTML','deleteRows','startEdit','startEditGroup',
   // the shirt-number gate: entries are refused before anything is written
-  'squadAt','gateHistory','checkEntryNumbers','numberGateMessage','selectEntryNumber'];
+  'squadIn','squadAt','gateHistory','checkEntryNumbers','numberGateMessage','selectEntryNumber',
+  // …and the gate at the other end: a whole match, judged as it is frozen
+  'duelTally','totalCheck','mirrorCheck','checkShotSpots','histWithoutRow',
+  'checkShirtNumbers','spotLine','spotCheck','shirtCheck','duelHints',
+  'checkAnalysis','analysisRefusal'];
 
 /* ---- a fresh sandbox per test, so no scenario can leak into the next ---- */
 function makeApp(opts){

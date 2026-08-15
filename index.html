@@ -236,6 +236,19 @@
   .modal-close:hover{color:var(--danger)}
   .modal-body{padding:14px;overflow:auto}
   .modal-body .ev-list{max-height:none}
+  /* Submit Analysis — the seven checks. The green is the one Stats already paints a
+     won duel with, so the dialog and the bars speak the same language; there is no
+     --ok token on purpose (see the note by :root — win/lose colours are not chrome). */
+  .an-checks{margin-top:10px;font-size:12px;line-height:1.65;max-height:46vh;overflow:auto}
+  .an-head{padding-bottom:6px;color:var(--mut)}
+  .an-row{padding:4px 0;border-top:1px solid var(--line)}
+  .an-ok .an-mark{color:#39d98a}
+  .an-bad .an-mark{color:var(--danger)}
+  .an-mark{font-weight:700;margin-right:6px}
+  .an-detail{color:var(--mut);padding-left:20px;white-space:pre-wrap}
+  .an-spot{color:var(--mut);padding-left:20px;font-variant-numeric:tabular-nums;white-space:pre-wrap}
+  .an-more{color:var(--mut);padding-left:20px;font-style:italic}
+  .an-hint{margin-top:8px;padding-top:6px;border-top:1px solid var(--line);color:var(--mut)}
   .file-link{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11px;color:var(--mut)}
   .file-link button{background:var(--panel2);border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:600}
   .file-link button:hover{border-color:var(--accent);color:var(--accent)}
@@ -596,6 +609,9 @@
       <label class="fld"><span>Channel (the club that will see it)</span></label>
       <select class="txt" id="submitClub"></select>
       <div class="mini" id="submitCount" style="margin-top:10px;line-height:1.7"></div>
+      <!-- the seven analysis checks: all of them, passing ones included, so the dialog
+           answers "is this match clean" and not only "what is broken" -->
+      <div class="an-checks" id="submitChecks"></div>
       <button class="addbtn" id="submitGo" style="margin-top:12px">Publish this match</button>
       <div class="mini" id="submitMsg" style="margin-top:10px;line-height:1.7"></div>
     </div>
@@ -1389,8 +1405,17 @@ function parseTime(s){
   if(p.length===3)return p[0]*3600+p[1]*60+p[2];
   return 0;
 }
-// which half does a row belong to (based on the 2nd-half kick-off in Duration)
-function eventHalf(r){const h2=state.duration.h2Start; return (h2>0 && r.t>=h2)?2:1;}
+/* which half does a row belong to (based on the 2nd-half kick-off in Duration)
+
+   The four clock helpers below come in pairs: a pure `…In(dur, …)` that is handed the
+   duration mapping, and the familiar name that reads state.duration and delegates. The
+   Submit Analysis gate has to date its findings against the duration in the PAYLOAD —
+   what the club will read — and that is not always what this tab is holding. Splitting
+   rather than copying keeps one answer in the file to "what minute is this event at":
+   a second copy would drift, and the symptom would be a gate quoting a minute the
+   events table does not show, which nothing would catch. */
+function eventHalfIn(dur,t){const h2=dur.h2Start; return (h2>0 && t>=h2)?2:1;}
+function eventHalf(r){return eventHalfIn(state.duration,r.t);}
 // scoreboard — auto-counted from tagged events
 const GOAL_SPORTS=['football','football7','futsal'];
 function computeScore(){
@@ -1403,20 +1428,21 @@ function computeScore(){
 }
 function updateScore(){const s=computeScore(),el=$('scoreBoard');if(el)el.innerHTML='<b class="sc-h">'+s.home+'</b><span class="sc-dash">-</span><b class="sc-a">'+s.away+'</b>';}
 // map a raw video time to match-clock seconds
-function matchTime(vt){
-  const d=state.duration; if(!d.enabled)return vt;
+function matchTimeIn(d,vt){
+  if(!d.enabled)return vt;
   const off=(+d.halfLen||45)*60;
   if(d.h2Start>0 && vt>=d.h2Start) return off+(vt-d.h2Start);
   return Math.max(0, vt-(d.h1Start||0));
 }
+function matchTime(vt){return matchTimeIn(state.duration,vt);}
 // display-only stoppage time: past the half length the main clock STOPS at 45:00 /
 // 90:00 (or the equivalent for 40/35/30/... minute halves) and the overflow counts
 // separately as "+MM:SS.cc". Returns null inside regular time (plain clock applies).
-function matchClockParts(vt){
-  const d=state.duration; if(!d.enabled)return null;
+function matchClockPartsIn(d,vt){
+  if(!d.enabled)return null;
   const L=(+d.halfLen||45)*60;
-  const cap=eventHalf({t:vt})===2?2*L:L;
-  const mt=matchTime(vt);
+  const cap=eventHalfIn(d,vt)===2?2*L:L;
+  const mt=matchTimeIn(d,vt);
   if(mt<=cap)return null;
   // format the overflow from integer centiseconds — the float subtraction lands a
   // hair under the true value and fmt()'s floor would drop a centisecond
@@ -1424,8 +1450,10 @@ function matchClockParts(vt){
   return {base:fmt(cap).slice(0,5),
     extra:'+'+p2(Math.floor(cs/6000))+':'+p2(Math.floor(cs/100)%60)+'.'+p2(cs%100)};
 }
+function matchClockParts(vt){return matchClockPartsIn(state.duration,vt);}
 // plain-text variant for the toolbar clock: "45:00 +01:05.36"
-function fmtMatchClock(vt){const p=matchClockParts(vt);return p?p.base+' '+p.extra:fmt(matchTime(vt));}
+function fmtMatchClockIn(d,vt){const p=matchClockPartsIn(d,vt);return p?p.base+' '+p.extra:fmt(matchTimeIn(d,vt));}
+function fmtMatchClock(vt){return fmtMatchClockIn(state.duration,vt);}
 // inverse of matchTime — map match-clock seconds back to raw video time
 // (a clock time past halfLen counts as 2nd half when the 2nd-half kick-off is set)
 function videoTimeFromMatch(mt){
@@ -2428,13 +2456,19 @@ const numEq=(a,b)=>String(a==null?'':a).trim()===String(b==null?'':b).trim();
 // hist0 lets a caller ask "what would the XI be if THESE snapshots didn't exist" —
 // used when an existing substitution entry is edited (its own snapshot must not
 // count as the starting point for re-applying it).
-function effectiveLU(team,t,hist0){
-  const lu=state.lineups[team];
-  const hist=(hist0||state.lineups.history||[]).filter(h=>h.team===team&&h.t<=t).sort((a,b)=>a.t-b.t);
+/* Split the same way the clock helpers above are: the pure one is handed a lineups
+   object, the familiar name reads the live one. The Submit Analysis gate asks these
+   questions of the lineups inside the PAYLOAD, and it must get its answer from this
+   function and not from a second copy — the day the two disagree, one gate lets an
+   entry through and the other refuses it, with nothing on screen to say why. */
+function effectiveLUIn(lineups,team,t,hist0){
+  const lu=lineups[team];
+  const hist=(hist0||lineups.history||[]).filter(h=>h.team===team&&h.t<=t).sort((a,b)=>a.t-b.t);
   const last=hist[hist.length-1];
   return last?{xi:last.xi,subs:last.subs,dir:lu.dir,roster:lu.roster}
              :{xi:lu.xi,subs:lu.subs,dir:lu.dir,roster:lu.roster};
 }
+function effectiveLU(team,t,hist0){return effectiveLUIn(state.lineups,team,t,hist0);}
 /* ===== SHIRT-NUMBER GATE =====
    A tagged number has to be a number the side actually has on the board at that moment.
    The board is not one list: it starts as the XI and bench that Submit home / Submit away
@@ -2456,13 +2490,14 @@ const OFF_PITCH_OK=new Set(['substitution','yellow card','red card']);
 const sideName=t=>t==='home'?($('homeName').value||'Home'):($('awayName').value||'Away');
 
 // what one side has at time t: on the pitch, on the bench, and the two together
-function squadAt(team,t,hist0){
-  const eff=effectiveLU(team,t,hist0);
+function squadIn(lineups,team,t,hist0){
+  const eff=effectiveLUIn(lineups,team,t,hist0);
   const norm=v=>String(v==null?'':v).trim();
   const on=(eff.xi||[]).map(x=>norm(x&&x.no)).filter(Boolean);
   const bench=(eff.subs||[]).map(norm).filter(Boolean);
   return {on,bench,all:on.concat(bench.filter(n=>!on.includes(n)))};
 }
+function squadAt(team,t,hist0){return squadIn(state.lineups,team,t,hist0);}
 /* Touch k of an entry is dot k — parseChain numbers them in the order the numbers were
    typed, and submitEntry stores each row against its own dot's time. So each number is
    judged at ITS OWN moment. The anchor is the fallback: this gate runs BEFORE the dot
@@ -2573,6 +2608,302 @@ function selectEntryNumber(idx){
     if(k++===idx){try{PI.setSelectionRange(pad+m.index,pad+m.index+m[0].length);}catch(e){}return;}
   }
 }
+
+/* ===== ANALYSIS GATE =========================================================
+   The seven rules a match has to satisfy before ⇪ Submit Analysis will publish it.
+
+   Where the shirt-number gate above judges ONE entry at the moment it is typed, this
+   judges the WHOLE match at the moment it is frozen. The two are not the same question
+   and neither can stand in for the other:
+
+     · Duel reciprocity cannot be a rule about one entry at all. The other half of an
+       aerial duel is a separate entry, tagged minutes of work later; at the moment the
+       first one is typed, "where is the other half" has no correct answer. It only
+       becomes a question when the tagger says the match is finished, and that is here.
+
+     · A row that was legal WHEN TYPED can be made illegal afterwards. Move a
+       substitution's time, delete one, add a red card earlier in the match, and the
+       formation history is rewritten underneath rows that were vetted against the old
+       one. Nothing re-runs the entry gate for them. This one runs over everything.
+
+     · What gets published is read back out of the DATABASE (buildReport), so it
+       includes rows this tab never saw — tagged in another tab, or before the entry
+       gate existed. Those have never passed any gate at all.
+
+   Everything here is PURE: it is handed the payload and returns a description of it.
+   No DOM, no `state`, no video. That is what lets it be run twice — once to draw the
+   dialog, once inside publishReport against the very build that is about to be written
+   — and what lets the suite drive it with hand-written matches. */
+
+/* Event names are user-editable, so every lookup here goes through this — the same
+   normalisation shared.js calls evKey(). A gate that misses "Aerial Duel Success"
+   over a capital letter is worse than no gate: it reports a clean match. It also
+   closes a hole the entry gate has, where GOAL_SPOT_EVENTS.has() is case-sensitive
+   and a renamed shot event slips past the goal mouth entirely. */
+const anKey=e=>String(e==null?'':e).trim().toLowerCase();
+/* Every duel has two players in it, one from each side, so each of these has to be
+   answered by its mirror on the other side. Read both ways round: one entry here is
+   two identities (a on home = b on away, and b on home = a on away).
+
+   'take-on succes' is the spelling the shipped event list carries and the spelling
+   EVENT_INC keys off; the corrected spelling is accepted beside it so a tagger who
+   fixed the typo is not told their match is unbalanced.
+
+   take-on fail has NO mirror, on purpose. A beaten take-on is answered by whatever the
+   defender actually did — a tackle, a ground duel, an interception, or nothing at all.
+   An identity for it would refuse matches that are tagged correctly. */
+const DUEL_MIRRORS=[
+  {id:'aerial-mirror',label:'Aerial duels won ↔ lost',
+   a:['aerial duel success'],b:['aerial duel fail'],aName:'won',bName:'lost'},
+  {id:'ground-mirror',label:'Ground duels won ↔ lost',
+   a:['ground duel success'],b:['ground duel fail'],aName:'won',bName:'lost'},
+  {id:'takeon-mirror',label:'Take-ons won ↔ take-on concerns',
+   a:['take-on succes','take-on success'],b:['take-on concern'],
+   aName:'won',bName:'concerns'}
+];
+/* The two totals you asked for. They are IMPLIED by the mirrors above — a side's total
+   is its wins plus its losses, so two mirrored identities force the totals to agree —
+   and they are still evaluated and still shown, because the total is the line read
+   first ("Home 34, Away 31") and the mirror is the line that says where to look.
+   Never one without the other, and never a "fix" that keeps only one. */
+const DUEL_TOTALS=[
+  {id:'aerial-total',label:'Aerial duels — the same number on both sides',
+   of:['aerial duel success','aerial duel fail'],from:'aerial-mirror',n:2},
+  {id:'ground-total',label:'Ground duels — the same number on both sides',
+   of:['ground duel success','ground duel fail'],from:'ground-mirror',n:4}
+];
+/* A goal is on target by definition, and openGoalCapture() already holds one back for
+   a spot, so the gate covers the same two events the capture does. A gate looser than
+   the UI it is backing up is not a gate. */
+const SPOT_REQUIRED=new Set(['shot on target','goal']);
+const AN_ORDER=['aerial-total','aerial-mirror','ground-total','ground-mirror',
+                'takeon-mirror','shot-spot','shirt-numbers'];
+// a broken match can produce hundreds of offending moments; a dialog nobody scrolls to
+// the end of helps nobody, so the list is cut and the rest counted
+const AN_SPOT_MAX=12;
+// how far apart the snapshot a row created may sit from the row's own time — lifted
+// from subSideEffects / redSideEffects so the three can never drift apart
+const SNAP_WINDOW=3;
+// how near the other side's duel has to be to read as the same duel — a HINT only
+const DUEL_PAIR_WINDOW=5;
+/* "H2 67:40" — the half and the clock, the two things needed to find the row in the
+   events table. Stoppage time reads the way the toolbar reads it: "H1 45:00 +01:12.40". */
+const anStamp=(dur,t)=>'H'+eventHalfIn(dur,t)+' '+fmtMatchClockIn(dur,t);
+const anSide=(meta,team)=>team==='home'?((meta&&meta.home)||'Home'):((meta&&meta.away)||'Away');
+const anDur=d=>Object.assign({enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0},d||{});
+const sumOf=(bucket,names)=>names.reduce((n,k)=>n+((bucket&&bucket[k])||0),0);
+const inMouth=g=>!!g&&typeof g.x==='number'&&typeof g.y==='number'
+  &&g.x>=0&&g.x<=100&&g.y>=0&&g.y<=100;
+
+/* one pass over the rows -> {home:{<event>:n}, away:{…}} for every name the mirrors
+   care about. A row whose team is neither side is ignored: the database does not allow
+   one, and inventing a third column here would only hide the day it does. */
+function duelTally(rows){
+  const want=new Set();
+  DUEL_MIRRORS.forEach(m=>m.a.concat(m.b).forEach(n=>want.add(n)));
+  const t={home:{},away:{}};
+  (rows||[]).forEach(r=>{
+    const k=anKey(r.event); if(!want.has(k))return;
+    const side=t[r.team]; if(!side)return;
+    side[k]=(side[k]||0)+1;
+  });
+  return t;
+}
+// "Away is short 2" / "Home is short 2" — which side has to be looked at, not just that
+// the two disagree
+const anShort=(h,a)=>h===a?'':(h>a?'Away is short '+(h-a):'Home is short '+(a-h));
+function totalCheck(d,T){
+  const h=sumOf(T.home,d.of), a=sumOf(T.away,d.of);
+  const ok=h===a, lines=[];
+  if(ok)lines.push('Home '+h+'   Away '+a);
+  else{
+    lines.push('Home '+h+'  ≠  Away '+a+'      '+anShort(h,a));
+    lines.push('See check '+d.n+' for which half of the duel is missing.');
+  }
+  return {id:d.id,label:d.label,ok,lines,spots:[]};
+}
+function mirrorCheck(d,T){
+  // the two identities, each printed whether it holds or not — a match where one side
+  // is right and the other wrong reads as nonsense with only the failing half shown
+  const ha=sumOf(T.home,d.a), hb=sumOf(T.home,d.b);
+  const aa=sumOf(T.away,d.a), ab=sumOf(T.away,d.b);
+  const one=ha===ab, two=hb===aa, lines=[];
+  lines.push('Home '+d.aName+' '+ha+(one?'  =  ':'  ≠  ')+'Away '+d.bName+' '+ab
+    +(one?'':'      '+anShort(ha,ab)));
+  lines.push('Home '+d.bName+' '+hb+(two?'  =  ':'  ≠  ')+'Away '+d.aName+' '+aa
+    +(two?'':'      '+anShort(hb,aa)));
+  return {id:d.id,label:d.label,ok:one&&two,lines,spots:[]};
+}
+
+/* ---- C6: a shot on target carries the spot the ball crossed the line at ----
+   The range is checked as well as the presence: goalFromPct() clamps to the frame so
+   the UI cannot produce one outside it, but gXY arrives from the goal_x/goal_y columns
+   and a row put there by any other hand has not been through that clamp. */
+function checkShotSpots(rows,dur){
+  const bad=[];
+  (rows||[]).forEach(r=>{
+    if(!SPOT_REQUIRED.has(anKey(r.event)))return;
+    if(inMouth(r.gXY))return;
+    bad.push({t:r.t,team:r.team,no:String(r.playerFrom||'').trim(),event:r.event,rowId:r.id,
+      why:r.gXY?'the stored spot is outside the goal frame':'no spot was placed'});
+  });
+  return bad.sort((x,y)=>x.t-y.t);
+}
+
+/* ---- C7: every shirt number was one that side had, at that moment ----
+
+   The board a row is judged against is the board WITHOUT that row's own footprint.
+   A red card puts a snapshot at exactly its own t which removes the carded man from the
+   board altogether — applyRedCard deliberately does not drop him on the bench — so ask
+   effectiveLU at that t and he looks like a number the side never had. A gate that did
+   that would refuse every red card in every match, and say something meaningless while
+   it did ("sent off at 67:05 and is not on the pitch at 67:05").
+
+   gateHistory() already solves this for a row being re-edited; this is the same rule
+   made pure and applied to every row, so it reads as one sentence with no exceptions:
+   judge each row against the board as it stood just before that row changed it.
+   Substitutions are stripped too. They do not need it — the outgoing player moves to
+   the bench and substitution is in OFF_PITCH_OK — but a rule with an exception in it
+   is a rule somebody eventually applies to the wrong case. */
+function histWithoutRow(hist,row){
+  const ev=anKey(row.event);
+  if(ev!=='red card'&&ev!=='substitution')return hist||[];
+  return (hist||[]).filter(h=>{
+    if(h.team!==row.team||Math.abs(h.t-row.t)>SNAP_WINDOW)return true;
+    if(ev==='red card')return !(h.off!=null&&numEq(h.off,row.playerFrom));
+    return !/^Substitution/.test(h.label||'');
+  });
+}
+/* -> the offending (row, number) pairs in time order; [] when C7 holds; null when there
+   is no line-up to judge against at all. Both numbers on a row are checked: a pass
+   played to somebody who is not on the pitch is the same error as one played by them. */
+function checkShirtNumbers(lineups,rows){
+  if(!lineups||!lineups.home||!lineups.away)return null;
+  const hist0=lineups.history||[], bad=[];
+  (rows||[]).forEach(r=>{
+    if(!lineups[r.team])return;
+    const ev=anKey(r.event), hist=histWithoutRow(hist0,r);
+    const sq=squadIn(lineups,r.team,r.t,hist);
+    // this side was never submitted, so nothing tagged for it can be vouched for —
+    // the same verdict checkEntryNumbers gives, reached the same way
+    if(!sq.on.length){bad.push({kind:'no-board',t:r.t,team:r.team,no:null,
+      event:r.event,rowId:r.id,sq});return;}
+    [r.playerFrom,r.playerTo].forEach(raw=>{
+      const no=String(raw==null?'':raw).trim();
+      if(!no)return;                       // nothing claimed at this end, nothing to check
+      if(!sq.all.includes(no)){
+        // a sending-off is asked about first: it is the one way a number leaves the
+        // board entirely, and "was sent off at 71:05" beats "is not in the formation"
+        const red=hist.filter(h=>h.team===r.team&&h.off!=null&&numEq(h.off,no)&&h.t<=r.t)
+          .sort((a,b)=>a.t-b.t).pop();
+        bad.push({kind:red?'sent-off':'unknown',redT:red?red.t:null,t:r.t,team:r.team,
+          no,event:r.event,rowId:r.id,sq});
+        return;
+      }
+      if(!sq.on.includes(no)&&!OFF_PITCH_OK.has(ev))
+        bad.push({kind:'bench',t:r.t,team:r.team,no,event:r.event,rowId:r.id,sq});
+    });
+  });
+  return bad.sort((a,b)=>a.t-b.t);
+}
+// one offending moment -> the line printed for it
+function spotLine(dur,meta,s,tail){
+  return anStamp(dur,s.t)+'   '+anSide(meta,s.team)
+    +(s.no?'  No.'+s.no:'')+'   '+s.event+'   — '+tail;
+}
+function spotCheck(bad,dur,meta){
+  const ok=!bad.length;
+  return {id:'shot-spot',label:'Shot on target has a spot in the goal mouth',ok,
+    lines:[ok?'Every shot on target and every goal carries a spot.'
+             :bad.length+' shot(s) were stored without a spot in the goal mouth.'],
+    spots:bad.map(s=>spotLine(dur,meta,s,s.why))};
+}
+function shirtCheck(bad,dur,meta){
+  /* No line-up at all: there is no board to print, so this says what to do instead of
+     what is wrong, and it is a REFUSAL rather than the warning it used to be. Publishing
+     a match whose every shirt number is unvouched for is exactly what the entry gate
+     refuses at the other end. */
+  if(bad===null)
+    return {id:'shirt-numbers',label:'Shirt numbers were on the pitch at the time',ok:false,
+      lines:['This match has no line-up saved, so no shirt number in it can be vouched for.',
+             'Open Player lists, then ⇪ Submit home and ⇪ Submit away.'],spots:[]};
+  const ok=!bad.length;
+  const why=s=>s.kind==='no-board'
+      ? anSide(meta,s.team)+' has no line-up at this point in the match'
+    : s.kind==='sent-off' ? 'sent off at '+fmtMatchClockIn(dur,s.redT)
+    : s.kind==='bench'    ? 'on the bench at '+fmtMatchClockIn(dur,s.t)+', not on the pitch'
+    : 'not in '+anSide(meta,s.team)+'’s formation';
+  return {id:'shirt-numbers',label:'Shirt numbers were on the pitch at the time',ok,
+    lines:[ok?'Every shirt number was one that side had, at the moment it was tagged.'
+             :bad.length+' event(s) name a shirt number the side did not have at that moment.'],
+    spots:bad.map(s=>spotLine(dur,meta,s,why(s)))};
+}
+
+/* ---- where to look, when the counts disagree ----
+   Pair each duel with the nearest opposite one on the other side within a window,
+   greedily and in time order; whatever is left over is probably where the missing tag
+   is. A HINT and never a verdict: the two halves of one duel are two separate entries,
+   dotted at two slightly different times, so any window is a guess — and a guess must
+   never be able to stop a publish. checkAnalysis keeps these out of `ok` entirely. */
+function duelHints(rows,dur,meta){
+  const out=[];
+  const pass=(mine,theirs,side,other,what)=>{
+    const ours=(rows||[]).filter(r=>r.team===side&&mine.includes(anKey(r.event)))
+      .sort((x,y)=>x.t-y.t);
+    const answers=(rows||[]).filter(r=>r.team===other&&theirs.includes(anKey(r.event)))
+      .sort((x,y)=>x.t-y.t);
+    const taken=new Set(), loose=[];
+    ours.forEach(r=>{
+      let best=-1,bestD=Infinity;
+      answers.forEach((o,i)=>{
+        if(taken.has(i))return;
+        const d=Math.abs(o.t-r.t);
+        if(d<=DUEL_PAIR_WINDOW&&d<bestD){best=i;bestD=d;}
+      });
+      if(best>=0)taken.add(best); else loose.push(r);
+    });
+    if(!loose.length)return;
+    out.push({label:loose.length+' '+what+' on '+anSide(meta,side)
+        +' with nothing on '+anSide(meta,other)+' nearby',
+      spots:loose.map(r=>anStamp(dur,r.t)+'   '+anSide(meta,r.team)
+        +'  No.'+String(r.playerFrom||'').trim()+'   '+r.event)});
+  };
+  DUEL_MIRRORS.forEach(m=>{
+    // the four directions of one mirror; the side that is short is the one that comes
+    // back with nothing left over, so both readings are run and only the loose ends print
+    const A=m.label.split(' ↔ ')[0].toLowerCase(), B=A.replace(/\S+$/,m.bName);
+    pass(m.a,m.b,'home','away',A); pass(m.b,m.a,'home','away',B);
+    pass(m.a,m.b,'away','home',A); pass(m.b,m.a,'away','home',B);
+  });
+  return out;
+}
+
+/* -> {ok, checks:[{id,n,label,ok,lines,spots}], hints}
+   All seven are always scored — never short-circuited. The tagger has to see the whole
+   picture in one opening of the dialog, not fix-and-reopen seven times. */
+function checkAnalysis(payload){
+  const rows=(payload&&payload.rows)||[];
+  const dur=anDur(payload&&payload.dur), meta=(payload&&payload.meta)||{};
+  const lineups=payload&&payload.lineups;
+  const T=duelTally(rows), by={};
+  DUEL_TOTALS.forEach(d=>{by[d.id]=totalCheck(d,T);});
+  DUEL_MIRRORS.forEach(d=>{by[d.id]=mirrorCheck(d,T);});
+  by['shot-spot']=spotCheck(checkShotSpots(rows,dur),dur,meta);
+  by['shirt-numbers']=shirtCheck(checkShirtNumbers(lineups,rows),dur,meta);
+  const checks=AN_ORDER.map((id,i)=>Object.assign(by[id],{n:i+1}));
+  return {ok:checks.every(c=>c.ok),checks,hints:duelHints(rows,dur,meta)};
+}
+/* The one-line refusal, naming the checks that failed — the dialog may well be scrolled
+   past the table by the time somebody presses Publish, and "checks failed" sends nobody
+   anywhere. null when there is nothing to refuse. */
+function analysisRefusal(v){
+  const bad=v.checks.filter(c=>!c.ok);
+  if(!bad.length)return null;
+  return 'Nothing was published — '+bad.length+' of the seven analysis checks '
+    +(bad.length===1?'is':'are')+' still failing ('
+    +bad.map(c=>c.label.split(' — ')[0].toLowerCase()).join('; ')+').';
+}
+
 /* Vet a whole entry's substitution pairs against the XI in effect at t0 BEFORE anything
    is written. Every pair has to take one player OFF the pitch and bring one ON:
      OUT on pitch,  IN off pitch  -> fine
@@ -3680,6 +4011,41 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
   const close=()=>modal.classList.remove('show');
   const say=(id,text,bad)=>{const n=$(id);n.textContent=text||'';n.style.color=bad?'var(--danger)':'var(--mut)';};
 
+  const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[c]);
+  /* The only piece of the gate that touches the DOM. Every passing check is drawn too:
+     a list of failures alone never says whether the gate ran at all. `stale` is the
+     sync warning — when the database is still behind this tab the duel counts are
+     counted off an incomplete match, and sending somebody to hunt three missing
+     headers that are simply still in flight is worse than saying nothing. */
+  function renderAnalysisChecks(v,stale){
+    const box=$('submitChecks'); if(!box)return;
+    if(!v){box.innerHTML='';return;}
+    const pass=v.checks.filter(c=>c.ok).length, out=[];
+    out.push('<div class="an-head">'+(v.ok
+      ? 'Analysis checks — all seven passed.'
+      : 'Analysis checks — '+pass+' of 7 passed.  Publishing is blocked until all seven'
+        +' pass.')+'</div>');
+    if(stale)out.push('<div class="an-head">The database is still behind this tab — these'
+      +' numbers are counted from what it holds today, and some of them will change once'
+      +' the sync finishes.</div>');
+    v.checks.forEach(c=>{
+      out.push('<div class="an-row '+(c.ok?'an-ok':'an-bad')+'"><span class="an-mark">'
+        +(c.ok?'✓':'✗')+'</span>'+c.n+'. '+esc(c.label)+'</div>');
+      c.lines.forEach(l=>out.push('<div class="an-detail">'+esc(l)+'</div>'));
+      c.spots.slice(0,AN_SPOT_MAX).forEach(s=>out.push('<div class="an-spot">'+esc(s)+'</div>'));
+      if(c.spots.length>AN_SPOT_MAX)
+        out.push('<div class="an-more">…and '+(c.spots.length-AN_SPOT_MAX)+' more.</div>');
+    });
+    // never part of the verdict — see duelHints()
+    if(!v.ok)v.hints.forEach(h=>{
+      out.push('<div class="an-hint">Where to look (a guess) — '+esc(h.label)+':</div>');
+      h.spots.slice(0,AN_SPOT_MAX).forEach(s=>out.push('<div class="an-spot">'+esc(s)+'</div>'));
+      if(h.spots.length>AN_SPOT_MAX)
+        out.push('<div class="an-more">…and '+(h.spots.length-AN_SPOT_MAX)+' more.</div>');
+    });
+    box.innerHTML=out.join('');
+  }
+
   $('submitClose').onclick=close;
   modal.addEventListener('click',e=>{if(e.target===modal)close();});
 
@@ -3688,6 +4054,7 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
     say('submitMsg',''); $('submitState').textContent='';
     $('submitGo').disabled=true;
     $('submitClub').innerHTML='';
+    renderAnalysisChecks(null);
     if(!window.Cloud||!Cloud.connected||!Cloud.matchId){
       say('submitCount','Open a match on the cloud first — ☁ Cloud, then a match code.',true);
       return;
@@ -3714,8 +4081,16 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
       if(!built.payload.lineups)bits.push('⚠ No starting line-up saved for this match.');
       bits.push(last?('Last published: v'+last.version+', '+last.event_count+' events.'):'Never published.');
       say('submitCount',bits.join(' '),short);
-      $('submitState').textContent=short?'not ready':'ready';
-      $('submitGo').disabled=short;
+      /* The seven checks, scored last: they are a statement about the payload, and the
+         payload is only worth judging once the two lines above have said it is the whole
+         match. A failing check disables Publish exactly as a lagging sync does — the
+         verdict here is a report, and the gate that actually refuses runs inside
+         publishReport() against the build it is about to write. */
+      const verdict=checkAnalysis(built.payload);
+      renderAnalysisChecks(verdict,short);
+      const blocked=short||!verdict.ok;
+      $('submitState').textContent=blocked?'not ready':'ready';
+      $('submitGo').disabled=blocked;
     }catch(e){say('submitCount',(e&&e.message)||String(e),true);}
   };
 
@@ -3726,12 +4101,26 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
     if(!confirm('Publish this match to '+name+'?\n\nThe club sees this version until you publish again.'))return;
     $('submitGo').disabled=true;
     say('submitMsg','Publishing…');
+    let refused=false;
     try{
-      const r=await Cloud.publishReport(id);
+      /* The gate proper. It is handed DOWN into publishReport so that what is judged and
+         what is written are the same build — the dialog's own verdict was scored against
+         an earlier one, and between the two a row can arrive from another tab. Returning
+         a string refuses; the RPC is never reached and the match keeps its old version. */
+      const r=await Cloud.publishReport(id,payload=>{
+        const v=checkAnalysis(payload);
+        renderAnalysisChecks(v);
+        if(v.ok)return null;
+        refused=true;
+        return analysisRefusal(v);
+      });
       say('submitMsg','Published as v'+r.version+' — '+r.eventCount+' events. '+name+' can open it now.');
       $('submitState').textContent='v'+r.version;
     }catch(e){
-      $('submitGo').disabled=false;
+      // a network error leaves the button live to try again; a refusal does not — the
+      // table above now says which checks failed, and pressing again cannot change that
+      $('submitGo').disabled=refused;
+      if(refused)$('submitState').textContent='not ready';
       say('submitMsg',(e&&e.message)||String(e),true);
     }
   };
@@ -3739,6 +4128,6 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
 
 window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, renderMacros, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
 </script>
-<script src="cloud-sync.js?v=48"></script>
+<script src="cloud-sync.js?v=49"></script>
 </body>
 </html>

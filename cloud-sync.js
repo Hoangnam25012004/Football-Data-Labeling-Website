@@ -471,9 +471,16 @@ const CONFIG = {
   }
 
   /* One transaction on the far side: the report is written and the match is
-     pointed at the channel and marked published, or neither happens. */
-  async function publishReport(clubId) {
+     pointed at the channel and marked published, or neither happens.
+
+     `gate` is the caller's veto, run on the built payload and before the RPC:
+     return a string to refuse, anything falsy to go ahead. It lives here rather
+     than in the dialog so that what is judged and what is written are the same
+     build — cloud-sync does not know what a fair aerial duel count looks like,
+     and the tagging app does not get to hold a payload that this one re-fetches. */
+  async function publishReport(clubId, gate) {
     const built = await buildReport();
+    if (gate) { const stop = gate(built.payload); if (stop) throw new Error(stop); }
     const { data, error } = await sb.rpc('publish_match_report', {
       p_match_id: matchId, p_club_id: clubId,
       p_payload: built.payload, p_event_count: built.eventCount, p_schema: 1

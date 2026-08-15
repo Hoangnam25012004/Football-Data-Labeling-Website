@@ -50,7 +50,9 @@ test('the substitution history goes with the line-ups', () => {
 });
 
 test('publishing is one call, so a report and its match cannot disagree', () => {
-  const fn=/async function publishReport\(clubId\)[\s\S]*?\n  \}/.exec(CLOUD)[0];
+  // the caller's veto rides along as a second parameter (see the analysis gate); it
+  // runs between the build and the RPC and does not turn one write into two
+  const fn=/async function publishReport\(clubId, gate\)[\s\S]*?\n  \}/.exec(CLOUD)[0];
   ok(/sb\.rpc\('publish_match_report'/.test(fn),'it goes through the function');
   notOk(/from\('matches'\)\.update|from\('match_reports'\)\.insert/.test(fn),
         'not two writes from the browser — half of that landing is the bad case');
@@ -77,7 +79,10 @@ test('it refuses to look ready when the database is behind this tab', () => {
   // still adds up, it is just wrong
   const wire=/\/\* ---- Submit Analysis[\s\S]*?\n\}\)\(\);/.exec(TAGGER)[0];
   ok(/built\.localCount>0&&built\.eventCount<built\.localCount/.test(wire),'it compares the two counts');
-  ok(/\$\('submitGo'\)\.disabled=short/.test(wire),'and the button stays down when they disagree');
+  // the button is held down by this OR a failing analysis check; what this test has
+  // always been about is that a lagging sync keeps its own veto either way
+  ok(/const blocked=short\|\|!verdict\.ok/.test(wire),'a lagging sync still vetoes, beside the seven checks');
+  ok(/\$\('submitGo'\)\.disabled=blocked/.test(wire),'and the button stays down when they disagree');
   ok(/let the sync finish/.test(wire),'saying what to do about it');
 });
 
