@@ -172,6 +172,22 @@ table.lu-tbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fix
 .lu-foot{padding:8px 14px;border-top:1px solid var(--line);color:var(--mut);font-size:11px}
 .lu-foot:empty{display:none}   /* the pool count is gone; the bar only shows for warnings */
 
+/* ⇪ Submit — the two-item menu on the Player lists header. Nothing arranged on that page
+   reaches the tagging tab until one of them is pressed, and the dot says when the two
+   disagree. Same shape as the ▾ Other menu on the tagging tab; that one is styled inside
+   index.html, which no other page reads, so this is the copy the sub-page gets. */
+.lu-submit{position:relative}
+.lu-submit>button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:600}
+.lu-submit>button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.lu-submit>button:disabled{color:var(--mut);cursor:not-allowed}
+.lu-submit>button.dirty::after{content:"●";color:var(--accent);margin-left:7px;font-size:9px;vertical-align:1px}
+.lu-submit-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:220px;z-index:60;display:none;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px;box-shadow:0 10px 24px rgba(0,0,0,.45)}
+.lu-submit-menu.show{display:block}
+.lu-submit-item{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;background:none;border:0;color:var(--ink);text-align:left;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600}
+.lu-submit-item:hover{background:var(--panel)}
+.lu-submit-item .mark{color:var(--mut);font-weight:400;font-size:11px;white-space:nowrap}
+.lu-submit-item.dirty .mark{color:var(--accent)}
+
 /* formation card */
 .lu-formbody{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
 .lu-pitchwrap{background:#142b18;border:1px solid var(--line);border-radius:8px;overflow:hidden;padding:6px;width:100%;max-width:860px;margin:0 auto}

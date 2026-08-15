@@ -1270,7 +1270,7 @@
      load — the spreadsheet library alone is larger than this whole site. */
   function loadStatsView() {
     var r = taggerRoot();
-    loadOnce(r + 'shared.css?v=13', 'css');
+    loadOnce(r + 'shared.css?v=14', 'css');
     loadOnce(r + 'Stats/stats-view.css?v=5', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })

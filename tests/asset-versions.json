@@ -20,8 +20,8 @@
     "sha256": "166a8ad4033724fd"
   },
   "client/assets/app.js": {
-    "v": 30,
-    "sha256": "957adf12fd097a03"
+    "v": 31,
+    "sha256": "2e0fcd8c5e7aa541"
   },
   "client/assets/hanley-town.png": {
     "v": 1,
@@ -44,8 +44,8 @@
     "sha256": "d84a50785100f357"
   },
   "shared.css": {
-    "v": 13,
-    "sha256": "3c260b75ebcc8fe4"
+    "v": 14,
+    "sha256": "103be207c19f844c"
   },
   "shared.js": {
     "v": 21,

@@ -6,7 +6,7 @@
 <title>Player lists — Pitch Tagger</title>
 <script src="../auth.js?v=1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="../shared.css?v=13">
+<link rel="stylesheet" href="../shared.css?v=14">
 <link rel="stylesheet" href="../shared-page.css?v=1">
 </head>
 <body>
@@ -15,6 +15,18 @@
   <div class="stats-toggle" style="margin-left:14px">
     <button id="luHomeBtn"></button>
     <button id="luAwayBtn"></button>
+  </div>
+  <!-- Send a side's board to the tagging tab. Nothing edited on this page crosses over
+       until one of these is pressed — see the draft / published split in the script below. -->
+  <div class="lu-submit">
+    <button id="luSubmitBtn" aria-haspopup="true" aria-expanded="false"
+            title="Send a side's starting XI, substitutes and formation to the tagging tab">⇪ Submit ▾</button>
+    <div class="lu-submit-menu" id="luSubmitMenu" role="menu">
+      <button class="lu-submit-item" id="luSubmitHome" role="menuitem">
+        <span class="who">Submit home</span><span class="mark" id="luMarkHome"></span></button>
+      <button class="lu-submit-item" id="luSubmitAway" role="menuitem">
+        <span class="who">Submit away</span><span class="mark" id="luMarkAway"></span></button>
+    </div>
   </div>
   <span id="saveStatus" style="margin-left:12px;font-size:11px;color:var(--mut)"></span>
 </header>
@@ -94,7 +106,40 @@ migrateLineupStamp(meta.matchId);                 // stores written before stamp
    until that resolves — and nothing is saved while it is false, or a squad belonging to
    another match would be written over this one's, locally and in the database. */
 let luMatchId=meta.matchId||null, luReady=false;
-let lineups=lineupsAreFor(luMatchId)?loadLineups():blankLineups();
+/* ---- the DRAFT, and the copy everybody else reads ----
+   `lineups` — the variable every editor function below already works through — is the
+   DRAFT now: what this page is arranging, and what nobody else can see. `published` is
+   the copy the tagging tab, the Stats page and the report read, and it only ever moves
+   when ⇪ Submit home / Submit away is pressed. That is the whole feature: before this,
+   every tick and every dragged dot went straight into the shared store and showed up on
+   the tagging tab mid-arrangement.
+   Same stamp rule as the published store: a draft belongs to exactly ONE match, and
+   localStorage is shared by every match this browser has ever opened. */
+const LU_DRAFT='pitchtagger.lineups.draft.v1';
+const LU_DRAFT_MATCH='pitchtagger.lineups.draft.match.v1';
+const draftStamp=()=>{try{const s=localStorage.getItem(LU_DRAFT_MATCH);return s==null?null:String(s);}catch(e){return null;}};
+const draftIsFor=id=>!!id&&draftStamp()===String(id);
+function loadDraft(){try{const s=localStorage.getItem(LU_DRAFT);
+  if(s){const o=JSON.parse(s); if(o&&o.home&&o.away)return o;}}catch(e){} return null;}
+const clone=v=>JSON.parse(JSON.stringify(v==null?null:v));
+/* A draft carries the two sides and NOTHING else. `history` — the formation snapshots a
+   substitution or a red card leaves behind — and `subHistory` belong to the tagging tab.
+   A draft holding a copy of them would hand a stale one back on submit, and would let
+   faceTeam() turn snapshots this page does not own: switching direction here would rotate
+   a copy of them, and the real ones would either be missed or overwritten along with the
+   substitution tagged while this page was open. So the turn is applied to the snapshots at
+   PUBLISH time instead, against the live copy, re-read there. */
+const teamDraft=t=>({roster:clone((t&&t.roster)||[]),xi:clone((t&&t.xi)||[]),
+                     subs:clone((t&&t.subs)||[]),dir:(t&&t.dir)||'lr'});
+const draftOf=l=>({home:teamDraft(l&&l.home),away:teamDraft(l&&l.away)});
+// Stamp FIRST, then the draft — the same order, and for the same reason, as saveLineupsLS().
+function saveDraftLS(){
+  const id=String(meta.matchId||''); if(!id)return false;
+  try{localStorage.setItem(LU_DRAFT_MATCH,id);localStorage.setItem(LU_DRAFT,JSON.stringify(lineups));}catch(e){}
+  return true;
+}
+let published=lineupsAreFor(luMatchId)?loadLineups():blankLineups();
+let lineups=(draftIsFor(luMatchId)&&loadDraft())||draftOf(published);
 let lineupTeam='home';
 let poolSort={key:'no',dir:1}, finalSort={key:'no',dir:1};
 function teamLU(){return lineups[lineupTeam];}
@@ -109,33 +154,96 @@ function splitName(name){
 }
 function setSaveStatus(txt,warn){const st=$('saveStatus');
   if(st){st.textContent=txt||'';st.style.color=warn?'var(--warn)':'var(--accent)';}}
-// save = localStorage (main tab mirrors it live via `storage`) + push straight to the
-// match row in Supabase, so saving never depends on the main tab being open to relay —
-// before this, edits made here could be overwritten by the stale cloud copy on reload.
-// Both writes are stamped with the match they belong to and are skipped entirely until
-// `lineups` is known to be that match's, so this page can never clear another match's squad.
-let pushTimer=null;
+/* Every edit on this page lands here, and from here it goes into the DRAFT only. Nothing
+   reaches the tagging tab, the Stats page or the match row until ⇪ Submit is pressed —
+   that is the whole feature, and it is this one line that makes it true.
+   The guard is the old one, unchanged: until `lineups` is known to be this match's, write
+   nothing, or a squad belonging to another match would be saved over this one's. */
 function save(){
   const id=meta.matchId;
   if(!luReady||!id||id!==luMatchId)return;
-  saveLineupsLS(lineups,id);
-  if(sb){
-    clearTimeout(pushTimer);
-    pushTimer=setTimeout(async()=>{
-      if(meta.matchId!==id)return;            // another match was opened while we waited
-      const {error}=await sb.from('matches').update({lineups}).eq('id',id);
-      setSaveStatus(error?'⚠ cloud save failed: '+error.message:'☁ saved to the match',!!error);
-      if(error)console.warn('lineups save:',error.message);
-    },300);
-  }
+  saveDraftLS();
+  renderSubmitState();
+}
+/* Send ONE side's squad and board to the tagging tab (and to the match row).
+   Everything the tagging tab owns survives untouched: the other side, `history` — the
+   formation snapshots substitutions and red cards leave behind — and each side's
+   `subHistory` (minutes played).
+   The published copy is re-read HERE, not remembered from load: a substitution tagged
+   while this page was being arranged has already changed it, and publishing a remembered
+   copy would hand that change back undone. */
+async function publishTeam(team){
+  const id=meta.matchId;
+  if(!luReady||!id||id!==luMatchId){
+    setSaveStatus('⚠ this match’s squad is still loading — try again in a moment',true); return; }
+  const P=lineupsAreFor(id)?loadLineups():blankLineups();
+  /* Attacking direction is ONE fact about the fixture, not two facts about two teams — two
+     sides cannot both attack the same goal — so it lands on both sides at once, with each
+     side's own dots AND its own snapshots turned with it. faceTeam() does nothing at all to
+     a side already facing that way, so a submit that does not change the direction moves
+     not one dot and not one snapshot. It runs BEFORE the copy below on purpose: the copy
+     overwrites this side's xi anyway, but the turn of this side's snapshots is the work. */
+  const dir=lineups[team].dir||'lr';
+  faceTeam(P,team,dir);
+  faceTeam(P,team==='home'?'away':'home',dir==='lr'?'rl':'lr');
+  // this side's squad and board, out of the draft. Object.assign keeps whatever else that
+  // side is carrying — subHistory above all — exactly where it was.
+  const src=lineups[team];
+  P[team]=Object.assign({},P[team],
+    {roster:clone(src.roster),xi:clone(src.xi),subs:clone(src.subs),dir});
+  if(!saveLineupsLS(P,id)){setSaveStatus('⚠ could not save the squad',true);return;}
+  published=P; renderSubmitState();
+  await pushPublished(P,id,team);
+}
+/* The cloud half of a publish: straight onto the match row, so it never depends on the
+   tagging tab being open to relay it. Also used by the offline-adoption path below, which
+   is why `team` is optional. */
+async function pushPublished(P,id,team){
+  const who=team?(team==='home'?meta.home:meta.away):'The squad';
+  if(!sb){setSaveStatus('⇪ '+who+' sent to the tagging tab (this browser only — offline)',true);return;}
+  const {error}=await sb.from('matches').update({lineups:P}).eq('id',id);
+  if(error)console.warn('lineups publish:',error.message);
+  setSaveStatus(error?'⚠ cloud save failed: '+error.message:'⇪ '+who+' sent to the tagging tab',!!error);
+}
+/* Does this side's draft differ from the board the tagging tab is showing? Compared on the
+   four things a submit sends, in a stable order, so re-sorting a table is not a change
+   while moving a dot is. Coordinates are compared to 1/100 of a percent: arrangeXI() lands
+   dots by arithmetic, and float noise is not an edit. */
+const teamSig=t=>JSON.stringify({
+  roster:((t&&t.roster)||[]).map(p=>[String(p.no),p.name||'',p.pid||'']).sort(),
+  xi:((t&&t.xi)||[]).map(x=>[String(x.no),Math.round(x.x*100),Math.round(x.y*100),x.pos||'']).sort(),
+  subs:((t&&t.subs)||[]).map(String).sort(),
+  dir:(t&&t.dir)||'lr'});
+const teamDirty=team=>teamSig(lineups[team])!==teamSig(published&&published[team]);
+const dirtyTeams=()=>['home','away'].filter(teamDirty);
+/* The dot means one thing in both places: this side's board is not the one the tagging tab
+   has. The tally beside each item is what WOULD be sent, so an incomplete XI is visible
+   before it is sent rather than after. It is deliberately not a block — the tagging tab
+   copes with a partial XI, and refusing to send one would be a new rule nobody asked for. */
+function renderSubmitState(){
+  const open=!!meta.matchId, dirty=open?dirtyTeams():[];
+  const btn=$('luSubmitBtn'); if(!btn)return;
+  btn.disabled=!open||!luReady;
+  btn.classList.toggle('dirty',!!dirty.length);
+  [['home','luSubmitHome','luMarkHome'],['away','luSubmitAway','luMarkAway']].forEach(([team,id,markId])=>{
+    const t=lineups[team]||{xi:[],subs:[]}, d=dirty.includes(team);
+    $(id).classList.toggle('dirty',d);
+    $(markId).textContent=(t.xi||[]).length+'/'+maxXI()+' · '+(t.subs||[]).length+' subs'+(d?' · not sent':'');
+  });
+  if(!open||!luReady)return;
+  setSaveStatus(dirty.length?'✎ draft — '+dirty.join(' + ')+' not sent to the tagging tab yet'
+                            :'✓ both sides match the tagging tab');
 }
 /* Read this match's squad from the match row — the source of truth — and only fall back to
    the local copy when it is stamped for this same match. Called on load and whenever the
-   tagging tab opens a different match. */
+   tagging tab opens a different match. What arrives is the PUBLISHED copy; the draft is
+   seeded from it the first time this browser sees the match, and left alone after that so
+   an arrangement in progress is never blanked by a reload. */
 async function loadMatchLineups(){
   const id=meta.matchId||null;
   luMatchId=id; luReady=false;
-  lineups=lineupsAreFor(id)?loadLineups():blankLineups();   // usable straight away
+  published=lineupsAreFor(id)?loadLineups():blankLineups();   // usable straight away
+  lineups=(draftIsFor(id)&&loadDraft())||draftOf(published);
   renderLineup();
   if(!id)return;
   if(!sb){                                  // no database: the local copy is all there is
@@ -150,13 +258,17 @@ async function loadMatchLineups(){
     console.warn('lineups load:',error.message); return;
   }
   const cloud=data&&data.lineups;
-  const hadLocal=lineupsAreFor(id)&&!lineupsEmpty(lineups);
-  if(cloud&&cloud.home&&cloud.away){lineups=cloud;saveLineupsLS(lineups,id);}
-  else if(!hadLocal)lineups=blankLineups();
+  const hadLocal=lineupsAreFor(id)&&!lineupsEmpty(published);
+  if(cloud&&cloud.home&&cloud.away){published=cloud;saveLineupsLS(published,id);}
+  else if(!hadLocal)published=blankLineups();
   luReady=true;
-  // the match has nothing saved yet but this browser does (entered while offline) —
-  // that copy is the only one there is, so put it in the match row now
-  if(!(cloud&&cloud.home&&cloud.away)&&hadLocal)save();
+  // first visit to this match on this browser: the draft starts as the board the tagging
+  // tab is already showing, so opening this page changes nothing and loses nothing
+  if(!draftIsFor(id)){lineups=draftOf(published);saveDraftLS();}
+  // the match has nothing saved yet but this browser does (entered while offline) — that
+  // copy is the only one there is, so put it in the match row now. It is a PUBLISHED copy,
+  // so it goes up whole; save() no longer reaches the cloud, hence the direct push.
+  if(!(cloud&&cloud.home&&cloud.away)&&hadLocal)pushPublished(published,id,null);
   renderLineup();
 }
 
@@ -469,7 +581,7 @@ function renderLineup(){
   const open=!!meta.matchId;
   $('noMatchMsg').style.display=open?'none':'block';
   document.querySelector('.lineup-body').style.display=open?'':'none';
-  if(!open)return;
+  if(!open){renderSubmitState();return;}
   $('luHomeBtn').className=lineupTeam==='home'?'act-home':'';
   $('luAwayBtn').className=lineupTeam==='away'?'act-away':'';
   $('luHomeBtn').textContent=meta.home;
@@ -481,7 +593,7 @@ function renderLineup(){
     if(!t.xi.some(x=>sameNo(x.no,p.no))&&!t.subs.some(n=>sameNo(n,p.no))){addToLineup(p.no);fixed=true;}
   });
   if(fixed)save();
-  renderPool(); renderFinal(); renderLuPitch();
+  renderPool(); renderFinal(); renderLuPitch(); renderSubmitState();
 }
 
 $('luHomeBtn').onclick=()=>{lineupTeam='home';renderLineup();};
@@ -490,6 +602,19 @@ $('dbAdd').onclick=addPlayer;
 $('dbName').addEventListener('keydown',e=>{if(e.key==='Enter')addPlayer();});
 $('dbSearch').addEventListener('input',renderPool);
 $('luDir').onclick=luSwitchDir;
+/* ⇪ Submit — the two ways a board crosses to the tagging tab. Same shape as the ▾ Other
+   menu there: the button toggles it, a click anywhere else shuts it, Escape shuts it. */
+function setSubmitOpen(on){
+  $('luSubmitMenu').classList.toggle('show',!!on);
+  $('luSubmitBtn').setAttribute('aria-expanded',on?'true':'false');
+}
+$('luSubmitBtn').onclick=e=>{e.stopPropagation();
+  setSubmitOpen(!$('luSubmitMenu').classList.contains('show'));};
+document.addEventListener('click',e=>{
+  if($('luSubmitMenu').classList.contains('show')&&!$('luSubmitMenu').contains(e.target))setSubmitOpen(false);});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')setSubmitOpen(false);});
+$('luSubmitHome').onclick=()=>{setSubmitOpen(false);publishTeam('home');};
+$('luSubmitAway').onclick=()=>{setSubmitOpen(false);publishTeam('away');};
 $('poolAll').onclick=e=>{                    // header tick only clears — adding needs a number each
   e.preventDefault();
   const picked=poolRows().filter(p=>p.inSquad);
@@ -518,7 +643,11 @@ window.addEventListener('storage',e=>{
   }
   else if(e.key===PT_KEYS.lineups){
     if(!lineupsAreFor(meta.matchId))return;   // another match's copy — not ours to show or save
-    lineups=loadLineups(); luMatchId=meta.matchId; luReady=true; renderLineup();
+    /* The live copy moved: a substitution or a red card was tagged over there, or somebody
+       else submitted. The DRAFT is deliberately left alone — this page is the one place an
+       unfinished board is allowed to sit. All that changes is whether the ⇪ Submit dot is
+       lit, which is what renderSubmitState() decides. */
+    published=loadLineups(); luMatchId=meta.matchId; luReady=true; renderSubmitState();
   }
 });
 
