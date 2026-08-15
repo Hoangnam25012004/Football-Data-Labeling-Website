@@ -779,7 +779,7 @@
      Same URL as the line below, so whichever view is opened first is the one
      that pays for it. */
   function loadShared() {
-    return loadOnce(taggerRoot() + 'shared.js?v=18');
+    return loadOnce(taggerRoot() + 'shared.js?v=19');
   }
 
   /* Pulled in the first time someone opens a match's stats, not on every page
@@ -790,8 +790,8 @@
     loadOnce(r + 'Stats/stats-view.css?v=5', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
-      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=12'); })
-      .then(function () { return loadOnce(r + 'Stats/report.js?v=30'); });
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=13'); })
+      .then(function () { return loadOnce(r + 'Stats/report.js?v=31'); });
   }
 
   /* ---------------------------------------------------------

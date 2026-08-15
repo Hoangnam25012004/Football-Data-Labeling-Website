@@ -150,6 +150,7 @@ function submitShot(app,raw,dots,spot){
 const SHARED=readSrc('shared.js');
 const CLOUD=readSrc('cloud-sync.js');
 const SHARED_EXPORTS=['esc','squadOnPitch','squadNames','playerLabel','withSquad',
+  'playedMinutes','matchWindows',
   'computeStats','sortedPlayers','newStat','statRow','sumTeam','passMatrix','pct',
   'blankTeamLU','blankLineups','zoneAt','EVENT_INC','STAT_HEADERS','STAT_GROUPS',
   'TEAM_SECTIONS','numOf',

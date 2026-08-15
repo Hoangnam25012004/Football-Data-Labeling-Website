@@ -117,12 +117,28 @@ function renderStats(){
   holder.innerHTML=dashboardHTML(statTeam);
   if(statCat==='distribution')heatHover('');   // canvas must exist in the DOM first
 }
-/* Stats view: the per-player table for the chosen category, and nothing else. */
+/* A player nobody entered a line-up for reads "—", never "0'": no minutes played is a
+   statement about the match, and this is the absence of one. A leading "~" marks a total
+   worked out without the Duration boundaries — the video's own clock, close but not the
+   match's. Shared by the table and the spreadsheet, which want different empties. */
+function minsCell(mins,no){
+  const m=mins&&mins[String(no==null?'':no).trim()];
+  if(!m)return '<td class="mn">—</td>';
+  const title=m.exact?`1st ${Math.round(m.h1/60)}' · 2nd ${Math.round(m.h2/60)}'`
+                     :'approximate — the match duration has not been set';
+  return `<td class="mn" title="${esc(title)}">${m.exact?'':'~'}${m.min}'</td>`;
+}
+/* Stats view: the per-player table for the chosen category, and nothing else.
+   Minutes played sits beside the name in all four categories rather than inside any
+   one of them: the rest of every row is a tally, and a tally reads differently against
+   12 minutes than against 90. */
 function statTableHTML(P,players){
   const names=squadNames(lineups,statTeam), cols=STAT_CATS[statCat];
-  const head='<th class="no">No</th><th class="pl">Player</th>'+cols.map(c=>`<th>${c[0]}</th>`).join('');
+  const mins=playedMinutes(lineups,dur,statTeam,rows);
+  const head='<th class="no">No</th><th class="pl">Player</th><th class="mn">Minutes Played</th>'
+    +cols.map(c=>`<th>${c[0]}</th>`).join('');
   const body=players.map(no=>'<tr><td class="no">'+esc(no)+'</td>'
-    +`<td class="pl">${esc(playerLabel(names,no))}</td>`
+    +`<td class="pl">${esc(playerLabel(names,no))}</td>`+minsCell(mins,no)
     +cols.map(c=>`<td>${c[1](P[no])}</td>`).join('')+'</tr>').join('');
   return `<table class="stats"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
@@ -1146,13 +1162,18 @@ function statsSheet(team){
   // same squad padding + name column as the on-screen table, so the export matches it
   const P=withSquad(computeStats(rows,team),lineups,team), players=sortedPlayers(P);
   const names=squadNames(lineups,team);
-  const headers=[STAT_HEADERS[0],'Player',...STAT_HEADERS.slice(1)];
+  /* Minutes played travels with the name here too (the CSV export is these same
+     sheets). A bare number, not "64'": a spreadsheet column of minutes is there to be
+     sorted and added up. Blank where there is no line-up to work it out from. */
+  const mins=playedMinutes(lineups,dur,team,rows);
+  const minOf=no=>{const m=mins&&mins[String(no==null?'':no).trim()];return m?m.min:'';};
+  const headers=[STAT_HEADERS[0],'Player','Minutes Played',...STAT_HEADERS.slice(1)];
   const h1=new Array(headers.length).fill(''); const merges=[];
-  let c=0; STAT_GROUPS.forEach((g,i)=>{const span=i===0?g[1]+1:g[1];   // 'No' group also holds 'Player'
+  let c=0; STAT_GROUPS.forEach((g,i)=>{const span=i===0?g[1]+2:g[1];   // the 'No' group also holds Player and Minutes Played
     if(g[0]){h1[c]=g[0]; if(span>1)merges.push({s:{r:0,c},e:{r:0,c:c+span-1}});} c+=span;});
-  merges.push({s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}});
+  merges.push({s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}});
   const aoa=[h1,headers,...players.map(no=>{const r=statRow(no,P[no]);
-    return [r[0],playerLabel(names,no),...r.slice(1)];})];
+    return [r[0],playerLabel(names,no),minOf(no),...r.slice(1)];})];
   const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!merges']=merges;
   ws['!cols']=headers.map((h,i)=>({wch:i===0?5:i===1?18:Math.max(7,h.length)}));
   return ws;

@@ -1,15 +1,15 @@
 {
   "Stats/report.js": {
-    "v": 30,
-    "sha256": "15effbbfefb7de9f"
+    "v": 31,
+    "sha256": "9a72daeb2b7b3f41"
   },
   "Stats/stats-view.css": {
     "v": 5,
     "sha256": "384f94936120e8ee"
   },
   "Stats/stats-view.js": {
-    "v": 12,
-    "sha256": "b2496c303ad7c190"
+    "v": 13,
+    "sha256": "cd8935d8e7e6f112"
   },
   "auth.js": {
     "v": 1,
@@ -20,8 +20,8 @@
     "sha256": "812b3a6f6f5a09b6"
   },
   "client/assets/app.js": {
-    "v": 27,
-    "sha256": "94fc3ad09c89e9a6"
+    "v": 28,
+    "sha256": "7399d30ffa21c934"
   },
   "client/assets/hanley-town.png": {
     "v": 1,
@@ -48,7 +48,7 @@
     "sha256": "3c260b75ebcc8fe4"
   },
   "shared.js": {
-    "v": 18,
-    "sha256": "5394fd7501e96193"
+    "v": 19,
+    "sha256": "7dca890aef563421"
   }
 }

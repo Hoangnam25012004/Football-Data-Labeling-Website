@@ -399,6 +399,99 @@ function withSquad(P,lineups,team){
   return P;
 }
 
+/* ---- minutes played ----
+   lineups.history is a list of SNAPSHOTS, not of changes: each one is the whole XI
+   from its own moment on (effectiveLU() in index.html reads it that way), so who was
+   on the pitch is a step function of time and minutes played is the length of the
+   stretches a shirt number spends inside it. Working from the snapshots rather than
+   replaying the substitution and red-card rows is what makes the number agree with
+   the formation board whatever produced the change: two swaps in one entry, a
+   sending-off inside a chain (13f*yc*rc), a swap tagged out of order, a period
+   re-tagged or deleted afterwards. None of that is this function's business.
+
+   Measured on the MATCH clock, not the video's: the stretch between the half-time
+   whistle and the second-half kick-off is inside neither window, so a swap made at
+   the interval is worth 45' to both players without a special case. Stoppage time is
+   capped by the half exactly as the minute labels cap it, so a man who plays every
+   minute reads 90' and not 96'. */
+const clockAt=(vt,w)=>Math.min(w.clock0+Math.max(0,Math.min(vt,w.end)-w.start),w.cap);
+/* The windows a match is actually played in, as {half,start,end,clock0,cap} in video
+   seconds. A half is a window only when its PAIR of boundaries makes one — h1Start is
+   allowed to be 0, a video that opens on the kick-off is the ordinary case. With no
+   second-half kick-off to split on, the video is one long half (the same reading
+   squadInHalf() takes) and the answer says of itself that it is not exact. */
+function matchWindows(dur,lastT){
+  const d=dur||{}, L=(+d.halfLen||45)*60, end=Math.max(0,+lastT||0);
+  const s1=+d.h1Start||0, e1=+d.h1End||0, s2=+d.h2Start||0, e2=+d.h2End||0;
+  if(!d.enabled||!(s2>s1))
+    return [{half:1,start:d.enabled?s1:0,end:Math.max(s1,e1,end),clock0:0,cap:2*L,exact:false}];
+  return [{half:1,start:s1,end:e1>s1?e1:s2,clock0:0,cap:L,exact:e1>s1},
+          {half:2,start:s2,end:e2>s2?e2:Math.max(s2,end),clock0:L,cap:2*L,exact:e2>s2}];
+}
+/* How long each shirt number was on the pitch, for one side:
+     {'7':{min,sec,h1,h2,sentOff,exact}}   — min is whole minutes, for display
+   null when the side has no line-up at all: nothing can be said then, and a column of
+   zeroes would say something false. `rows` is read for one thing only — the last
+   tagged moment, which stands in for the full-time whistle when Duration has none. */
+function playedMinutes(lineups,dur,team,rows){
+  const lu=(lineups&&lineups[team])||null;
+  const hist=((lineups&&lineups.history)||[]).filter(h=>h&&h.team===team&&h.xi)
+    .slice().sort((a,b)=>(+a.t||0)-(+b.t||0));
+  const xi0=(lu&&lu.xi)||[];
+  if(!xi0.length&&!hist.length)return null;
+  const key=n=>String(n==null?'':n).trim();
+  const setOf=xi=>{const s=new Set();(xi||[]).forEach(p=>{const k=key(p&&p.no);if(k)s.add(k);});return s;};
+
+  /* Walk the snapshots, opening a stretch when a shirt appears and closing it when it
+     goes. -Infinity / Infinity stand for "since the kick-off" / "until the whistle";
+     the windows clip them, so a match whose boundaries were never set still adds up. */
+  const iv={}, open={};
+  const close=(no,t,red)=>{if(!(no in open))return;
+    (iv[no]=iv[no]||[]).push({from:open[no],to:t,red:!!red}); delete open[no];};
+  setOf(xi0).forEach(no=>{open[no]=-Infinity;});
+  hist.forEach(h=>{
+    const t=+h.t||0, next=setOf(h.xi), off=key(h.off);
+    Object.keys(open).forEach(no=>{if(!next.has(no))close(no,t,!!off&&off===no);});
+    next.forEach(no=>{if(!(no in open))open[no]=t;});
+  });
+  /* A swap whose snapshot was edited away still counts — the same fallback
+     squadOnPitch() and squadInHalf() make, matched to a snapshot on the ±3s the events
+     table ties a period to its rows with, so a swap that HAS one is never counted twice. */
+  ((lu&&lu.subHistory)||[]).forEach(s=>{
+    if(!s)return; const t=+s.t||0;
+    if(hist.some(h=>Math.abs((+h.t||0)-t)<=3))return;
+    const out=key(s.out), inNo=key(s.in);
+    if(out)close(out,t,false);                                  // he was on until the swap
+    if(!inNo)return;
+    const first=(iv[inNo]||[])[0];                              // …and his replacement from it on
+    if(inNo in open)open[inNo]=Math.min(open[inNo],t);
+    else if(first)first.from=Math.min(first.from,t);
+    else open[inNo]=t;
+  });
+  Object.keys(open).forEach(no=>close(no,Infinity,false));
+
+  const most=a=>a.reduce((m,v)=>v>m?v:m,0);
+  const wins=matchWindows(dur,Math.max(most((rows||[]).map(r=>+(r&&r.t)||0)),
+                                       most(hist.map(h=>+h.t||0))));
+  const exact=wins.every(w=>w.exact);
+  const out={};
+  Object.keys(iv).forEach(no=>{
+    let sec=0,h1=0,h2=0,played=false;
+    wins.forEach(w=>iv[no].forEach(s=>{
+      const from=Math.max(s.from===-Infinity?w.start:s.from,w.start);
+      const to=Math.min(s.to===Infinity?w.end:s.to,w.end);
+      if(to<=from)return;                       // this stretch is not inside this half
+      played=true;
+      const d=clockAt(to,w)-clockAt(from,w);    // capped: stoppage does not run the total past 90
+      sec+=d; if(w.half===2)h2+=d; else h1+=d;
+    }));
+    // a man brought on deep in stoppage has played, however little the capped clock moved
+    out[no]={sec,h1,h2,exact,sentOff:iv[no].some(s=>s.red),
+      min:sec>0?Math.max(1,Math.round(sec/60)):(played?1:0)};
+  });
+  return out;
+}
+
 /* ---- pass distribution matrix ---- */
 const PASS_EVENTS=new Set(['pass success','cross success']);
 function passMatrix(rows,team){

@@ -540,11 +540,18 @@ function teamTable(team,headers,rowFor){
   const P=withSquad(computeStats(rows,team),lineups,team), list=sortedPlayers(P);
   if(!list.length)return {rows:0,html:`<div class="rp-note" style="font-size:11px">No events for ${esc(TN(team))} yet.</div>`};
   const names=squadNames(lineups,team);
+  /* Minutes played beside the name on every player page, the way the Stats tab carries
+     it: the columns after it are tallies, and a tally is read against the time on the
+     pitch that produced it. "Min" rather than the full label — these tables are wide,
+     and it sits among Shoot Acc / Intercept / T-on Con, which are abbreviated too. */
+  const mins=playedMinutes(lineups,dur,team,rows);
+  const minOf=no=>{const m=mins&&mins[String(no==null?'':no).trim()];return m?dotv(m.min):dotv(0);};
   const body=list.map(no=>`<tr><td>${pill(no,team)}</td><td class="rp-pl">${esc(playerLabel(names,no))}</td>`
+    +`<td>${minOf(no)}</td>`
     +`${rowFor(P[no],no,team).map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');
   return {rows:list.length,
     html:`<div class="rp-sub" style="color:${TC(team)}">${esc(TN(team))}</div>`
-      +`<table class="rpt"><thead><tr><th>No</th><th>Player</th>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`};
+      +`<table class="rpt"><thead><tr><th>No</th><th>Player</th><th>Min</th>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`};
 }
 function playerStatPages(title,headers,rowFor){
   const h=teamTable('home',headers,rowFor), a=teamTable('away',headers,rowFor);
