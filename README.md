@@ -132,6 +132,22 @@ its owner's privileges, so row-level security does not reach it. Anonymous acces
 revoked there and given a `public_match_stats` that does the filtering itself. The
 raw event stream is never opened to anyone.
 
+### The contact form on the landing page
+**Email us** is a `mailto:`, and a `mailto:` opens nothing at all on a machine with
+no mail client registered — a club on webmail, a locked-down work laptop — with no
+way for the page to detect it. So the landing page also carries a **form**, which
+posts to the Cloudflare Worker: the enquiry is saved to `public.leads` and then
+emailed on, with `reply_to` set to the sender so hitting Reply answers the club. The
+`mailto:` and the copy-the-address button stay exactly where they were, as the path
+for a browser running no JavaScript.
+
+Needs [`supabase/migrations/0019_leads.sql`](supabase/migrations/0019_leads.sql) and
+the secrets in [`worker/README.md`](worker/README.md#the-contact-form-contact).
+`public.leads` has **no policy for `anon` and no INSERT policy at all** — for the
+same reason 0017 warns about, the browser must not be able to write here, so the
+Worker does it with the service role key. Full design:
+[`docs/contact-form-design.md`](docs/contact-form-design.md).
+
 ## How the labeling app runs
 The whole app is the static file [`index.html`](index.html) — no backend required.
 It is hosted for free on **GitHub Pages** and served over HTTPS, so anyone with the

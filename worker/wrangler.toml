@@ -1,5 +1,9 @@
+# The NAME is the deployed URL (https://r2-presign.<you>.workers.dev) and
+# cloud-sync.js has it written down — leave it alone. `main` only names the
+# entry file, and that is now the router: / still presigns, /contact takes the
+# landing page's contact form.
 name = "r2-presign"
-main = "r2-presign.js"
+main = "index.js"
 compatibility_date = "2024-09-01"
 
 # Non-secret config. Fill these in with your own values.
@@ -9,9 +13,29 @@ R2_BUCKET      = "football-videos"
 # Public base URL of the bucket: either the r2.dev dev URL or your custom domain.
 # TODO: paste the URL you got from "Public Development URL -> Enable" here (https://pub-XXXX.r2.dev)
 R2_PUBLIC_BASE = "https://pub-9cdd291bf181425b9738328ada297691.r2.dev"
-# Lock the presign endpoint to your site's origin ("*" allows any origin — fine for testing).
+# Lock BOTH endpoints to your site's origin ("*" allows any origin — fine for testing).
 ALLOW_ORIGIN   = "https://hoangnam25012004.github.io"
+
+# ---------- contact form (/contact) ----------
+# Where an enquiry is emailed to.
+CONTACT_TO     = "dnam2501@gmail.com"
+# Who it comes from. Resend's shared sender works without owning a domain, but
+# it may only deliver to the address that owns the Resend account — which is
+# what CONTACT_TO is. Verify a domain and put your own address here to lift that.
+RESEND_FROM    = "onboarding@resend.dev"
+
+# Rate limiting for /contact. Create it once, then paste the id it prints:
+#   npx wrangler kv namespace create CONTACT_KV
+# Left commented out, the limits are simply not applied — which is what makes
+# `wrangler dev` work with no setup at all.
+# [[kv_namespaces]]
+# binding = "CONTACT_KV"
+# id      = "<paste the id wrangler printed>"
 
 # Secrets are NOT stored here — set them once with:
 #   wrangler secret put R2_ACCESS_KEY_ID
 #   wrangler secret put R2_SECRET_ACCESS_KEY
+#   wrangler secret put SUPABASE_URL            # https://xtzmtdcohoixoxqusyyz.supabase.co
+#   wrangler secret put SUPABASE_SERVICE_KEY    # Settings -> API -> service_role. NOT the anon key.
+#   wrangler secret put RESEND_API_KEY          # resend.com -> API Keys
+#   wrangler secret put IP_SALT                 # any long random string

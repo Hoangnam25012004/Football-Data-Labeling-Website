@@ -207,6 +207,49 @@
 .mail-copy:hover{color:var(--red); border-bottom-color:var(--red)}
 .cta-mail .done{color:var(--red)}
 
+/* ---------- the contact form ----------
+   The mailto: above stays, but it is no longer the only way through. It opens
+   nothing at all on a machine with no mail client registered, and the page has
+   no way to detect that — so this posts to the Worker instead, and anyone can
+   reach us whatever their machine is set up to do. */
+.cta-form{
+  position:relative; max-width:660px; margin:36px auto 0; text-align:left;
+  border:1px solid var(--line); border-radius:3px; background:var(--carbon);
+  padding:clamp(20px,3vw,30px);
+}
+.cf-head{
+  font-family:var(--f-mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--ash-dim); margin:0 0 18px;
+}
+.cf-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px 16px}
+@media (max-width:640px){ .cf-grid{grid-template-columns:1fr} }
+.cf-field{display:grid; gap:7px}
+.cf-field.wide{grid-column:1 / -1}
+.cf-field label{
+  font-family:var(--f-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--ash-dim);
+}
+.cf-field label .opt{text-transform:none; letter-spacing:.06em; opacity:.7}
+.cf-field input, .cf-field select, .cf-field textarea{
+  font-family:var(--f-body); font-size:14px; color:var(--chalk); width:100%;
+  background:var(--void); border:1px solid var(--line); border-radius:2px; padding:10px 12px;
+}
+.cf-field textarea{resize:vertical; min-height:104px; line-height:1.55}
+.cf-field input:focus, .cf-field select:focus, .cf-field textarea:focus{outline:none; border-color:var(--red)}
+/* The honeypot. Hidden in CSS and deliberately NOT type="hidden": a bot skips
+   the fields a form marks hidden, but fills in one it can read in the markup —
+   which is the whole trick. Nothing a person can reach by tab or by pointer. */
+.cf-hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
+.cf-actions{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:18px}
+.cf-actions .btn{flex:none}
+.cf-actions .note{margin:0}
+.cf-msg{
+  margin:16px 0 0; padding:11px 13px; border:1px solid var(--line); border-radius:2px;
+  font-size:13.5px; color:var(--chalk); background:var(--carbon-2);
+}
+.cf-msg.err{border-color:var(--red)}
+.cf-msg a{color:var(--red)}
+
 /* scroll reveals */
 .js .reveal{opacity:0; transform:translateY(20px)}
 .js .reveal.in{opacity:1; transform:none; transition:opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1)}
@@ -568,6 +611,62 @@
       <span id="mailHint">or write to</span>
       <button type="button" class="mail-copy" id="mailCopy" data-mail="dnam2501@gmail.com">dnam2501@gmail.com</button>
     </p>
+
+    <!-- The button above hands the visitor's machine a mailto:, which is fine
+         where something is registered to answer one and does nothing at all
+         where nothing is. This form does not care either way. -->
+    <form class="cta-form" id="contactForm" novalidate>
+      <p class="cf-head">Or tell us here — no mail app needed</p>
+      <div class="cf-grid">
+        <div class="cf-field">
+          <label for="cfName">Full name</label>
+          <input id="cfName" name="name" type="text" autocomplete="name" maxlength="120" required>
+        </div>
+        <div class="cf-field">
+          <label for="cfEmail">Work email</label>
+          <input id="cfEmail" name="email" type="email" autocomplete="email" maxlength="200" required>
+        </div>
+        <div class="cf-field">
+          <label for="cfClub">Club or academy</label>
+          <input id="cfClub" name="club" type="text" autocomplete="organization" maxlength="120" required>
+        </div>
+        <div class="cf-field">
+          <label for="cfRole">Your role</label>
+          <select id="cfRole" name="role" required>
+            <option value="">Choose…</option>
+            <option>Head coach</option>
+            <option>Assistant coach</option>
+            <option>Technical / sporting director</option>
+            <option>Performance analyst</option>
+            <option>Academy director</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="cf-field">
+          <label for="cfCountry">Country <span class="opt">(optional)</span></label>
+          <input id="cfCountry" name="country" type="text" autocomplete="country-name" maxlength="120">
+        </div>
+        <div class="cf-field">
+          <label for="cfVideo">Link to the match <span class="opt">(optional)</span></label>
+          <input id="cfVideo" name="videoUrl" type="url" placeholder="https://" maxlength="500">
+        </div>
+        <div class="cf-field wide">
+          <label for="cfMessage">Message</label>
+          <textarea id="cfMessage" name="message" maxlength="4000" required></textarea>
+        </div>
+      </div>
+
+      <div class="cf-hp" aria-hidden="true">
+        <label for="cfWebsite">Leave this empty</label>
+        <input id="cfWebsite" name="website" type="text" tabindex="-1" autocomplete="off">
+      </div>
+
+      <div class="cf-actions">
+        <button class="btn btn-primary" id="cfSend" type="submit">Send</button>
+        <span class="note">We use this to reply to you, and for nothing else.</span>
+      </div>
+      <div class="cf-msg" id="cfMsg" role="status" hidden></div>
+    </form>
   </div>
 </section>
 
@@ -671,6 +770,83 @@
       } else {
         selectAddress();
       }
+    });
+  }
+
+  /* ---------- the contact form ----------
+     One Worker, two paths: / presigns an R2 upload for the tagging app and
+     /contact takes this. Same host as CONFIG.R2.workerUrl in cloud-sync.js —
+     if that Worker ever moves, both move together. */
+  var CONTACT_ENDPOINT = 'https://r2-presign.hoangnam25012004.workers.dev/contact';
+  var MAIL = 'dnam2501@gmail.com';
+
+  var cForm = document.getElementById('contactForm');
+  if (cForm) {
+    var cMsg = document.getElementById('cfMsg'), cBtn = document.getElementById('cfSend');
+    /* Sent as a DURATION rather than as a timestamp the server checks against
+       its own clock: a visitor whose device clock is days out is still a
+       visitor. The server drops anything filled in faster than a person could
+       have read seven fields. */
+    var shownAt = Date.now();
+    var val = function (id) { return (document.getElementById(id).value || '').trim(); };
+
+    function cSay(text, isErr) {
+      cMsg.textContent = text;
+      cMsg.classList.toggle('err', !!isErr);
+      cMsg.hidden = false;
+    }
+    /* Anything that is OUR fault ends with the address, spelled out. The whole
+       point of this form is that nobody reaches a dead end, and a form that is
+       down is a dead end unless it says where else to go. A field the visitor
+       simply has not filled in is not that, and says only what to fix. */
+    function cFail(text) {
+      cSay(text + ' You can write to us at ' + MAIL + ' instead.', true);
+      cBtn.disabled = false;
+      cBtn.textContent = 'Send';
+    }
+
+    cForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var payload = {
+        name: val('cfName'), email: val('cfEmail'), club: val('cfClub'),
+        role: val('cfRole'), country: val('cfCountry'),
+        videoUrl: val('cfVideo'), message: val('cfMessage'),
+        website: document.getElementById('cfWebsite').value,
+        elapsed: Date.now() - shownAt
+      };
+
+      /* An early word, not the ruling: worker/contact.js checks all of this
+         again, because nothing arriving over the network is trusted. */
+      if (!payload.name) return cSay('Please tell us your name.', true);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))
+        return cSay('That email address does not look right.', true);
+      if (!payload.club) return cSay('Please tell us which club or academy you are with.', true);
+      if (!payload.role) return cSay('Please choose your role.', true);
+      if (!payload.message) return cSay('Please write us a message.', true);
+
+      cBtn.disabled = true;
+      cBtn.textContent = 'Sending…';
+      cMsg.hidden = true;
+
+      fetch(CONTACT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; })
+            .then(function (d) { return { ok: r.ok, data: d || {} }; });
+        })
+        .then(function (res) {
+          if (!res.ok || !res.data.ok) { cFail(res.data.error || 'That did not go through.'); return; }
+          /* Done with it. Leaving the filled-in form on screen invites a
+             second copy of the same message. */
+          ['.cf-head', '.cf-grid', '.cf-actions'].forEach(function (sel) {
+            var el = cForm.querySelector(sel); if (el) el.hidden = true;
+          });
+          cSay('Thank you — that reached us. We will reply to ' + payload.email + '.');
+        })
+        .catch(function () { cFail('We could not reach the server.'); });
     });
   }
 
