@@ -31,7 +31,15 @@ const MANIFEST=path.join(__dirname,'asset-versions.json');
    rather than against its own folder (see taggerRoot() in that file). */
 const PAGES=['index.html','auth.html','Stats/index.html','Player-Lists/index.html',
              'client/index.html','client/app.html','client/login.html'];
-const LOADERS={'client/assets/app.js':'.'};      // file -> what its refs resolve against
+/* file -> the bases its refs may resolve against, in order.
+   app.js addresses two different places. Refs into the tagging app are written
+   against the deployed root, where this site sits and the tagger is moved under
+   /tagger, so they resolve against the repo root. Refs to the files that ship
+   beside it are written against the PAGE that loads it — client/app.html — so
+   they resolve against client/. The first base the file actually exists under
+   wins; a ref matching none falls back to the first, so a genuine typo still
+   fails the test below. */
+const LOADERS={'client/assets/app.js':['.','client']};
 
 const isExternal=u=>/^(?:https?:)?\/\//.test(u);
 const posix=p=>p.split(path.sep).join('/');
@@ -48,11 +56,13 @@ function references(){
     }
   });
   Object.keys(LOADERS).forEach(loader=>{
-    const src=readSrc(loader), base=LOADERS[loader];
+    const src=readSrc(loader), bases=[].concat(LOADERS[loader]);
     let m; const re=/'([^']+?)\?v=(\d+)'/g;
     while((m=re.exec(src))){
       if(isExternal(m[1]))continue;
-      out.push({file:path.posix.normalize(path.posix.join(base,m[1])),v:+m[2],from:loader});
+      const tries=bases.map(b=>path.posix.normalize(path.posix.join(b,m[1])));
+      const hit=tries.filter(f=>fs.existsSync(path.join(ROOT,f)))[0];
+      out.push({file:hit||tries[0],v:+m[2],from:loader});
     }
   });
   return out;

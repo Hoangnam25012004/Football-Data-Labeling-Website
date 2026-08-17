@@ -1558,6 +1558,35 @@ function filmStart(win,cues,src){
   document.addEventListener('webkitfullscreenchange',filmFullChange);
   // a redraw UNDER full screen gets a brand-new button saying the wrong thing
   filmFullSet(filmFull);
+
+  if(filmTools)filmTools.attach(filmToolsCtx());
+}
+
+/* ---- the companion ----
+
+   The analyst's toolkit — the right-click menu, the drawing layer, clips and
+   the exports — is NOT in this file. It is loaded by the client channel alone
+   (Q1 answered B), and this file knows it only through four one-line calls that
+   do nothing at all when nobody has registered.
+
+   Handed a context rather than the module's own bindings: the tools get exactly
+   what they need and no way to reach past it, so a change in here cannot be
+   silently depended on from over there. The same reason report.js is given a
+   HELPERS object instead of the closure. */
+let filmTools=null;
+function registerFilmTools(t){filmTools=t||null;return API;}
+
+function filmToolsCtx(){
+  const f=film;
+  return {
+    video:f.video, stage:$('fmStage'), box:filmFullBox(),
+    win:f.win, cues:f.cues, meta:meta, dur:dur,
+    seek:filmSeek, seekBy:filmSeekBy, play:filmPlay, toggle:filmToggle,
+    pause:()=>{try{f.video.pause();}catch(e){}},
+    end:filmEnd, matchTime:matchTime, clock:filmClock,
+    isFull:()=>filmFull, exitFull:filmFullOff,
+    chainHTML:filmChainHTML
+  };
 }
 
 /* Everything Film holds open — the fetch, the loop, the document listener —
@@ -1571,6 +1600,7 @@ function filmStop(){
   document.removeEventListener('click',filmDocClick);
   document.removeEventListener('fullscreenchange',filmFullChange);
   document.removeEventListener('webkitfullscreenchange',filmFullChange);
+  if(filmTools)filmTools.detach();
   try{f.video.pause();f.video.removeAttribute('src');f.video.load();}catch(e){}
   film=null;
 }
@@ -1660,6 +1690,7 @@ function filmFullSet(on){
   // a panel is cut to the room under it AS IT OPENS, and that room just changed:
   // closing is cheaper and more honest than re-measuring one that is already open
   filmSlicerOpen(null,false);
+  if(filmTools)filmTools.fullscreen(filmFull);
 }
 
 /* The browser's answer, not ours. Escape, F11 and the element leaving the
@@ -1784,6 +1815,12 @@ function filmKeys(e){
     if(filmFull&&!filmFullNative){filmFullOff();e.preventDefault();}
     return;
   }
+  /* The companion gets first refusal on what is left. BELOW Escape, because
+     Escape is answered above by the rule Q3 settled — one meaning, "out", in
+     both full-screen modes — and ABOVE the transport keys, because a tool being
+     drawn has to be able to claim a key the player would otherwise eat. It
+     returns true only for a key it actually took. */
+  if(filmTools&&filmTools.key(e)){e.preventDefault();return;}
   if(e.key==='ArrowRight')filmSeekBy(FILM_STEP);
   else if(e.key==='ArrowLeft')filmSeekBy(-FILM_STEP);
   else if(e.key===' '||e.key==='Spacebar')filmToggle();
@@ -1820,6 +1857,7 @@ function filmFrame(){
   f.last=now;
   filmBall(now);
   filmBar(now);
+  if(filmTools)filmTools.frame(now);
 }
 
 function filmAdvance(now){
@@ -2242,6 +2280,7 @@ const HELPERS={
 
 const API={mount:mount,update:update,destroy:destroy,data:data,
   render:renderStats,isMounted:function(){return mounted;},
+  registerFilmTools:registerFilmTools,
   helpers:HELPERS,schema:1};
 return API;
 })();

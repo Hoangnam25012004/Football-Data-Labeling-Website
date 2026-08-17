@@ -51,6 +51,8 @@ jobs:
           cp client/assets/app.css  _site/assets/app.css
           cp client/assets/supa.js  _site/assets/supa.js
           cp client/assets/app.js   _site/assets/app.js
+          cp client/assets/film-tools.js  _site/assets/film-tools.js
+          cp client/assets/film-tools.css _site/assets/film-tools.css
           cp client/assets/hanley-town.png _site/assets/hanley-town.png
 
           # ---------- tagging app, relocated under /tagger ----------

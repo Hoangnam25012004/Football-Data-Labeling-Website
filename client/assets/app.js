@@ -1277,8 +1277,19 @@
     loadOnce(r + 'Stats/stats-view.css?v=7', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
-      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=16'); })
-      .then(function () { return loadOnce(r + 'Stats/report.js?v=31'); });
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=17'); })
+      .then(function () { return loadOnce(r + 'Stats/report.js?v=31'); })
+      /* The analyst's toolkit. This site's file, not the tagging app's — Q1 was
+         answered B, so the right-click menu, the drawing layer, clips and the
+         exports exist in the channel and nowhere else. It registers itself with
+         the mounted view through the one hook stats-view.js publishes; a host
+         that never loads it is a host where none of it exists. */
+      .then(function () { return loadOnce('assets/film-tools.js?v=1'); })
+      .then(function () {
+        loadOnce('assets/film-tools.css?v=1', 'css');
+        if (window.PTStats && window.PTStats.registerFilmTools && window.PTFilmTools)
+          window.PTStats.registerFilmTools(window.PTFilmTools);
+      });
   }
 
   /* ---------------------------------------------------------

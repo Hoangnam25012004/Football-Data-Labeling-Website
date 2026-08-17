@@ -8,8 +8,8 @@
     "sha256": "1b2323648c651269"
   },
   "Stats/stats-view.js": {
-    "v": 16,
-    "sha256": "17b14e917aaa4c88"
+    "v": 17,
+    "sha256": "ef4470b347d2d086"
   },
   "auth.js": {
     "v": 1,
@@ -20,8 +20,16 @@
     "sha256": "166a8ad4033724fd"
   },
   "client/assets/app.js": {
-    "v": 32,
-    "sha256": "67730a7492a03cd5"
+    "v": 33,
+    "sha256": "169c2fe8a43750a0"
+  },
+  "client/assets/film-tools.css": {
+    "v": 1,
+    "sha256": "c91fdf49ee86b8ed"
+  },
+  "client/assets/film-tools.js": {
+    "v": 1,
+    "sha256": "f879b1aee12efae2"
   },
   "client/assets/hanley-town.png": {
     "v": 1,

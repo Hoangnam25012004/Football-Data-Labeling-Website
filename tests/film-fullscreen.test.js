@@ -86,6 +86,8 @@ function sandbox(o){
     'function filmToggle(){toggles++;}',
     'function filmSlicerFit(){}',
     G('FILM_STEP'),
+    // the companion hook: null here, which is what every host but the channel sees
+    G('filmTools'),
     G('filmFull'),G('filmFullNative'),
     G('filmFullOK'),G('filmFullBox'),G('FM_FULL_D'),G('filmFullIcon'),
     F('filmFullOn'),F('filmFullOff'),G('filmFullToggle'),
