@@ -18,7 +18,10 @@
      the client site    renders the toolbar this file provides and hands over a
                         published report. It fetches nothing, subscribes to
                         nothing, and touches no localStorage: a mounted view
-                        draws what it was given.
+                        draws what it was given. It also mounts with
+                        {fullscreen:true} — the one thing a host has to ask for
+                        rather than be given, because a club watches Film on a
+                        projector and an analyst does not.
 
    Loaded after shared.js, which it uses throughout ($, esc, computeStats,
    the pitches, the goal mouth). report.js reads the current four values back
@@ -65,6 +68,12 @@ function renderStats(){
   // Film holds a video, an animation loop and a document listener. Whatever is
   // about to be drawn, none of that may survive the redraw.
   filmStop();
+  /* Full screen belongs to Film. Anything else about to be drawn into that box —
+     another view, or the "no match" notice, which hides .stats-wrap and would
+     leave a black screen with nothing on it — gives the screen back first. A
+     no-op whenever full screen is not on, which is every renderStats() Film has
+     no part in. */
+  if(statView!=='film'||!meta.matchId)filmFullOff();
   /* No open match -> the notice, not the last match's leftovers. The stores are shared by
      every match this browser has opened, so with none open there is nothing here that can
      be said to belong to anything. A #match= link loads over the cloud and sets meta.matchId
@@ -1432,6 +1441,11 @@ function filmHTML(wins,win,cues,choices){
         +'<div class="fm-track" id="fmTrack"><div class="fm-rail"></div>'
           +'<div class="fm-fill" id="fmFill"></div><div class="fm-knob" id="fmKnob"></div></div>'
         +'<span class="fm-tc" id="fmTc">00:00 / 00:00</span>'
+        // the end of the transport bar, where every video player in the world
+        // keeps this. Only for a host that asked (filmFullOK) — see below.
+        +(filmFullOK()?'<button type="button" class="fm-full" id="fmFull"'
+          +' aria-pressed="false" aria-label="Full screen (F)" title="Full screen (F)">'
+          +filmFullIcon(false)+'</button>':'')
       +'</div>'
     +'</div>'
     +'<div class="film-side">'
@@ -1535,6 +1549,15 @@ function filmStart(win,cues,src){
      again by filmStop(), or Film would go on swallowing those keys — Space above
      all — long after it has been left. */
   document.addEventListener('keydown',filmKeys);
+
+  /* Full screen. The button only exists on a host that asked for it, so it is
+     bound only if it is there; the listeners go on either way and cost nothing,
+     which keeps the add/remove pair in filmStop() unconditional and symmetrical. */
+  if($('fmFull'))$('fmFull').onclick=()=>{filmFullToggle();$('fmFull').blur();};
+  document.addEventListener('fullscreenchange',filmFullChange);
+  document.addEventListener('webkitfullscreenchange',filmFullChange);
+  // a redraw UNDER full screen gets a brand-new button saying the wrong thing
+  filmFullSet(filmFull);
 }
 
 /* Everything Film holds open — the fetch, the loop, the document listener —
@@ -1546,8 +1569,107 @@ function filmStop(){
   if(f.raf)cancelAnimationFrame(f.raf);
   document.removeEventListener('keydown',filmKeys);
   document.removeEventListener('click',filmDocClick);
+  document.removeEventListener('fullscreenchange',filmFullChange);
+  document.removeEventListener('webkitfullscreenchange',filmFullChange);
   try{f.video.pause();f.video.removeAttribute('src');f.video.load();}catch(e){}
   film=null;
+}
+
+/* ---- full screen ----
+
+   A club watches this on a projector, in a room, with the whole squad. What it
+   needs there is not a different view: it is the SAME six things — the frame,
+   the strip under it, the pitch, the three slicers and the list — with the
+   browser's chrome gone and everything big enough to read from the back row.
+
+   THE ELEMENT THAT GOES FULL SCREEN IS #statsHolder, NOT .film. An element
+   being taken out of the document is how the browser is told full screen is
+   over, and renderFilm() rebuilds .film from scratch: on every change of half,
+   and on the Stats page again on every event arriving over the cloud. Half a
+   dozen of those into a meeting and the screen would simply fall out — and it
+   could not be asked for again, because requestFullscreen() wants a user
+   gesture and a WebSocket callback has none. #statsHolder is the one node in
+   the chain renderFilm() writes INTO rather than replaces, so it survives every
+   redraw, and it is removed exactly when Film really is over (destroy() empties
+   the root) — which is the moment the screen should go back. The class rides on
+   it for the same reason: there is no layout state to save and restore.
+
+   Only a host that asked for it: the client channel mounts with
+   {fullscreen:true}, the Stats page mounts as it always has and gets no button,
+   no key and no way in. */
+const filmFullOK=()=>!!opts.fullscreen;
+let filmFull=false;        // the layout is up (natively, or by the fallback below)
+let filmFullNative=false;  // ...and whether the browser is really holding the screen
+
+const filmFullBox=()=>$('statsHolder');
+
+/* Four corners pointing out to go in, pointing in to come out. Paths rather
+   than a character: U+26F6 is missing from plenty of system fonts and falls
+   back to an empty box — and this is the only control in the view with no
+   words beside it to say what it is. */
+const FM_FULL_D={
+  in:'M2.5 6.5v-4h4M13.5 2.5h4v4M17.5 13.5v4h-4M6.5 17.5h-4v-4',
+  out:'M6.5 2.5v4h-4M17.5 6.5h-4v-4M13.5 17.5v-4h4M2.5 13.5h4v4'
+};
+const filmFullIcon=on=>'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor"'
+  +' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  +'<path d="'+(on?FM_FULL_D.out:FM_FULL_D.in)+'"/></svg>';
+
+/* The layout first, the API second. If the API is missing or refused, what the
+   first line already did IS the fallback: the view fills the WINDOW instead of
+   the screen, keeping all six parts and losing only the browser's chrome. No
+   branch here ends in "pressed the button, nothing happened". */
+function filmFullOn(){
+  const box=filmFullBox(); if(!box||filmFull||!filmFullOK())return;
+  filmFullSet(true);
+  const req=box.requestFullscreen||box.webkitRequestFullscreen;
+  if(!req)return;
+  try{
+    const p=req.call(box);
+    if(p&&p.catch)p.catch(()=>{});   // refused by a policy, or an embed — stay maximised
+  }catch(e){}
+}
+
+function filmFullOff(){
+  if(!filmFull)return;
+  filmFullSet(false);
+  const on=document.fullscreenElement||document.webkitFullscreenElement;
+  if(!on||on!==filmFullBox())return;
+  if(document.exitFullscreen){const p=document.exitFullscreen(); if(p&&p.catch)p.catch(()=>{});}
+  else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+}
+
+const filmFullToggle=()=>filmFull?filmFullOff():filmFullOn();
+
+/* The class, the button, and anything measured against the box. Split out
+   because three different callers arrive here: the two above, and the browser's
+   own fullscreenchange — Escape, F11, the window manager, or the element
+   leaving the document. */
+function filmFullSet(on){
+  const box=filmFullBox(); if(!box)return;
+  filmFull=!!on;
+  box.classList.toggle('film-full',filmFull);
+  const b=$('fmFull');
+  if(b){
+    const lbl=filmFull?'Exit full screen (Esc)':'Full screen (F)';
+    b.setAttribute('aria-pressed',filmFull?'true':'false');
+    b.setAttribute('aria-label',lbl);
+    b.title=lbl;
+    b.innerHTML=filmFullIcon(filmFull);
+  }
+  // a panel is cut to the room under it AS IT OPENS, and that room just changed:
+  // closing is cheaper and more honest than re-measuring one that is already open
+  filmSlicerOpen(null,false);
+}
+
+/* The browser's answer, not ours. Escape, F11 and the element leaving the
+   document all end full screen without asking, and a state we kept on our own
+   would go on believing otherwise — leaving a position:fixed sheet over a page
+   that is no longer full screen, which is this feature's classic bug. */
+function filmFullChange(){
+  const on=(document.fullscreenElement||document.webkitFullscreenElement)===filmFullBox();
+  if(filmFullNative&&!on)filmFullSet(false);
+  filmFullNative=on;
 }
 
 /* ---- the slicers ----
@@ -1655,9 +1777,18 @@ function filmKeys(e){
     return;
   }
   if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||(t&&t.isContentEditable))return;
+  /* Escape under NATIVE full screen belongs to the browser and cannot be
+     cancelled — in some it is not even delivered here. The fallback has nothing
+     doing it for us, so there it is ours. One of the two, never both. */
+  if(e.key==='Escape'){
+    if(filmFull&&!filmFullNative){filmFullOff();e.preventDefault();}
+    return;
+  }
   if(e.key==='ArrowRight')filmSeekBy(FILM_STEP);
   else if(e.key==='ArrowLeft')filmSeekBy(-FILM_STEP);
   else if(e.key===' '||e.key==='Spacebar')filmToggle();
+  // a host that was not given full screen does not claim the key either
+  else if((e.key==='f'||e.key==='F')&&filmFullOK())filmFullToggle();
   else return;
   e.preventDefault();          // Space would scroll the page, arrows the list
 }
@@ -2064,6 +2195,7 @@ function update(data){
 
 function destroy(){
   filmStop();
+  filmFullOff();          // said out loud, rather than left to the browser's own
   if(root)root.innerHTML='';
   root=null; opts={}; mounted=false;
   rows=[]; meta=blankMeta(); lineups=blankLineups(); dur=blankDur();

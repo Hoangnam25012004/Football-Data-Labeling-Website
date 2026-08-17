@@ -346,3 +346,109 @@ table.stats .grp.g5{background:#331A1A;color:#F0CACA}
   .film-pitch{max-width:520px;margin:0 auto}
   .film-list{max-height:260px}
 }
+
+/* ============================================================
+   Film, full screen — the same six things, on a projector.
+
+   Nothing here exists outside .film-full, and .film-full is put on
+   #statsHolder by filmFullSet() and taken off again by the browser's
+   own fullscreenchange. Every rule below is an OVERRIDE of a rule
+   above, never an edit of one: out of full screen this file behaves
+   exactly as it did before the block was added.
+
+   The class does the LAYOUT and the API only takes the browser's
+   chrome away — so a browser that refuses the API (a policy, an
+   embed, an older iPad) still gets the big view, filling the window
+   instead of the screen.
+
+   A class rather than :fullscreen, for three reasons: :fullscreen is
+   dead on that fallback path; Safari before 16.4 wants
+   :-webkit-full-screen, and ONE selector a browser cannot parse kills
+   the whole comma-separated rule with it; and a class can be tested
+   from a stub DOM, which a pseudo-class cannot.
+   ============================================================ */
+.film-full{
+  position:fixed;inset:0;z-index:2000;box-sizing:border-box;
+  background:var(--bg);padding:14px 16px;overflow:hidden;display:flex;
+}
+/* No ancestor of #statsHolder in either host sets transform / filter /
+   perspective / contain, so `fixed` is against the viewport in both. On the
+   client site .app-top and .side are sticky at z-index 50 — sticky makes no
+   containing block, and 2000 clears them. */
+.film-full .film{flex:1;min-height:0;gap:10px}
+.film-full .film-grid{
+  flex:1;min-height:0;align-items:stretch;gap:16px;
+  grid-template-columns:minmax(0,1fr) clamp(320px,23vw,460px);
+}
+.film-full .film-main{min-height:0}
+.film-full .film-side{min-height:0}
+/* Out there the stage is sized by its aspect ratio, because neither host can be
+   asked for a viewport height. Full screen is the one shell where the height IS
+   the known quantity, so the stage takes what is left and the video letterboxes
+   inside it — which also hands .film-cap a black band of its own to be read in,
+   rather than reading it over the very grass it is describing. */
+.film-full .film-stage{aspect-ratio:auto;flex:1;min-height:0}
+.film-full .film-pitch{flex:none}
+.film-full .film-list{flex:1;min-height:0;max-height:none}
+
+/* ---- the type scale, anchored to vh: what decides whether the back row can
+        read a shirt number is the height of the projection, not the width of
+        a window. The floors keep a 768px laptop from swelling, the ceilings
+        keep a 4K screen from turning into a poster. ---- */
+.film-full .film-halves button{font-size:15px;padding:7px 20px}
+.film-full .film-cap{
+  min-height:clamp(38px,5vh,54px);padding:8px 16px;gap:22px;
+  font-size:clamp(15px,1.9vh,21px);
+}
+.film-full .fm-no{
+  min-width:clamp(24px,3vh,32px);height:clamp(24px,3vh,32px);
+  padding:0 7px;border-radius:6px;font-size:clamp(14px,1.7vh,19px);
+}
+.film-full .fm-ev{font-size:clamp(14px,1.8vh,20px)}
+.film-full .film-bar{padding:8px 14px;gap:14px}
+.film-full .fm-play{width:38px;height:32px;font-size:14px}
+.film-full .fm-track{height:22px}
+.film-full .fm-rail,.film-full .fm-fill{top:9px;height:5px}
+.film-full .fm-knob{top:11px;width:14px;height:14px}
+.film-full .fm-tc{font-size:15px}
+/* the slicers are the operator's tools, not the room's reading matter: big
+   enough to hit, deliberately not competing with the match for the eye */
+.film-full .fm-sl-btn{font-size:13.5px;padding:7px 9px}
+.film-full .fm-sl-opt{font-size:13.5px;padding:6px 8px}
+.film-full .fm-sl-opt input{width:15px;height:15px}
+.film-full .fm-next{width:40px;font-size:14px}
+/* The list. Those two .fm-row lines have to be restated HERE: the base sheet
+   carries `.fm-row .fm-no{...18px}` at the same specificity (0,2,0) as
+   `.film-full .fm-no` above, and on a tie the LATER rule wins — so without
+   them the numbers in the list would jump to caption size. */
+.film-full .fm-row{font-size:clamp(13px,1.5vh,16px);padding:7px 12px;gap:10px}
+.film-full .fm-row .fm-no{min-width:22px;height:22px;font-size:13px}
+.film-full .fm-row .fm-ev{font-size:13.5px}
+.film-full .fm-t{font-size:clamp(12px,1.35vh,15px)}
+.film-full .fm-none{padding:22px;font-size:14px}
+
+/* ---- the button: the one new element, at the end of the transport bar,
+        where every video player in the world keeps it ---- */
+.fm-full{
+  flex:none;width:30px;height:26px;display:inline-flex;
+  align-items:center;justify-content:center;padding:0;
+  background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  border-radius:6px;cursor:pointer;
+}
+.fm-full:hover{border-color:var(--accent)}
+.fm-full svg{width:15px;height:15px;display:block}
+.film-full .fm-full{width:40px;height:32px}
+.film-full .fm-full svg{width:19px;height:19px}
+
+/* The block above outranks the @media further up on specificity alone, so a
+   tablet held upright would be forced into two columns unless this says
+   otherwise. overflow:auto instead of hidden is DELIBERATE — scrolling is the
+   right answer at this width — and it keeps the property §filmSlicerFit leans
+   on: auto is not visible either, so the fit still stops at this box. */
+@media (max-width:900px){
+  .film-full{padding:10px;overflow:auto}
+  .film-full .film-grid{grid-template-columns:minmax(0,1fr)}
+  .film-full .film-stage{aspect-ratio:16/9;flex:none}
+  .film-full .film-pitch{max-width:520px;margin:0 auto}
+  .film-full .film-list{flex:none;max-height:42vh}
+}

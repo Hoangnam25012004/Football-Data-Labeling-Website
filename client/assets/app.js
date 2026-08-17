@@ -259,7 +259,10 @@
           'with it. It appears here the moment they do.'));
         return;
       }
-      window.PTStats.mount(holder, rep.payload, {});
+      /* {fullscreen:true}: a club watches this on a projector, with the squad in
+         the room, so Film gets the control that fills the screen with it. The
+         analyst's own Stats page mounts without it and is unchanged. */
+      window.PTStats.mount(holder, rep.payload, { fullscreen: true });
       /* the PDF button is part of the chrome that mount() just drew, so it did
          not exist when report.js ran */
       if (window.PTReport && window.PTReport.bind) window.PTReport.bind();
@@ -1271,10 +1274,10 @@
   function loadStatsView() {
     var r = taggerRoot();
     loadOnce(r + 'shared.css?v=14', 'css');
-    loadOnce(r + 'Stats/stats-view.css?v=6', 'css');
+    loadOnce(r + 'Stats/stats-view.css?v=7', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
-      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=15'); })
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=16'); })
       .then(function () { return loadOnce(r + 'Stats/report.js?v=31'); });
   }
 
