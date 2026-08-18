@@ -1478,7 +1478,61 @@ function loadEvents(){
   // first open (nothing saved yet) -> use the events bundled in this file
   return JSON.parse(JSON.stringify(DEFAULT_EVENTS));
 }
+
+/* ---- my keyboard, on everybody's event list ----
+   The list of events is the website's; the codes typed on it are not. event_types.key
+   is the SITE DEFAULT — what a new analyst inherits, and what the previous build put
+   there. state.hotkeys is this account's own map on top of it.
+
+   state.events keeps its shape — [{name,key}, …] — so every reader downstream
+   (parseChain, expandKey, eventForKey, nextFreeKey, updateBanner, renderEvents) goes on
+   reading .key exactly as it always did and never learns any of this happened. The only
+   thing that changed is where that .key came from, and resolveKeys() is the one place
+   that answers it.
+
+   Cached per user id, the way pitchtagger.recent.v1 already is (see recentUser()): two
+   accounts sharing one browser must not read each other's keyboard. The cloud is the
+   source of truth — this store is a copy, so the app opens with the right keys before
+   Supabase has answered, and still works when it never does. */
+const HK_STORE='pitchtagger.hotkeys.v1';
+const prefsUid=()=>{const u=window.PTAuth&&window.PTAuth.user();return u&&u.id?u.id:'local';};
+const bySport=o=>{const out={};SPORTS.forEach(sp=>{out[sp]=(o&&o[sp]&&typeof o[sp]==='object'&&!Array.isArray(o[sp]))?o[sp]:{}});return out;};
+function hotkeysAll(){try{const o=JSON.parse(localStorage.getItem(HK_STORE));return (o&&typeof o==='object'&&!Array.isArray(o))?o:{};}catch(e){return {};}}
+function loadHotkeys(){return bySport(hotkeysAll()[prefsUid()]);}
+function saveHotkeys(){
+  const all=hotkeysAll(); all[prefsUid()]=state.hotkeys;
+  try{localStorage.setItem(HK_STORE,JSON.stringify(all));}catch(e){STORAGE_OK=false;}
+  touchPrefs();
+  window.Cloud&&window.Cloud.onUserPrefsChanged&&window.Cloud.onUserPrefsChanged();
+}
+let siteKeys={};                     // {sport:{eventName:key}} — the shared default
+// take the codes arriving with a dictionary as the site defaults, BEFORE mine go over them
+function snapSiteKeys(ev){
+  siteKeys={}; SPORTS.forEach(sp=>{siteKeys[sp]={};
+    (ev[sp]||[]).forEach(e=>{siteKeys[sp][e.name]=e.key||''});});
+}
+/* An event created HERE has no site default yet — the cloud has not echoed its row back,
+   and offline it never will. The code it was given is that default until it does, so it
+   is recorded before the next resolve can read a blank and wipe it. Only missing entries
+   are filled: an event the site already has a code for keeps that code, not mine. */
+function seedSiteKeys(){
+  SPORTS.forEach(sp=>{siteKeys[sp]=siteKeys[sp]||{};
+    (state.events[sp]||[]).forEach(e=>{
+      if(!Object.prototype.hasOwnProperty.call(siteKeys[sp],e.name))siteKeys[sp][e.name]=e.key||'';
+    });});
+}
+/* '' in my map means "I unbound this one"; no entry at all means "give me the site
+   default". `||` cannot tell those apart, so this asks the object itself. */
+function resolveKeys(){
+  SPORTS.forEach(sp=>{
+    const mine=state.hotkeys[sp]||{}, site=siteKeys[sp]||{};
+    (state.events[sp]||[]).forEach(e=>{
+      e.key=Object.prototype.hasOwnProperty.call(mine,e.name)?String(mine[e.name]||''):(site[e.name]||'');
+    });
+  });
+}
 function saveEvents(){
+  seedSiteKeys();   // a just-created event keeps the code it was given (see seedSiteKeys)
   try{localStorage.setItem(EV_STORE,JSON.stringify(state.events));}catch(e){STORAGE_OK=false;}
   updateStoreStatus();
   window.Cloud&&window.Cloud.onEventTypesChanged&&window.Cloud.onEventTypesChanged(); // push to Supabase if connected
@@ -1486,38 +1540,83 @@ function saveEvents(){
 // apply an event dictionary pushed from the cloud (other clients)
 function applyEventTypes(ev){
   SPORTS.forEach(sp=>{if(!ev[sp])ev[sp]=[]});
+  // the codes on the incoming rows are the SITE defaults; mine go over them right after,
+  // so a dictionary arriving from the cloud can no longer re-key anyone's keyboard
+  snapSiteKeys(ev);
   state.events=ev;
+  resolveKeys();
   try{localStorage.setItem(EV_STORE,JSON.stringify(ev));}catch(e){}
   if(!curEvents().some(e=>e.name===state.activeEvent))state.activeEvent=curEvents()[0]?.name||null;
   // the macro rows read the dictionary too: a re-keyed event can start clashing with a
   // macro's code, and a deleted one leaves the macro pointing at nothing
   renderEvents(); renderMacros(); updateBanner(); updateStoreStatus();
 }
-/* ---- macros (saved across reload, this browser only) ----
+/* ---- macros (mine, and they follow the account) ----
    A macro is one hotkey standing for a run of events: "qs" -> recovery + pass success.
-   Stored by event NAME, not by the events' hotkeys, so re-binding an event's key (or
-   picking the dictionary up from the cloud) leaves every macro pointing at the same
-   events. They live in their own store — the cloud event_types table has no column for
-   them, and nothing else in the app reads this key. */
-const MAC_STORE='pitchtagger.macros.v1';
+   Stored by event NAME, not by the events' hotkeys, so re-binding a key (mine or the
+   site's) leaves every macro pointing at the same events.
+
+   v2 is v1 keyed by user id. v1 was a bare {sport:[…]} in one browser's localStorage,
+   which is how a domain move erased every macro on the site: nothing else held a copy.
+   Now the cloud holds them (user_prefs.macros) and this store is the local cache.
+   v1 is READ once, adopted for whoever is signed in, and then left alone for good — it
+   costs a few KB and it is the only copy anybody had. */
+const MAC_STORE='pitchtagger.macros.v2';
+const MAC_V1='pitchtagger.macros.v1';
+// one macro list, cleaned: drop the empty ones, lower-case the codes, names to strings
+function cleanMacros(o){
+  const out={}; SPORTS.forEach(sp=>{out[sp]=(o&&Array.isArray(o[sp])?o[sp]:[])
+    .filter(m=>m&&Array.isArray(m.events)&&m.events.length)
+    .map(m=>({key:String(m.key||'').toLowerCase(),events:m.events.map(String)}));});
+  return out;
+}
+function macrosAll(){try{const o=JSON.parse(localStorage.getItem(MAC_STORE));return (o&&typeof o==='object'&&!Array.isArray(o))?o:{};}catch(e){return {};}}
 function loadMacros(){
-  try{
-    const o=JSON.parse(localStorage.getItem(MAC_STORE)||'null');
-    if(o&&typeof o==='object'&&!Array.isArray(o)){
-      const out={};
-      SPORTS.forEach(sp=>{out[sp]=(Array.isArray(o[sp])?o[sp]:[])
-        .filter(m=>m&&Array.isArray(m.events)&&m.events.length)
-        .map(m=>({key:String(m.key||'').toLowerCase(),events:m.events.map(String)}));});
-      return out;
-    }
-  }catch(e){}
-  const empty={}; SPORTS.forEach(sp=>{empty[sp]=[]}); return empty;
+  const all=macrosAll(), uid=prefsUid();
+  if(Object.prototype.hasOwnProperty.call(all,uid))return cleanMacros(all[uid]);
+  // nothing under this account yet — adopt the pre-account store, once
+  try{const v1=JSON.parse(localStorage.getItem(MAC_V1)||'null');
+    if(v1&&typeof v1==='object'&&!Array.isArray(v1))return cleanMacros(v1);}catch(e){}
+  return cleanMacros(null);
 }
 function saveMacros(){
-  try{localStorage.setItem(MAC_STORE,JSON.stringify(state.macros));}catch(e){STORAGE_OK=false;}
+  const all=macrosAll(); all[prefsUid()]=state.macros;
+  try{localStorage.setItem(MAC_STORE,JSON.stringify(all));}catch(e){STORAGE_OK=false;}
+  touchPrefs();
   updateStoreStatus();
+  window.Cloud&&window.Cloud.onUserPrefsChanged&&window.Cloud.onUserPrefsChanged();
 }
 state.macros=loadMacros();   // here, not in the state literal — see the note on state.macros
+
+/* ---- the two personal stores, as one thing the cloud can carry ----
+   PREFS_AT is the local clock: when this browser last changed either of them. On connect
+   it is weighed against user_prefs.updated_at so an edit made while the network was down
+   is not quietly overwritten by an older copy from the server. */
+const PREFS_AT='pitchtagger.prefs.at.v1';
+function touchPrefs(){
+  try{const all=JSON.parse(localStorage.getItem(PREFS_AT))||{};all[prefsUid()]=Date.now();
+    localStorage.setItem(PREFS_AT,JSON.stringify(all));}catch(e){}
+}
+function prefsAt(){
+  try{const all=JSON.parse(localStorage.getItem(PREFS_AT))||{};return +all[prefsUid()]||0;}catch(e){return 0;}
+}
+// what cloud-sync uploads
+function localPrefs(){return {hotkeys:state.hotkeys,macros:state.macros,at:prefsAt()};}
+/* what cloud-sync hands back. Writes the local cache WITHOUT touching PREFS_AT: this copy
+   came from the server, so it must not look newer than the server on the next connect. */
+function applyUserPrefs(p){
+  state.hotkeys=bySport(p&&p.hotkeys);
+  state.macros=cleanMacros(p&&p.macros);
+  const hk=hotkeysAll(); hk[prefsUid()]=state.hotkeys;
+  const mc=macrosAll(); mc[prefsUid()]=state.macros;
+  try{localStorage.setItem(HK_STORE,JSON.stringify(hk));localStorage.setItem(MAC_STORE,JSON.stringify(mc));}catch(e){}
+  resolveKeys();
+  renderEvents(); renderMacros(); updateBanner(); updateStoreStatus();
+}
+// boot: my keyboard over the dictionary that was already on the page
+state.hotkeys=loadHotkeys();
+snapSiteKeys(state.events);
+resolveKeys();
 function updateStoreStatus(){
   const el=$('storeStatus'); if(!el)return;
   const n=Object.values(state.events).reduce((a,arr)=>a+(arr?arr.length:0),0);
@@ -1987,11 +2086,19 @@ function updateBanner(){
   if(n)n.textContent=ev?ev.name:'—';
   if(k)k.textContent=ev&&ev.key?'['+ev.key+']':'';
 }
+/* A hotkey is mine, not the site's. This writes to state.hotkeys and NOT to
+   state.events — no saveEvents(), so the shared dictionary is never touched and nobody
+   else's keyboard moves under them. Adding, renaming or reordering an event still goes
+   through saveEvents() and is still shared by everyone: it is the event list that is
+   common property, not the codes typed on it. */
 function setKey(ev,val){
   val=(val||'').trim().toLowerCase().replace(/\s+/g,'');
-  // prevent duplicates: clear the same code from any other event
-  if(val) curEvents().forEach(o=>{if(o!==ev&&o.key===val)o.key=''});
-  ev.key=val; saveEvents(); renderEvents(); renderMacros(); updateBanner();
+  const mine=state.hotkeys[state.sport]||(state.hotkeys[state.sport]={});
+  // prevent duplicates: clear the same code from any other event — in MY map, and as ''
+  // ("I unbound it"), because deleting the entry would only hand back the site default
+  if(val) curEvents().forEach(o=>{if(o!==ev&&o.key===val)mine[o.name]=''});
+  mine[ev.name]=val;
+  saveHotkeys(); resolveKeys(); renderEvents(); renderMacros(); updateBanner();
 }
 function renderEvents(){
   const list=$('evList'); list.innerHTML='';
@@ -2013,11 +2120,12 @@ function renderEvents(){
     key.onblur=()=>setKey(ev,key.value);
     const name=document.createElement('div');name.className='ev-name';name.textContent=ev.name;
     name.onclick=()=>setActive(ev.name);
-    const x=document.createElement('div');x.className='ev-x';x.textContent='×';x.title='delete';
-    x.onclick=e=>{e.stopPropagation();state.events[state.sport]=curEvents().filter(o=>o!==ev);
-      if(state.activeEvent===ev.name)state.activeEvent=curEvents()[0]?.name||null;
-      saveEvents();renderEvents();renderMacros();updateBanner()};
-    item.appendChild(key);item.appendChild(name);item.appendChild(x);
+    /* No × here. The event list belongs to the whole website: one analyst deleting a row
+       took the event away from everybody, broke every macro pointing at it, and left the
+       matches already tagged with it naming something the dictionary no longer has. The
+       ✎ / ✖ on the Events table in the tagger are untouched — a tagged row is one
+       person's work on one match, and anyone may still edit or delete that. */
+    item.appendChild(key);item.appendChild(name);
     list.appendChild(item);
   });
 }
@@ -2147,6 +2255,41 @@ function expandMacros(raw){
     const keys=names.map(n=>{const ev=curEvents().find(o=>o.name===n);return ev&&ev.key?ev.key:''});
     return keys.every(Boolean)?keys.join('*'):tok;
   });
+}
+
+/* ---- read somebody else's entry in MY keyboard ----
+   A hotkey belongs to an account now, so the code stored on a row is the code the person
+   who TAGGED it pressed. Handing that back to a different analyst is how ✎ Edit would
+   silently rewrite the row: A's "s" is #pass success, B's "s" is #shot, B presses Enter
+   and the row becomes a shot. The rows themselves say what each code meant — action is
+   the code, event is the name — so they are the dictionary to read the entry with.
+
+   Only the code tokens move. Shirt numbers, '*' and the order are left exactly as typed.
+   When the tagger is also the editor and nothing was re-bound, every token maps back to
+   itself: the result is the string that went in, character for character. */
+function retypeForMe(raw,rows){
+  const was={};                                   // the tagger's code -> event name
+  (rows||[]).forEach(r=>{const k=(r&&r.action||'').toLowerCase();
+    if(k&&r.event&&!(k in was))was[k]=r.event;});
+  return String(raw||'').replace(/[a-z]+/gi,tok=>{
+    const k=tok.toLowerCase();
+    const name=was[k]||eventForKey(k);
+    if(!name)return tok;                          // one of my macros, or a code nobody owns
+    const ev=curEvents().find(o=>o.name===name);
+    if(ev&&ev.key)return ev.key;                  // my code for it
+    /* I have no code for this event. Handing the tagger's back is only safe while it
+       means nothing to me — if it means something ELSE, re-submitting would quietly tag
+       the row as that other event, which is the whole failure this function exists to
+       stop. Put a code nobody answers to there instead: the entry gate then refuses out
+       loud and names it, and nothing is written. */
+    return eventForKey(k)?freeCode():tok;
+  });
+}
+// a code no event and no macro of mine answers to. Keys are capped at 8 characters, so
+// this walks at most nine steps.
+function freeCode(){
+  let c='z'; while(eventForKey(c)||macroForKey(c))c+='z';
+  return c;
 }
 
 /* ===== SYNTAX — chains of events in one entry =====
@@ -3293,9 +3436,17 @@ function startEdit(idx){
   state.editingId=row.id;
   setTeam(row.team);
   state.activeEvent=row.event; renderEvents(); updateBanner();  // keyless re-submit keeps this event
-  // reconstruct the syntax (e.g. "1s2"); fall back to the stored raw input, written out
-  // long-hand so a macro comes back as the events it stands for (see expandMacros)
-  const syntax=((row.playerFrom||'')+(row.action||'')+(row.playerTo||''))||expandMacros(row.raw)||'';
+  /* reconstruct the syntax (e.g. "1s2"); fall back to the stored raw input, written out
+     long-hand so a macro comes back as the events it stands for (see expandMacros).
+
+     The code is MINE for this event, not the one the tagger pressed: a hotkey belongs to
+     an account now, and their "s" can be somebody else's #shot. If I have no code for it
+     the numbers go back alone — an entry with no code at all re-tags the ACTIVE event,
+     which the line above has just set to this row's own. Handing back their code instead
+     would be the one way to get this wrong. */
+  const mine=(curEvents().find(o=>o.name===row.event)||{}).key;
+  const syntax=((row.playerFrom||'')+(mine||'')+(row.playerTo||''))
+              ||retypeForMe(expandMacros(row.raw),[row])||'';
   $('playerInput').value=syntax;
   // restore the dots (keep their original timeline)
   state.pendingDots=[
@@ -3317,8 +3468,10 @@ function startEditGroup(grpRows){
   state.editingId=null; state.editingGroup=grpRows[0].grp;
   setTeam(grpRows[0].team);
   // the chain as typed, with any macro written out long-hand ("2xxaa" -> "2xx*aa"): the
-  // box has to show the events the rows actually are, not the shorthand that made them
-  $('playerInput').value=expandMacros(grpRows[0].raw||'');
+  // box has to show the events the rows actually are, not the shorthand that made them.
+  // The chain's own rows say what each code meant, so it comes back in MY keyboard
+  // whoever tagged it — see retypeForMe.
+  $('playerInput').value=retypeForMe(expandMacros(grpRows[0].raw||''),grpRows);
   // rebuild the ordered touch dots. Multiple rows can point at the SAME physical
   // touch dot — consecutive chain rows (row N's receiver IS row N+1's player), and
   // also several solo '*' events sharing one player's dot with a transfer row's
@@ -4126,8 +4279,8 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
   };
 })();
 
-window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, renderEvents, renderMacros, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, applyUserPrefs, localPrefs, renderEvents, renderMacros, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
 </script>
-<script src="cloud-sync.js?v=49"></script>
+<script src="cloud-sync.js?v=50"></script>
 </body>
 </html>

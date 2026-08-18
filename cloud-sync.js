@@ -100,6 +100,8 @@ const CONFIG = {
     connected = true; status('Connected', true);
     if ($('cloudConnected')) $('cloudConnected').style.display = 'block';
     await initEventTypes();      // shared event dictionary (live)
+    // after the dictionary, never before: my codes are resolved ONTO that list
+    await initUserPrefs(session);
     await loadTeams();           // teams database -> create-match autocomplete
     return true;
   }
@@ -151,19 +153,40 @@ const CONFIG = {
     const { data, error } = await sb.from('event_types').select('*').order('ord');
     if (!error && data) applyToApp(data);
   }
+  /* The dictionary is the whole site's, so this only ever ADDS to it and re-orders it.
+     Two things it deliberately does not do any more:
+
+     `key` is written when an event FIRST enters the table and never again. It is the site
+     default — the code a new analyst inherits — and each analyst's real keyboard lives in
+     user_prefs. Sending it on every push would put one person's bindings on everybody.
+
+     And nothing is deleted. An event removed here vanished for every analyst at once,
+     broke every macro pointing at it, and orphaned the matches already tagged with it.
+     (The ✎ / ✖ on the tagger's own Events table are untouched: a tagged row is one
+     person's work on one match, and anyone may still edit or delete that.)
+
+     The two writes are separate calls on purpose. PostgREST builds the column list from
+     the UNION of the keys across the whole array, so one new event carrying `key` in a
+     batch with existing ones would put `key` in the ON CONFLICT ... DO UPDATE SET clause
+     and blank the site default on every row that went with it. */
   async function pushEventTypes(events) {
-    const rows = [];
+    const { data: existing, error: exErr } = await sb.from('event_types').select('id,sport,event_name');
+    if (exErr) { console.warn('event_types read:', exErr.message); return; }
+    const known = new Set((existing || []).map(r => r.sport + '|' + r.event_name));
+    const fresh = [], seen = [];
     Object.keys(events).forEach(sport =>
-      (events[sport] || []).forEach((e, i) => rows.push({ sport, event_name: e.name, key: e.key || null, ord: i })));
-    if (rows.length) {
-      const { error } = await sb.from('event_types').upsert(rows, { onConflict: 'sport,event_name' });
+      (events[sport] || []).forEach((e, i) => {
+        if (known.has(sport + '|' + e.name)) seen.push({ sport, event_name: e.name, ord: i });
+        else fresh.push({ sport, event_name: e.name, key: e.key || null, ord: i });
+      }));
+    if (seen.length) {
+      const { error } = await sb.from('event_types').upsert(seen, { onConflict: 'sport,event_name' });
       if (error) { console.warn('event_types upsert:', error.message); return; }
     }
-    // delete rows that no longer exist locally
-    const { data: existing } = await sb.from('event_types').select('id,sport,event_name');
-    const keep = new Set(rows.map(r => r.sport + '|' + r.event_name));
-    const del = (existing || []).filter(r => !keep.has(r.sport + '|' + r.event_name)).map(r => r.id);
-    if (del.length) await sb.from('event_types').delete().in('id', del);
+    if (fresh.length) {
+      const { error } = await sb.from('event_types').insert(fresh);
+      if (error) console.warn('event_types insert:', error.message);
+    }
   }
   function subscribeEventTypes() {
     if (etChannel) sb.removeChannel(etChannel);
@@ -172,11 +195,78 @@ const CONFIG = {
         () => { clearTimeout(etTimer); etTimer = setTimeout(reloadEventTypes, 150); })
       .subscribe();
   }
-  // called by the app whenever the local event dictionary changes (add/delete/key)
+  // called by the app whenever the local event dictionary changes (add / re-order)
   function onEventTypesChanged() {
     if (!connected || applyingET) return;
     clearTimeout(etTimer);
     etTimer = setTimeout(() => pushEventTypes(PT().state.events), 250);
+  }
+
+  /* ---------- my keyboard and my macros (user_prefs) ----------
+     event_types answers "which events does this website have". This answers "and which
+     key do I press for each of them" — one row per account, readable by nobody else.
+     Macros live here too: they used to sit in one browser's localStorage and nowhere
+     else, which is how a domain move erased every macro on the site. */
+  let applyingPrefs = false, upTimer = null, upChannel = null, prefsUid = null;
+
+  /* connect() signs in anonymously when it finds no session, and an anonymous uid is
+     thrown away at the end of the visit. Prefs written under one are lost, and the empty
+     set read back could go over the real ones — so an anonymous session stays local-only.
+     Same rule auth.js applies in user(). */
+  const realUid = (session) => {
+    const u = session && session.user;
+    return (u && u.id && u.is_anonymous !== true) ? u.id : null;
+  };
+
+  async function initUserPrefs(session) {
+    prefsUid = realUid(session);
+    if (!prefsUid) return;
+    const { data, error } = await sb.from('user_prefs')
+      .select('hotkeys,macros,updated_at').eq('user_id', prefsUid).maybeSingle();
+    // a read that failed says NOTHING about what is up there. Pushing now would answer a
+    // network error by overwriting the only copy — exactly the way the macros went.
+    if (error) { console.warn('user_prefs:', error.message); return; }
+    const local = PT().localPrefs();
+    if (!data) await pushUserPrefs(local);                                   // nothing stored yet: seed it
+    else if (local.at && local.at > Date.parse(data.updated_at || 0)) await pushUserPrefs(local); // edited offline
+    else {
+      applyingPrefs = true;
+      PT().applyUserPrefs({ hotkeys: data.hotkeys || {}, macros: data.macros || {} });
+      applyingPrefs = false;
+    }
+    subscribeUserPrefs();
+  }
+  async function reloadUserPrefs() {
+    if (!prefsUid) return;
+    const { data, error } = await sb.from('user_prefs')
+      .select('hotkeys,macros').eq('user_id', prefsUid).maybeSingle();
+    if (error || !data) return;
+    applyingPrefs = true;
+    PT().applyUserPrefs({ hotkeys: data.hotkeys || {}, macros: data.macros || {} });
+    applyingPrefs = false;
+  }
+  async function pushUserPrefs(p) {
+    if (!prefsUid) return;
+    const { error } = await sb.from('user_prefs')
+      .upsert({ user_id: prefsUid, hotkeys: (p && p.hotkeys) || {}, macros: (p && p.macros) || {} },
+              { onConflict: 'user_id' });
+    if (error) console.warn('user_prefs upsert:', error.message);
+  }
+  function subscribeUserPrefs() {
+    if (upChannel) sb.removeChannel(upChannel);
+    // filtered to my own row: a second tab signed in as me picks the change up, and RLS
+    // means no other account's row could arrive here even unfiltered
+    upChannel = sb.channel('user_prefs')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'user_prefs', filter: 'user_id=eq.' + prefsUid },
+        () => { clearTimeout(upTimer); upTimer = setTimeout(reloadUserPrefs, 150); })
+      .subscribe();
+  }
+  // called by the app whenever a hotkey or a macro of mine changes
+  function onUserPrefsChanged() {
+    if (!connected || !prefsUid || applyingPrefs) return;
+    clearTimeout(upTimer);
+    upTimer = setTimeout(() => pushUserPrefs(PT().localPrefs()), 250);
   }
 
   /* ---------- match create / join / load ---------- */
@@ -508,7 +598,8 @@ const CONFIG = {
     get teams() { return teamsCache; },
     loadTeams, createTeam, createMatchWithTeams, findMatchByCode,
     openMatch: openByInput,
-    onLocalUpsert, onLocalDelete, onEventTypesChanged, onTeamNamesChanged, onDurationChanged, onLineupsChanged,
+    onLocalUpsert, onLocalDelete, onEventTypesChanged, onUserPrefsChanged,
+    onTeamNamesChanged, onDurationChanged, onLineupsChanged,
     setVideoUrl, uploadToR2,
     buildReport, reportClubs, publishReport, reportStatus
   };

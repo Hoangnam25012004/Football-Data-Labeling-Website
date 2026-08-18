@@ -80,7 +80,7 @@ const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
   'SNAP_WINDOW','DUEL_PAIR_WINDOW','anStamp','anSide','anDur','sumOf','inMouth','anShort'];
 const FUNCS=['fmt','parseTime','eventHalfIn','eventHalf','matchTimeIn','matchTime',
   'matchClockPartsIn','fmtMatchClockIn','zoneAt','eventForKey',
-  'macroForKey','expandKey','expandMacros','parseChain','goalToPct','goalFromPct','goalBallSVG',
+  'macroForKey','expandKey','expandMacros','freeCode','retypeForMe','parseChain','goalToPct','goalFromPct','goalBallSVG',
   'openGoalCapture','closeGoalCapture',
   'effectiveLUIn','effectiveLU','planSubGroup','swapInSnapshot','applySubGroup','subSideEffects',
   'removeSubSideEffects','shiftSubRowsWithPeriod','applyRedCard','redSideEffects',

@@ -293,11 +293,13 @@ test('the Event modal holds two separate tables', () => {
 });
 
 test('macros are kept in their own store, away from the event dictionary', () => {
-  ok(/const MAC_STORE='pitchtagger\.macros\.v1'/.test(SRC),'its own key');
+  ok(/const MAC_STORE='pitchtagger\.macros\.v2'/.test(SRC),'its own key');
   ok(/const EV_STORE='pitchtagger\.events\.v1'/.test(SRC),'the event store is untouched');
-  // saveEvents still pushes to the cloud; saveMacros must not pretend to
-  ok(/onEventTypesChanged/.test(grabFunction('saveEvents')),'events still sync');
-  notOk(/Cloud/.test(grabFunction('saveMacros')),'macros are local — no cloud table for them');
+  // the two now sync down two different pipes: the dictionary is the site's, the macros
+  // are the account's. Neither may be pushed through the other's call.
+  ok(/onEventTypesChanged/.test(grabFunction('saveEvents')),'events still sync as the site list');
+  notOk(/onEventTypesChanged/.test(grabFunction('saveMacros')),'a macro is not a change to the shared dictionary');
+  ok(/onUserPrefsChanged/.test(grabFunction('saveMacros')),'macros ride with the account');
 });
 
 test('the macros are loaded after MAC_STORE exists, not from the state literal', () => {
