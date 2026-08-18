@@ -2,6 +2,9 @@
 *.xlsx
 ~$*
 
+# Rendered video — the 3-minute client film is 17 MB and rebuilt from takes
+*.mp4
+
 # OS / editor noise
 .DS_Store
 Thumbs.db
