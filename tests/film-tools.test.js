@@ -81,11 +81,43 @@ function load(opts){
     URL:{createObjectURL:()=>'blob:x',revokeObjectURL(){}},
     MediaRecorder:opts.mimes?function(){}:undefined,
     Promise};
+  /* attach() puts a resize handler on the window and takes it off again in
+     detach(); tracked here so the pair can be shown to balance. */
+  const winL={};
+  ctx.addEventListener=(t,f)=>{(winL[t]=winL[t]||[]).push(f);};
+  ctx.removeEventListener=(t,f)=>{const a=winL[t]||[];const i=a.indexOf(f);if(i>=0)a.splice(i,1);};
   ctx.window=ctx; ctx.self=ctx;
   if(opts.mimes)ctx.MediaRecorder.isTypeSupported=t=>opts.mimes.indexOf(t)>=0;
   vm.createContext(ctx);
   vm.runInContext(TOOLS+'\n;globalThis.T=window.PTFilmTools;',ctx,{filename:'film-tools.js'});
-  return {T:ctx.T,doc,ctx};
+  return {T:ctx.T,doc,ctx,winL};
+}
+
+/* A toolkit mounted the way stats-view mounts it: a real attach(), a
+   letterboxed stage, and full screen on — which is the only state in which any
+   of this exists. 1430x951 holding a 1920x1080 picture is the measurement the
+   whole coordinate system is built on, so it is the one used here. */
+function mounted(extra){
+  const {T,doc,ctx:vmctx,winL}=load();
+  const v=vid(1920,1080,{x:0,y:0,width:1430,height:951});
+  v.offsetWidth=1430; v.offsetHeight=951;
+  const c=ctxFor(v,extra);
+  c.stage.offsetWidth=1430; c.stage.offsetHeight=951;
+  T.attach(c);
+  T._internals.setFull(true);
+  const I=T._internals;
+  const layerOf=()=>c.stage.children.find(n=>n.attrs&&n.attrs['class']==='fmt-layer');
+  const grp=cls=>{const s=layerOf();return s?s.children.find(n=>n.attrs&&n.attrs['class']===cls):null;};
+  return {T,I,c,v,doc,winL,
+    layerOf,grp,
+    live:()=>{const g=grp('fmt-shapes');return g?g.children.length:-1;},
+    key:(k,x)=>T.key(Object.assign({key:k,preventDefault(){},stopPropagation(){}},x||{})),
+    menu:(t,p)=>I.menuModel({t,p}),
+    pick:(model,label)=>{
+      const walk=m=>{for(const it of m){if(it&&it.label===label)return it;
+        if(it&&it.sub){const f=walk(it.sub);if(f)return f;}}return null;};
+      return walk(model);
+    }};
 }
 
 /* a video that reports a real picture inside a real stage */
@@ -286,10 +318,31 @@ function keyed(){
 }
 test('it claims its own keys and hands back everything else', () => {
   const {T,hit}=keyed();
-  [',','.','[',']','h','H','d','D','c','C','z','Z','l','L'].forEach(k=>
+  [',','.','[',']','h','H','d','D','c','C','l','L','t','T','s','S'].forEach(k=>
     ok(hit(k),k+' is claimed'));
-  [' ','ArrowLeft','ArrowRight','f','F','Enter','a','1'].forEach(k=>
+  [' ','ArrowLeft','ArrowRight','f','F','Enter','a'].forEach(k=>
     notOk(hit(k),k+' is left for the player'));
+});
+
+/* z was the 2x zoom toggle and is now the wheel's job. A key that no longer
+   does anything must also stop being advertised — a menu promising a shortcut
+   that is not bound is the exact defect S sat in for the life of this file. */
+test('z is gone, and nothing still advertises it', () => {
+  const {hit}=keyed();
+  notOk(hit('z'),'the key is unbound');
+  notOk(hit('Z'),'in both cases');
+  const model=grabFunction('menuModel',TOOLS,'client/assets/film-tools.js');
+  notOk(/key:\s*'Z'/.test(model),'and the menu no longer offers it');
+  ok(/lăn chuột/.test(model),'it points at the wheel instead');
+});
+
+/* The window keys answer only when there is something to apply them to. A key
+   that returns true makes filmKeys() call preventDefault() and stop, so one
+   that claims a press it did nothing with would eat it from the whole page. */
+test('the window keys hand the press back when there is nothing selected', () => {
+  const {hit}=keyed();
+  ['1','5','9','0','Delete'].forEach(k=>
+    notOk(hit(k),k+' is not claimed with no shape selected and no tool armed'));
 });
 
 /* Q3 was answered A: Escape means one thing in both full-screen modes — out —
@@ -378,6 +431,382 @@ test('a player who opens no clip gets no layer and no query', () => {
   ok(/if\s*\(layer\s*\|\|\s*!ctx/.test(ens),'the layer is built once, on demand');
   const rest=grabFunction('restore',TOOLS,'client/assets/film-tools.js');
   ok(/if\s*\(shapes\.length\)/.test(rest),'and only restored when there is something to restore');
+});
+
+/* ============================================================================
+   TIME — a mark belongs to the moment it was drawn on
+
+   The complaint that started this: "I draw an arrow at 3:14 and it is there for
+   the whole match." Measured, the window was already there and already worked —
+   four seconds, fixed, invisible and uneditable, with four bugs around it. What
+   follows locks down the window being VISIBLE and OWNED, and each of the four.
+   ========================================================================== */
+test('a mark is alive at its moment and nowhere else', () => {
+  const {I,v,live,menu,pick}=mounted();
+  v.currentTime=194;
+  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  const s=I.state().shapes[0];
+  eq(s.t,194,'anchored to the frame it was drawn on');
+  eq(s.in,194); eq(s.out,198,'four seconds, which is what Q2 settled');
+  [[193.5,0],[194,1],[197.9,1],[198.4,0],[400,0],[2000,0]].forEach(([t,n])=>{
+    v.currentTime=t; I.paint(t,0);
+    eq(live(),n,'at t='+t+' the layer holds '+n+' node(s)');
+  });
+});
+
+test('pinning is the ONE way back to being there for the whole file', () => {
+  const {I,v,live,menu,pick}=mounted();
+  v.currentTime=194;
+  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  const s=I.state().shapes[0];
+  I.selectShape(s.id);
+  ok(/📌/.test(pick(menu(194,{x:900,y:500}),'📌 Giữ suốt clip').label),'offered, not assumed');
+  pick(menu(194,{x:900,y:500}),'📌 Giữ suốt clip').run();
+  eq(I.state().shapes[0].life,'pinned');
+  [0,194,2000,9999].forEach(t=>{ v.currentTime=t; I.paint(t,0); eq(live(),1,'alive at t='+t); });
+});
+
+test('the fade is a function of time, so the export can have it too', () => {
+  const {I}=mounted();
+  const s={in:100,out:104,fade:0.25,life:'moment'};
+  eq(I.alpha(s,99.75).toFixed(2),'0.00','it begins at nothing');
+  eq(I.alpha(s,99.875).toFixed(2),'0.50','half way in');
+  eq(I.alpha(s,100).toFixed(2),'1.00');
+  eq(I.alpha(s,102).toFixed(2),'1.00');
+  eq(I.alpha(s,104).toFixed(2),'1.00');
+  eq(I.alpha(s,104.25).toFixed(2),'0.00','and ends at nothing');
+  eq(I.alpha({in:1,out:2,life:'pinned'},9e9),1,'a pinned mark never fades');
+});
+
+/* MEASURED BUG (a): with the video running, a stroke that took longer than the
+   window was stored 100..104 and was therefore already dead when the analyst
+   let go — they drew a line and nothing appeared. */
+test('a stroke that outlasts its own window is not born dead', () => {
+  const {I,c,v,live,layerOf,menu,pick}=mounted();
+  v.currentTime=100;
+  pick(menu(100,{x:1,y:1}),'Bút tự do').run();
+  c.stage.on['pointerdown'][0]({button:0,clientX:300,clientY:300,pointerId:1,
+    preventDefault(){},stopPropagation(){}});
+  const svg=layerOf();
+  for(let i=1;i<=6;i++){v.currentTime=100+i;svg.on['pointermove'][0]({clientX:300+i*40,clientY:300+i*10});}
+  svg.on['pointerup'][0]({});
+  const pen=I.state().shapes.slice(-1)[0];
+  eq(pen.in,100,'anchored where the pen went down');
+  ok(pen.out>=106+1.5,'and it outlives the release by MIN_TAIL — got out='+pen.out);
+  v.currentTime=106; I.paint(106,0);
+  ok(live()>=1,'so the analyst sees what they just drew');
+});
+
+/* MEASURED BUG (b): playing a clip replaced the match drawing with the clip's
+   copy, and the next persist() wrote that truncated list to disk. */
+test('playing a clip leaves the match drawing alone', () => {
+  const {I,v,menu,pick}=mounted();
+  [194,600,1200].forEach(t=>{v.currentTime=t;pick(menu(t,{x:900,y:500}),'Rọi đèn vào đây').run();});
+  eq(I.state().shapes.length,3);
+  const clip=I.saveClip(190,200,'Clip A');
+  eq(clip.shapes.length,1,'the clip still carries only what overlaps it');
+  const playClip=grabFunction('playClip',TOOLS,'client/assets/film-tools.js');
+  notOk(/shapes\s*=\s*c\.shapes/.test(playClip),'and playing it never reassigns shapes');
+  eq(I.state().shapes.length,3,'so all three survive');
+});
+
+/* MEASURED BUG (c): every node rebuilt sixty times a second, and a fresh mask
+   id on each of five consecutive frames. */
+test('a frame that changes nothing touches no DOM', () => {
+  const {I,v,grp,menu,pick}=mounted();
+  v.currentTime=194;
+  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  I.paint(194,0);
+  const n1=grp('fmt-shapes').children[0];
+  I.paint(194.01,0.1);
+  eq(grp('fmt-shapes').children[0],n1,'the same node, not a replacement');
+});
+
+test('the dim mask is rebuilt when a spotlight moves, and only then', () => {
+  const {I,v,grp,key,menu,pick}=mounted();
+  v.currentTime=194;
+  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  key('d');                                     // dim on
+  const idOf=()=>{const m=grp('fmt-dim').children.find(n=>n.tag==='mask');return m&&m.attrs.id;};
+  I.paint(194,0); const first=idOf();
+  for(let i=1;i<5;i++)I.paint(194+i*0.001,0);
+  eq(idOf(),first,'nothing moved, so the mask is left where it is');
+  I.onWheel({deltaY:-100,clientX:700,clientY:400,preventDefault(){}});   // grow it
+  I.paint(194,0);
+  ok(idOf()!==first,'the hole has to follow the light — id is x/y/r, not the id alone');
+});
+
+test('a v1 record loads, keeps its window to the millisecond, and gains a fade', () => {
+  const {I}=mounted();
+  const up=I.upgrade({kind:'arrow',in:10.125,out:14.5});
+  eq(up.in,10.125,'window untouched'); eq(up.out,14.5);
+  eq(up.t,10.125,'the anchor was the start, back then');
+  eq(up.life,'moment'); eq(up.fade,0.25,'Q3: yes, old drawings get the fade too');
+  eq(up.rev,0);
+});
+
+/* ================= the four adjustments ================= */
+/* #4 — the toolkit is not a transport control. Opening it must not stop the
+   film; what that costs is that every item creating a drawing has to anchor to
+   the frame that was right-clicked, not to wherever the clock has got to. */
+test('right-clicking opens the toolkit without stopping the film', () => {
+  const {c,v}=mounted();
+  v.paused=false;
+  c.stage.on['contextmenu'][0]({clientX:700,clientY:400,preventDefault(){},stopPropagation(){}});
+  eq(v.paused,false,'the analyst keeps their playback');
+  const open=grabFunction('openMenu',TOOLS,'client/assets/film-tools.js');
+  notOk(/ctx\.pause\(\)/.test(open),'and the pause is gone from the source, not just quiet');
+});
+
+test('a menu item anchors to the frame that was right-clicked, not to now', () => {
+  const {I,v,menu,pick}=mounted();
+  v.currentTime=300;
+  const model=menu(300,{x:800,y:400});
+  v.currentTime=303;                       // three seconds spent reading the menu
+  pick(model,'Rọi đèn vào đây').run();
+  const s=I.state().shapes.slice(-1)[0];
+  eq(s.t,300,'the light lands on the frame that was pointed at');
+  eq(s.in,300);
+});
+
+/* #1 — S has been printed beside "Rọi đèn vào đây" since the day this file was
+   written, and nothing was ever bound to it. */
+test('S places a spotlight where the pointer is', () => {
+  const {I,c,key}=mounted();
+  c.stage.on['pointermove'][0]({clientX:500,clientY:400});
+  ok(key('s'),'the key is taken now');
+  const s=I.state().shapes.slice(-1)[0];
+  eq(s.kind,'spotlight');
+  eq(Math.round(s.at.x),Math.round(I.state().ptr.x),'at the pointer, not the middle');
+  ok(I.state().adjust&&I.state().adjust.id===s.id,
+     'and straight into adjust, so the wheel sizes it without a second trip');
+});
+
+test('S with the pointer off the picture falls back to the centre', () => {
+  const {I,key}=mounted();
+  ok(key('S'),'still taken');
+  const s=I.state().shapes.slice(-1)[0];
+  eq(s.at.x,960,'half of 1920'); eq(s.at.y,540,'half of 1080');
+});
+
+/* #2 — the spotlight can be put where it belongs and sized by the wheel. */
+test('the wheel sizes the spotlight being adjusted, within limits', () => {
+  const {I,key}=mounted();
+  key('s');
+  const r0=I.state().shapes.slice(-1)[0].r;
+  I.onWheel({deltaY:-100,clientX:500,clientY:400,preventDefault(){}});
+  ok(I.state().shapes.slice(-1)[0].r>r0,'up grows it');
+  I.onWheel({deltaY:120,clientX:500,clientY:400,preventDefault(){}});
+  I.onWheel({deltaY:120,clientX:500,clientY:400,preventDefault(){}});
+  ok(I.state().shapes.slice(-1)[0].r<r0,'down shrinks it');
+  for(let i=0;i<120;i++)I.onWheel({deltaY:-100,clientX:5,clientY:5,preventDefault(){}});
+  ok(I.state().shapes.slice(-1)[0].r<=1080*0.60+0.001,
+     'and it stops at 0.60 of the picture — an unbounded wheel plus dim is a white screen');
+  for(let i=0;i<300;i++)I.onWheel({deltaY:120,clientX:5,clientY:5,preventDefault(){}});
+  ok(I.state().shapes.slice(-1)[0].r>=1080*0.02-0.001,'and at 0.02 the other way');
+});
+
+test('dragging the adjusted spotlight moves it, and nothing else takes the click', () => {
+  const {I,c,key,layerOf}=mounted();
+  key('s');
+  const id=I.state().shapes.slice(-1)[0].id;
+  c.stage.on['pointerdown'][0]({button:0,clientX:400,clientY:300,pointerId:2,
+    preventDefault(){},stopPropagation(){}});
+  const moved=I.state().shapes.slice(-1)[0].at;
+  ok(moved.x>0&&moved.y>0,'it went to the pointer');
+  ok(layerOf().classList.contains('fmt-adjust'),
+     'the layer takes the pointer only while adjusting — the rule it may not repeal otherwise');
+  layerOf().on['pointerup'][0]({});
+  eq(I.state().shapes.slice(-1)[0].id,id,'still the same one');
+});
+
+/* #3 — the wheel is the zoom, and the arbitration between the two jobs. */
+test('with nothing being adjusted the wheel is the zoom', () => {
+  const {I,key}=mounted();
+  I.onWheel({deltaY:-100,clientX:700,clientY:400,preventDefault(){}});
+  ok(I.state().zoom&&I.state().zoom.k>1,'in');
+  for(let i=0;i<60;i++)I.onWheel({deltaY:-100,clientX:700,clientY:400,preventDefault(){}});
+  ok(I.state().zoom.k<=6,'capped at 6x');
+  for(let i=0;i<80;i++)I.onWheel({deltaY:120,clientX:700,clientY:400,preventDefault(){}});
+  eq(I.state().zoom,null,
+     'and back at life size the transform is taken OFF, not left as scale(1)');
+});
+
+test('the wheel refuses the two cases where it is not ours', () => {
+  const {I}=mounted();
+  let stopped=false;
+  I.onWheel({deltaY:-100,clientX:700,clientY:400,ctrlKey:true,preventDefault(){stopped=true;}});
+  notOk(stopped,'ctrl+wheel is the browser own zoom — taking it breaks an OS control');
+  eq(I.state().zoom,null,'and it did nothing');
+  I.setFull(false);
+  I.onWheel({deltaY:-100,clientX:700,clientY:400,preventDefault(){stopped=true;}});
+  notOk(stopped,'outside full screen the page keeps its scroll — .film-full is overflow:auto under 900px');
+});
+
+test('the wheel listener is on the stage, and asks for the right to cancel', () => {
+  const at=grabFunction('attach',TOOLS,'client/assets/film-tools.js');
+  ok(/ctx\.stage\.addEventListener\('wheel',\s*onWheel,\s*\{\s*passive:\s*false\s*\}\)/.test(at),
+     'on ctx.stage, never document, and passive:false or preventDefault is ignored');
+  notOk(/document\.addEventListener\('wheel'/.test(TOOLS),'nothing global');
+});
+
+/* The zoom origin, which the wheel made load-bearing. One origin string for two
+   differently shaped boxes put the grass and the drawing on separate centres. */
+test('the zoom origin is worked out in each element own box', () => {
+  const {I}=mounted();
+  const o=I.originOnElement(480,270);
+  const y=parseFloat(o.split(' ')[1]);
+  ok(Math.abs(y-274.5/951*100)<0.01,
+     'y=270 of 1080 sits at 73.5+(270/1080)*804 = 274.5 of 951, not at 25% — got '+o);
+  const x=parseFloat(o.split(' ')[0]);
+  ok(Math.abs(x-25)<0.01,'and the unboxed axis is still a plain quarter');
+  const az=grabFunction('applyZoom',TOOLS,'client/assets/film-tools.js');
+  ok(/originOnElement/.test(az),'the video uses the element-space origin');
+  ok(/layer\.w\s*\*\s*100/.test(az),'the SVG keeps the picture-space one, because it IS the picture');
+});
+
+/* ================= the lane ================= */
+test('the lane shows one bar per shape, at its own window', () => {
+  // a 200s window, so a four-second mark is 2% wide and clears the floor below
+  const {I,v,menu,pick}=mounted({win:{half:1,label:'1st Half',start:0,end:200},end:()=>200});
+  [20,60,120].forEach(t=>{v.currentTime=t;pick(menu(t,{x:900,y:500}),'Rọi đèn vào đây').run();});
+  const st=I.state().strip;
+  ok(st,'it is up as soon as the match has a drawing (Q4)');
+  eq(Object.keys(st.bars).length,3,'one bar each');
+  const first=st.lane.children[0];
+  ok(Math.abs(parseFloat(first.style.left)-10)<0.01,'left is its in-point: 20/200');
+  ok(Math.abs(parseFloat(first.style.width)-2)<0.01,'width is its length: 4/200');
+  ok(Math.abs(parseFloat(st.lane.children[2].style.left)-60)<0.01,'and the third is at 120/200');
+});
+
+/* A four-second mark inside a forty-five minute half is 0.13% of the lane —
+   about two pixels, which is neither visible nor clickable. */
+test('a very short window still gets a bar you can hit', () => {
+  const {I,v,menu,pick}=mounted();                 // the default 3000s half
+  v.currentTime=194;
+  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  const bar=I.state().strip.lane.children[0];
+  ok(Math.abs(parseFloat(bar.style.left)-194/3000*100)<0.01,'placed exactly');
+  eq(parseFloat(bar.style.width),0.4,'but floored at 0.4% so it can be seen and hit');
+});
+
+test('the lane sits in the black bar ABOVE the picture, clear of the caption', () => {
+  const {I,key}=mounted();
+  key('s');
+  const st=I.state().strip, top=parseFloat(st.el.style.top);
+  // 1430x951 around a 1430x804 picture leaves 73.3px above and below; the one
+  // below already belongs to .film-cap, which is 38-54px tall in full screen
+  ok(top>=0,'inside the stage');
+  ok(top+26<=73.32,'and entirely inside the top letterbox — got top='+top);
+  notOk(st.el.classList.contains('fmt-over'),'so it covers no grass at all');
+});
+
+test('with no room above, the lane says so instead of moving somewhere unexpected', () => {
+  const {T,I}=(()=>{
+    const {T,doc,ctx}=load();
+    const v=vid(1920,1080,{x:0,y:0,width:1430,height:810});   // barely any letterbox
+    v.offsetWidth=1430; v.offsetHeight=810;
+    const c=ctxFor(v); c.stage.offsetWidth=1430; c.stage.offsetHeight=810;
+    T.attach(c); T._internals.setFull(true);
+    return {T,I:T._internals};
+  })();
+  T.key({key:'s',preventDefault(){},stopPropagation(){}});
+  ok(I.state().strip.el.classList.contains('fmt-over'),'it goes darker and lies over the edge');
+});
+
+test('the lane is a full-screen thing, and goes when full screen does', () => {
+  const {T,I,key}=mounted();
+  key('s');
+  ok(I.state().strip,'up in full screen');
+  T.fullscreen(false);
+  eq(I.state().strip,null,'and down outside it');
+  eq(I.state().selected,null,'with nothing left selected');
+  eq(I.state().adjust,null);
+});
+
+/* ================= editing a window ================= */
+test('the number row sets the window, and 0 pins it', () => {
+  const {I,v,key,menu,pick}=mounted();
+  v.currentTime=194;
+  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  const s=I.state().shapes[0];
+  I.selectShape(s.id);
+  ok(key('8'),'claimed, because there is something to apply it to');
+  eq(I.state().shapes[0].out,202,'194 + 8');
+  ok(key('0'));
+  eq(I.state().shapes[0].life,'pinned');
+  ok(key('0'));
+  eq(I.state().shapes[0].life,'moment','and back again');
+  ok(key('Delete'));
+  eq(I.state().shapes.length,0,'Delete takes the selected one');
+});
+
+test('shift+arrow nudges the window by a frame, and leaves the transport keys alone', () => {
+  const {I,v,key,menu,pick}=mounted();
+  v.currentTime=194;
+  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  I.selectShape(I.state().shapes[0].id);
+  const before=I.state().shapes[0].in;
+  ok(key('ArrowRight',{shiftKey:true}),'shift+right is ours');
+  ok(I.state().shapes[0].in>before,'the whole window moved');
+  eq(I.state().shapes[0].out-I.state().shapes[0].in,4,'its length did not');
+  notOk(key('ArrowRight'),'plain right is still the player seeking');
+});
+
+test('nothing here relies on a modifier stats-view throws away first', () => {
+  const k=grabFunction('key',TOOLS,'client/assets/film-tools.js');
+  ['altKey','ctrlKey','metaKey'].forEach(m=>
+    notOk(k.indexOf(m)>=0,
+      'key() reads '+m+' — filmKeys() returns before us on those, so it would never run'));
+  ok(/shiftKey/.test(k),'shift is the one modifier that does reach here');
+});
+
+/* ================= the exports ================= */
+test('the export builds its overlay detached, and stops driving the screen', () => {
+  const ov=grabFunction('overlaySVGString',TOOLS,'client/assets/film-tools.js');
+  notOk(/\bpaint\(/.test(ov),'a forty-second render may not move the analyst own picture');
+  ok(/liveAt\(now\)/.test(ov),'the same window the screen uses');
+  ok(/alpha\(s,\s*now\)/.test(ov),'and the same fade, so the file matches what was seen');
+});
+
+/* Q1 was answered B: the reference product stops on the frame. */
+test('a freeze segment holds one frame, and the file comes out longer for it', () => {
+  const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
+  ok(/s\.freeze\s*>\s*0/.test(ex),'a shape can ask for a hold');
+  ok(/Math\.abs\(last\.t\s*-\s*f\.t\)\s*<\s*0\.25/.test(ex),
+     'points within a quarter second merge — an arrow, a zone and a caption on one frame stop it once');
+  ok(/Math\.max\(last\.hold,\s*f\.hold\)/.test(ex),'and the longest hold wins');
+  ok(/total\s*=\s*dur\s*\+\s*holdTotal/.test(ex),'the progress figure counts the holds');
+  const pump=grabFunction('pump',TOOLS,'client/assets/film-tools.js');
+  ok(/if\s*\(frozen\)/.test(pump),'the pump has a holding branch');
+  ok(/v\.pause\(\)/.test(pump),'the source stops, so the picture really is one frame');
+  ok(/Date\.now\(\)\s*>=\s*frozen\.until/.test(pump),
+     'and the wall clock ends it, because that is what MediaRecorder writes against');
+});
+
+test('a shape can be given a freeze from the menu it belongs to', () => {
+  const {I,v,menu,pick}=mounted();
+  v.currentTime=194;
+  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  const model=menu(194,{x:900,y:500-81});          // on the ring of the light
+  const item=pick(model,'4 s');
+  ok(item,'the freeze lengths are offered on the shape that was hit');
+  pick(model,'Chọn để sửa').run();
+  pick(menu(194,{x:900,y:500-81}),'3 s').run();
+  ok(I.state().shapes[0].freeze===3||I.state().shapes[0].out===197,
+     'either the freeze or the window took the number — both live on that submenu');
+});
+
+/* ================= nothing is left behind ================= */
+test('detach takes off every listener attach put on', () => {
+  const {T,c,v,winL}=mounted();
+  ['contextmenu','pointerdown','pointermove','wheel'].forEach(t=>
+    ok((c.stage.on[t]||[]).length>0,t+' is bound while Film is up'));
+  T.detach();
+  ['contextmenu','pointerdown','pointermove','wheel'].forEach(t=>
+    eq((c.stage.on[t]||[]).length,0,t+' is gone again'));
+  eq((winL.resize||[]).length,0,'and so is the window resize');
+  eq((v.on['loadedmetadata']||[]).length,0,'and the metadata handler');
 });
 
 /* ================= the stylesheet cannot reach anything else ================= */

@@ -23,7 +23,41 @@
    no click since Film was written, and arming a tool is the only thing that
    may temporarily change that */
 .fmt-layer.fmt-armed{pointer-events:auto; cursor:crosshair}
+/* the second, and only other, reason the layer may take the pointer: a
+   spotlight is being placed. Drag moves it, the wheel sizes it. */
+.fmt-layer.fmt-adjust{pointer-events:auto; cursor:move}
 .fmt-layer .fmt-s{pointer-events:none}
+/* the selected shape, so "which one am I editing" is never a guess */
+.fmt-layer .fmt-sel{filter:drop-shadow(0 0 6px #fff) drop-shadow(0 0 2px #fff)}
+
+/* ---------- the timeline lane ---------- */
+/* In the BLACK BAR ABOVE the picture. Not below: #fmStage's other child is
+   .film-cap, anchored bottom:0 and 38–54px tall in full screen, and the
+   letterbox only gives 73.5px — the bottom bar belongs to the caption. */
+.fmt-strip{
+  position:absolute; z-index:5; user-select:none;
+  border-radius:6px; background:rgba(10,8,9,.55);
+  border:1px solid rgba(255,255,255,.10);
+  /* JS sets width to the PICTURE's width; without this the 1px border on each
+     side puts the lane 2px wider than the frame it belongs to */
+  box-sizing:border-box;
+}
+/* no room in the letterbox: lie over the top edge of the picture instead, and
+   say so by getting darker rather than by moving somewhere unexpected */
+.fmt-strip.fmt-over{background:rgba(10,8,9,.78)}
+.fmt-lane{position:absolute; inset:4px 0; pointer-events:none}
+.fmt-bar{
+  position:absolute; top:0; bottom:0; min-width:3px;
+  border-radius:3px; opacity:.62; cursor:pointer; pointer-events:auto;
+}
+.fmt-bar:hover{opacity:.9}
+.fmt-bar.on{opacity:1; box-shadow:0 0 0 2px #fff}
+.fmt-bar.pin{opacity:.34}
+/* where the film is right now, over the lane rather than in it */
+.fmt-cur{
+  position:absolute; top:0; bottom:0; width:2px; margin-left:-1px;
+  background:#fff; box-shadow:0 0 4px rgba(0,0,0,.8); pointer-events:none;
+}
 
 /* the text tool's field, dropped where the click landed */
 .fmt-text-in{
