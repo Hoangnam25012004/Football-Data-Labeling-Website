@@ -21,15 +21,15 @@
   },
   "client/assets/app.js": {
     "v": 33,
-    "sha256": "03650b4db4cb998e"
+    "sha256": "95dc7ae036ee5299"
   },
   "client/assets/film-tools.css": {
-    "v": 2,
-    "sha256": "5c31395c411f6fa5"
+    "v": 3,
+    "sha256": "324821424912a87f"
   },
   "client/assets/film-tools.js": {
-    "v": 2,
-    "sha256": "decc7040febb5767"
+    "v": 3,
+    "sha256": "1dd1e2a6cfee992b"
   },
   "client/assets/hanley-town.png": {
     "v": 1,

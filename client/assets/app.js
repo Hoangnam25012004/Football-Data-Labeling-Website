@@ -1284,9 +1284,9 @@
          exports exist in the channel and nowhere else. It registers itself with
          the mounted view through the one hook stats-view.js publishes; a host
          that never loads it is a host where none of it exists. */
-      .then(function () { return loadOnce('assets/film-tools.js?v=2'); })
+      .then(function () { return loadOnce('assets/film-tools.js?v=3'); })
       .then(function () {
-        loadOnce('assets/film-tools.css?v=2', 'css');
+        loadOnce('assets/film-tools.css?v=3', 'css');
         if (window.PTStats && window.PTStats.registerFilmTools && window.PTFilmTools)
           window.PTStats.registerFilmTools(window.PTFilmTools);
       });

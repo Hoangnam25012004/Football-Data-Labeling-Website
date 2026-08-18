@@ -135,6 +135,10 @@
   font-size:12px; font-weight:600;
 }
 .fmt-p-btn:hover{border-color:#E0122B}
+/* a render already proved the video server sends no CORS header: the button
+   still works (it explains itself when pressed) but stops looking ready */
+.fmt-p-btn.off{opacity:.4}
+.fmt-p-btn.off:hover{border-color:#2A2325}
 
 /* ---------- the line of text over the frame ---------- */
 .fmt-toast{

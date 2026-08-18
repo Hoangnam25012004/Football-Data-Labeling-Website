@@ -170,8 +170,9 @@ test('and it never touches the original video object', () => {
   ['setVideoUrl','video_url','matches','removeAttribute(\'src\')']
     .forEach(n=>notOk(grabFunction('exportClip',TOOLS,'client/assets/film-tools.js')
       .indexOf('video_url')>=0,'the export never names '+n));
-  // the export reads the SAME url the player is already playing, and only reads
-  ok(/v\.src\s*=\s*src/.test(TOOLS),'a second element pointed at the same source');
+  // the export reads the SAME url the player is already playing, and only reads.
+  // The element is built in openSource() now, so the binding is named there.
+  ok(/\bel\.src\s*=\s*src/.test(TOOLS),'a second element pointed at the same source');
   ok(/currentSrc\s*\|\|\s*ctx\.video\.src/.test(TOOLS),'taken from the player, not rebuilt');
 });
 
@@ -415,7 +416,11 @@ test('a tainted canvas is proved on one pixel before forty seconds are spent', (
   const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
   ok(/getImageData\(0,\s*0,\s*1,\s*1\)/.test(ex),'one pixel, read early');
   ok(ex.indexOf('getImageData')<ex.indexOf('rec.start'),'before the recorder is started');
-  ok(/crossOrigin\s*=\s*'anonymous'/.test(ex),'on a SECOND element');
+  // crossOrigin lives in openSource() now — still on an element of its own, and
+  // still never on the one the analyst is watching
+  const open=grabFunction('openSource',TOOLS,'client/assets/film-tools.js');
+  ok(/crossOrigin\s*=\s*'anonymous'/.test(open),'on a SECOND element');
+  ok(/document\.createElement\('video'\)/.test(open),'built there, not borrowed');
   notOk(/ctx\.video\.crossOrigin/.test(TOOLS),
      'never on the one on screen — the attribute is a requirement, and a mismatch is no video at all');
 });
@@ -807,6 +812,201 @@ test('detach takes off every listener attach put on', () => {
     eq((c.stage.on[t]||[]).length,0,t+' is gone again'));
   eq((winL.resize||[]).length,0,'and so is the window resize');
   eq((v.on['loadedmetadata']||[]).length,0,'and the metadata handler');
+});
+
+/* ============================================================================
+   OPENING THE SOURCE — telling the truth about why a render failed
+
+   Measured against the bucket this site serves video from: a request carrying
+   an Origin header comes back with no Access-Control-Allow-Origin at all. With
+   crossOrigin="anonymous" set — and it must be set, or the canvas is tainted
+   and nothing can be recorded from it — the file therefore fails to LOAD, and
+   the export blamed the video. The video was fine. The header was missing.
+   ========================================================================== */
+function opener(){
+  const {T,doc}=load();
+  const I=T._internals;
+  const lastVideo=()=>doc.created.filter(n=>n.tag==='video').slice(-1)[0];
+  const fire=(n,t)=>(n.on[t]||[]).forEach(f=>f());
+  return {T,I,doc,lastVideo,fire};
+}
+
+test('the source is opened with crossOrigin, and resolves when it loads', async () => {
+  const {I,lastVideo,fire}=opener();
+  const p=I.openSource('https://x.test/m.mp4',true);
+  const el=lastVideo();
+  eq(el.crossOrigin,'anonymous','beat one asks for the header');
+  eq(el.src,'https://x.test/m.mp4','pointed at the url the player is already on');
+  fire(el,'loadedmetadata');
+  const got=await p;
+  eq(got,el,'and hands back the element it opened');
+});
+
+test('and rejects when the browser refuses it', async () => {
+  const {I,lastVideo,fire}=opener();
+  const p=I.openSource('https://x.test/m.mp4',true);
+  fire(lastVideo(),'error');
+  let rejected=false;
+  await p.then(()=>{},()=>{rejected=true;});
+  ok(rejected,'a refusal is a rejection, not a hang');
+});
+
+test('beat two drops crossOrigin — that is the whole point of it', () => {
+  const {I,lastVideo}=opener();
+  I.openSource('https://x.test/m.mp4',false);
+  const el=lastVideo();
+  ok(!el.crossOrigin,'no attribute, so a server without CORS can still answer');
+  eq(el.src,'https://x.test/m.mp4','same file, so the answer is about the header alone');
+});
+
+test('a source that answers twice only settles once', async () => {
+  const {I,lastVideo,fire}=opener();
+  const p=I.openSource('https://x.test/m.mp4',true);
+  const el=lastVideo();
+  fire(el,'loadedmetadata');
+  fire(el,'error');            // some browsers follow one with the other
+  let ok1=false;
+  await p.then(()=>{ok1=true;},()=>{});
+  ok(ok1,'the first answer is the answer');
+});
+
+test('the export asks twice, and the second answer picks the message', () => {
+  const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
+  ok(/openSource\(src,\s*true\)/.test(ex),'beat one, with the header demanded');
+  ok(/openSource\(src,\s*false\)/.test(ex),'beat two, without it');
+  ok(ex.indexOf('openSource(src, true)')<ex.indexOf('openSource(src, false)'),
+     'and only ever in that order — beat two is a diagnosis, not a fallback');
+  ok(/fail\(NEED_CORS\)/.test(ex),
+     'it opened without the header, so the file is fine and the SERVER is what to fix');
+  ok(/URL hỏng hoặc file không còn/.test(ex),
+     'neither opened, so this really is the file');
+  notOk(/Không mở được video để kết xuất/.test(TOOLS),
+     'the old sentence blamed the video for a missing header and is gone');
+});
+
+test('the diagnosing element renders nothing and is thrown away at once', () => {
+  const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
+  ok(/dropSource\(el\)/.test(ex),'beat two is disposed of the moment it has answered');
+  const drop=grabFunction('dropSource',TOOLS,'client/assets/film-tools.js');
+  ok(/removeAttribute\('src'\)/.test(drop),'src let go');
+  ok(/\.load\(\)/.test(drop),'and the buffer with it');
+});
+
+test('a proven missing header is remembered, and said before it is asked again', () => {
+  const {T,I}=(()=>{const {T}=load();return {T,I:T._internals};})();
+  eq(I.state().corsState,null,'nothing assumed to begin with');
+  I.setCors(false);
+  eq(I.state().corsState,false);
+  const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
+  ok(/corsState === false/.test(ex),'a second attempt says so at once');
+  ok(ex.indexOf('corsState === false')<ex.indexOf('pickMime'),
+     'before a recorder, an audio graph or a canvas is built for nothing');
+  const rp=grabFunction('renderPanel',TOOLS,'client/assets/film-tools.js');
+  ok(/corsState === false/.test(rp),'and the drawer stops offering the button as ready');
+});
+
+/* Finding the cause must not smuggle in a network primitive. The four promises
+   at the top of this file are statements about code that EXISTS. */
+test('diagnosing CORS added no way to talk to anything', () => {
+  ['fetch(','XMLHttpRequest','navigator.sendBeacon','.upload('].forEach(n=>
+    notOk(TOOLS.indexOf(n)>=0,'film-tools.js mentions '+n));
+  const open=grabFunction('openSource',TOOLS,'client/assets/film-tools.js');
+  ok(/document\.createElement\('video'\)/.test(open),
+     'the only thing that touches the network is a <video>, which the player was already doing');
+});
+
+/* A render that cannot draw the drawing must STOP. Handing over a file that
+   looks finished but carries no graphics is the worst of the three outcomes. */
+test('an overlay that will not rasterise stops the render instead of shipping a bare clip', () => {
+  const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
+  const then=ex.slice(ex.indexOf('overlayImage(str).then'));
+  notOk(/overlayImage\(str\)\.then\(function \(img\) \{ lastImg = img; after\(\); \}, after\)/.test(ex),
+     'the rejection no longer falls through to after() with lastImg still null');
+  ok(/Không dựng được lớp đồ hoạ/.test(then),'it fails, loudly');
+  ok(then.indexOf('fail(')<then.indexOf('} else after();'),'and fails rather than continuing');
+});
+
+/* ============================================================================
+   DISMISSING THE MENU — the one thing every context menu does
+   ========================================================================== */
+function withMenu(){
+  const m=mounted();
+  m.c.stage.on['contextmenu'][0]({clientX:700,clientY:400,
+    preventDefault(){},stopPropagation(){}});
+  return m;
+}
+
+test('a left click on the frame shuts the menu, and stops there', () => {
+  const {I,c}=withMenu();
+  ok(I.state().menu,'the menu is up');
+  let prevented=false,stopped=false;
+  c.stage.on['pointerdown'][0]({button:0,clientX:600,clientY:400,pointerId:1,
+    preventDefault(){prevented=true;},stopPropagation(){stopped=true;}});
+  eq(I.state().menu,null,'and now it is not');
+  ok(prevented,'the press is consumed');
+  ok(stopped,'and does not carry on to anything else');
+});
+
+test('that click does not also move a spotlight or begin a stroke', () => {
+  const {T,I,c,key}=mounted();
+  key('s');                                            // a spotlight, in adjust
+  const at0=Object.assign({},I.state().shapes[0].at);
+  const n0=I.state().shapes.length;
+  c.stage.on['contextmenu'][0]({clientX:700,clientY:400,preventDefault(){},stopPropagation(){}});
+  c.stage.on['pointerdown'][0]({button:0,clientX:200,clientY:200,pointerId:2,
+    preventDefault(){},stopPropagation(){}});
+  eq(I.state().menu,null,'the menu shut');
+  eq(I.state().shapes.length,n0,'no shape was added');
+  eq(I.state().shapes[0].at.x,at0.x,'and the light did not jump to the pointer');
+  eq(I.state().shapes[0].at.y,at0.y);
+});
+
+/* The items are <button>s driven by onclick, and click fires AFTER pointerdown.
+   Without this guard, pressing an item would shut the menu at pointerdown, tear
+   the button out of the document, and the click would never arrive — every item
+   in the menu silently dead. */
+test('a press INSIDE the menu is left alone, so the items still work', () => {
+  const {I,c}=withMenu();
+  const menu=c.box.children.find(n=>n.className==='fmt-menu');
+  ok(menu,'the menu is a child of the box');
+  const item=menu.children.find(n=>n.className==='fmt-m-it');
+  c.box.on['pointerdown'][0]({target:item,button:0});
+  ok(I.state().menu,'still open — the click belongs to the item');
+  let ran=false;
+  const model=I.menuModel({t:0,p:{x:10,y:10}});
+  ok(model.length>0,'and the model behind it is intact');
+});
+
+test('a press elsewhere in the box shuts it, and is NOT swallowed', () => {
+  const {I,c}=withMenu();
+  const elsewhere={parentNode:c.box};                  // a row in the event list
+  let prevented=false;
+  c.box.on['pointerdown'][0]({target:elsewhere,button:0,preventDefault(){prevented=true;}});
+  eq(I.state().menu,null,'shut');
+  notOk(prevented,'and the row underneath still gets its click');
+});
+
+test('the box listener exists only while the menu does', () => {
+  const {T,I,c}=mounted();
+  eq((c.box.on['pointerdown']||[]).length,0,'nothing bound with no menu');
+  c.stage.on['contextmenu'][0]({clientX:700,clientY:400,preventDefault(){},stopPropagation(){}});
+  eq(c.box.on['pointerdown'].length,1,'one while it is open');
+  T.key({key:'Backspace',preventDefault(){},stopPropagation(){}});
+  eq(I.state().menu,null);
+  eq(c.box.on['pointerdown'].length,0,'and none again after it closes');
+});
+
+test('with no menu open, a click on the frame does what it always did: nothing', () => {
+  const {I,c}=mounted();
+  const before=I.state().shapes.length;
+  let prevented=false;
+  c.stage.on['pointerdown'][0]({button:0,clientX:600,clientY:400,pointerId:3,
+    preventDefault(){prevented=true;},stopPropagation(){}});
+  eq(I.state().shapes.length,before,'no shape');
+  notOk(prevented,'and the press is not claimed — the video surface takes no click');
+  const od=grabFunction('onDown',TOOLS,'client/assets/film-tools.js');
+  ok(od.indexOf('if (menu)')<od.indexOf('if (!mode && adjust)'),
+     'the dismiss branch is FIRST, so one click can only ever mean one thing');
 });
 
 /* ================= the stylesheet cannot reach anything else ================= */

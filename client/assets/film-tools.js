@@ -99,6 +99,12 @@ window.PTFilmTools = (function () {
   }
   var id = function () { return 's' + (++seq) + '-' + Date.now().toString(36); };
   function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+  /* Node.contains by hand, walking parentNode: the same answer in a browser and
+     under the stub the tests drive this with. */
+  function within(root, n) {
+    while (n) { if (n === root) return true; n = n.parentNode; }
+    return false;
+  }
 
   /* mm:ss of the MATCH clock — the same reading the transport bar shows, so a
      clip's name and the bar under it cannot disagree about when it happened */
@@ -659,6 +665,14 @@ window.PTFilmTools = (function () {
 
   function onDown(e) {
     if (e.button !== 0) return;
+
+    /* ONE click, ONE meaning. With the menu open this press is for shutting it,
+       and it must not also drag a spotlight or begin a stroke. It stops here —
+       and it still does not touch playback: the video surface has taken no
+       transport click since Film was written, and dismissing a panel that is
+       covering the frame is not a transport command. */
+    if (menu) { closeMenu(); e.preventDefault(); e.stopPropagation(); return; }
+
     var p = toVideo(e.clientX, e.clientY); if (!p) return;
 
     /* Moving the spotlight being adjusted. No tool is armed here — this is the
@@ -1096,10 +1110,55 @@ window.PTFilmTools = (function () {
     return '';
   }
 
+  /* ---------------------------------------------------------------
+     Opening the source — and why it is done TWICE on failure
+
+     `crossOrigin = "anonymous"` is a requirement, not a hint: with it set, a
+     server that sends no Access-Control-Allow-Origin makes the file fail to
+     LOAD AT ALL. Measured against the public bucket this site serves video
+     from: a request carrying an Origin header comes back with no
+     Access-Control-Allow-Origin and no Vary: Origin at all.
+
+     So the export died on a perfectly good file and blamed the file. It cannot
+     be fixed by dropping the attribute either — a video without CORS taints
+     the canvas, and a tainted canvas cannot be read, saved, or recorded. The
+     fix belongs on the bucket (docs/film-export-cors-design.md §3).
+
+     What CODE can do is stop lying about the cause. Open once with the
+     attribute; if that fails, open once more WITHOUT it. If the second attempt
+     succeeds the file is fine and the header is missing — which is a different
+     sentence, pointing at a different thing to go and fix. The second element
+     renders nothing and is thrown away the moment it has answered. */
+  var NEED_CORS = 'Máy chủ video chưa bật CORS nên không kết xuất được. '
+    + 'Cần thêm Access-Control-Allow-Origin cho bucket — xem docs/film-export-cors-design.md §3.';
+  var corsState = null;      // null = chưa biết · false = đã đo và thiếu CORS
+
+  function openSource(src, withCors) {
+    return new Promise(function (ok, no) {
+      var el = document.createElement('video');
+      if (withCors) el.crossOrigin = 'anonymous';
+      el.preload = 'auto'; el.muted = false; el.playsInline = true;
+      var done = false;
+      el.addEventListener('loadedmetadata', function () {
+        if (done) return; done = true; ok(el);
+      });
+      el.addEventListener('error', function () {
+        if (done) return; done = true; no(el);
+      });
+      el.src = src;
+    });
+  }
+  function dropSource(el) {
+    try { el.pause(); el.removeAttribute('src'); el.load(); } catch (e) { /* already gone */ }
+  }
+
   function exportClip(a, b, title) {
     if (busy) { toast('Đang kết xuất một clip khác'); return; }
     if (!ctx) return;
     if (a == null || b == null || b <= a) { toast('Chưa có đoạn nào được đánh dấu'); return; }
+    // once one render has proved the header is missing, say so at once rather
+    // than build a recorder, an audio graph and a canvas to learn it again
+    if (corsState === false) { toast(NEED_CORS, true); return; }
     var mime = pickMime();
     if (!mime) { toast('Trình duyệt này không kết xuất được video'); return; }
     var mp4 = mime.indexOf('mp4') >= 0;
@@ -1113,12 +1172,9 @@ window.PTFilmTools = (function () {
 
     /* A SEPARATE video element, so the analyst's own playback is not dragged
        around by the render — and so this one can carry crossorigin without ever
-       risking the one on screen (§11.1: the attribute is a requirement, not a
-       hint, and a mismatch means no video at all). */
-    var v = document.createElement('video');
-    v.crossOrigin = 'anonymous';
-    v.preload = 'auto'; v.muted = false; v.playsInline = true;
-    v.src = src;
+       risking the one on screen. It is opened below rather than here, because
+       opening it is now a two-step question (see openSource). */
+    var v = null;
 
     var canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
@@ -1127,18 +1183,6 @@ window.PTFilmTools = (function () {
     var track = stream.getVideoTracks()[0];
 
     var actx = null;
-    try {
-      var AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) {
-        actx = new AC();
-        var dest = actx.createMediaStreamDestination();
-        actx.createMediaElementSource(v).connect(dest);
-        // deliberately NOT connected to actx.destination: this is an offscreen
-        // element the analyst never sees, and a render should not talk over them
-        dest.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
-      }
-    } catch (e) { actx = null; }             // no audio is better than no clip
-
     var chunks = [], rec, stopped = false, lastSvg = '', lastImg = null;
 
     /* FREEZE SEGMENTS (Q1 = B).
@@ -1173,7 +1217,7 @@ window.PTFilmTools = (function () {
     var finish = function () {
       busy = false;
       if (actx) try { actx.close(); } catch (e) {}
-      try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {}
+      if (v) dropSource(v);
     };
     var fail = function (msg) {
       stopped = true;
@@ -1181,18 +1225,50 @@ window.PTFilmTools = (function () {
       finish(); toast(msg, true);
     };
 
-    v.addEventListener('error', function () { fail('Không mở được video để kết xuất'); });
-    v.addEventListener('loadedmetadata', function () {
+    /* Two beats. The first is the only one that can produce a clean canvas; the
+       second exists solely to tell the analyst WHICH thing is broken. */
+    openSource(src, true).then(opened, function () {
+      openSource(src, false).then(function (el) {
+        dropSource(el);                     // it opened, so the file is fine
+        corsState = false;                  // remembered: the drawer dims ⭳ from now on
+        if (panel) renderPanel();
+        fail(NEED_CORS);
+      }, function () {
+        fail('Không mở được file video — URL hỏng hoặc file không còn.');
+      });
+    });
+
+    function opened(el) {
+      if (stopped) { dropSource(el); return; }
+      v = el;
+      corsState = true;
+      /* Audio is wired only once an element exists. Not connected to
+         actx.destination: this is an offscreen element the analyst never sees,
+         and a render should not talk over them. */
+      try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          actx = new AC();
+          var dest = actx.createMediaStreamDestination();
+          actx.createMediaElementSource(v).connect(dest);
+          dest.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
+        }
+      } catch (e) { actx = null; }          // no audio is better than no clip
+
       // a tainted canvas throws only when it is read, so it is proved here, on
       // one pixel, before forty seconds of the analyst's time are spent
       v.currentTime = a;
       v.addEventListener('seeked', function once() {
         v.removeEventListener('seeked', once);
-        try { g.drawImage(v, 0, 0, 1, 1); canvas.getContext('2d').getImageData(0, 0, 1, 1); }
-        catch (e) { fail('Video này không cho trang đọc pixel (CORS) — không kết xuất được'); return; }
+        try { g.drawImage(v, 0, 0, 1, 1); g.getImageData(0, 0, 1, 1); }
+        catch (e) {
+          corsState = false;
+          if (panel) renderPanel();
+          fail('Video này không cho trang đọc pixel (CORS) — không kết xuất được'); return;
+        }
         start();
       });
-    });
+    }
 
     function start() {
       try {
@@ -1232,7 +1308,12 @@ window.PTFilmTools = (function () {
       };
       if (str !== lastSvg) {
         lastSvg = str;
-        overlayImage(str).then(function (img) { lastImg = img; after(); }, after);
+        /* A rejection used to fall through to after(), which drew the frame with
+           lastImg still null — the file came out looking finished but with no
+           graphics on it at all. A render that cannot draw the drawing must stop
+           and say so, not hand over a clip that is quietly wrong. */
+        overlayImage(str).then(function (img) { lastImg = img; after(); },
+          function () { fail('Không dựng được lớp đồ hoạ — dừng, để không giao ra một clip thiếu hình.'); });
       } else after();
     }
     function pump() {
@@ -1306,7 +1387,15 @@ window.PTFilmTools = (function () {
       var nm = el('span', 'fmt-p-nm', c.title);
       var go = el('button', 'fmt-p-btn', '▶'); go.type = 'button';
       go.onclick = function () { play = { list: list, i: i, clip: c }; playClip(c); };
-      var dl = el('button', 'fmt-p-btn', '⭳'); dl.type = 'button'; dl.title = 'Tải .mp4 về máy';
+      var dl = el('button', 'fmt-p-btn', '⭳'); dl.type = 'button';
+      // a render that already proved the header is missing says so on the button,
+      // instead of letting the analyst find out again forty seconds at a time
+      if (corsState === false) {
+        dl.classList.add('off');
+        dl.title = 'Máy chủ video chưa bật CORS — chưa kết xuất được';
+      } else {
+        dl.title = 'Tải .mp4 về máy';
+      }
       dl.onclick = function () { exportClip(c.in, c.out, c.title); };
       var rm = el('button', 'fmt-p-btn', '✕'); rm.type = 'button';
       rm.onclick = function () {
@@ -1326,8 +1415,27 @@ window.PTFilmTools = (function () {
      painted however high its z-index.
      --------------------------------------------------------------- */
   function closeMenu() {
-    if (menu && menu.parentNode) menu.parentNode.removeChild(menu);
+    if (!menu) return;
+    if (menu.parentNode) menu.parentNode.removeChild(menu);
+    if (ctx && ctx.box) ctx.box.removeEventListener('pointerdown', onBoxDown);
     menu = null;
+  }
+
+  /* Clicking away shuts the menu — the one thing every context menu on earth
+     does and this one did not.
+
+     It does NOT preventDefault: shutting a menu must not also swallow the click
+     on the row of the event list underneath it.
+
+     The `within` guard is the line that must never be dropped. The items are
+     <button>s driven by onclick, and click fires AFTER pointerdown; without it
+     pressing an item would shut the menu at pointerdown, tear the button out of
+     the document, and the click would never arrive — every item in the menu
+     silently dead. */
+  function onBoxDown(e) {
+    if (!menu) return;
+    if (within(menu, e.target)) return;
+    closeMenu();
   }
 
   /* How far a point is from a shape, in video pixels — enough to answer "did
@@ -1492,6 +1600,8 @@ window.PTFilmTools = (function () {
     menu = el('div', 'fmt-menu');
     build(menu, menuModel(hit));
     ctx.box.appendChild(menu);
+    // taken off again by closeMenu(), so it exists only while the menu does
+    ctx.box.addEventListener('pointerdown', onBoxDown);
 
     // keep it on screen: the click can be two pixels from the right-hand edge
     var b = ctx.box.getBoundingClientRect();
@@ -1684,12 +1794,16 @@ window.PTFilmTools = (function () {
         return { shapes: shapes, dim: dim, zoom: zoom, hidden: hidden,
                  mode: mode, loopAB: loopAB, mark: mark, full: full, fps: fps,
                  selected: selected, adjust: adjust, ptr: ptr,
-                 strip: strip, stripOn: stripOn, defaultDur: defaultDur };
+                 strip: strip, stripOn: stripOn, defaultDur: defaultDur,
+                 menu: menu, corsState: corsState };
       },
       setCtx: function (c) { ctx = c; }, setFull: function (f) { full = f; },
       clips: clips, setClips: setClips, saveClip: saveClip, STORE_KEY: STORE_KEY,
       // the time model, so the window can be tested without a browser
       liveAt: liveAt, alpha: alpha, upgrade: upgrade, hitShape: hitShape,
+      openSource: openSource, NEED_CORS: NEED_CORS,
+      setCors: function (s) { corsState = s; },
+      exportClip: function (a, b, t) { return exportClip(a, b, t); },
       selectShape: selectShape, originOnElement: originOnElement,
       onWheel: function (e) { return onWheel(e); },
       overlaySVGString: function (n, p) { return overlaySVGString(n, p); },
