@@ -911,7 +911,13 @@
      the order they were put down, `entries` are the rows those dots belong to.
      `carry` is the same player at two dots — received there, played from here,
      which is what a #step in looks like on the pitch. A #pass fail names no
-     receiver and takes `dead` instead: the dot where the ball was lost. */
+     receiver and takes `dead` instead: the dot where the ball was lost.
+
+     No two events in one entry may book the same metric: #goal already counts
+     itself as a total shot and a shot on target (EVENT_INC, shared.js), so
+     "#shot on target #goal" would put one attempt in the table twice. For the
+     same reason the ball that produced the goal is an #assist and the one that
+     produced a shot off target is a #key pass — one or the other, never both. */
   var CHAINS = [
     {
       touches: [
@@ -922,8 +928,8 @@
         { from: 0, to: 1, ev: ['#recovery', '#pass success'] },
         { carry: [1, 2], from: 2, to: 3, ev: ['#step in', '#pass success'] },
         { from: 3, to: 4, ev: ['#pass success'] },
-        { from: 4, to: 5, ev: ['#cross success', '#key pass'] },
-        { from: 5, shot: { x: 99, y: 44 }, goal: 1, ev: ['#shot on target', '#goal'] }
+        { from: 4, to: 5, ev: ['#cross success', '#assist'] },
+        { from: 5, shot: { x: 99, y: 44 }, goal: 1, ev: ['#goal'] }
       ]
     },
     {
