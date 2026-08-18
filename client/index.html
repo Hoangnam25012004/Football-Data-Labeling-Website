@@ -77,7 +77,7 @@
   background:var(--red); color:#fff; font-size:9.5px; letter-spacing:.16em; font-weight:700;
 }
 .feed{
-  position:absolute; right:14px; bottom:14px; width:min(268px,58%);
+  position:absolute; right:14px; bottom:14px; width:min(286px,60%);
   background:color-mix(in srgb,var(--carbon-2) 94%, transparent);
   border:1px solid var(--line); border-radius:3px; backdrop-filter:blur(8px);
   box-shadow:var(--shadow); overflow:hidden;
@@ -87,17 +87,50 @@
   font-size:9.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--ash-dim);
   display:flex; align-items:center; gap:7px;
 }
-.feed-h i{width:5px; height:5px; border-radius:50%; background:var(--red); display:block}
-.feed ul{list-style:none; margin:0; padding:5px 0; height:132px; overflow:hidden}
+.feed-h i{width:5px; height:5px; border-radius:50%; background:var(--red); display:block; animation:pip 2.2s ease-in-out infinite}
+@keyframes pip{0%,100%{opacity:1} 50%{opacity:.2}}
+.feed-h b{
+  margin-left:auto; font-weight:400; letter-spacing:.14em; color:var(--ash);
+  font-variant-numeric:tabular-nums;
+}
+/* The feed reads as one possession rather than a stack of unrelated rows:
+   a rail joins the steps, so the eye follows the chain from the win-back
+   down to whatever it ended in. */
+.feed ol{list-style:none; margin:0; padding:7px 0; height:196px; overflow:hidden}
 .feed li{
-  display:flex; align-items:baseline; gap:9px; padding:5px 11px;
+  position:relative; display:flex; align-items:baseline; gap:9px; padding:4px 11px 4px 27px;
   font-family:var(--f-mono); font-size:11px; color:var(--ash); animation:slot .45s cubic-bezier(.2,.7,.2,1);
 }
 @keyframes slot{from{opacity:0; transform:translateY(-8px)} to{opacity:1; transform:none}}
-.feed li .t{color:var(--ash-dim); font-size:10px; flex:none}
-.feed li .ev{color:var(--chalk)}
+.feed li::before{
+  content:""; position:absolute; left:13px; top:7.5px; width:5px; height:5px; border-radius:50%;
+  background:var(--ash-dim); z-index:1;
+}
+.feed li::after{
+  content:""; position:absolute; left:15.2px; top:12.5px; bottom:-4px; width:1px; background:var(--line);
+}
+.feed li:last-child::after{display:none}
+.feed li:last-child::before{background:var(--red); box-shadow:0 0 9px var(--red)}
+.feed li.g::before{background:var(--red); box-shadow:0 0 11px var(--red)}
+.feed li.wait{opacity:.5}
+.feed li.wait::before{background:var(--ash-dim); box-shadow:none; animation:pip 1.6s ease-in-out infinite}
+.feed li .t{color:var(--ash-dim); font-size:10px; flex:none; font-variant-numeric:tabular-nums}
+.feed li .ev{color:var(--chalk); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .feed li .ev.g{color:var(--red); font-weight:700}
-.feed li .pl{margin-left:auto; color:var(--ash-dim); flex:none}
+.feed li .pl{margin-left:auto; padding-left:8px; color:var(--ash-dim); flex:none}
+/* On a phone the board itself is short. The chain has to sit inside it, so
+   the rows tighten rather than the possession being cut off half-way. */
+@media (max-width:560px){
+  .feed{width:min(238px,66%); right:9px; bottom:9px}
+  .feed-h{padding:6px 9px; font-size:8.5px; letter-spacing:.13em}
+  .feed ol{height:152px; padding:5px 0}
+  .feed li{font-size:9.5px; padding:2px 9px 2px 22px; gap:6px}
+  .feed li::before{left:10px; top:5.5px; width:4px; height:4px}
+  .feed li::after{left:11.7px; top:9.5px}
+  .feed li .t{font-size:8.5px}
+}
+.sb-score.flash{animation:scoreflash .9s ease-out}
+@keyframes scoreflash{0%{color:var(--red); text-shadow:0 0 16px var(--red)} 100%{color:var(--chalk); text-shadow:none}}
 
 .strip{border-block:1px solid var(--line-soft); padding:22px 0; background:var(--carbon)}
 .strip-in{display:flex; align-items:center; gap:clamp(18px,3.4vw,44px); flex-wrap:wrap}
@@ -269,6 +302,9 @@
 @media (prefers-reduced-motion: reduce){
   .js .reveal,.js .stagger > *,.js .fade-up{opacity:1 !important; transform:none !important}
   .js .hero h1 .ln > span{transform:none !important}
+  /* the hero board keeps its picture — the chain is drawn once, in full — but
+     nothing on it is left moving */
+  .stage-frame::after,.dot-live,.feed-h i,.feed li,.feed li.wait::before,.sb-score.flash{animation:none !important}
 }
 </style>
 </head>
@@ -334,10 +370,12 @@
           <span class="sb-clock"><span class="sb-tag">LIVE</span> <span id="sbClock">67:14</span></span>
         </div>
         <canvas id="pitch" width="1000" height="620" role="img"
-                aria-label="Animated tactical board: pitch, passing network and a shot arc"></canvas>
-        <aside class="feed" aria-label="Live event feed">
-          <div class="feed-h"><i></i> Event feed</div>
-          <ul id="feedList"></ul>
+                aria-label="Animated tactical board: the ball carried through one possession, pass by pass, to the shot that ended it"></canvas>
+        <aside class="feed" aria-label="Live event chain">
+          <div class="feed-h"><i></i> Event chain <b id="feedSeq">seq 07</b></div>
+          <!-- one row is in the markup so the panel is never an empty box:
+               it shows while the board builds, and before JS has run at all -->
+          <ol id="feedList"><li class="wait"><span class="t">67'</span><span class="ev">chain forming</span><span class="pl">…</span></li></ol>
         </aside>
       </div>
     </div>
@@ -872,58 +910,22 @@
   }, { threshold: .6 });
   document.querySelectorAll('[data-count]').forEach(function (el) { ioNum.observe(el); });
 
-  /* hero clock + event feed */
-  var feed = document.getElementById('feedList'), clock = document.getElementById('sbClock');
-  /* names here have to match the real event dictionary — this feed is the first
-     thing a visitor reads, and it is the same list the #data chips come from */
-  var EVENTS = [
-    { ev: '#pass success', pl: '8 → 14' }, { ev: '#take-on success', pl: '7' },
-    { ev: '#cross fail', pl: '2' }, { ev: '#interception', pl: '4' },
-    { ev: '#key pass', pl: '15 → 14' }, { ev: '#shot on target', pl: '14' },
-    { ev: '#goal', pl: '14', goal: true }, { ev: '#tackle success', pl: '6' },
-    { ev: '#recovery', pl: '14' }, { ev: '#step in', pl: '13' },
-    { ev: '#pass success', pl: '13 → 2' }, { ev: '#offside', pl: '20' }
-  ];
-  var sec = 67 * 60 + 14, idx = 0;
-  function two(n) { return (n < 10 ? '0' : '') + n; }
-  function pushEvent() {
-    if (!feed) return;
-    var e = EVENTS[idx % EVENTS.length]; idx++;
-    var li = document.createElement('li');
-    li.innerHTML = '<span class="t">' + two(Math.floor(sec / 60)) + "'</span>" +
-      '<span class="ev' + (e.goal ? ' g' : '') + '">' + e.ev + '</span>' +
-      '<span class="pl">' + e.pl + '</span>';
-    feed.insertBefore(li, feed.firstChild);
-    while (feed.children.length > 5) feed.removeChild(feed.lastChild);
-  }
-  for (var i = 0; i < 5; i++) pushEvent();
-  if (!reduce) {
-    setInterval(function () { sec++; if (clock) clock.textContent = two(Math.floor(sec / 60)) + ':' + two(sec % 60); }, 1000);
-    setInterval(pushEvent, 2600);
-  }
+  /* ---------------------------------------------------------------------
+     Hero board.
 
-  /* tactical canvas */
-  var cv = document.getElementById('pitch');
-  if (!cv) return;
-  var ctx = cv.getContext('2d'), pal = {};
-  function readPalette() {
-    var cs = getComputedStyle(document.documentElement);
-    pal.chalk = cs.getPropertyValue('--chalk').trim() || '#EFEAE8';
-    pal.red = cs.getPropertyValue('--red').trim() || '#E0122B';
-    pal.ember = cs.getPropertyValue('--ember').trim() || '#FF5A3C';
-  }
-  readPalette();
+     A match is not a list of loose events, it is a chain: somebody wins the
+     ball, it travels through three or four team-mates, and the move ends in
+     something — a goal, a shot that missed, possession thrown away. So the
+     board plays one possession at a time. The ball is carried across the
+     pitch and the same chain writes itself into the panel step by step, both
+     halves of the frame telling one story instead of two.
+     --------------------------------------------------------------------- */
+  var feed = document.getElementById('feedList'),
+      clock = document.getElementById('sbClock'),
+      seqLbl = document.getElementById('feedSeq'),
+      scoreEl = document.querySelector('.sb-score');
 
   var W = 1000, H = 620;
-  function resize() {
-    var dpr = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth || W;
-    cv.width = Math.round(w * dpr);
-    cv.height = Math.round(w * (H / W) * dpr);
-    ctx.setTransform(dpr * (w / W), 0, 0, dpr * (w / W), 0, 0);
-  }
-  resize();
-  window.addEventListener('resize', resize);
-
   var PAD = { l: 52, r: 52, t: 46, b: 46 }, PW = W - PAD.l - PAD.r, PH = H - PAD.t - PAD.b;
   function px(x) { return PAD.l + (x / 100) * PW; }
   function py(y) { return PAD.t + (y / 100) * PH; }
@@ -937,7 +939,136 @@
     { x: 62, y: 50, r: 20, a: .34 }, { x: 74, y: 38, r: 15, a: .26 }, { x: 46, y: 62, r: 16, a: .20 },
     { x: 80, y: 56, r: 12, a: .30 }, { x: 34, y: 44, r: 14, a: .14 }
   ];
-  var SHOT = { from: { x: 76, y: 50 }, to: { x: 99, y: 44 } };
+
+  /* Chains are written in shirt numbers, the way an analyst says them out
+     loud. `s` is who the ball reaches, `shot` is a leg that finishes at goal
+     instead of at a team-mate, `out` is the row the chain ends on. The event
+     names have to match the real dictionary — this panel is the first thing a
+     visitor reads, and it is the same list the #data chips come from. */
+  var CHAINS = [
+    { steps: [
+      { s: 8,  ev: '#recovery' },
+      { s: 6,  ev: '#pass success' },
+      { s: 13, ev: '#pass success' },
+      { s: 11, ev: '#pass success' },
+      { s: 14, ev: '#key pass' },
+      { shot: 1, ev: '#shot on target', to: { x: 99, y: 44 }, out: { ev: '#goal', goal: 1 } }
+    ]},
+    { steps: [
+      { s: 5,  ev: '#tackle success' },
+      { s: 8,  ev: '#pass success' },
+      { s: 7,  ev: '#pass success' },
+      { s: 14, ev: '#cross success' },
+      { shot: 1, ev: '#aerial duel success', to: { x: 99, y: 17 }, out: { ev: '#shot off target' } }
+    ]},
+    { steps: [
+      { s: 1, ev: '#recovery' },
+      { s: 5, ev: '#pass success' },
+      { s: 6, ev: '#pass success' },
+      { s: 8, ev: '#pass success' },
+      { s: 7, ev: '#pass fail' }
+    ]}
+  ];
+
+  function nodeOf(shirt) {
+    for (var i = 0; i < NODES.length; i++) if (NODES[i].n === shirt) return i;
+    return 0;
+  }
+
+  var LEG_MS = 720, DWELL = 300, SHOT_MS = 860, HOLD_MS = 1700, FADE_MS = 560;
+
+  /* One chain, flattened into a timeline: the legs the ball travels, and the
+     rows the feed writes. A pass is written when it arrives; a shot is written
+     as it leaves the foot, its outcome when the ball gets there. */
+  function buildChain(chain) {
+    var legs = [], rows = [], t = DWELL, steps = chain.steps, prev = nodeOf(steps[0].s);
+    rows.push({ t: 0, ev: steps[0].ev, pl: String(NODES[prev].n) });
+    for (var i = 1; i < steps.length; i++) {
+      var st = steps[i];
+      if (st.shot) {
+        legs.push({
+          shot: 1, from: prev, to: st.to || { x: 99, y: 44 },
+          goal: !!(st.out && st.out.goal), t0: t, t1: t + SHOT_MS
+        });
+        rows.push({ t: t + 80, ev: st.ev, pl: String(NODES[prev].n) });
+        if (st.out) rows.push({ t: t + SHOT_MS, ev: st.out.ev, pl: String(NODES[prev].n), goal: st.out.goal });
+        t += SHOT_MS;
+      } else {
+        var to = nodeOf(st.s);
+        legs.push({ from: prev, to: to, fail: st.ev.indexOf('fail') > -1, t0: t, t1: t + LEG_MS });
+        rows.push({ t: t + LEG_MS, ev: st.ev, pl: NODES[prev].n + ' → ' + NODES[to].n });
+        if (st.out) rows.push({ t: t + LEG_MS + 260, ev: st.out.ev, pl: String(NODES[to].n) });
+        t += LEG_MS + DWELL;
+        prev = to;
+      }
+    }
+    return { legs: legs, rows: rows, dur: t + HOLD_MS };
+  }
+
+  var sec = 67 * 60 + 14, seqNo = 7, cur = null, chainIx = -1, chainT0 = 0, rowN = 0;
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+
+  function pushRow(r) {
+    if (!feed) return;
+    var li = document.createElement('li');
+    if (r.goal) li.className = 'g';
+    li.innerHTML = '<span class="t">' + two(Math.floor(sec / 60)) + "'</span>" +
+      '<span class="ev' + (r.goal ? ' g' : '') + '">' + r.ev + '</span>' +
+      '<span class="pl">' + r.pl + '</span>';
+    feed.appendChild(li);
+    /* a goal is the one row that should be felt on the scoreline too */
+    if (r.goal && scoreEl) {
+      scoreEl.classList.remove('flash');
+      void scoreEl.offsetWidth;
+      scoreEl.classList.add('flash');
+    }
+  }
+
+  function startChain(now) {
+    chainIx = (chainIx + 1) % CHAINS.length;
+    cur = buildChain(CHAINS[chainIx]);
+    chainT0 = now; rowN = 0;
+    if (feed) feed.innerHTML = '';
+    if (seqLbl) seqLbl.textContent = 'seq ' + two(seqNo++);
+  }
+
+  /* Where the current chain is, in milliseconds. Rolls on to the next one
+     when this possession is finished and has been left up long enough. */
+  function advance(now) {
+    if (!cur) startChain(now);
+    var ct = now - chainT0;
+    if (ct >= cur.dur) { startChain(now); ct = 0; }
+    while (rowN < cur.rows.length && ct >= cur.rows[rowN].t) pushRow(cur.rows[rowN++]);
+    return ct;
+  }
+
+  if (!reduce) {
+    setInterval(function () {
+      sec++;
+      if (clock) clock.textContent = two(Math.floor(sec / 60)) + ':' + two(sec % 60);
+    }, 1000);
+  }
+
+  /* tactical canvas */
+  var cv = document.getElementById('pitch');
+  var ctx = cv ? cv.getContext('2d') : null, pal = {};
+  function readPalette() {
+    var cs = getComputedStyle(document.documentElement);
+    pal.chalk = cs.getPropertyValue('--chalk').trim() || '#EFEAE8';
+    pal.red = cs.getPropertyValue('--red').trim() || '#E0122B';
+    pal.ember = cs.getPropertyValue('--ember').trim() || '#FF5A3C';
+  }
+  readPalette();
+
+  function resize() {
+    if (!ctx) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth || W;
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(w * (H / W) * dpr);
+    ctx.setTransform(dpr * (w / W), 0, 0, dpr * (w / W), 0, 0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
 
   function hexA(hex, a) {
     var h = hex.replace('#', '');
@@ -945,6 +1076,8 @@
     var n = parseInt(h, 16);
     return 'rgba(' + ((n>>16)&255) + ',' + ((n>>8)&255) + ',' + (n&255) + ',' + a + ')';
   }
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
   function drawPitch(p) {
     ctx.save();
     ctx.strokeStyle = hexA(pal.chalk, .17); ctx.lineWidth = 1.4;
@@ -974,56 +1107,135 @@
     });
     ctx.restore();
   }
-  function drawNetwork(p, t) {
+  /* The network is the quiet floor the chain is played on: it builds once and
+     then stays, dimmed, so the live possession is the only bright thing. The
+     players this chain has run through are lit as it reaches them. */
+  function drawNetwork(p, t, live) {
     var per = 1 / EDGES.length;
     EDGES.forEach(function (e, i) {
-      var lp = Math.max(0, Math.min(1, (p - i * per * .8) / (per * 2.4)));
+      var lp = clamp01((p - i * per * .8) / (per * 2.4));
       if (lp <= 0) return;
       var a = NODES[e[0]], b = NODES[e[1]];
       var x1 = px(a.x), y1 = py(a.y), x2 = px(b.x), y2 = py(b.y);
-      ctx.strokeStyle = hexA(pal.chalk, .16); ctx.lineWidth = 1.1;
+      ctx.strokeStyle = hexA(pal.chalk, .13); ctx.lineWidth = 1.1;
       ctx.beginPath(); ctx.moveTo(x1, y1);
       ctx.lineTo(x1 + (x2 - x1) * lp, y1 + (y2 - y1) * lp); ctx.stroke();
     });
     NODES.forEach(function (n, i) {
-      var np = Math.max(0, Math.min(1, (p - .18 - i * .045) / .3));
+      var np = clamp01((p - .18 - i * .045) / .3);
       if (np <= 0) return;
-      var x = px(n.x), y = py(n.y);
-      ctx.fillStyle = hexA(pal.red, .16 * np);
-      ctx.beginPath(); ctx.arc(x, y, 13 * np * (1 + .10 * Math.sin(t / 900 + i)) + 7, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = pal.red; ctx.globalAlpha = np;
+      var x = px(n.x), y = py(n.y), hot = (live && live[i]) || 0;
+      ctx.fillStyle = hexA(pal.red, (.13 + .28 * hot) * np);
+      ctx.beginPath();
+      ctx.arc(x, y, 13 * np * (1 + .10 * Math.sin(t / 900 + i)) + 7 + 10 * hot, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = np;
+      if (hot) { ctx.shadowColor = hexA(pal.red, .75); ctx.shadowBlur = 16 * hot; }
+      ctx.fillStyle = hot ? pal.red : hexA(pal.red, .66);
       ctx.beginPath(); ctx.arc(x, y, 13, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
       ctx.fillStyle = '#fff'; ctx.font = '600 12px "Cascadia Mono",Consolas,monospace';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(String(n.n), x, y + .5); ctx.globalAlpha = 1;
     });
   }
-  function drawShot(p, t) {
-    if (p < .62) return;
-    var lp = Math.min(1, (p - .62) / .3);
-    var x1 = px(SHOT.from.x), y1 = py(SHOT.from.y), x2 = px(SHOT.to.x), y2 = py(SHOT.to.y);
+  /* Which shirts the chain has reached by now — read before anything is drawn,
+     so the network underneath can already be lit when the chain goes over it. */
+  function chainLive(ct) {
+    var live = {};
+    cur.legs.forEach(function (l) {
+      var p = clamp01((ct - l.t0) / (l.t1 - l.t0));
+      if (p <= 0) return;
+      live[l.from] = 1;
+      if (!l.shot && p >= 1) live[l.to] = 1;
+    });
+    return live;
+  }
+  function qpoint(x1, y1, cx, cy, x2, y2, p) {
+    var m = 1 - p;
+    return { x: m*m*x1 + 2*m*p*cx + p*p*x2, y: m*m*y1 + 2*m*p*cy + p*p*y2 };
+  }
+  function drawBall(x, y, t) {
     ctx.save();
-    ctx.strokeStyle = pal.red; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
-    ctx.shadowColor = hexA(pal.red, .6); ctx.shadowBlur = 14;
-    ctx.setLineDash([600, 600]); ctx.lineDashOffset = 600 * (1 - lp);
-    ctx.beginPath(); ctx.moveTo(x1, y1);
-    ctx.quadraticCurveTo((x1 + x2) / 2, Math.min(y1, y2) - PH * .16, x2, y2); ctx.stroke();
-    ctx.setLineDash([]);
-    if (lp > .9) {
-      ctx.fillStyle = hexA(pal.ember, .55 + .45 * Math.sin(t / 260));
-      ctx.beginPath(); ctx.arc(x2, y2, 6.5, 0, Math.PI * 2); ctx.fill();
-    }
+    ctx.shadowColor = hexA(pal.ember, .9); ctx.shadowBlur = 18;
+    ctx.fillStyle = hexA(pal.chalk, .96);
+    ctx.beginPath(); ctx.arc(x, y, 5.4, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = hexA(pal.ember, .45 + .35 * Math.sin(t / 190)); ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(x, y, 11 + 2.5 * Math.sin(t / 190), 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
+  /* The chain itself: every leg played so far stays on the pitch until the
+     possession is over, so a visitor sees the whole move at once, not a dot
+     wandering about. */
+  function drawChain(ct, t) {
+    var fade = ct > cur.dur - FADE_MS ? clamp01((cur.dur - ct) / FADE_MS) : 1, head = null;
+    ctx.save(); ctx.globalAlpha = fade; ctx.lineCap = 'round';
+    cur.legs.forEach(function (l) {
+      var p = clamp01((ct - l.t0) / (l.t1 - l.t0));
+      if (p <= 0) return;
+      var a = NODES[l.from], x1 = px(a.x), y1 = py(a.y), x2, y2, pt;
+      if (l.shot) {
+        x2 = px(l.to.x); y2 = py(l.to.y);
+        var cx = (x1 + x2) / 2, cy = Math.min(y1, y2) - PH * .16;
+        ctx.strokeStyle = l.goal ? pal.red : hexA(pal.ember, .5);
+        ctx.lineWidth = 2.4;
+        ctx.shadowColor = hexA(l.goal ? pal.red : pal.ember, .6); ctx.shadowBlur = 14;
+        ctx.setLineDash([600, 600]); ctx.lineDashOffset = 600 * (1 - p);
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(cx, cy, x2, y2); ctx.stroke();
+        ctx.setLineDash([]); ctx.shadowBlur = 0;
+        if (p < 1) { pt = qpoint(x1, y1, cx, cy, x2, y2, p); head = pt; }
+        else if (l.goal) {
+          ctx.fillStyle = hexA(pal.ember, .55 + .45 * Math.sin(t / 260));
+          ctx.beginPath(); ctx.arc(x2, y2, 6.5 + 2 * Math.sin(t / 260), 0, Math.PI * 2); ctx.fill();
+        }
+      } else {
+        var b = NODES[l.to]; x2 = px(b.x); y2 = py(b.y);
+        ctx.strokeStyle = l.fail ? hexA(pal.chalk, .34) : pal.red;
+        ctx.lineWidth = 2.2;
+        ctx.shadowColor = hexA(pal.red, .45); ctx.shadowBlur = l.fail ? 0 : 10;
+        ctx.beginPath(); ctx.moveTo(x1, y1);
+        ctx.lineTo(x1 + (x2 - x1) * p, y1 + (y2 - y1) * p); ctx.stroke();
+        ctx.shadowBlur = 0;
+        if (p < 1) head = { x: x1 + (x2 - x1) * p, y: y1 + (y2 - y1) * p };
+      }
+    });
+    if (head) drawBall(head.x, head.y, t);
+    ctx.restore();
+  }
+
+  /* No canvas on the page — the chain still has to read, so run the panel on
+     its own rather than losing the feed with it. */
+  if (!ctx) {
+    if (reduce) { advance(0); while (rowN < cur.rows.length) pushRow(cur.rows[rowN++]); }
+    else { requestAnimationFrame(function tick(now) { advance(now); requestAnimationFrame(tick); }); }
+    return;
+  }
+
+  /* Reduced motion: build nothing, just leave one finished chain on the board. */
+  if (reduce) {
+    cur = buildChain(CHAINS[0]); chainT0 = 0; rowN = 0;
+    if (feed) feed.innerHTML = '';
+    while (rowN < cur.rows.length) pushRow(cur.rows[rowN++]);
+    var still = cur.dur - HOLD_MS;
+    ctx.clearRect(0, 0, W, H);
+    drawHeat(0); drawPitch(1); drawNetwork(1, 0, chainLive(still)); drawChain(still, 0);
+    return;
+  }
+
   var start = null;
   function loop(t) {
     if (start === null) start = t;
-    var p = Math.min(1, (t - start) / 2600);
-    if (reduce) p = 1;
+    var p = Math.min(1, (t - start) / 1600);
     ctx.clearRect(0, 0, W, H);
-    drawHeat(reduce ? 0 : t); drawPitch(p);
-    drawNetwork(p, reduce ? 0 : t); drawShot(p, reduce ? 0 : t);
-    if (!reduce || p < 1) requestAnimationFrame(loop);
+    drawHeat(t); drawPitch(p);
+    if (p < 1) { drawNetwork(p, t, null); }
+    else {
+      var ct = advance(t);
+      drawNetwork(1, t, chainLive(ct));
+      drawChain(ct, t);
+    }
+    requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
 })();

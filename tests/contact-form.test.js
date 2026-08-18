@@ -92,11 +92,11 @@ test('a failure names the address; a blank field does not', () => {
 
 /* ================= where the handler sits ================= */
 test('the form is wired up BEFORE the canvas early-return', () => {
-  // the IIFE ends with `if (!cv) return;` and the tactical canvas after it.
-  // Registered below that line, the form would be dead on any page without
-  // the canvas — and dead silently.
+  // the IIFE ends with the hero board, which bails out early when there is no
+  // canvas to draw on (and again when motion is not wanted). Registered below
+  // that line, the form would be dead on such a page — and dead silently.
   const form=SCRIPT.indexOf("document.getElementById('contactForm')");
-  const bail=SCRIPT.indexOf('if (!cv) return;');
+  const bail=SCRIPT.search(/\n  if \(!ctx\) \{|\n  if \(!cv\) return;/);
   ok(form>-1&&bail>-1,'both are in the script');
   ok(form<bail,'the form is wired up first');
 });
