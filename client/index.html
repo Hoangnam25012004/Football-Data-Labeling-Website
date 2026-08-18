@@ -343,7 +343,7 @@
           <span class="sb-clock"><span class="sb-tag">LIVE</span> <span id="sbClock">67:14</span></span>
         </div>
         <canvas id="pitch" width="1000" height="620" role="img"
-                aria-label="Animated tactical board: pitch, passing network and one possession played out entry by entry"></canvas>
+                aria-label="Animated tactical board: one possession, drawn as the touches it was tagged from"></canvas>
         <aside class="feed" aria-label="Live event feed">
           <div class="feed-h"><i></i> Event feed</div>
           <ul id="feedList"></ul>
@@ -884,13 +884,17 @@
   /* ---------------------------------------------------------------------
      Hero board.
 
-     An entry in the tagging app is not one event, it is a chain: a player, a
-     run of events they played at that spot, and the team-mate the ball ended
-     up with — "8qq*s6" is number 8 recovering and passing to 6, tagged in one
-     go (a macro is just a hotkey for such a run). So the feed writes one row
-     per ENTRY, with every event in that entry on the row, and the board plays
-     the possession those entries belong to: the ball travels a leg, and the
-     row for that leg is written as it arrives.
+     What we record is TOUCHES, not positions. An entry is a player, the run
+     of events they played, and who the ball reached — "8qq*s6" is number 8
+     recovering and passing to 6 — and it puts ONE DOT ON THE PITCH PER
+     NUMBER, in order: where 8 played it, where 6 received it. A pass that
+     fails takes one dot more, where the opponent picked the ball up.
+
+     So a shirt is not a place. Number 6 receives at one spot, carries the
+     ball, and plays it from another — two touches, two dots. A board of
+     eleven fixed dots would be a formation drawing, which is not what any of
+     this is: it is one possession's touches, laid down as they happen, over
+     the faint scatter of the touches already recorded in the match.
      --------------------------------------------------------------------- */
   var feed = document.getElementById('feedList'), clock = document.getElementById('sbClock');
 
@@ -898,68 +902,83 @@
   var PAD = { l: 52, r: 52, t: 46, b: 46 }, PW = W - PAD.l - PAD.r, PH = H - PAD.t - PAD.b;
   function px(x) { return PAD.l + (x / 100) * PW; }
   function py(y) { return PAD.t + (y / 100) * PH; }
-  var NODES = [
-    { n: 1, x: 6, y: 50 }, { n: 2, x: 22, y: 84 }, { n: 5, x: 20, y: 62 }, { n: 4, x: 20, y: 38 },
-    { n: 3, x: 22, y: 16 }, { n: 6, x: 38, y: 50 }, { n: 8, x: 46, y: 72 }, { n: 13, x: 46, y: 28 },
-    { n: 7, x: 70, y: 84 }, { n: 14, x: 76, y: 50 }, { n: 11, x: 70, y: 16 }
-  ];
-  var EDGES = [[0,3],[0,2],[3,5],[2,5],[5,6],[5,7],[6,8],[7,10],[6,9],[7,9],[9,8],[1,6],[4,7],[8,9],[10,9]];
   var HEAT = [
     { x: 62, y: 50, r: 20, a: .34 }, { x: 74, y: 38, r: 15, a: .26 }, { x: 46, y: 62, r: 16, a: .20 },
     { x: 80, y: 56, r: 12, a: .30 }, { x: 34, y: 44, r: 14, a: .14 }
   ];
 
-  /* Each step is one entry, written the way it would be typed: `s` is the
-     player on the ball, `ev` the run of events they played, `to` the team-mate
-     it reached. The app's own rules hold here — a successful pass names its
-     receiver, a failed one names nobody — and every name is one the dictionary
-     really has, since this panel is the same list the #data chips come from. */
+  /* A possession, written as the app would take it: `touches` are the dots in
+     the order they were put down, `entries` are the rows those dots belong to.
+     `carry` is the same player at two dots — received there, played from here,
+     which is what a #step in looks like on the pitch. A #pass fail names no
+     receiver and takes `dead` instead: the dot where the ball was lost. */
   var CHAINS = [
-    { steps: [
-      { s: 8,  to: 6,  ev: ['#recovery', '#pass success'] },
-      { s: 6,  to: 13, ev: ['#step in', '#pass success'] },
-      { s: 13, to: 11, ev: ['#pass success'] },
-      { s: 11, to: 14, ev: ['#cross success', '#key pass'] },
-      { s: 14, shot: { x: 99, y: 44 }, goal: 1, ev: ['#shot on target', '#goal'] }
-    ]},
-    { steps: [
-      { s: 5,  to: 8,  ev: ['#interception', '#pass success'] },
-      { s: 8,  to: 7,  ev: ['#pass success'] },
-      { s: 7,  to: 14, ev: ['#cross success', '#key pass'] },
-      { s: 14, shot: { x: 99, y: 17 }, ev: ['#shot off target'] }
-    ]},
-    { steps: [
-      { s: 1, to: 5, ev: ['#recovery', '#pass success'] },
-      { s: 5, to: 6, ev: ['#pass success'] },
-      { s: 6, to: 8, ev: ['#step in', '#pass success'] },
-      { s: 8, dead: { x: 62, y: 88 }, ev: ['#pass fail'] }
-    ]}
+    {
+      touches: [
+        { n: 8, x: 44, y: 74 }, { n: 6, x: 37, y: 56 }, { n: 6, x: 45, y: 47 },
+        { n: 13, x: 49, y: 29 }, { n: 11, x: 71, y: 17 }, { n: 14, x: 79, y: 45 }
+      ],
+      entries: [
+        { from: 0, to: 1, ev: ['#recovery', '#pass success'] },
+        { carry: [1, 2], from: 2, to: 3, ev: ['#step in', '#pass success'] },
+        { from: 3, to: 4, ev: ['#pass success'] },
+        { from: 4, to: 5, ev: ['#cross success', '#key pass'] },
+        { from: 5, shot: { x: 99, y: 44 }, goal: 1, ev: ['#shot on target', '#goal'] }
+      ]
+    },
+    {
+      touches: [
+        { n: 5, x: 21, y: 60 }, { n: 8, x: 43, y: 71 }, { n: 7, x: 69, y: 83 }, { n: 14, x: 76, y: 41 }
+      ],
+      entries: [
+        { from: 0, to: 1, ev: ['#interception', '#pass success'] },
+        { from: 1, to: 2, ev: ['#pass success'] },
+        { from: 2, to: 3, ev: ['#cross success', '#key pass'] },
+        { from: 3, shot: { x: 99, y: 17 }, ev: ['#shot off target'] }
+      ]
+    },
+    {
+      touches: [
+        { n: 1, x: 7, y: 50 }, { n: 5, x: 19, y: 64 }, { n: 6, x: 36, y: 52 },
+        { n: 6, x: 44, y: 60 }, { n: 8, x: 53, y: 74 }
+      ],
+      entries: [
+        { from: 0, to: 1, ev: ['#recovery', '#pass success'] },
+        { from: 1, to: 2, ev: ['#pass success'] },
+        { carry: [2, 3], from: 3, to: 4, ev: ['#step in', '#pass success'] },
+        { from: 4, dead: { x: 66, y: 87 }, ev: ['#pass fail'] }
+      ]
+    }
   ];
 
-  function nodeOf(shirt) {
-    for (var i = 0; i < NODES.length; i++) if (NODES[i].n === shirt) return i;
-    return 0;
-  }
+  var LEG_MS = 760, CARRY_MS = 420, SHOT_MS = 800, DWELL = 560, HOLD_MS = 1700, FADE_MS = 560;
 
-  var LEG_MS = 820, DWELL = 640, SHOT_MS = 820, HOLD_MS = 1700, FADE_MS = 560;
-
-  /* One possession, flattened into a timeline: the legs the ball travels, and
-     the row each leg writes when the ball gets there. */
+  /* One possession, flattened into a timeline: the legs the ball travels, the
+     dot each leg lands on, and the row the entry writes when it gets there. */
   function buildChain(chain) {
     var legs = [], rows = [], t = DWELL;
-    chain.steps.forEach(function (st) {
-      var from = nodeOf(st.s), span = st.shot ? SHOT_MS : LEG_MS;
+    chain.entries.forEach(function (en) {
+      var a = chain.touches[en.from];
+      if (en.carry) {
+        legs.push({ carry: 1, a: chain.touches[en.carry[0]], b: chain.touches[en.carry[1]],
+                    lands: en.carry[1], t0: t, t1: t + CARRY_MS });
+        t += CARRY_MS;
+      }
+      var span = en.shot ? SHOT_MS : LEG_MS;
       legs.push({
-        from: from,
-        to: st.to != null ? nodeOf(st.to) : null,
-        pt: st.shot || st.dead || null,
-        shot: !!st.shot, dead: !!st.dead, goal: !!st.goal,
+        a: a,
+        b: en.to != null ? chain.touches[en.to] : (en.shot || en.dead),
+        lands: en.to != null ? en.to : null,
+        shot: !!en.shot, dead: !!en.dead, goal: !!en.goal,
         t0: t, t1: t + span
       });
-      rows.push({ t: t + span, ev: st.ev, goal: !!st.goal, pl: st.to != null ? st.s + ' → ' + st.to : String(st.s) });
+      rows.push({
+        t: t + span, ev: en.ev, goal: !!en.goal,
+        pl: en.to != null ? a.n + ' → ' + chain.touches[en.to].n : String(a.n)
+      });
       t += span + DWELL;
     });
-    return { legs: legs, rows: rows, dur: t + HOLD_MS };
+    return { chain: chain, legs: legs, rows: rows, dur: t + HOLD_MS };
   }
 
   /* a wrapped chain is twice as tall, so a narrow panel holds fewer rows */
@@ -996,8 +1015,7 @@
 
   /* The panel starts full rather than empty: the entries of the two
      possessions before this one, which are the two the board is about to
-     play — so what is on screen at the first paint is the same feed, just
-     already running. */
+     play — so the first paint is the same feed, already running. */
   buildChain(CHAINS[1]).rows.concat(buildChain(CHAINS[2]).rows).slice(-5).forEach(pushRow);
 
   if (!reduce) {
@@ -1065,46 +1083,58 @@
     });
     ctx.restore();
   }
-  function drawNetwork(p, t) {
-    var per = 1 / EDGES.length;
-    EDGES.forEach(function (e, i) {
-      var lp = clamp01((p - i * per * .8) / (per * 2.4));
-      if (lp <= 0) return;
-      var a = NODES[e[0]], b = NODES[e[1]];
-      var x1 = px(a.x), y1 = py(a.y), x2 = px(b.x), y2 = py(b.y);
-      ctx.strokeStyle = hexA(pal.chalk, .16); ctx.lineWidth = 1.1;
-      ctx.beginPath(); ctx.moveTo(x1, y1);
-      ctx.lineTo(x1 + (x2 - x1) * lp, y1 + (y2 - y1) * lp); ctx.stroke();
+  /* Every touch of every possession on this board, dim and unlabelled: the
+     match so far. The live possession is drawn bright on top of it, which is
+     the whole point — the same shirt turns up in several of these. */
+  var PAST = [];
+  CHAINS.forEach(function (c) {
+    c.touches.forEach(function (d) { PAST.push(d); });
+    c.entries.forEach(function (en) { if (en.dead) PAST.push(en.dead); });
+  });
+  function drawPast(p) {
+    ctx.save(); ctx.globalAlpha = clamp01(p);
+    PAST.forEach(function (d) {
+      ctx.fillStyle = hexA(pal.chalk, .13);
+      ctx.beginPath(); ctx.arc(px(d.x), py(d.y), 3.4, 0, Math.PI * 2); ctx.fill();
     });
-    NODES.forEach(function (n, i) {
-      var np = clamp01((p - .18 - i * .045) / .3);
-      if (np <= 0) return;
-      var x = px(n.x), y = py(n.y);
-      ctx.fillStyle = hexA(pal.red, .16 * np);
-      ctx.beginPath(); ctx.arc(x, y, 13 * np * (1 + .10 * Math.sin(t / 900 + i)) + 7, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = pal.red; ctx.globalAlpha = np;
-      ctx.beginPath(); ctx.arc(x, y, 13, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = '600 12px "Cascadia Mono",Consolas,monospace';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(String(n.n), x, y + .5); ctx.globalAlpha = 1;
-    });
+    ctx.restore();
   }
   function qpoint(x1, y1, cx, cy, x2, y2, p) {
     var m = 1 - p;
     return { x: m*m*x1 + 2*m*p*cx + p*p*x2, y: m*m*y1 + 2*m*p*cy + p*p*y2 };
   }
+  /* A touch, as it goes down: the number is the shirt that made it, and it
+     stays on the board until the possession is over. */
+  function drawTouch(d, age, t) {
+    var x = px(d.x), y = py(d.y), pop = clamp01(age / 260), fresh = 1 - clamp01(age / 900);
+    ctx.fillStyle = hexA(pal.red, .16 + .18 * fresh);
+    ctx.beginPath(); ctx.arc(x, y, 10 * pop + 7 + 4 * fresh, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = pal.red;
+    if (fresh > .01) { ctx.shadowColor = hexA(pal.red, .7); ctx.shadowBlur = 16 * fresh; }
+    ctx.beginPath(); ctx.arc(x, y, 11 * pop, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    if (pop > .6) {
+      ctx.globalAlpha = clamp01((pop - .6) / .4);
+      ctx.fillStyle = '#fff'; ctx.font = '600 11px "Cascadia Mono",Consolas,monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(d.n), x, y + .5); ctx.globalAlpha = 1;
+    }
+  }
   /* The possession: every leg played so far stays on the pitch until the move
-     is over, so the whole chain is visible at once rather than a dot wandering
-     about. The ball is the only thing that moves. */
+     is over, so the whole thing is visible at once. */
   function drawChain(ct, t) {
-    var fade = ct > cur.dur - FADE_MS ? clamp01((cur.dur - ct) / FADE_MS) : 1, head = null;
+    var fade = ct > cur.dur - FADE_MS ? clamp01((cur.dur - ct) / FADE_MS) : 1;
+    var head = null, shown = [];
     ctx.save(); ctx.globalAlpha = fade; ctx.lineCap = 'round';
+
+    /* the first dot is down as soon as the possession starts */
+    if (cur.legs.length) shown.push({ d: cur.legs[0].a, age: ct });
+
     cur.legs.forEach(function (l) {
       var p = clamp01((ct - l.t0) / (l.t1 - l.t0));
       if (p <= 0) return;
-      var a = NODES[l.from], x1 = px(a.x), y1 = py(a.y), x2, y2;
+      var x1 = px(l.a.x), y1 = py(l.a.y), x2 = px(l.b.x), y2 = py(l.b.y);
       if (l.shot) {
-        x2 = px(l.pt.x); y2 = py(l.pt.y);
         var cx = (x1 + x2) / 2, cy = Math.min(y1, y2) - PH * .16;
         ctx.strokeStyle = l.goal ? pal.red : hexA(pal.ember, .5);
         ctx.lineWidth = 2.4;
@@ -1117,19 +1147,27 @@
           ctx.fillStyle = hexA(pal.ember, .55 + .45 * Math.sin(t / 260));
           ctx.beginPath(); ctx.arc(x2, y2, 6.5, 0, Math.PI * 2); ctx.fill();
         }
-      } else {
-        /* a failed pass reaches nobody, so it runs to a point and dies there */
-        if (l.dead) { x2 = px(l.pt.x); y2 = py(l.pt.y); }
-        else { var b = NODES[l.to]; x2 = px(b.x); y2 = py(b.y); }
-        ctx.strokeStyle = l.dead ? hexA(pal.chalk, .28) : pal.red;
-        ctx.lineWidth = 2.2;
-        ctx.shadowColor = hexA(pal.red, .45); ctx.shadowBlur = l.dead ? 0 : 10;
-        ctx.beginPath(); ctx.moveTo(x1, y1);
-        ctx.lineTo(x1 + (x2 - x1) * p, y1 + (y2 - y1) * p); ctx.stroke();
-        ctx.shadowBlur = 0;
-        if (p < 1) head = { x: x1 + (x2 - x1) * p, y: y1 + (y2 - y1) * p };
+        return;
       }
+      /* a carry is the same player walking the ball to their next touch, so it
+         is dashed: nothing was passed, the dot simply moved */
+      if (l.carry) { ctx.strokeStyle = hexA(pal.red, .5); ctx.setLineDash([5, 5]); ctx.lineWidth = 1.6; }
+      else if (l.dead) { ctx.strokeStyle = hexA(pal.chalk, .28); ctx.lineWidth = 2.2; }
+      else { ctx.strokeStyle = pal.red; ctx.lineWidth = 2.2; ctx.shadowColor = hexA(pal.red, .45); ctx.shadowBlur = 10; }
+      ctx.beginPath(); ctx.moveTo(x1, y1);
+      ctx.lineTo(x1 + (x2 - x1) * p, y1 + (y2 - y1) * p); ctx.stroke();
+      ctx.setLineDash([]); ctx.shadowBlur = 0;
+      if (p < 1) head = { x: x1 + (x2 - x1) * p, y: y1 + (y2 - y1) * p };
+      else if (l.dead) {
+        /* the extra dot a failed pass takes: where the ball was lost, and it
+           belongs to nobody on this side, so it carries no number */
+        ctx.strokeStyle = hexA(pal.chalk, .5); ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(x2, y2, 7, 0, Math.PI * 2); ctx.stroke();
+      }
+      if (p >= 1 && l.lands != null) shown.push({ d: l.b, age: ct - l.t1 });
     });
+
+    shown.forEach(function (s) { drawTouch(s.d, s.age, t); });
     if (head) {
       ctx.shadowColor = hexA(pal.ember, .85); ctx.shadowBlur = 14;
       ctx.fillStyle = hexA(pal.chalk, .95);
@@ -1151,7 +1189,7 @@
     cur = buildChain(CHAINS[0]); chainT0 = 0; rowN = 0;
     while (rowN < cur.rows.length) pushRow(cur.rows[rowN++]);
     ctx.clearRect(0, 0, W, H);
-    drawHeat(0); drawPitch(1); drawNetwork(1, 0); drawChain(cur.dur - HOLD_MS, 0);
+    drawHeat(0); drawPitch(1); drawPast(1); drawChain(cur.dur - HOLD_MS, 0);
     return;
   }
 
@@ -1160,7 +1198,7 @@
     if (start === null) start = t;
     var p = Math.min(1, (t - start) / 1600);
     ctx.clearRect(0, 0, W, H);
-    drawHeat(t); drawPitch(p); drawNetwork(p, t);
+    drawHeat(t); drawPitch(p); drawPast((p - .45) / .55);
     if (p >= 1) drawChain(advance(t), t);
     requestAnimationFrame(loop);
   }
