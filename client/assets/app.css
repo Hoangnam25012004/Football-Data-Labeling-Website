@@ -531,22 +531,54 @@ table.stbl tfoot .c-opp{position:sticky; left:104px; z-index:2; text-align:left;
   color:var(--ash-dim);
 }
 
+/* ---------- one player: where he has stood ----------
+   The tagger's own pitch (pitchSVG) with the tagger's own squares
+   (FORMATION_GRID), read back: a dot on every square he has played, nothing on
+   the rest. Clicking one picks the card set for the job it belongs to.
+
+   The class names are pl-pz rather than the tagger's pz on purpose. shared.css
+   styles .pz for the formation board, gets loaded the first time anyone opens a
+   match, and stays in the document afterwards — its .pz carries
+   pointer-events:none, which would leave these squares looking clickable and
+   doing nothing. Two boards, two vocabularies, no way for either to reach the
+   other. */
+.pl-pos{max-width:520px; margin-bottom:14px}
+/* aspect-ratio is set inline, off PITCH_DIMS — the channel's game decides it, and
+   a futsal court is not a football pitch's shape. This is the fallback for a
+   channel whose sport nothing could answer for. */
+.pl-pitch{position:relative; aspect-ratio:1050/680; margin-top:11px}
+/* The tagger's pitch is grass; this one is a diagram on a dark page. Both come
+   out of pitchSVG as presentation attributes, which any rule here outranks. */
+.pl-pitch > svg{border-radius:2px}
+.pl-pitch > svg > rect{fill:var(--carbon-2)}
+.pl-pitch > svg > g{stroke:var(--line-soft)}
+.pl-pz{
+  position:absolute; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:7px; padding:0; border:0; border-radius:2px;
+  background:color-mix(in srgb,var(--chalk) 7%, transparent); cursor:pointer;
+  transition:background .16s;
+}
+.pl-pz:hover{background:color-mix(in srgb,var(--chalk) 13%, transparent)}
+.pl-pz-dot{width:21px; height:21px; border-radius:50%; background:var(--chalk); flex:none}
+.pl-pz-lb{font-family:var(--f-mono); font-size:10px; letter-spacing:.1em; color:var(--chalk)}
+/* the square being read takes the amber of the badge beside his name */
+.pl-pz.on{background:color-mix(in srgb,var(--amber) 17%, transparent)}
+.pl-pz.on .pl-pz-dot{background:var(--amber)}
+.pl-pz.on .pl-pz-lb{color:var(--amber)}
+.pl-pz-arrow{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  color:var(--ash-dim); font-size:19px; line-height:1; pointer-events:none;
+}
+@media (max-width:560px){
+  .pl-pz-dot{width:15px; height:15px}
+  .pl-pz-lb{font-size:8.5px; letter-spacing:.06em}
+}
+
 /* ---------- one player: the bar over his tiles ----------
-   Which role on the left, which reading on the right. One bar rather than two
-   rows: two rows of chips stacked read as two tiers of tabs, and there is
-   already a real tier of category tabs under the tiles.
-   On a narrow screen the whole bar wraps and margin-left:auto stops applying —
-   which is what should happen: the two groups stack, each still a block. */
+   Which reading the four tiles on the right are in. */
 .pl-ctl{display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin:0 0 14px}
 .pl-grp{display:flex; align-items:center; flex-wrap:wrap; gap:7px; min-width:0}
 .pl-grp.right{margin-left:auto}
-.pl-grp-l{
-  font-family:var(--f-mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase;
-  color:var(--ash-dim); margin-right:3px;
-}
-/* A role chip takes the amber of the badge beside his name, so the eye joins the
-   two. The two reading buttons keep the red .chip.on has everywhere else. */
-.pl-ctl .chip.role.on{border-color:var(--amber); color:var(--amber)}
 /* Per 90 with no minutes to divide by */
 .pl-ctl .chip[disabled]{opacity:.4; cursor:not-allowed}
 

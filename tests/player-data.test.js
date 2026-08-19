@@ -67,7 +67,7 @@ function sandbox(state){
     /\n  var PL_GK = \[[\s\S]*?\n  \];/.exec(APPJS)[0],
     ROLEBLOCK,
     ';globalThis.A={'+LIFT.join(',')+',PL_OUT,PL_GK,PLAYER_CATS,GK_COLS,'
-      +'ROLES,ROLE_POS,ROLE_OF,ROLE_LABEL,ROLE_BADGE,ROLE_RANK,MODES,'
+      +'ROLES,ROLE_POS,ROLE_OF,ROLE_LABEL,ROLE_BADGE,MODES,'
       +'ROLE_KPIS,GK_KPIS,FALLBACK_KPIS,'
       +'squadIds,gkShirts,onPitchAt,newStat,pct};'
   ].join('\n'),ctx,{filename:'client/assets/app.js-extract.js'});

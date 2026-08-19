@@ -4,10 +4,11 @@
 Striker, thay vì một bộ dùng chung cho mọi cầu thủ ngoài sân. Ai đá nhiều vị trí thì có chip
 filter để chọn vai. Cạnh đó là hai nút đọc số: `Total` và `Per 90 mins`.**
 
-Trạng thái: **ĐÃ TRIỂN KHAI** (2026-08-19). Tài liệu này mô tả code đang chạy.
+Trạng thái: **ĐÃ TRIỂN KHAI** (2026-08-19, bản 2 — bảng sân thay hai chip vai).
+Tài liệu này mô tả code đang chạy.
 
-Test: `node tests/run.js` → **1214/1214 passed**
-(1171 test cũ — trong đó 1170 không sửa một ký tự — cộng 43 test mới ở `tests/player-role-cards.test.js`).
+Test: `node tests/run.js` → **1225/1225 passed**
+(1171 test cũ, 1170 trong đó không sửa một ký tự, + 54 test mới ở `tests/player-role-cards.test.js`).
 
 Đã sửa: `client/assets/app.js`, `client/assets/app.css`, `client/app.html`,
 `client/login.html` (cache-bust), `tests/asset-versions.json`, `tests/player-data.test.js` (5 dòng).
@@ -15,19 +16,29 @@ Test: `node tests/run.js` → **1214/1214 passed**
 `cloud-sync.js`, `client/assets/supa.js`, `client/assets/site.css`, `deploy.yml`,
 không migration DB, không thêm file runtime mới.
 
-**Bốn quyết định của bạn, đã thi hành:**
+**Bản 2 — bảng vị trí thay hai chip:**
+
+| | Kết quả trong code |
+|---|---|
+| Hai chip `MIDFIELDER` / `STRIKER` | **bỏ hẳn** — chúng nói có bộ card nào, không nói gì về cầu thủ |
+| Thay bằng | `positionBoard()`: sân của tagger (`pitchSVG`) + lưới của tagger (`FORMATION_GRID`), sáng đúng ô anh đã đá |
+| Bấm một ô | chọn bộ card của nghề ô đó thuộc về; **mọi ô cùng vai sáng cùng nhau**, vì bốn tile bên dưới là của *vai* |
+| Card mặc định | nghề của **ô đầu tiên** anh ta đá, không phải ô đá nhiều nhất |
+| Vẽ trên sân nào | môn của channel (`state.channel.sport`), tỉ lệ khung lấy từ `PITCH_DIMS` |
+
+**Bốn quyết định trước đó, vẫn nguyên:**
 
 | | | Kết quả trong code |
 |---|---|---|
 | **D5** | thủ môn **có** hai nút Total / Per 90 | `GK_KPIS` đi qua đúng một builder với ba bộ còn lại; `playerCtl()` không hỏi `who.gk` một lần nào |
-| **D6** | **không nhớ** chế độ đọc (phương án a) | `var mode = 'total'` — không localStorage, không hash. Mở một cầu thủ là nhìn cả chiến dịch |
-| **D7** | bỏ `%` khỏi nhãn, dùng `(total)` / `(per 90)` | mọi tile đếm được đều mang hậu tố; phần trăm xuống dòng chú thích, nơi nó không đổi theo chế độ |
+| **D6** | **không nhớ** chế độ đọc (phương án a) | `var mode = 'total'` — không localStorage, không hash |
+| **D7** | bỏ `%` khỏi nhãn, dùng `(total)` / `(per 90)` | mọi tile đếm được đều mang hậu tố; phần trăm xuống dòng chú thích |
 | D3, D4 | thẻ phạt xuống meta, badge vai | như đã duyệt |
 
-> **Một chỗ D7 không áp dụng được, và vì sao.** `Save Rate` là một tỉ lệ và `Clean Sheets` đếm
-> theo **trận** chứ không theo phút — chia chúng cho số phút cho ra đại lượng vô nghĩa. Hai tile
-> đó mang cờ `fixed`: giữ nguyên nhãn, giữ nguyên giá trị ở cả hai chế độ. `Cards` (`0Y · 0R`)
-> trong bộ dự phòng cũng vậy. Ba tile, và chỉ ba, có một test riêng canh đúng con số đó.
+> **Ba tile không mang hậu tố, và vì sao.** `Save Rate` là một tỉ lệ, `Clean Sheets` đếm theo
+> **trận** chứ không theo phút, `Cards` là một cặp thẻ. Chia chúng cho số phút cho ra đại lượng vô
+> nghĩa, nên chúng mang cờ `fixed`: giữ nguyên nhãn và giá trị ở cả hai chế độ. Ba tile, và chỉ ba,
+> có một test canh đúng con số đó.
 
 ---
 
@@ -47,9 +58,10 @@ không migration DB, không thêm file runtime mới.
 
    15 vị trí + `GK` = 16, đúng bằng `POS_ORDER` trong `Stats/stats-view.js:778` và đúng bằng
    toàn bộ nhãn mà `FORMATION_GRID` (`shared.js:116-118`) sinh ra. **Phủ kín, không thừa, không thiếu.**
-3. Một cầu thủ có **≥ 2 vai** trong cả chiến dịch → hiện một hàng chip filter phía trên hàng card.
-   Chỉ **một** vai → không có chip (không bày ra một nút chỉ có một lựa chọn).
-4. **Hai nút đọc số** cạnh hàng chip: `Total` (mặc định) và `Per 90 mins` (cùng những con số
+3. Một **bảng sân** phía trên hàng card, sáng đúng những ô cầu thủ đã đứng. Bấm một ô là chọn
+   bộ card của nghề mà ô đó thuộc về. Bộ card mặc định khi mở trang là nghề của **ô đầu tiên
+   anh ta đá** (mục 3.3).
+4. **Hai nút đọc số** dưới bảng sân: `Total` (mặc định) và `Per 90 mins` (cùng những con số
    ấy, chia cho số phút anh ta thực sự đá, nhân 90). Áp lên **bốn tile bên phải của mọi người,
    thủ môn kể cả** (D5); hai tile `Appearances` / `Minutes` bên trái đứng yên, vì chúng chính là
    cái mẫu số mà "per 90" được tính ra từ đó (mục 4.4).
@@ -191,35 +203,46 @@ không sửa một chữ**.
 **Trong vòng `order.forEach`**, sau khối `gkTotal`:
 
 ```js
-      /* Ba vai, đếm theo hai cách khác nhau vì chúng trả lời hai câu hỏi khác nhau.
-         `roleApps` là "anh từng đá vai này bao nhiêu trận" — nó quyết định chip nào hiện ra.
-         `picked` là "anh được XẾP vào vai này bao nhiêu trận" — nó quyết định chip nào
-         sáng khi vừa mở trang. Một hậu vệ dâng lên đá tiền vệ mười phút cuối vẫn là hậu vệ. */
-      var apps = {}, picked = {};
-      p.matches.forEach(function (r) {
-        if (!r.pos) return;
-        var seen = {};
-        (r.pos.all || []).forEach(function (ps) {
-          var role = ROLE_OF[ps];
-          if (role && !seen[role]) { seen[role] = 1; apps[role] = (apps[role] || 0) + 1; }
-        });
-        var p0 = ROLE_OF[r.pos.start];
-        if (p0) picked[p0] = (picked[p0] || 0) + 1;
-      });
-      p.roleApps = apps;
-      /* Thứ tự cố định — Defender, Midfielder, Striker — chứ không phải thứ tự bắt gặp.
-         Hàng chip của một người không được đổi chỗ giữa hai lần mở trang. */
-      p.roles = ROLES.filter(function (r) { return apps[r[0]]; }).map(function (r) { return r[0]; });
-      p.role = p.roles.slice().sort(function (x, y) {
-        return (picked[y] || 0) - (picked[x] || 0) ||        // được xếp vào nhiều nhất
-               (apps[y] || 0) - (apps[x] || 0) ||            // rồi ra sân nhiều nhất
-               ROLE_RANK[x] - ROLE_RANK[y];                  // rồi thứ tự cố định
-      })[0] || '';
+  /* Every square he has stood in, and how many matches in each — that is what
+     the board over his tiles lights up, and what its tooltips count.
+     `roles` is the same run read one level up, in the fixed order Defender,
+     Midfielder, Striker rather than the order they turned up in: it is what
+     says whether a role asked for in the URL is one he ever actually played. */
+  var posApps = {}, first = '';
+  p.matches.forEach(function (r) {
+    if (!r.pos) return;
+    /* matches are in kickoff order, so the earliest one that placed him at
+       all is the first position he played */
+    if (!first && r.pos.start) first = r.pos.start;
+    var seen = {};
+    (r.pos.all || []).forEach(function (ps) {
+      if (seen[ps]) return;
+      seen[ps] = 1;
+      posApps[ps] = (posApps[ps] || 0) + 1;
+    });
+  });
+  p.posApps = posApps;
+  p.pos0 = first;
+  p.roles = ROLES.filter(function (r) {
+    return ROLE_POS[r[0]].some(function (ps) { return posApps[ps]; });
+  }).map(function (r) { return r[0]; });
+  /* The card a profile opens on is the job of the FIRST square he played in.
+     Not the one he played most: a man is introduced by where he began, and a
+     reading that shifts as the season adds matches is a reading nobody can
+     point at twice. */
+  p.role = ROLE_OF[first] || '';
 ```
 
-`p.role` là **vai mặc định**; `p.roles` là danh sách chip (đã theo thứ tự cố định);
-`p.roleApps` cho số trận mỗi vai (dùng cho tooltip chip, mục 5.2).
-`p.role === ''` nghĩa là **không biết vai** — hợp lệ và có đường đi riêng (mục 3.4).
+`p.posApps` là *ô nào, mấy trận* — bảng sân sáng theo nó và tooltip đếm theo nó.
+`p.pos0` là ô đầu tiên anh ta đá; `p.role` là nghề của ô đó, tức bộ card mở sẵn.
+`p.roles` là ba vai theo thứ tự cố định, dùng để kiểm một vai lấy từ URL có thật là vai anh
+từng đá hay không. `p.role === ''` nghĩa là **không biết vai** — hợp lệ, có đường đi riêng (3.4).
+
+> **Vì sao "ô đầu tiên" chứ không phải "ô đá nhiều nhất".** Bạn chọn thế, và nó có một tính chất
+> mà "nhiều nhất" không có: **nó đứng yên**. Một cầu thủ được giới thiệu bằng chỗ anh bắt đầu, và
+> một cách đọc tự đổi khi mùa giải cộng thêm trận là cách đọc không ai chỉ vào hai lần được.
+> Cái giá: một tiền đạo có trận đầu tiên bị kéo xuống đá hậu vệ sẽ mở ra ở card hậu vệ. Bảng sân
+> ngay trên đó cho anh ta đúng một cú bấm để sang nghề khác, nên cái giá dừng ở một cú bấm.
 
 `p.gk` vẫn được tính đúng như cũ và **đi trước** `p.role` ở mọi chỗ hiển thị.
 
@@ -228,7 +251,7 @@ không sửa một chữ**.
 | Tình huống | Kết quả |
 |---|---|
 | **Thủ môn kiêm cầu thủ** (một trận ô GK, một trận CB) | `p.gk = true` (luật cũ: một trận ở ô GK là đủ cho cả chiến dịch). Anh ta giữ **bộ tile thủ môn** và **không** có chip vai. Hai nút đọc số thì có, như mọi người. |
-| **Đá 3 vai** trong cả chiến dịch | 3 chip. Nhiều nhất là 3, hàng chip không thể tràn. |
+| **Đá nhiều ô** trong cả chiến dịch | mỗi ô một chấm. Nhiều nhất là 15 ô, và chúng nằm trên lưới của chính tấm bảng nên không thể tràn. |
 | Report **không có lineups** | Xem 3.4.1 — cổng Submit Analysis đã **từ chối** đúng trường hợp này, nhưng nó vẫn phải có đường đi. |
 | Chấm còn nằm ở **ô chờ** | `pos === ''` → `posFigures` bỏ qua → không vai. Xem 3.4.1. Không bịa ra một vai từ chỗ đứng tạm. |
 
@@ -310,9 +333,9 @@ var ROLE_POS = {
   midfielder: ['CDM', 'CM', 'RM', 'LM', 'CAM'],
   striker:    ['LW', 'RW', 'CF', 'RF', 'LF']
 };
-var ROLE_OF = {}, ROLE_LABEL = {}, ROLE_BADGE = {}, ROLE_RANK = {};
-ROLES.forEach(function (r, i) {
-  ROLE_LABEL[r[0]] = r[1]; ROLE_BADGE[r[0]] = r[2]; ROLE_RANK[r[0]] = i;
+var ROLE_OF = {}, ROLE_LABEL = {}, ROLE_BADGE = {};
+ROLES.forEach(function (r) {
+  ROLE_LABEL[r[0]] = r[1]; ROLE_BADGE[r[0]] = r[2];
   ROLE_POS[r[0]].forEach(function (p) { ROLE_OF[p] = r[0]; });
 });
 /* Two readings of the same figures, and only two. 'total' is the default
@@ -511,72 +534,133 @@ Hai hệ quả, cả hai đều là chủ ý:
 - Không có khoá `localStorage` mới nào trong repo → không có gì để đụng vào `'hna.rail'`, không có
   `try/catch` mới nào phải viết, không có trạng thái nào sống sót qua một lần tải trang.
 
-## 5. Bộ lọc vai và hai nút đọc số
+## 5. Bảng vị trí và hai nút đọc số
 
 ### 5.1 Chỗ đứng trên màn hình
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  Elva                        [DEF]           PLAYER ▼    │   ← .pl-head  (badge = vai ĐANG xem)
-│  4 appearances · 360' · 7 Jun 2024 → 11 Jun 2025 · 0Y·0R │   ← .pl-meta  (thẻ xuống đây)
+┌─ .pl-head ───────────────────────────────────────────────┐
+│  Elva                        [ST]            PLAYER ▼    │   badge = vai ĐANG đọc
+│  4 appearances · 360' · 7 Jun 2024 → 11 Jun 2025 · 0Y·0R │
 └──────────────────────────────────────────────────────────┘
-  POSITION [DEFENDER] [Midfielder]        [TOTAL] [Per 90]     ← .pl-ctl  (MỚI)
+┌─ .pl-pos "Position" ─────────────┐
+│ ┌──────────────────────────────┐ │
+│ │        ● LM    ● LW          │ │   ← ô sáng = vị trí đã đá
+│ │  ────────────  ▶  ─────────  │ │      amber = vai đang đọc
+│ │                ● RW          │ │
+│ └──────────────────────────────┘ │
+└──────────────────────────────────┘
+                              [TOTAL] [Per 90]   ← .pl-ctl
 ┌────────┬────────┬────────┬────────┬────────┬────────┐
-│ APPS   │MINUTES │TACKLES │INTERC. │CLEARAN.│ DUELS  │
-│        │        │WON     │(TOTAL) │(TOTAL) │WON     │       ← .kpis.six  (bố cục KHÔNG đổi)
-│        │        │(TOTAL) │        │        │(TOTAL) │
-│  4     │  360'  │   9    │   14   │   21   │   31   │
-│        │        │64.3%   │balls   │balls   │58.5%   │
-│        │        │of 14   │cut out │put away│of 53   │
+│ APPS   │MINUTES │GOALS   │ASSISTS │SHOTS   │SHOTS ON│      ← .kpis.six
+│  4     │  360'  │(TOTAL) │(TOTAL) │(TOTAL) │TARGET  │
 └────────┴────────┴────────┴────────┴────────┴────────┘
-  [Shooting] [Distribution] [Defensive] [Other]                ← .dsubs  (KHÔNG đổi)
-  ─ bảng theo trận ─                                           ← KHÔNG đổi, không bị lọc
+  [Shooting] [Distribution] [Defensive] [Other]                ← .dsubs (KHÔNG đổi)
+  ─ bảng theo trận ─                                           ← KHÔNG đổi
 ```
 
-**Một thanh điều khiển, hai nhóm.** Trái là bộ lọc vai (chỉ khi ≥2 vai), phải là hai nút đọc số
-(`margin-left:auto`, luôn có). Chúng nằm chung một thanh chứ không phải hai hàng, vì hai nhóm chip
-chồng nhau đọc thành hai tầng tab — mà ngay dưới hàng card đã có tầng tab category thật rồi.
+**Vì sao bỏ hai chip.** `[MIDFIELDER] [STRIKER]` nói có những bộ card nào, và không nói gì về
+người đàn ông ấy. Ô sân nói cả hai: nó **là** vị trí anh đã đá, và bấm vào nó **là** chọn bộ card.
+Bộ lọc và sự thật trở thành một nút.
 
-**Vì sao hai nhóm khác màu.** Chip vai dùng sắc **hổ phách**, cùng sắc với badge `DEF` cạnh tên —
-mắt nối được chip đang sáng với badge. Hai nút đọc số dùng sắc **đỏ** mặc định của `.chip.on`,
-như mọi thứ khác trong app.
+**Ô nào sáng amber.** Tất cả các ô của **vai đang đọc**, không riêng ô vừa bấm. Bốn tile bên dưới
+là của *vai*, và card của một tiền đạo cánh không thuộc về cánh trái hơn cánh phải. Đó cũng là thứ
+dạy người dùng bản đồ ô → vai: bấm `LW` thì `RW` sáng theo.
 
-### 5.2 `playerCtl()` — builder mới
+**Hướng đọc cố định trái → phải.** `pos` được lưu chuẩn hoá — `zoneAt()` đã vắt hướng tấn công ra
+khỏi nó — nên không có "hướng của cả chiến dịch" nào để tôn trọng. Một hướng cố định là cách đọc
+duy nhất không nhảy giữa hai cầu thủ, hay giữa hai lần mở. Mũi tên ▶ ở giữa sân nói ra điều đó.
+
+**Ai không có bảng.** Thủ môn (không có vai để lọc), và người không đội hình nào xếp vào đâu (một
+sân trống là một câu hỏi, mà câu trả lời đã nằm ở bộ tile dự phòng anh ta nhận).
+
+### 5.2 `positionBoard()` — builder mới
 
 ```js
-/* The bar over the tiles: which role on the left, which reading on the right.
+/* Where he has stood, on the board he was placed on.
 
-   One bar rather than two rows — two rows of chips stacked read as two tiers of
-   tabs, and there is already a real tier of category tabs under the tiles.
+   Two chips reading "Midfielder" and "Striker" said which card sets existed and
+   nothing about the man. The squares themselves say both: the same six-by-three
+   grid the tagger writes `pos` from (FORMATION_GRID), on the same pitch drawing
+   (pitchSVG), with a dot on every square he has actually played and nothing at
+   all on the rest. Clicking one picks the card set for the job that square
+   belongs to, so the filter and the fact are the same control.
 
-   The role group is only built when there are at least two to choose between: a
-   button with one option is not a filter, it is a label, and that label is
-   already sitting beside his name. The reading group is always there, because it
-   does not depend on his role — only on whether there are minutes to divide by.
+   Every square of a role reads selected together, not just the one clicked: the
+   four tiles below are the ROLE's, and a winger's card is no more about the left
+   wing than about the right. That is also what teaches the mapping — press LW
+   and RW lights with it.
 
+   The board always reads left to right. `pos` is stored canonically, zoneAt()
+   having already turned the attacking direction out of it, so there is no one
+   direction a campaign was played in to honour — and a fixed one is the only
+   reading that does not move between two players, or between two visits.
+
+   Nothing here for a keeper: he has no role to filter by, and his four tiles are
+   about the goal. Nothing either for a man no board ever placed — an empty pitch
+   would be a question, and the answer is in the empty state he already gets. */
+function positionBoard(who, cat, role) {
+  if (who.gk || !who.roles.length) return null;
+  var card = el('div', 'card pl-pos');
+  card.appendChild(el('p', 'card-h', 'Position'));
+
+  /* The channel's own game, so a futsal club gets a futsal court — the tagger
+     lays this same six-by-three grid over whichever pitch it drew, and this is
+     that pitch read back. The shape comes from PITCH_DIMS rather than from the
+     stylesheet for the same reason: a court is not a pitch's proportions.
+
+     The id belongs to the tagger's board, where the dots being placed live in
+     it. Nothing reads it here, and two of them in one document is a bug waiting
+     for whoever writes the third. */
+  var sport = (state.channel && state.channel.sport) || 'football';
+  var dim = PITCH_DIMS[sport] || PITCH_DIMS.football;
+  var pitch = el('div', 'pl-pitch', pitchSVG(sport).replace(' id="pv-dots"', ''));
+  pitch.style.aspectRatio = dim.w + ' / ' + dim.h;
+  for (var row = 0; row < 3; row++) {
+    for (var col = 0; col < 6; col++) {
+      var ps = FORMATION_GRID[effRow(row, 'lr')][effCol(col, 'lr')];
+      var r = ps && ROLE_OF[ps];
+      if (!r || !who.posApps[ps]) continue;      // the GK square, and every square he never took
+      var b = el('button', 'pl-pz' + (r === role ? ' on' : ''),
+        '<span class="pl-pz-dot"></span><span class="pl-pz-lb">' + esc(ps) + '</span>');
+      b.type = 'button';
+      b.style.left = (col * 100 / 6) + '%';
+      b.style.top = PZ_ROW_TOP[row] + '%';
+      b.style.width = (100 / 6) + '%';
+      b.style.height = PZ_ROW_H[row] + '%';
+      /* which job it feeds, then how often he took it — the mapping first,
+         because that is the thing a click is about to act on */
+      b.title = ROLE_LABEL[r] + ' · ' + who.posApps[ps] +
+                (who.posApps[ps] === 1 ? ' match' : ' matches') + ' at ' + ps;
+      b.setAttribute('data-role', r);
+      b.setAttribute('aria-pressed', r === role ? 'true' : 'false');
+      pitch.appendChild(b);
+    }
+  }
+  /* Which way the board reads, since it is not the way any one match was played */
+  var arrow = el('span', 'pl-pz-arrow', '&#9654;');
+  arrow.setAttribute('aria-hidden', 'true');
+  pitch.appendChild(arrow);
+
+  /* One listener rather than one per square, as the match tables do it */
+  var base = '#/data/player/' + encodeURIComponent(who.key) + '/' + cat + '/';
+  pitch.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button[data-role]') : null;
+    if (b) location.hash = base + b.getAttribute('data-role');
+  });
+  card.appendChild(pitch);
+  return card;
+}
+```
+
+### 5.3 `playerCtl()` — nay chỉ còn hai nút đọc số
+
+```js
+/* The bar over the tiles: which reading the four on the right are in.
    It draws nothing itself. The caller passes `onMode`, so the only place that
    knows how to build a row of tiles stays renderPlayerProfile(). */
-function playerCtl(who, cat, role, onMode) {
+function playerCtl(who, onMode) {
   var bar = el('div', 'pl-ctl');
-
-  if (who.roles && who.roles.length > 1) {
-    var left = el('div', 'pl-grp');
-    left.appendChild(el('span', 'pl-grp-l', 'Position'));
-    var base = '#/data/player/' + encodeURIComponent(who.key) + '/' + cat + '/';
-    who.roles.forEach(function (r) {
-      var b = el('button', 'chip role' + (r === role ? ' on' : ''), esc(ROLE_LABEL[r]));
-      b.type = 'button';
-      /* The match count lives in the tooltip rather than on the chip: a role has
-         to be readable in one glance, and that number is not something to
-         compare one chip against another with. */
-      b.title = who.roleApps[r] + (who.roleApps[r] === 1 ? ' match' : ' matches') +
-                ' in this position';
-      b.addEventListener('click', function () { location.hash = base + r; });
-      left.appendChild(b);
-    });
-    bar.appendChild(left);
-  }
-
   var right = el('div', 'pl-grp right');
   var canRate = !!(who.timed && who.min);
   MODES.forEach(function (m) {
@@ -597,7 +681,7 @@ function playerCtl(who, cat, role, onMode) {
 }
 ```
 
-#### 5.2.1 Sáu ô ở nguyên trong `renderPlayerProfile`
+### 5.4 Sáu ô ở nguyên trong `renderPlayerProfile`
 
 ```js
   var kpis = el('div', 'kpis six');
@@ -654,7 +738,7 @@ Ba tính chất đáng ghi:
 - **Một builder cho cả ba bộ tile.** Thủ môn, vai, và lưới dự phòng đi qua đúng một `set.map()`,
   nên không có hàng tile nào được viết ra hai lần và không bộ nào lỡ nhịp với hai nút.
 
-### 5.3 Vai sống trong URL
+### 5.5 Vai sống trong URL
 
 Đúng nguyên tắc đã ghi trong `app.js:294` — *"Which section is open lives in the hash — a link
 somebody can send"*. Vai là đoạn **thứ tư**:
@@ -671,7 +755,7 @@ thiếu → rơi về `who.role`, không redirect, không trang trắng.
 **Không có đoạn thứ năm.** Chế độ đọc không vào hash — lý do ở mục 5.2.1. Route dừng ở 4 đoạn,
 đúng như trước khi có hai nút.
 
-### 5.4 `catTabs` phải giữ được vai khi bấm chip category
+### 5.6 `catTabs` phải giữ được vai khi bấm chip category
 
 `catTabs(cat, base, tabs)` dựng href bằng `base + t[0]`. Vai đứng **sau** category nên cần một
 đuôi. Thêm tham số thứ tư, có mặc định:
@@ -692,7 +776,7 @@ thiếu → rơi về `who.role`, không redirect, không trang trắng.
 
 Call site `app.js:654` (Team Data) không đổi một ký tự → href sinh ra giống hệt.
 
-### 5.5 Dropdown đổi cầu thủ: giữ category, **bỏ** vai
+### 5.7 Dropdown đổi cầu thủ: giữ category, **bỏ** vai
 
 Trong `playerHead`, nút chọn người khác đang giữ lại category. Vai thì **không** giữ:
 vai là một sự thật về *người này*, người kia có thể chưa từng đá vai đó. Đổi người → rơi về
@@ -712,11 +796,11 @@ sinh ra 4 đoạn, và đoạn thứ năm vắng mặt chính là "dùng mặc �
 | 3 | sau `gkFigures()` | **hàm mới** `posFigures()` |
 | 4 | sau `minsTotal()` | **hàm mới** `per90()` — cạnh hàm đọc cùng ba cờ `timed`/`exact`/`min` |
 | 5 | sau `per90()` | **khối hằng mới**: `ROLES`, `ROLE_POS`, bốn bảng tra, `MODES`, `duelsW`/`duelsT`/`share`, `ROLE_KPIS`, `GK_KPIS`, `FALLBACK_KPIS` |
-| 6 | `playerIndex()` | thêm `pos:` vào record mỗi trận; tính `p.roleApps`, `p.roles`, `p.role` |
+| 6 | `playerIndex()` | thêm `pos:` vào record mỗi trận; tính `p.posApps`, `p.pos0`, `p.roles`, `p.role` |
 | 7 | `renderPlayerData` | truyền `rest[3]` xuống |
-| 8 | `renderPlayerProfile` | chữ ký `(body, who, people, wanted, wantedRole)`; chốt `role`; `mode`; closure `row()`; chèn `playerCtl()`; truyền `tail` cho `catTabs` |
+| 8 | `renderPlayerProfile` | chữ ký `(body, who, people, wanted, wantedRole)`; chốt `role`; `mode`; closure `row()`; chèn `positionBoard()` rồi `playerCtl()`; truyền `tail` cho `catTabs` |
 | 9 | `playerHead` | chữ ký `(who, people, cat, role)`; badge vai; điều kiện dòng thẻ |
-| 10 | cạnh `renderPlayerProfile` | **builder mới** `playerCtl()` |
+| 10 | cạnh `renderPlayerProfile` | **builder mới** `positionBoard()` và `playerCtl()` |
 
 Hai chỗ **cố ý giữ nguyên hình dạng cũ**, vì test hiện có so khớp đúng chúng:
 
@@ -731,37 +815,75 @@ var set = who.gk ? GK_KPIS : (ROLE_KPIS[role] || FALLBACK_KPIS);
 ### 6.2 `client/assets/app.css` — thêm **một** khối, không sửa khối nào
 
 ```css
-/* ---------- Player Data: thanh điều khiển của một cầu thủ ----------
-   Trái là vai (chỉ khi có nhiều hơn một), phải là cách đọc số. Một thanh chứ không
-   phải hai hàng: hai hàng chip chồng nhau đọc thành hai tầng tab, mà ngay dưới hàng
-   card đã có tầng tab category thật rồi.
-   Trên màn hẹp cả thanh xuống dòng và `margin-left:auto` mất tác dụng — đúng ý:
-   hai nhóm xếp chồng, mỗi nhóm vẫn đứng liền khối của nó. */
+/* ---------- one player: where he has stood ----------
+   The tagger's own pitch (pitchSVG) with the tagger's own squares
+   (FORMATION_GRID), read back: a dot on every square he has played, nothing on
+   the rest. Clicking one picks the card set for the job it belongs to.
+
+   The class names are pl-pz rather than the tagger's pz on purpose. shared.css
+   styles .pz for the formation board, gets loaded the first time anyone opens a
+   match, and stays in the document afterwards — its .pz carries
+   pointer-events:none, which would leave these squares looking clickable and
+   doing nothing. Two boards, two vocabularies, no way for either to reach the
+   other. */
+.pl-pos{max-width:520px; margin-bottom:14px}
+/* aspect-ratio is set inline, off PITCH_DIMS — the channel's game decides it, and
+   a futsal court is not a football pitch's shape. This is the fallback for a
+   channel whose sport nothing could answer for. */
+.pl-pitch{position:relative; aspect-ratio:1050/680; margin-top:11px}
+/* The tagger's pitch is grass; this one is a diagram on a dark page. Both come
+   out of pitchSVG as presentation attributes, which any rule here outranks. */
+.pl-pitch > svg{border-radius:2px}
+.pl-pitch > svg > rect{fill:var(--carbon-2)}
+.pl-pitch > svg > g{stroke:var(--line-soft)}
+.pl-pz{
+  position:absolute; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:7px; padding:0; border:0; border-radius:2px;
+  background:color-mix(in srgb,var(--chalk) 7%, transparent); cursor:pointer;
+  transition:background .16s;
+}
+.pl-pz:hover{background:color-mix(in srgb,var(--chalk) 13%, transparent)}
+.pl-pz-dot{width:21px; height:21px; border-radius:50%; background:var(--chalk); flex:none}
+.pl-pz-lb{font-family:var(--f-mono); font-size:10px; letter-spacing:.1em; color:var(--chalk)}
+/* the square being read takes the amber of the badge beside his name */
+.pl-pz.on{background:color-mix(in srgb,var(--amber) 17%, transparent)}
+.pl-pz.on .pl-pz-dot{background:var(--amber)}
+.pl-pz.on .pl-pz-lb{color:var(--amber)}
+.pl-pz-arrow{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  color:var(--ash-dim); font-size:19px; line-height:1; pointer-events:none;
+}
+@media (max-width:560px){
+  .pl-pz-dot{width:15px; height:15px}
+  .pl-pz-lb{font-size:8.5px; letter-spacing:.06em}
+}
+
+/* ---------- one player: the bar over his tiles ----------
+   Which reading the four tiles on the right are in. */
 .pl-ctl{display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin:0 0 14px}
 .pl-grp{display:flex; align-items:center; flex-wrap:wrap; gap:7px; min-width:0}
 .pl-grp.right{margin-left:auto}
-.pl-grp-l{
-  font-family:var(--f-mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase;
-  color:var(--ash-dim); margin-right:3px;
-}
-/* Chip vai lấy sắc hổ phách của badge cạnh tên, để mắt nối được hai thứ với nhau.
-   Hai nút đọc số giữ sắc đỏ mặc định của .chip.on, như mọi nút khác trong app. */
-.pl-ctl .chip.role.on{border-color:var(--amber); color:var(--amber)}
-/* Per 90 mins khi không có phút nào để chia (mục 4.4.4) */
+/* Per 90 with no minutes to divide by */
 .pl-ctl .chip[disabled]{opacity:.4; cursor:not-allowed}
 ```
 
-Sáu selector, tất cả đều bắt đầu bằng `.pl-ctl` hoặc `.pl-grp` — hai tên **chưa từng xuất hiện**
-trong `site.css`, `app.css`, `shared.css` hay `Stats/stats-view.css`, nên **không có cách nào một
-trang khác dính vào**. `.chip` mượn nguyên từ `site.css:193` (file không đụng tới), và
-`.chip.role.on` chỉ thắng `.chip.on` nhờ cụ thể hơn — không ghi đè, không `!important`.
+Mọi selector đều bắt đầu bằng `.pl-pos`, `.pl-pitch`, `.pl-pz`, `.pl-ctl` hoặc `.pl-grp` — năm tên
+**chưa từng xuất hiện** trong `site.css`, `app.css`, `shared.css` hay `Stats/stats-view.css`.
+`.chip` mượn nguyên từ `site.css:193` (file không đụng tới).
+
+> **Chỗ suýt hỏng, và cách tránh.** Bảng đội hình của tagger dùng class `.pz`, định nghĩa trong
+> `shared.css` — file được nạp lần đầu ai đó mở một match và **ở lại trong document sau đó**. Rule
+> `.pz` của nó mang `pointer-events:none`. Nếu bảng này cũng gọi ô của nó là `.pz` thì sau khi user
+> xem một match, mọi ô ở đây **trông bấm được và không bấm được** — còn `.pz` của tôi thì đi ngược
+> lại phá bảng đội hình trong Stats view. Hai bảng, hai bộ từ vựng, không đường nào với tới nhau.
+> Có test canh cả hai chiều.
 
 ### 6.3 Cache-busting — đã làm
 
 | File | Trước | Sau | Sửa ở |
 |---|---|---|---|
-| `client/assets/app.js` | `?v=33` | **`?v=34`** | `client/app.html:81` |
-| `client/assets/app.css` | `?v=16` | **`?v=17`** | `client/app.html:9` **và** `client/login.html:8` |
+| `client/assets/app.js` | `?v=33` | **`?v=35`** | `client/app.html:81` |
+| `client/assets/app.css` | `?v=16` | **`?v=18`** | `client/app.html:9` **và** `client/login.html:8` |
 
 `app.css` được **hai** trang nạp — bump một, quên một là trang login giữ CSS cũ. Xong rồi chạy
 `node tests/asset-versions.test.js --update` để dựng lại manifest.
@@ -777,31 +899,32 @@ trang khác dính vào**. `.chip` mượn nguyên từ `site.css:193` (file khô
 node tests/run.js
 ```
 
-→ **1214/1214 passed** = 1171 test cũ + 43 test mới.
+→ **1225/1225 passed** = 1171 test cũ + 54 test mới.
 
-### 7.1 `tests/player-role-cards.test.js` — 43 test mới
+### 7.1 `tests/player-role-cards.test.js` — 54 test
 
-Chia làm hai nửa. Nửa đầu **chạy thật** `posFigures`, `playerIndex`, `per90` và các bảng tile
-trong vm. Nửa sau đọc phần render bằng source — **cộng sáu test vẽ thật cả trang** trong một DOM
-nhỏ, vì regex trên source không bắt được một tên ngoài phạm vi hay một trường đọc trên `undefined`.
+Nửa đầu **chạy thật** `posFigures`, `playerIndex`, `per90` và các bảng tile trong vm. Nửa sau đọc
+phần render bằng source — **cộng 13 test vẽ thật cả trang** trong một DOM nhỏ, vì regex trên source
+không bắt được một tên ngoài phạm vi hay một trường đọc trên `undefined`.
 
-| Nhóm | Số test | Canh cái gì |
-|---|---|---|
-| Bản đồ ô → vai | 3 | 15 ô ngoài GK đều có đúng **một** vai; `GK` không có vai nào; ba nhóm khớp từng chữ với bảng bạn đưa |
-| Bảng tile | 5 | `ROLE_KPIS` đúng ba khoá; mỗi bộ đúng 4 tile; cả 20 tile chạy được trên `newStat()` rỗng ở **cả hai chế độ**; không tile nào tự khai `%`/`total`/`per 90` trong nhãn; đúng **ba** tile `fixed`; `Shots On Target` bằng đúng cột *Shooting Accuracy* của `shared.js` |
-| `posFigures` | 6 | XI xuất phát; người vào sân thay lấy ô người ra; đổi ô giữa trận giữ cả hai; **snapshot ngược thứ tự `t` vẫn ra đúng ô xuất phát**; ô chờ bị bỏ qua; không lineups không ném |
-| `playerIndex` | 7 | một vai; hai vai đúng thứ tự cố định; đổi vai trong một trận; ba ô cùng vai vẫn là **một** trận; **vai mặc định không phụ thuộc thứ tự trận**; không đội hình → không vai; thủ môn không đổi một số nào |
-| `per90` | 5 | phép chia; bốn cửa ra `'—'`; tiền tố `~`; tỉ lệ đứng yên còn mẫu số đi theo; hai ô trái không bao giờ bị chia |
-| Cái được vẽ | 11 | một builder ba bộ tile, thủ môn hỏi trước; `mode` không vào hash và không vào localStorage; thủ môn có nút, không có chip; `Per 90` bị disable đúng lúc và **không được gắn listener**; href chip mang đủ category + vai; `catTabs` giữ tail còn Team Data không; badge; bảng theo trận không bị lọc; không số áo; CSS mang đúng tên mới; không listener nào trên `document` |
-| **Vẽ thật** | 6 | hồ sơ hậu vệ ra đúng 6 nhãn + 6 giá trị; bấm `Per 90` đổi nhãn và chia đúng (`21 → 5.3`); thủ môn ra `Save Rate` / `Clean Sheets` **không hậu tố**; người không vai ra đúng trang cũ; hai vai ra hai chip với `title` đúng số trận; không phút thì nút bị khoá |
+| Nhóm | Canh cái gì |
+|---|---|
+| Bản đồ ô → vai | 15 ô ngoài GK đều có đúng **một** vai; `GK` không có vai nào; ba nhóm khớp từng chữ với bảng bạn đưa |
+| Bảng tile | `ROLE_KPIS` đúng ba khoá; mỗi bộ đúng 4 tile; cả 20 tile chạy được trên `newStat()` rỗng ở **cả hai chế độ**; không tile nào tự khai `%`/`total`/`per 90`; đúng **ba** tile `fixed`; `Shots On Target` bằng đúng cột *Shooting Accuracy* của `shared.js` |
+| `posFigures` | XI xuất phát; người vào sân thay lấy ô người ra; đổi ô giữa trận giữ cả hai; **snapshot ngược thứ tự `t` vẫn ra đúng ô xuất phát**; ô chờ bị bỏ qua; không lineups không ném |
+| `playerIndex` | `posApps` đếm **một lần mỗi trận** dù ô lặp lại; **card mặc định là nghề của ô đầu tiên**, và ba trận nữa ở vai khác không viết lại nó; một trận không xếp ai thì bỏ qua chứ không coi là không có vị trí; không đội hình → không vai; thủ môn không đổi một số nào |
+| `per90` | phép chia; bốn cửa ra `'—'`; tiền tố `~`; tỉ lệ đứng yên còn mẫu số đi theo; hai ô trái không bao giờ bị chia |
+| Bảng vị trí (source) | thủ môn và người-không-vai bị loại; **không còn một chữ `chip` nào trong hàm**; một listener trên sân chứ không phải một trên mỗi ô; URL vẫn là vai; vẽ trên môn của channel; `pv-dots` bị gỡ |
+| **Va chạm CSS** | `shared.css` **thật sự** có `.pz{…pointer-events:none}`; không selector nào trong `app.css` tên `.pz`; không tên `pl-pz` nào trong `shared.css`; hàm chỉ viết ra từ vựng của chính nó |
+| **Vẽ thật** | ba ô sáng đúng LM/LW/RW và **không ô nào khác trong 18 ô**; toạ độ `left`/`top` đúng ô của `FORMATION_GRID` đọc trái→phải; **cả hai ô của vai đang đọc cùng sáng**, ô của vai kia thì không; tooltip nói nghề + số trận; `aria-pressed`; bấm một ô ra đúng URL kèm category; mở trang không có vai trong URL thì ra card của ô đầu tiên; một-ô vẫn có bảng; hồ sơ hậu vệ ra đúng 6 nhãn + 6 giá trị; `Per 90` chia đúng (`21 → 5.3`); thủ môn ra `Save Rate` / `Clean Sheets` không hậu tố; người không vai ra đúng trang cũ; không phút thì nút bị khoá |
 
 ### 7.2 `tests/player-data.test.js` — sửa **5 dòng**, 49/50 test không đổi một ký tự
 
 | Dòng | Việc |
 |---|---|
-| 37, 38 | nới hai regex chữ ký thành `\([^)]*\)` — lần sau đổi tham số không phải sửa nữa |
-| 47-48 | thêm `posFigures`, `per90` vào `LIFT`; thêm `ROLEBLOCK` (khối hằng vai, lấy nguyên khối) vào sandbox |
-| 530, 534 | hai assertion so khớp `kpi('Saves'` / `kpi('Goals'` trong thân hàm → nay so khớp `GK_KPIS` và `FALLBACK_KPIS`. **Nội dung khẳng định y nguyên**, chỉ đổi chỗ nhìn |
+| 37, 38 | nới hai regex chữ ký thành `\([^)]*\)` |
+| 47-48 | thêm `posFigures`, `per90` vào `LIFT`; thêm `ROLEBLOCK` vào sandbox |
+| 530, 534 | hai assertion so khớp `kpi('Saves'` / `kpi('Goals'` trong thân hàm → nay so khớp `GK_KPIS` và `FALLBACK_KPIS`. **Nội dung khẳng định y nguyên** |
 | 536 | dòng thẻ phạt: `who.gk ?` → `who.gk \|\| role ?` — đúng thay đổi **D3 bạn đã duyệt** |
 
 Assertion `who.gk ?` và `pl-role">GK` **không phải sửa** — chủ ý thiết kế (mục 6.1).
@@ -815,12 +938,14 @@ Assertion `who.gk ?` và `pl-role">GK` **không phải sửa** — chủ ý thi�
 | Data → **Overview** | Không đọc `playerIndex`. `aggregate()` chỉ **thêm** một khoá; `totalOf`, `playerTally`, `discipline` lặp trên `newStat()` hoặc trên khoá tự chọn, không lặp trên khoá của aggregate. 50 test của `data-page.test.js` xanh nguyên. |
 | Data → **Team Data** | `catTabs(cat)` gọi một tham số → `tail` là `undefined` → `(tail \|\| '')` là `''` → href cũ từng ký tự. Có test canh chính call site đó. |
 | Player Data → **danh sách** | `renderPlayerList`, `playerTable`, `PL_OUT`, `PL_GK` không sửa. `p.roles` chỉ là thuộc tính thừa trên object. |
-| Player Data → **thủ môn** | `who.gk` hỏi **trước** ở cả ba chỗ còn phân biệt (bộ tile, chip vai, badge). Bốn tile của anh ta không đổi một chữ; hai tile `fixed` không đổi kể cả khi bấm `Per 90`. |
+| Player Data → **thủ môn** | `who.gk` hỏi **trước** ở cả ba chỗ còn phân biệt (bộ tile, bảng vị trí, badge). Bốn tile của anh ta không đổi một chữ; hai tile `fixed` không đổi kể cả khi bấm `Per 90`. |
 | Player Data → **bảng theo trận** | `playerMatchTable(who, cat)` không sửa, không nhận `role`, không nhận `mode`. Có test canh rằng ba chữ đó không xuất hiện trong hàm. |
 | **Link cũ** `#/data/player/KEY/defensive` | `rest[3] === undefined` → rơi về `who.role`. Không redirect, không trang trắng. Route vẫn dừng ở 4 đoạn. |
 | Report **không có lineups** | `pos = null` xuyên suốt → `role = ''` → `FALLBACK_KPIS` = đúng hàng card hôm nay, thẻ phạt vẫn ở tile. Có test **vẽ thật** kiểm 6 nhãn + 6 giá trị của trường hợp này. |
 | Đăng nhập / route khác (`#/channels`, `#/match/…`) | Không chạm `route()`. |
-| Rò rỉ listener | `playerCtl` chỉ gắn listener lên chính các `<button>` nó dựng — không có listener trên `document`, nên không có gì phải gỡ. Nút `disabled` không được gắn listener nào cả. Cả hai đều có test. |
+| Rò rỉ listener | `playerCtl` gắn listener lên chính các `<button>` nó dựng; `positionBoard` gắn **một** listener lên tấm sân của nó, không phải một trên mỗi ô. Không có listener nào trên `document`, nên không có gì phải gỡ. Nút `disabled` không được gắn listener nào cả. Đều có test. |
+| **Bảng đội hình của tagger** | Đây là chỗ dễ hỏng nhất và nó có mục riêng ở 6.2: `shared.css` nạp một lần rồi ở lại, `.pz` của nó có `pointer-events:none`. Bảng này gọi ô của nó là `.pl-pz`, và hai test canh cả hai chiều — không tên nào của bên này xuất hiện ở bên kia. |
+| Môn thể thao khác football | Sân vẽ theo `state.channel.sport` và tỉ lệ khung lấy từ `PITCH_DIMS`, y như tagger làm. Channel không nói môn gì thì về football, đúng fallback thẻ channel đang dùng. |
 | Vẽ lại (đổi **vai**) | Đổi hash = `route()` chạy. `dataSource()` và `playerJob` đều cache theo channel → **không request mạng nào phát sinh**. |
 | Vẽ lại (đổi **cách đọc**) | Không đụng hash, không gọi `route()`. Hai node, cả hai do chính hàm đó vừa dựng. |
 | Trạng thái sống sót qua tải trang | **Không có.** D6 phương án (a): không localStorage, không hash, không DB. Không có gì để đụng vào `'hna.rail'`. |
@@ -852,14 +977,24 @@ phải viết lại phần dữ liệu.
 | Bước | Việc | Cổng |
 |---|---|---|
 | 1 | `posFigures()` + `pos:` trong `aggregate()` + khối hằng vai + `per90()` | 1171/1171, màn hình chưa đổi gì |
-| 2 | `p.roles` / `p.role` / `p.roleApps` trong `playerIndex` | vẫn 1171, vẫn chưa đổi gì |
+| 2 | `p.posApps` / `p.pos0` / `p.roles` / `p.role` trong `playerIndex` | vẫn 1171, vẫn chưa đổi gì |
 | 3 | `ROLE_KPIS` / `GK_KPIS` / `FALLBACK_KPIS` + closure `row()` | bước duy nhất chạm `player-data.test.js` |
-| 4 | `playerCtl()` + `.pl-ctl` + `tail` của `catTabs` + badge + dòng meta | 43 test mới |
-| 5 | bump `?v=` → `asset-versions.test.js --update` → `run.js` | **1214/1214** |
+| 4 | `positionBoard()` + `playerCtl()` + `.pl-pos` / `.pl-pz` / `.pl-ctl` + `tail` của `catTabs` + badge | 54 test mới |
+| 5 | bump `?v=` → `asset-versions.test.js --update` → `run.js` | **1225/1225** |
 
 **Một chỗ chưa xác minh được, nói thẳng:** chưa mở trang thật trên trình duyệt để nhìn bằng mắt.
 Trang này nằm sau đăng nhập và cần một channel đã có report submit, và máy này vốn hay treo ở khâu
-chụp màn hình. Bù lại, sáu test *"vẽ thật"* chạy nguyên `renderPlayerProfile` trong một DOM giả và
-đọc ngược ra 6 nhãn + 6 giá trị của từng trường hợp — đủ để nói **logic** đúng. Cái chúng **không**
-nói được là CSS trông ra sao trên màn hình thật; mục cần liếc là thanh `.pl-ctl` ở bề rộng hẹp và
-nhãn hai dòng như `TACKLES WON (TOTAL)`.
+chụp màn hình.
+
+Bù lại, 13 test *"vẽ thật"* chạy nguyên `renderPlayerProfile` trong một DOM giả và đọc ngược ra
+từng ô: ba ô sáng đúng LM/LW/RW, toạ độ `left`/`top` đúng ô của lưới, và markup SVG thật đã được
+in ra kiểm tay một lần (`viewBox 0 0 1050 680`, `pv-dots` đã gỡ, ba nút ở `50%/0%`, `66.7%/0%`,
+`66.7%/75%` — khớp ảnh bạn gửi).
+
+Cái chúng **không** nói được là hình ảnh cuối cùng. Đáng liếc mắt ba chỗ khi bạn mở lên:
+
+1. **Màu sân.** `pitchSVG` vẽ sân cỏ xanh; hai rule ở 6.2 đè lại thành `--carbon-2` / `--line-soft`.
+   Đây là chỗ tôi kém chắc chắn nhất — nó phụ thuộc vào việc CSS có thắng được presentation
+   attribute của SVG hay không (theo chuẩn thì có).
+2. **Kích thước chấm và nhãn** trong ô, ở bề rộng 520px và ở mobile.
+3. **Ô hàng giữa cao 50%** (CB/CM/CF…) so với hàng biên 25% — chấm sẽ nằm giữa một ô cao gấp đôi.

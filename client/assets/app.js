@@ -932,33 +932,34 @@
         return r.gk ? { conceded: g.conceded + r.gk.conceded, clean: g.clean + r.gk.clean,
                         known: g.known + r.gk.known } : g;
       }, { conceded: 0, clean: 0, known: 0 });
-      /* Three roles, counted two different ways because they answer two
-         different questions. `apps` is how many matches he played the role in —
-         that decides which chips appear. `picked` is how many matches he was
-         PICKED in it — that decides which chip is lit when the page opens. A
-         full back who pushes into midfield for the last ten minutes is still a
-         full back. */
-      var apps = {}, picked = {};
+      /* Every square he has stood in, and how many matches in each — that is what
+         the board over his tiles lights up, and what its tooltips count.
+         `roles` is the same run read one level up, in the fixed order Defender,
+         Midfielder, Striker rather than the order they turned up in: it is what
+         says whether a role asked for in the URL is one he ever actually played. */
+      var posApps = {}, first = '';
       p.matches.forEach(function (r) {
         if (!r.pos) return;
+        /* matches are in kickoff order, so the earliest one that placed him at
+           all is the first position he played */
+        if (!first && r.pos.start) first = r.pos.start;
         var seen = {};
         (r.pos.all || []).forEach(function (ps) {
-          var role = ROLE_OF[ps];
-          if (role && !seen[role]) { seen[role] = 1; apps[role] = (apps[role] || 0) + 1; }
+          if (seen[ps]) return;
+          seen[ps] = 1;
+          posApps[ps] = (posApps[ps] || 0) + 1;
         });
-        var first = ROLE_OF[r.pos.start];
-        if (first) picked[first] = (picked[first] || 0) + 1;
       });
-      p.roleApps = apps;
-      /* Fixed order — Defender, Midfielder, Striker — not the order they turned
-         up in. A man's row of chips may not move about between two visits. */
-      p.roles = ROLES.filter(function (r) { return apps[r[0]]; })
-                     .map(function (r) { return r[0]; });
-      p.role = p.roles.slice().sort(function (x, y) {
-        return (picked[y] || 0) - (picked[x] || 0) ||     // picked there most often
-               (apps[y] || 0) - (apps[x] || 0) ||         // then played there most often
-               ROLE_RANK[x] - ROLE_RANK[y];               // then the fixed order
-      })[0] || '';
+      p.posApps = posApps;
+      p.pos0 = first;
+      p.roles = ROLES.filter(function (r) {
+        return ROLE_POS[r[0]].some(function (ps) { return posApps[ps]; });
+      }).map(function (r) { return r[0]; });
+      /* The card a profile opens on is the job of the FIRST square he played in.
+         Not the one he played most: a man is introduced by where he began, and a
+         reading that shifts as the season adds matches is a reading nobody can
+         point at twice. */
+      p.role = ROLE_OF[first] || '';
     });
 
     return order.sort(function (x, y) {
@@ -1037,9 +1038,9 @@
     midfielder: ['CDM', 'CM', 'RM', 'LM', 'CAM'],
     striker:    ['LW', 'RW', 'CF', 'RF', 'LF']
   };
-  var ROLE_OF = {}, ROLE_LABEL = {}, ROLE_BADGE = {}, ROLE_RANK = {};
-  ROLES.forEach(function (r, i) {
-    ROLE_LABEL[r[0]] = r[1]; ROLE_BADGE[r[0]] = r[2]; ROLE_RANK[r[0]] = i;
+  var ROLE_OF = {}, ROLE_LABEL = {}, ROLE_BADGE = {};
+  ROLES.forEach(function (r) {
+    ROLE_LABEL[r[0]] = r[1]; ROLE_BADGE[r[0]] = r[2];
     ROLE_POS[r[0]].forEach(function (p) { ROLE_OF[p] = r[0]; });
   });
   /* Two readings of the same figures, and only two. 'total' is the default
@@ -1264,7 +1265,10 @@
     var paint = function () { kpis.innerHTML = row(); };
     paint();
 
-    var ctl = playerCtl(who, cat, role, function (m) {
+    var board = positionBoard(who, cat, role);
+    if (board) body.appendChild(board);
+
+    var ctl = playerCtl(who, function (m) {
       mode = m;
       paint();
       /* The two buttons swap which one is lit, in place — the bar is not rebuilt,
@@ -1273,7 +1277,7 @@
         b.classList.toggle('on', MODES[i][0] === m);
       });
     });
-    if (ctl) body.appendChild(ctl);
+    body.appendChild(ctl);
     body.appendChild(kpis);
 
     body.appendChild(catTabs(cat, '#/data/player/' + encodeURIComponent(who.key) + '/', tabs,
@@ -1281,39 +1285,86 @@
     body.appendChild(playerMatchTable(who, cat));
   }
 
-  /* The bar over the tiles: which role on the left, which reading on the right.
+  /* Where he has stood, on the board he was placed on.
 
-     One bar rather than two rows — two rows of chips stacked read as two tiers of
-     tabs, and there is already a real tier of category tabs under the tiles.
+     Two chips reading "Midfielder" and "Striker" said which card sets existed and
+     nothing about the man. The squares themselves say both: the same six-by-three
+     grid the tagger writes `pos` from (FORMATION_GRID), on the same pitch drawing
+     (pitchSVG), with a dot on every square he has actually played and nothing at
+     all on the rest. Clicking one picks the card set for the job that square
+     belongs to, so the filter and the fact are the same control.
 
-     The role group is only built when there are at least two to choose between: a
-     button with one option is not a filter, it is a label, and that label is
-     already sitting beside his name. The reading group is always there, because it
-     does not depend on his role — only on whether there are minutes to divide by.
+     Every square of a role reads selected together, not just the one clicked: the
+     four tiles below are the ROLE's, and a winger's card is no more about the left
+     wing than about the right. That is also what teaches the mapping — press LW
+     and RW lights with it.
 
+     The board always reads left to right. `pos` is stored canonically, zoneAt()
+     having already turned the attacking direction out of it, so there is no one
+     direction a campaign was played in to honour — and a fixed one is the only
+     reading that does not move between two players, or between two visits.
+
+     Nothing here for a keeper: he has no role to filter by, and his four tiles are
+     about the goal. Nothing either for a man no board ever placed — an empty pitch
+     would be a question, and the answer is in the empty state he already gets. */
+  function positionBoard(who, cat, role) {
+    if (who.gk || !who.roles.length) return null;
+    var card = el('div', 'card pl-pos');
+    card.appendChild(el('p', 'card-h', 'Position'));
+
+    /* The channel's own game, so a futsal club gets a futsal court — the tagger
+       lays this same six-by-three grid over whichever pitch it drew, and this is
+       that pitch read back. The shape comes from PITCH_DIMS rather than from the
+       stylesheet for the same reason: a court is not a pitch's proportions.
+
+       The id belongs to the tagger's board, where the dots being placed live in
+       it. Nothing reads it here, and two of them in one document is a bug waiting
+       for whoever writes the third. */
+    var sport = (state.channel && state.channel.sport) || 'football';
+    var dim = PITCH_DIMS[sport] || PITCH_DIMS.football;
+    var pitch = el('div', 'pl-pitch', pitchSVG(sport).replace(' id="pv-dots"', ''));
+    pitch.style.aspectRatio = dim.w + ' / ' + dim.h;
+    for (var row = 0; row < 3; row++) {
+      for (var col = 0; col < 6; col++) {
+        var ps = FORMATION_GRID[effRow(row, 'lr')][effCol(col, 'lr')];
+        var r = ps && ROLE_OF[ps];
+        if (!r || !who.posApps[ps]) continue;      // the GK square, and every square he never took
+        var b = el('button', 'pl-pz' + (r === role ? ' on' : ''),
+          '<span class="pl-pz-dot"></span><span class="pl-pz-lb">' + esc(ps) + '</span>');
+        b.type = 'button';
+        b.style.left = (col * 100 / 6) + '%';
+        b.style.top = PZ_ROW_TOP[row] + '%';
+        b.style.width = (100 / 6) + '%';
+        b.style.height = PZ_ROW_H[row] + '%';
+        /* which job it feeds, then how often he took it — the mapping first,
+           because that is the thing a click is about to act on */
+        b.title = ROLE_LABEL[r] + ' · ' + who.posApps[ps] +
+                  (who.posApps[ps] === 1 ? ' match' : ' matches') + ' at ' + ps;
+        b.setAttribute('data-role', r);
+        b.setAttribute('aria-pressed', r === role ? 'true' : 'false');
+        pitch.appendChild(b);
+      }
+    }
+    /* Which way the board reads, since it is not the way any one match was played */
+    var arrow = el('span', 'pl-pz-arrow', '&#9654;');
+    arrow.setAttribute('aria-hidden', 'true');
+    pitch.appendChild(arrow);
+
+    /* One listener rather than one per square, as the match tables do it */
+    var base = '#/data/player/' + encodeURIComponent(who.key) + '/' + cat + '/';
+    pitch.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-role]') : null;
+      if (b) location.hash = base + b.getAttribute('data-role');
+    });
+    card.appendChild(pitch);
+    return card;
+  }
+
+  /* The bar over the tiles: which reading the four on the right are in.
      It draws nothing itself. The caller passes `onMode`, so the only place that
      knows how to build a row of tiles stays renderPlayerProfile(). */
-  function playerCtl(who, cat, role, onMode) {
+  function playerCtl(who, onMode) {
     var bar = el('div', 'pl-ctl');
-
-    if (who.roles && who.roles.length > 1) {
-      var left = el('div', 'pl-grp');
-      left.appendChild(el('span', 'pl-grp-l', 'Position'));
-      var base = '#/data/player/' + encodeURIComponent(who.key) + '/' + cat + '/';
-      who.roles.forEach(function (r) {
-        var b = el('button', 'chip role' + (r === role ? ' on' : ''), esc(ROLE_LABEL[r]));
-        b.type = 'button';
-        /* The match count lives in the tooltip rather than on the chip: a role has
-           to be readable in one glance, and that number is not something to
-           compare one chip against another with. */
-        b.title = who.roleApps[r] + (who.roleApps[r] === 1 ? ' match' : ' matches') +
-                  ' in this position';
-        b.addEventListener('click', function () { location.hash = base + r; });
-        left.appendChild(b);
-      });
-      bar.appendChild(left);
-    }
-
     var right = el('div', 'pl-grp right');
     var canRate = !!(who.timed && who.min);
     MODES.forEach(function (m) {
