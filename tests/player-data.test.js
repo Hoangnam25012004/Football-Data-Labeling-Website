@@ -34,8 +34,8 @@ const renderData=/function renderData\(view\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const playerData=/function renderPlayerData\(body, rest\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const listView=/function renderPlayerList\(body, people\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const oneTable=/function playerTable\(title, people, cols\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
-const profile=/function renderPlayerProfile\(body, who, people, wanted\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
-const headCard=/function playerHead\(who, people, cat\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
+const profile=/function renderPlayerProfile\([^)]*\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
+const headCard=/function playerHead\([^)]*\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const matchTable=/function playerMatchTable\(who, cat\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const indexFn=/function playerIndex\(aggs\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const tabs=/function dataTabs\(open\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
@@ -44,8 +44,13 @@ const tabs=/function dataTabs\(open\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
    shared.js first (the stat engine), then the named functions lifted out of
    app.js, as ONE script so their bindings can see each other. `window` is the
    handful of shared.js names app.js reaches through it. */
-const LIFT=['playerIndex','aliasMap','sumStats','playerCards','gkFigures','gkCell',
-            'minsTotal','minsOne','aggregate','discipline','playerTally','totalOf','aggregates'];
+const LIFT=['playerIndex','aliasMap','sumStats','playerCards','gkFigures','gkCell','posFigures',
+            'minsTotal','minsOne','per90','aggregate','discipline','playerTally','totalOf','aggregates'];
+/* The role block, lifted whole: ROLES, ROLE_POS, the four lookups built off them,
+   MODES, and the four tile tables. It is one contiguous run in app.js from its own
+   banner comment to the last line of FALLBACK_KPIS, and taking it in one piece is
+   what keeps the lookups in step with the tables they are read beside. */
+const ROLEBLOCK=/\n  \/\* -+ roles -+[\s\S]*?c: 'yellow and red' \}\n  \];/.exec(APPJS)[0];
 function sandbox(state){
   const ctx={console,location:{hash:''},
     document:{getElementById:()=>null,addEventListener(){},removeEventListener(){}},
@@ -60,7 +65,10 @@ function sandbox(state){
     /* app.js declares with `var`, which grabConst does not scan for */
     /\n  var PL_OUT = \[[\s\S]*?\n  \];/.exec(APPJS)[0],
     /\n  var PL_GK = \[[\s\S]*?\n  \];/.exec(APPJS)[0],
+    ROLEBLOCK,
     ';globalThis.A={'+LIFT.join(',')+',PL_OUT,PL_GK,PLAYER_CATS,GK_COLS,'
+      +'ROLES,ROLE_POS,ROLE_OF,ROLE_LABEL,ROLE_BADGE,ROLE_RANK,MODES,'
+      +'ROLE_KPIS,GK_KPIS,FALLBACK_KPIS,'
       +'squadIds,gkShirts,onPitchAt,newStat,pct};'
   ].join('\n'),ctx,{filename:'client/assets/app.js-extract.js'});
   return ctx.A;
@@ -519,14 +527,16 @@ test('the list columns read a player the way his section reads him', () => {
 });
 
 test('a keeper-s six tiles are about the goal, and his cards are not lost', () => {
-  ok(/kpi\('Saves'/.test(profile)&&/kpi\('Conceded'/.test(profile)&&
-     /kpi\('Save Rate'/.test(profile)&&/kpi\('Clean Sheets'/.test(profile),
+  /* The four moved out of the function body and into a table when roles arrived —
+     one builder now draws a keeper's row, a role's row and the fallback row, so
+     none of the three is written out twice. What they SAY has not moved. */
+  deepEq(A.GK_KPIS.map(t=>t.l),['Saves','Conceded','Save Rate','Clean Sheets'],
      'what he did instead of shooting');
   ok(/who\.gk\s*\n?\s*\?/.test(profile),'chosen by role, not drawn twice');
-  ok(/kpi\('Goals'/.test(profile)&&/kpi\('Cards'/.test(profile),
-     'and the outfield strip is exactly as it was');
-  ok(/who\.gk \? ' · ' \+ who\.cards\.y \+ 'Y · ' \+ who\.cards\.r \+ 'R' : ''/.test(headCard),
-     'a keeper-s booking record moves to the meta line rather than disappearing');
+  deepEq(A.FALLBACK_KPIS.map(t=>t.l),['Goals','Assists','Key Passes','Cards'],
+     'and the strip for a player no line-up placed is exactly as it was');
+  ok(/who\.gk \|\| role \? ' · ' \+ who\.cards\.y \+ 'Y · ' \+ who\.cards\.r \+ 'R' : ''/.test(headCard),
+     'a keeper-s booking record moves to the meta line rather than disappearing — and so does a role-s');
   ok(/pl-role">GK/.test(headCard),'and the badge says what he is — the one thing that does not change');
 });
 

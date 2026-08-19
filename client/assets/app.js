@@ -356,12 +356,16 @@
   /* The same four category chips on both tables — the columns underneath them
      are the same four subjects either way. `base` is what a click lands on, so
      Team Data keeps its own route and a player keeps his. */
-  function catTabs(cat, base, tabs) {
+  /* `tail` is whatever follows the category key. Player Data hangs the role
+     there, so clicking through to Defensive does not throw a man back to his
+     default role. Team Data passes nothing and builds the same href it always
+     did. */
+  function catTabs(cat, base, tabs, tail) {
     var bar = el('div', 'dsubs');
     (tabs || TD_TABS).forEach(function (t) {
       var b = el('button', 'chip' + (t[0] === cat ? ' on' : ''), t[1]);
       b.type = 'button';
-      b.addEventListener('click', function () { location.hash = (base || '#/data/team/') + t[0]; });
+      b.addEventListener('click', function () { location.hash = (base || '#/data/team/') + t[0] + (tail || ''); });
       bar.appendChild(b);
     });
     return bar;
@@ -425,7 +429,11 @@
          9 of the next can be recognised as one man; and who kept goal, with what
          went in past him while he was on the pitch. */
       ids: window.squadIds(rep.lineups || {}, m.side),
-      gk: gkFigures(rep.rows, rep.lineups || {}, m.side)
+      gk: gkFigures(rep.rows, rep.lineups || {}, m.side),
+      /* Which square of the formation board — the only thing that says what JOB
+         he did that match. Read here, where a match is reduced exactly once,
+         beside gk because it comes off the same board. */
+      pos: posFigures(rep.lineups || {}, m.side)
     };
   }
   function aggregates() {
@@ -773,6 +781,46 @@
     return out;
   }
 
+  /* Shirt number -> where he stood, for one side of one match. The same board
+     gkShirts() reads to find the keeper, read for every square instead of the
+     one:
+
+       { '4': { start: 'CB', all: ['CB', 'CDM'] } }
+
+     `start` is the square he was PICKED in — the earliest snapshot naming him,
+     which is the starting XI for a starter and the spot the man he replaced left
+     behind for a substitute. That is the shape the team sheet gave him, and it
+     is what settles his main role.
+     `all` is every square he stood in that match: a man who begins at left back
+     and pushes up to left midfield after a substitution was both, and both are
+     true.
+
+     The staging square beside the keeper answers '' (zoneAt does that) — it is
+     somewhere to park a dot, not a position. Skipped here rather than turned
+     into a role. */
+  function posFigures(lineups, team) {
+    var lu = (lineups && lineups[team]) || null, out = {};
+    if (!lu) return out;
+    var take = function (xi) {
+      (xi || []).forEach(function (p) {
+        var no = String(p && p.no == null ? '' : p.no).trim();
+        var ps = String(p && p.pos == null ? '' : p.pos).trim();
+        if (!no || !ps) return;
+        var e = out[no] || (out[no] = { start: '', all: [] });
+        if (!e.start) e.start = ps;                       // earliest snapshot wins
+        if (e.all.indexOf(ps) < 0) e.all.push(ps);
+      });
+    };
+    take(lu.xi);                                          // the starting XI first
+    /* Sorted, which gkShirts() does not need to be: it only asks whether a shirt
+       was ever in the GK square, and `start` asks which square came first. A
+       double substitution tagged out of order still has to name the right one. */
+    ((lineups && lineups.history) || []).filter(function (h) { return h && h.team === team; })
+      .slice().sort(function (a, b) { return (+a.t || 0) - (+b.t || 0); })
+      .forEach(function (h) { take(h.xi); });
+    return out;
+  }
+
   /* Add a run of stat objects up into one. Starts from shared.js's own zero
      row, so every percentage in PLAYER_CATS comes out as one ratio of the
      totals rather than as a mean of per-match ratios. totalOf() above does the
@@ -854,7 +902,8 @@
           stat: a.players[no] || window.newStat(),
           mins: (a.mins && a.mins[no]) || null,
           cards: (a.cards && a.cards[no]) || { y: 0, r: 0 },
-          gk: (a.gk && a.gk[no]) || null
+          gk: (a.gk && a.gk[no]) || null,
+          pos: (a.pos && a.pos[no]) || null
         });
       };
       Object.keys(a.mins || {}).forEach(add);
@@ -883,6 +932,33 @@
         return r.gk ? { conceded: g.conceded + r.gk.conceded, clean: g.clean + r.gk.clean,
                         known: g.known + r.gk.known } : g;
       }, { conceded: 0, clean: 0, known: 0 });
+      /* Three roles, counted two different ways because they answer two
+         different questions. `apps` is how many matches he played the role in —
+         that decides which chips appear. `picked` is how many matches he was
+         PICKED in it — that decides which chip is lit when the page opens. A
+         full back who pushes into midfield for the last ten minutes is still a
+         full back. */
+      var apps = {}, picked = {};
+      p.matches.forEach(function (r) {
+        if (!r.pos) return;
+        var seen = {};
+        (r.pos.all || []).forEach(function (ps) {
+          var role = ROLE_OF[ps];
+          if (role && !seen[role]) { seen[role] = 1; apps[role] = (apps[role] || 0) + 1; }
+        });
+        var first = ROLE_OF[r.pos.start];
+        if (first) picked[first] = (picked[first] || 0) + 1;
+      });
+      p.roleApps = apps;
+      /* Fixed order — Defender, Midfielder, Striker — not the order they turned
+         up in. A man's row of chips may not move about between two visits. */
+      p.roles = ROLES.filter(function (r) { return apps[r[0]]; })
+                     .map(function (r) { return r[0]; });
+      p.role = p.roles.slice().sort(function (x, y) {
+        return (picked[y] || 0) - (picked[x] || 0) ||     // picked there most often
+               (apps[y] || 0) - (apps[x] || 0) ||         // then played there most often
+               ROLE_RANK[x] - ROLE_RANK[y];               // then the fixed order
+      })[0] || '';
     });
 
     return order.sort(function (x, y) {
@@ -926,6 +1002,125 @@
     if (!p.timed) return '—';
     return (p.exact ? '' : '~') + p.min + "'";
   }
+  /* The same figure at a rate: n over the minutes he actually played, times 90.
+
+     "—" where there are no minutes to divide by. A player no line-up ever named
+     has no rate at all, and 0.0 would claim he had one of zero — the same reading
+     minsTotal() takes two lines up, off the same two flags. "—" as well for
+     anything that is not a finite number, which is what the keeper's Conceded
+     already reads when no board could answer (gkCell).
+
+     The ~ travels the same road it travels in minsTotal(): an approximate
+     minutes total can only make an approximate rate, and without the mark "5.2"
+     looks more exact than it is.
+
+     The divisor is p.min — the total SHOWN on the Minutes tile beside it. Going
+     back to raw seconds would be a truer number and a worse one: it would not be
+     dividing what the eye can see in the next tile along. Same reasoning
+     playerIndex() gives for adding p.min up the way it does. */
+  function per90(p, n) {
+    if (typeof n !== 'number' || !isFinite(n)) return '—';
+    if (!p.timed || !p.min) return '—';
+    return (p.exact ? '' : '~') + (n / p.min * 90).toFixed(1);
+  }
+
+  /* ---------- roles ----------
+     key, what the chip says, what the badge beside his name says. This order is
+     the order the chips appear in and the last tie-break for his main role — read
+     from the back line forward, the way POS_ORDER walks the board. */
+  var ROLES = [['defender', 'Defender', 'DEF'],
+               ['midfielder', 'Midfielder', 'MID'],
+               ['striker', 'Striker', 'ST']];
+  /* position -> role. The fifteen outfield squares of FORMATION_GRID, none missing. */
+  var ROLE_POS = {
+    defender:   ['RB', 'CB', 'LB', 'RWB', 'LWB'],
+    midfielder: ['CDM', 'CM', 'RM', 'LM', 'CAM'],
+    striker:    ['LW', 'RW', 'CF', 'RF', 'LF']
+  };
+  var ROLE_OF = {}, ROLE_LABEL = {}, ROLE_BADGE = {}, ROLE_RANK = {};
+  ROLES.forEach(function (r, i) {
+    ROLE_LABEL[r[0]] = r[1]; ROLE_BADGE[r[0]] = r[2]; ROLE_RANK[r[0]] = i;
+    ROLE_POS[r[0]].forEach(function (p) { ROLE_OF[p] = r[0]; });
+  });
+  /* Two readings of the same figures, and only two. 'total' is the default
+     everywhere it is read, and nothing remembers which one you were on: open a
+     player and you are looking at his campaign. */
+  var MODES = [['total', 'Total'], ['p90', 'Per 90 mins']];
+
+  /* ---------- the four tiles that say what job he did ----------
+     A tile is an object rather than an array: it carries four things now, and
+     [a,b,c,d] at that size stops being readable.
+
+       l      the label, WITHOUT the reading — ' (total)' / ' (per 90)' is added
+              on by the row builder, so no tile can disagree with the button
+       v      the figure, always a COUNT of things he did, so both readings are
+              one function apart
+       c      the line under it — a string when fixed, a function (p, p90) when
+              it has to read the figure beside it
+       fixed  set on the two tiles a rate makes no sense of: a percentage is a
+              percentage at any length of season, and a clean sheet is counted in
+              matches rather than in minutes. They keep their label and their
+              value in both readings.
+
+     Everything comes off p.total — the whole campaign through sumStats() — so
+     every percentage is ONE ratio of the totals rather than a mean of per-match
+     ratios, exactly as the Total row under the table is. */
+  var duelsW = function (p) { return p.total.groundDuelsWon + p.total.aerialDuelsWon; };
+  var duelsT = function (p) { return p.total.groundDuels + p.total.aerialDuels; };
+  /* "62.5% of 40" — and at a rate, "62.5% of 10.0". The share cannot move with
+     the reading; the count it is a share of has to. */
+  function share(n, d) {
+    return function (p, p90) { return pct(n(p), d(p)) + ' of ' + (p90 ? per90(p, d(p)) : d(p)); };
+  }
+
+  var ROLE_KPIS = {
+    defender: [
+      { l: 'Tackles Won',   v: function (p) { return p.total.tacklesWon; },
+        c: share(function (p) { return p.total.tacklesWon; }, function (p) { return p.total.tackles; }) },
+      { l: 'Interceptions', v: function (p) { return p.total.interceptions; }, c: 'balls cut out' },
+      { l: 'Clearances',    v: function (p) { return p.total.clearances; },    c: 'balls put away' },
+      { l: 'Duels Won',     v: duelsW, c: share(duelsW, duelsT) }
+    ],
+    midfielder: [
+      { l: 'Pass Success', v: function (p) { return p.total.passesComp; },
+        c: share(function (p) { return p.total.passesComp; }, function (p) { return p.total.passes; }) },
+      { l: 'Key Passes',   v: function (p) { return p.total.keyPasses; },  c: 'shots created' },
+      { l: 'Assists',      v: function (p) { return p.total.assists; },    c: 'in this channel' },
+      { l: 'Recoveries',   v: function (p) { return p.total.recoveries; }, c: 'balls won back' }
+    ],
+    striker: [
+      { l: 'Goals',   v: function (p) { return p.total.goals; },      c: 'in this channel' },
+      { l: 'Assists', v: function (p) { return p.total.assists; },    c: 'in this channel' },
+      { l: 'Shots',   v: function (p) { return p.total.totalShots; }, c: 'attempts on goal' },
+      { l: 'Shots On Target', v: function (p) { return p.total.shotsOn; },
+        c: share(function (p) { return p.total.shotsOn; }, function (p) { return p.total.totalShots; }) }
+    ]
+  };
+  /* A keeper's four, which the three above cannot hold: his goals, assists and
+     key passes are three zeroes that will never be anything else, and what does
+     say something about him is what happened at the other end.
+     Save Rate and Clean Sheets are `fixed` — see the note on the flag above. */
+  var GK_KPIS = [
+    { l: 'Saves',    v: function (p) { return p.total.saves; },         c: 'shots kept out' },
+    { l: 'Conceded', v: function (p) { return gkCell(p, 'conceded'); }, c: 'while he was on' },
+    { l: 'Save Rate',    fixed: true, v: function (p) { return gkCell(p, 'rate'); },
+      c: 'of the shots on target he faced' },
+    { l: 'Clean Sheets', fixed: true, v: function (p) { return gkCell(p, 'clean'); },
+      c: 'matches without conceding' }
+  ];
+  /* NOT a fourth role — ROLE_KPIS holds exactly the three. This is the net under
+     the two gaps a role can fall through: a report published back when a missing
+     line-up was a warning rather than the refusal shirtCheck() now gives, and a
+     board whose dots were never dragged out of the staging square. These four are
+     the row every outfield player saw before roles existed, so when the net has
+     to catch someone, what he sees is the page he had. */
+  var FALLBACK_KPIS = [
+    { l: 'Goals',      v: function (p) { return p.total.goals; },     c: 'in this channel' },
+    { l: 'Assists',    v: function (p) { return p.total.assists; },   c: 'in this channel' },
+    { l: 'Key Passes', v: function (p) { return p.total.keyPasses; }, c: 'shots created' },
+    { l: 'Cards',      fixed: true, v: function (p) { return p.cards.y + 'Y · ' + p.cards.r + 'R'; },
+      c: 'yellow and red' }
+  ];
   /* and one match's cell, which is minsCell() in Stats/stats-view.js, cell for
      cell — same mark, same tooltip, same empty */
   function minsOne(mn) {
@@ -950,7 +1145,7 @@
        Back does not walk straight into the same dead key again. */
     if (key && !who) { location.replace('#/data/player'); return; }
     if (!who) return renderPlayerList(body, people);
-    renderPlayerProfile(body, who, people, rest[2]);
+    renderPlayerProfile(body, who, people, rest[2], rest[3]);
   }
 
   /* ---------- the list ----------
@@ -1025,37 +1220,117 @@
   }
 
   /* ---------- one player ---------- */
-  function renderPlayerProfile(body, who, people, wanted) {
+  function renderPlayerProfile(body, who, people, wanted, wantedRole) {
     var tabs = tabsFor(who);
     var cat = tabs.some(function (t) { return t[0] === wanted; }) ? wanted : tabs[0][0];
+    /* The role off the URL where he really played it, otherwise the one he was
+       picked in most often. A keeper has none: his four tiles are about the goal,
+       and the request was for everybody but him. */
+    var role = who.gk ? '' : (who.roles.indexOf(wantedRole) >= 0 ? wantedRole : who.role);
+    /* Which reading is on the screen. Nothing remembers it between two visits —
+       open a player and you are looking at his campaign. */
+    var mode = 'total';
 
     var back = el('button', 'back', '&larr; All players');
     back.addEventListener('click', function () { location.hash = '#/data/player'; });
     body.appendChild(back);
 
-    body.appendChild(playerHead(who, people, cat));
+    body.appendChild(playerHead(who, people, cat, role));
 
     var kpis = el('div', 'kpis six');
-    /* The first two tiles are the same job for anybody. The other four are the
-       job he actually did: a keeper's goals, assists and key passes are three
-       zeroes that will never be anything else, and the tile they make room for
-       is the one thing only he can answer for. */
-    kpis.innerHTML =
-      kpi('Appearances', who.apps, who.apps === 1 ? 'match played' : 'matches played') +
-      kpi('Minutes', minsTotal(who), 'on the pitch') +
-      (who.gk
-        ? kpi('Saves', who.total.saves, 'shots kept out') +
-          kpi('Conceded', gkCell(who, 'conceded'), 'while he was on') +
-          kpi('Save Rate', gkCell(who, 'rate'), 'of the shots on target he faced') +
-          kpi('Clean Sheets', gkCell(who, 'clean'), 'matches without conceding')
-        : kpi('Goals', who.total.goals, 'in this channel') +
-          kpi('Assists', who.total.assists, 'in this channel') +
-          kpi('Key Passes', who.total.keyPasses, 'shots created') +
-          kpi('Cards', who.cards.y + 'Y · ' + who.cards.r + 'R', 'yellow and red'));
+    /* Six tiles, and they have to be buildable TWICE now — once here, once more
+       every time the reading changes. So a closure rather than an expression: it
+       reads who / role / mode from just above it and takes no arguments.
+
+       The first two are the same job for anybody, and they hold still under Per
+       90 because they ARE the divisor. The other four are the job he actually
+       did — a keeper's goals are three zeroes that will never be anything else,
+       and a centre back measured in goals reads just as wrong. One table drives
+       all three cases, so no row of tiles is written out twice. */
+    var row = function () {
+      var p90 = mode === 'p90';
+      var set = who.gk ? GK_KPIS : (ROLE_KPIS[role] || FALLBACK_KPIS);
+      return kpi('Appearances', who.apps, who.apps === 1 ? 'match played' : 'matches played') +
+        kpi('Minutes', minsTotal(who), 'on the pitch') +
+        set.map(function (t) {
+          /* A `fixed` tile is one no length of season changes: it keeps its label
+             and its value, and only the tiles that count things follow the button. */
+          var rate = p90 && !t.fixed;
+          return kpi(t.l + (t.fixed ? '' : rate ? ' (per 90)' : ' (total)'),
+                     rate ? per90(who, t.v(who)) : t.v(who),
+                     typeof t.c === 'function' ? t.c(who, p90) : t.c);
+        }).join('');
+    };
+    var paint = function () { kpis.innerHTML = row(); };
+    paint();
+
+    var ctl = playerCtl(who, cat, role, function (m) {
+      mode = m;
+      paint();
+      /* The two buttons swap which one is lit, in place — the bar is not rebuilt,
+         so no listener is dropped and none is added. */
+      ctl.querySelectorAll('.pl-grp.right .chip').forEach(function (b, i) {
+        b.classList.toggle('on', MODES[i][0] === m);
+      });
+    });
+    if (ctl) body.appendChild(ctl);
     body.appendChild(kpis);
 
-    body.appendChild(catTabs(cat, '#/data/player/' + encodeURIComponent(who.key) + '/', tabs));
+    body.appendChild(catTabs(cat, '#/data/player/' + encodeURIComponent(who.key) + '/', tabs,
+                             role ? '/' + role : ''));
     body.appendChild(playerMatchTable(who, cat));
+  }
+
+  /* The bar over the tiles: which role on the left, which reading on the right.
+
+     One bar rather than two rows — two rows of chips stacked read as two tiers of
+     tabs, and there is already a real tier of category tabs under the tiles.
+
+     The role group is only built when there are at least two to choose between: a
+     button with one option is not a filter, it is a label, and that label is
+     already sitting beside his name. The reading group is always there, because it
+     does not depend on his role — only on whether there are minutes to divide by.
+
+     It draws nothing itself. The caller passes `onMode`, so the only place that
+     knows how to build a row of tiles stays renderPlayerProfile(). */
+  function playerCtl(who, cat, role, onMode) {
+    var bar = el('div', 'pl-ctl');
+
+    if (who.roles && who.roles.length > 1) {
+      var left = el('div', 'pl-grp');
+      left.appendChild(el('span', 'pl-grp-l', 'Position'));
+      var base = '#/data/player/' + encodeURIComponent(who.key) + '/' + cat + '/';
+      who.roles.forEach(function (r) {
+        var b = el('button', 'chip role' + (r === role ? ' on' : ''), esc(ROLE_LABEL[r]));
+        b.type = 'button';
+        /* The match count lives in the tooltip rather than on the chip: a role has
+           to be readable in one glance, and that number is not something to
+           compare one chip against another with. */
+        b.title = who.roleApps[r] + (who.roleApps[r] === 1 ? ' match' : ' matches') +
+                  ' in this position';
+        b.addEventListener('click', function () { location.hash = base + r; });
+        left.appendChild(b);
+      });
+      bar.appendChild(left);
+    }
+
+    var right = el('div', 'pl-grp right');
+    var canRate = !!(who.timed && who.min);
+    MODES.forEach(function (m) {
+      var b = el('button', 'chip' + (m[0] === 'total' ? ' on' : ''), esc(m[1]));
+      b.type = 'button';
+      /* Nothing to divide by: the rate would be a row of dashes, which is honest
+         and useless. Say why instead of offering it. */
+      if (m[0] === 'p90' && !canRate) {
+        b.disabled = true;
+        b.title = 'No match in this channel has a line-up, so there are no minutes to divide by.';
+      } else {
+        b.addEventListener('click', function () { onMode(m[0]); });
+      }
+      right.appendChild(b);
+    });
+    bar.appendChild(right);
+    return bar;
   }
 
   /* Name, role, and the way to another player without going back for him.
@@ -1063,15 +1338,17 @@
      listener off with it: this view is redrawn on every category click, and a
      listener left behind would keep a detached node alive for the life of the
      page. */
-  function playerHead(who, people, cat) {
+  function playerHead(who, people, cat, role) {
     var card = el('div', 'card pl-head');
     /* No shirt number anywhere on this card. He wore whichever one the squad
        was numbered with that week, and a single one printed beside his name
        reads as a property of the man. The role is not like that — a keeper
-       keeps goal — so that is what is worth a badge. */
+       keeps goal, a centre back defends — so that is what is worth a badge, and
+       it says which role is being READ, so a man with two of them can tell. */
     var id = el('div', 'pl-id',
       '<span class="pl-nm">' + esc(who.name) + '</span>' +
-      (who.gk ? '<span class="pl-role">GK</span>' : ''));
+      (who.gk ? '<span class="pl-role">GK</span>'
+              : role ? '<span class="pl-role">' + esc(ROLE_BADGE[role]) + '</span>' : ''));
 
     var wrap = el('span', 'menu-wrap');
     var btn = el('button', 'btn btn-ghost menu-btn',
@@ -1122,9 +1399,12 @@
       esc(minsTotal(who)) + ' · ' +
       esc(window.HNA.shortDate(first.m.date)) +
       (last !== first ? ' → ' + esc(window.HNA.shortDate(last.m.date)) : '') +
-      /* a keeper's four tiles are all about the goal, so his booking record has
-         nowhere else to go — and a card record is not something to drop */
-      (who.gk ? ' · ' + who.cards.y + 'Y · ' + who.cards.r + 'R' : '')));
+      /* The booking record comes down here only when the tiles have no room for
+         it: a keeper's four are all about the goal, and a role's four are all
+         about the job. FALLBACK_KPIS still carries a Cards tile, so for a man no
+         line-up placed this line stays quiet — exactly as it does today. A figure
+         never appears twice on one screen. */
+      (who.gk || role ? ' · ' + who.cards.y + 'Y · ' + who.cards.r + 'R' : '')));
     return card;
   }
 

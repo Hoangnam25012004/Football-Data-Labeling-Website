@@ -531,6 +531,25 @@ table.stbl tfoot .c-opp{position:sticky; left:104px; z-index:2; text-align:left;
   color:var(--ash-dim);
 }
 
+/* ---------- one player: the bar over his tiles ----------
+   Which role on the left, which reading on the right. One bar rather than two
+   rows: two rows of chips stacked read as two tiers of tabs, and there is
+   already a real tier of category tabs under the tiles.
+   On a narrow screen the whole bar wraps and margin-left:auto stops applying —
+   which is what should happen: the two groups stack, each still a block. */
+.pl-ctl{display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin:0 0 14px}
+.pl-grp{display:flex; align-items:center; flex-wrap:wrap; gap:7px; min-width:0}
+.pl-grp.right{margin-left:auto}
+.pl-grp-l{
+  font-family:var(--f-mono); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ash-dim); margin-right:3px;
+}
+/* A role chip takes the amber of the badge beside his name, so the eye joins the
+   two. The two reading buttons keep the red .chip.on has everywhere else. */
+.pl-ctl .chip.role.on{border-color:var(--amber); color:var(--amber)}
+/* Per 90 with no minutes to divide by */
+.pl-ctl .chip[disabled]{opacity:.4; cursor:not-allowed}
+
 /* ---------- one match ---------- */
 /* The mounted Stats view brings its own stylesheet (Stats/stats-view.css) and
    the tagging app's tokens with it. Both are class-scoped, so all this has to

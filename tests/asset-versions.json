@@ -16,12 +16,12 @@
     "sha256": "8b01800a0a5476be"
   },
   "client/assets/app.css": {
-    "v": 16,
-    "sha256": "166a8ad4033724fd"
+    "v": 17,
+    "sha256": "2125bef6c88e7f15"
   },
   "client/assets/app.js": {
-    "v": 33,
-    "sha256": "95dc7ae036ee5299"
+    "v": 34,
+    "sha256": "6ea628dd5457ba6d"
   },
   "client/assets/film-tools.css": {
     "v": 3,
