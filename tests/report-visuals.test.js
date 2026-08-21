@@ -31,7 +31,7 @@ function makeReport(opts,names,src){
     return ctx.rows.filter(r=>r.team===team&&r.event==='goal').length
          + ctx.rows.filter(r=>r.team===opp&&/^own[ -]goal$/.test(r.event)).length;};
   vm.createContext(ctx);
-  const consts=['C','TC','TRGB','TN','secTitle','insight','legend','pc0','frac','dotv','mmss'];
+  const consts=['C','TC','TRGB','TN','secTitle','legend','pc0','frac','dotv','mmss'];
   vm.runInContext(consts.map(grabRC).join('\n')
     +'\n'+(names||[]).map(grabR).join('\n')
     +'\n'+(src||'')
@@ -303,7 +303,9 @@ test('every Stats-tab defensive category, take-on concern included, gets a repor
   const ctx=makeReport({rows,lineups:LU,DEF_CATS},mapFns,grabR('defCategoryPages'));
   const pages=ctx.defCategoryPages();
   eq(pages.length,Object.keys(DEF_CATS).length,'one page per category');
-  ok(pages.some(p=>p.includes('Defensive — Take-on Concern')),'including the new one');
+  // each page names the category it drew, so the contents page can list it
+  ok(pages.some(p=>p.html.includes('Defensive — Take-on Concern')),'including the new one');
+  ok(pages.every(p=>p.sub),'and none of them is anonymous');
 });
 // DEF_CATS lives in the Stats page; lift it out so the two stay in step
 function statsDefCats(){

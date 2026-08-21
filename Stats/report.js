@@ -91,9 +91,17 @@ function ensureCss(){
 .rp-sec{font-size:20px;font-weight:800;color:${C.navy};padding-bottom:8px;border-bottom:3px solid ${C.navy};margin-bottom:16px}
 .rp-sub{font-size:14px;font-weight:800;margin:4px 0 10px}
 .rp-note{font-size:9.5px;color:${C.mut};margin-top:10px}
-.rp-ins{background:#eef3f9;border-left:4px solid ${C.navy};padding:11px 14px;margin-top:16px;border-radius:0 4px 4px 0}
-.rp-ins b{display:block;font-size:11px;color:${C.navy};margin-bottom:5px}
-.rp-ins p{margin:0;font-size:11px;line-height:1.55;color:#3d4754}
+.rp-toch{font-size:27px;font-weight:400;color:${C.mut};text-align:center;letter-spacing:0.4px;margin:30px 0 38px}
+.rp-tocrow{display:flex;align-items:flex-end;gap:9px}
+.rp-toc1{font-size:12.5px;font-weight:800;color:${C.navy};padding:7px 0 4px}
+.rp-toc2{font-size:10.5px;font-weight:400;color:${C.mut};padding:3px 0 3px 24px}
+.rp-tocttl{flex:none;max-width:560px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* the leader is a bottom border lifted off the baseline by a margin rather than by
+   a transform — html2canvas is what turns these pages into the PDF, and a margin is
+   the one of the two it redraws exactly */
+.rp-tocgap{flex:1;min-width:14px;border-bottom:1px solid ${C.line};margin-bottom:4px}
+.rp-toc2 .rp-tocgap{border-bottom-style:dotted}
+.rp-tocpg{flex:none;min-width:20px;text-align:right}
 .rp-leg{display:flex;justify-content:center;gap:26px;font-size:11px;color:#3d4754;margin:2px 0 12px}
 .rp-leg span{display:inline-flex;align-items:center;gap:6px}
 .rp-leg i{width:12px;height:12px;border-radius:3px;display:inline-block}
@@ -147,6 +155,10 @@ table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
 .rp-sgwrap{display:flex;gap:18px;align-items:flex-start}
 .rp-sgleft{width:292px;flex:none}
 .rp-sgright{flex:1;min-width:0}
+/* the width rp-sgright resolves to beside the map — 794 page less 100 padding,
+   less the 292 map column and the 18 gap — so an Event List that runs on to a
+   page of its own is drawn at the size it had on the page it came from */
+.rp-sgcont{width:384px;margin:0 auto}
 .rp-goalmouth{margin:0 0 6px}
 .rp-sgleg{justify-content:flex-start;gap:9px;font-size:8.5px;margin-top:7px}
 .rp-sgleg i{width:8px;height:8px;margin-right:4px}
@@ -177,11 +189,12 @@ table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
 
 /* ================= small building blocks ================= */
 const secTitle=t=>`<div class="rp-sec">${t}</div>`;
-const insight=t=>t?`<div class="rp-ins"><b>◆ Analyst Insight</b><p>${t}</p></div>`:'';
 const legend=()=>`<div class="rp-leg"><span><i style="background:${C.home}"></i>${esc(TN('home'))}</span>`
   +`<span><i style="background:${C.away}"></i>${esc(TN('away'))}</span></div>`;
 const pill=(no,team)=>`<span class="rp-pill" style="background:${TC(team)}">${esc(no)}</span>`;
-const BALL=`<svg width="13" height="13" viewBox="0 0 20 20" style="vertical-align:-2px"><circle cx="10" cy="10" r="9" fill="#fff" stroke="#333" stroke-width="1.6"/><polygon points="10,5.5 13.8,8.3 12.4,12.8 7.6,12.8 6.2,8.3" fill="#333"/></svg>`;
+/* the goal marker is the ⚽ glyph rather than a drawn ball; line-height:1 keeps it
+   on the row's centre line beside the label it sits with */
+const BALL=`<span style="font-size:13px;line-height:1">⚽</span>`;
 
 /* Comparison bars — home fill anchors right (grows toward centre), away anchors left.
    Each side gets its SHARE of the two values, exactly as the Stats tab's General view
@@ -240,22 +253,6 @@ function normXY(team){
   };
 }
 
-/* ---- formation string from XI board coords (canonical = attacking per lu.dir) ---- */
-function formationOf(xi,dir){
-  if(!xi||xi.length<3)return '';
-  const gi=xi.findIndex(p=>p.pos==='GK');
-  let xs=xi.map(p=>dir==='rl'?100-p.x:p.x);
-  if(gi>=0)xs=xs.filter((_,i)=>i!==gi).sort((a,b)=>a-b);   // tagged keeper dropped
-  else xs=xs.sort((a,b)=>a-b).slice(1);                    // otherwise deepest = GK
-  const lines=[]; let cur=[xs[0]];
-  for(let i=1;i<xs.length;i++){
-    const mean=cur.reduce((s,v)=>s+v,0)/cur.length;
-    if(xs[i]-cur[cur.length-1]>8&&xs[i]-mean>11){lines.push(cur);cur=[xs[i]];}
-    else cur.push(xs[i]);
-  }
-  lines.push(cur);
-  return lines.map(l=>l.length).join('-');
-}
 /* formation periods: starting XI + every lineups.history snapshot of this team */
 function teamPeriods(team){
   const lu=lineups[team]; if(!lu||!lu.xi||!lu.xi.length)return [];
@@ -264,8 +261,7 @@ function teamPeriods(team){
   const ps=[{t:0,xi:lu.xi},...hist.map(h=>({t:matchTime(h.t),xi:h.xi}))];
   const evEnd=rows.filter(r=>r.t!=null).map(r=>matchTime(r.t));
   const end=Math.max((+dur.halfLen||45)*120, ...(evEnd.length?evEnd:[0]));
-  return ps.map((p,i)=>({start:p.t, end:i+1<ps.length?ps[i+1].t:end, xi:p.xi, dir,
-                         f:formationOf(p.xi,dir)}));
+  return ps.map((p,i)=>({start:p.t, end:i+1<ps.length?ps[i+1].t:end, xi:p.xi, dir}));
 }
 
 /* ================= PAGE 1 — header + match timeline ================= */
@@ -273,8 +269,7 @@ function teamPeriods(team){
 // "Lineups & Formation" page, so the formation summary that used to sit under the
 // score is gone; the score block carries the spacing it used to add.
 function headerBlock(){
-  return `<div style="text-align:center;font-size:12px;color:${C.mut};letter-spacing:0.4px;margin:4px 0 24px">Performance Analysis · Full Match Report</div>`
-    +`<div style="display:flex;align-items:center;justify-content:center;gap:24px;margin-bottom:30px">`
+  return `<div style="display:flex;align-items:center;justify-content:center;gap:24px;margin:14px 0 30px">`
     +`<span style="flex:1;text-align:right;font-size:23px;font-weight:800;color:${C.home}">${esc(meta.home)}</span>`
     +`<span style="flex:none;font-size:42px;font-weight:800;color:${C.ink}">${teamGoals('home')} <span style="color:${C.grey};font-weight:400">–</span> ${teamGoals('away')}</span>`
     +`<span style="flex:1;text-align:left;font-size:23px;font-weight:800;color:${C.away}">${esc(meta.away)}</span></div>`;
@@ -391,7 +386,7 @@ function timelinePages(){
   else chunks.push(null);
   return chunks.map((ch,ci)=>
     (ci===0?headerBlock():'')
-    +secTitle('Match Timeline'+(ci?' (continued)':''))
+    +secTitle('Match Timeline')
     +legend()
     +(ch?`<div class="rp-tlwrap"><div class="rp-tlspine"></div>${ch.join('')}</div>`
         :`<div class="rp-note" style="text-align:center;padding:26px 0;font-size:11px">No goals or cards tagged yet.</div>`));
@@ -404,17 +399,20 @@ function fmCard(p,team){
     const left=y, top=100-x;                                     // rotate 90° CCW → attacking UP
     return `<div class="rp-fdot" style="left:${left.toFixed(1)}%;top:${top.toFixed(1)}%;background:${TC(team)}">${esc(q.no)}</div>`;
   }).join('');
-  return `<div class="rp-fcard"><div class="rp-fttl"><b>${mmss(p.start)}–${mmss(p.end)}</b> · ${p.f||'—'}</div>`
+  return `<div class="rp-fcard"><div class="rp-fttl"><b>${mmss(p.start)}–${mmss(p.end)}</b></div>`
     +`<div class="rp-fpitch">${vPitchSVG()}${dots}</div></div>`;
 }
 function formationPages(team){
   const ps=teamPeriods(team), pages=[];
-  const side=team==='home'?'Home':'Away';
-  if(!ps.length)return [secTitle(`Lineups &amp; Formation — ${esc(TN(team))} (${side})`)
+  /* One title, carried by every page of the section: the team names itself, so
+     "(Home)" said nothing the name did not, and a reader who has turned a page
+     knows they have. */
+  const title=`Lineups &amp; Formation — ${esc(TN(team))}`;
+  if(!ps.length)return [secTitle(title)
     +`<div class="rp-note" style="font-size:11px">No starting lineup set for this team (see Player lists).</div>`];
   for(let i=0;i<ps.length;i+=4){
-    let b=secTitle(`Lineups &amp; Formation — ${esc(TN(team))} (${side})${i?' — cont.':''}`);
-    b+=`<div class="rp-sub" style="color:${TC(team)}">${esc(TN(team))}${ps[0].f?' — '+ps[0].f:''}</div>`;
+    let b=secTitle(title);
+    b+=`<div class="rp-sub" style="color:${TC(team)}">${esc(TN(team))}</div>`;
     b+=`<div class="rp-fgrid">${ps.slice(i,i+4).map(p=>fmCard(p,team)).join('')}</div>`;
     pages.push(b);
   }
@@ -445,27 +443,12 @@ function donutCard(team){
     +row(C.grey,'Off Target / Blocked / Missed',frac(off,total))
     +'</div></div>';
 }
-function attInsight(){
-  const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
-  const conv=s=>s.totalShots?Math.round(s.goals/s.totalShots*100):0;
-  let t=`${esc(TN('home'))} produced ${h.totalShots} shots (${pct(h.shotsOn,h.totalShots)} on target, ${conv(h)}% conversion) against ${esc(TN('away'))}'s ${a.totalShots} (${pct(a.shotsOn,a.totalShots)} on target, ${conv(a)}% conversion).`;
-  const gh=teamGoals('home'), ga=teamGoals('away');
-  if(gh!==ga){
-    const L=gh>ga?'home':'away', O=L==='home'?'away':'home';
-    const ls=L==='home'?h:a, os=L==='home'?a:h;
-    t+=os.totalShots>ls.totalShots
-      ?` ${esc(TN(O))} generated more volume, but ${esc(TN(L))} converted at the higher rate — chance quality, not quantity, decided the scoreline.`
-      :` ${esc(TN(L))} led on both volume and efficiency in front of goal.`;
-  }else t+=' Neither side found a decisive edge in front of goal.';
-  return t;
-}
 /* Attacking — team comparison on its own page (the donuts now live on each team's
    own "Shots & Goals" page, so this one is purely the head-to-head bars). */
 function attackingComparisonPage(){
   return secTitle('Attacking — Team Comparison')
     +legend()
-    +`<div class="rp-cmphead">Attacking</div>`+cmpRows(sectionRows(0))
-    +insight(attInsight());
+    +`<div class="rp-cmphead">Attacking</div>`+cmpRows(sectionRows(0));
 }
 /* ---- "Shots & Goals" — ONE page per team: the shot map on the left, the summary donut
    and the shot-by-shot Event List on the right. Map markers carry the same number as the
@@ -527,9 +510,14 @@ function shotsAndGoalsPages(team){
     +`<div class="rp-mtitle" style="margin-top:13px">Event List</div>`
     +(list.length?table(list.slice(0,FIRST)):`<div class="rp-note">No shots recorded.</div>`)
     +`</div>`;
+  /* The rest of the SAME table, so it is drawn at the width it had beside the map
+     rather than stretched across the page: left to itself a table fills its parent,
+     and four columns 694px wide read as a different table from the four 384px ones
+     the reader has just come off. Centred — there is no map beside it to sit against. */
+  const cont=slice=>`<div class="rp-sgcont"><div class="rp-mtitle">Event List</div>${table(slice)}</div>`;
   const pages=[secTitle(title)+`<div class="rp-sgwrap">${left}${right}</div>`];
   for(let i=FIRST;i<list.length;i+=CONT)
-    pages.push(secTitle(title+' — cont.')+table(list.slice(i,i+CONT)));
+    pages.push(secTitle(title)+cont(list.slice(i,i+CONT)));
   return pages;
 }
 
@@ -557,7 +545,7 @@ function playerStatPages(title,headers,rowFor){
   const h=teamTable('home',headers,rowFor), a=teamTable('away',headers,rowFor);
   if(h.rows+a.rows<=30)
     return [secTitle(title)+h.html+'<div style="height:16px"></div>'+a.html];
-  return [secTitle(title)+h.html, secTitle(title+' — cont.')+a.html];
+  return [secTitle(title)+h.html, secTitle(title)+a.html];
 }
 function cardCounts(team){
   const out={};
@@ -587,19 +575,8 @@ function defensivePlayerPages(){
 }
 
 /* ================= distribution ================= */
-function distInsight(){
-  const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
-  if(!h.passes&&!a.passes)return '';
-  const posH=h.passes+a.passes?h.passes/(h.passes+a.passes)*100:50;
-  const L=posH>=50?'home':'away', O=L==='home'?'away':'home';
-  const ls=L==='home'?h:a, os=L==='home'?a:h;
-  let t=`${esc(TN(L))} dominated the ball (${pct(ls.passes,ls.passes+os.passes)} possession) with ${pct(ls.passesComp,ls.passes)} pass accuracy vs ${pct(os.passesComp,os.passes)}.`;
-  if(ls.crosses||os.crosses)t+=` Wide play: ${ls.crosses} crosses to ${os.crosses}.`;
-  t+=` ${esc(TN(O))}'s lower completion suggests longer, more contested passes under pressure.`;
-  return t;
-}
 const distributionPage=()=>secTitle('Distribution')+legend()
-  +`<div class="rp-cmphead">Distribution</div>`+cmpRows(sectionRows(1))+insight(distInsight());
+  +`<div class="rp-cmphead">Distribution</div>`+cmpRows(sectionRows(1));
 
 /* pass-network map — nodes at average involvement, arrows = completed passes.
    `filter` restricts the passes (used for the 15-minute windows); `idSuffix`
@@ -688,7 +665,7 @@ function netWindowPages(){
   });
   const pages=[];
   for(let i=0;i<blocks.length;i+=2){
-    pages.push(secTitle('Distribution : Passes ( 15 Minute Intervals )'+(i?' — cont.':''))
+    pages.push(secTitle('Distribution : Passes ( 15 Minute Intervals )')
       +blocks.slice(i,i+2).join(''));
   }
   return pages;
@@ -723,21 +700,9 @@ function scatterPanel(team){
     +`<div style="display:flex;justify-content:space-between;font-size:10px;color:${C.mut};padding:4px 2px 0">`
     +`<span>0%</span><span>Pass Accuracy →</span><span>100%</span></div>`;
 }
-function scatterInsight(){
-  const top=team=>{
-    const P=computeStats(rows,team), ps=sortedPlayers(P).filter(n=>P[n].passes>0);
-    if(!ps.length)return null;
-    const no=ps.reduce((b,n)=>P[n].passes>P[b].passes?n:b,ps[0]);
-    return `#${esc(no)} leads ${esc(TN(team))} with ${P[no].passes} passes at ${pct(P[no].passesComp,P[no].passes)}`;
-  };
-  const th=top('home'), ta=top('away');
-  return `Top-right = high volume + high accuracy (reliable circulators); isolated bottom-left dots are low-volume wide or substitute players.`
-    +(th||ta?` ${[th,ta].filter(Boolean).join('; ')}.`:'')
-    +` Use this to spot over-reliance on single nodes and players who break rhythm with low completion.`;
-}
 function scatterPage(){
   const card=team=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Passes by Volume &amp; Accuracy</div>${scatterPanel(team)}</div>`;
-  return secTitle('Distribution — Passing Profile')+card('home')+card('away')+insight(scatterInsight());
+  return secTitle('Distribution — Passing Profile')+card('home')+card('away');
 }
 
 /* pass heatmap matrix (From → To) — one page per team */
@@ -760,12 +725,7 @@ function matrixPage(team){
     body+=`<tr><th>${esc(f)}</th>${cells}<td style="color:${C.navy};font-weight:800">${rowSum}</td></tr>`;
   });
   body+=`<tr><th>Σ recv</th>${players.map(p=>`<td style="color:${C.navy};font-weight:800">${colSum[p]||0}</td>`).join('')}<td></td></tr>`;
-  // strongest link + busiest distributor for the insight line
-  let bf='',bt='',bv=0; players.forEach(f=>players.forEach(t=>{const v=(mtx[f]&&mtx[f][t])||0; if(f!==t&&v>bv){bv=v;bf=f;bt=t;}}));
-  let hub='',hv=-1; players.forEach(f=>{const s=players.reduce((sum,t)=>sum+(f!==t?((mtx[f]&&mtx[f][t])||0):0),0); if(s>hv){hv=s;hub=f;}});
-  return b+`<table class="rpm"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
-    +insight(`Darker cells = more completed passes along that lane. The strongest link is #${esc(bf)} → #${esc(bt)} (${bv} passes); `
-      +`#${esc(hub)} is the busiest distributor (Σ ${hv}). High column totals mark the team's favourite outlets/receivers.`);
+  return b+`<table class="rpm"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 /* touch heatmaps — canvas drawn after the page is mounted (see buildPages) */
@@ -845,17 +805,8 @@ function crossMapsPage(){
 }
 
 /* ================= defensive ================= */
-function defInsight(){
-  const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
-  const wl=(h.recoveries+h.clearances)>=(a.recoveries+a.clearances)?'home':'away', ol=wl==='home'?'away':'home';
-  const ws=wl==='home'?h:a, os=wl==='home'?a:h;
-  let t=`${esc(TN(wl))} did more defensive work out of possession — ${ws.recoveries} recoveries and ${ws.clearances} clearances vs ${os.recoveries} / ${os.clearances}.`;
-  if(h.tackles&&a.tackles)t+=` In the tackle: ${esc(TN('home'))} ${pct(h.tacklesWon,h.tackles)} success vs ${pct(a.tacklesWon,a.tackles)}.`;
-  if(h.aerialDuels||a.aerialDuels)t+=` Aerial duels won: ${h.aerialDuelsWon} – ${a.aerialDuelsWon}.`;
-  return t;
-}
 const defensivePage=()=>secTitle('Defensive')+legend()
-  +`<div class="rp-cmphead">Defensive</div>`+cmpRows(sectionRows(2))+insight(defInsight());
+  +`<div class="rp-cmphead">Defensive</div>`+cmpRows(sectionRows(2));
 
 /* Top-5 player ranking printed under a map. `rk` describes what to count and how to order:
      {events:[…]}            Rank · Player · Total, most events first
@@ -944,8 +895,8 @@ function actionMapsPage(cat,title,ranks){
    Take-on Concern, Mistakes). Types with no located event on either side are skipped. */
 function defCategoryPages(){
   return Object.values(DEF_CATS)
-    .map(cat=>actionMapsPage(cat,`Defensive — ${cat.label}`))
-    .filter(Boolean);
+    .map(cat=>({sub:cat.label,html:actionMapsPage(cat,`Defensive — ${cat.label}`)}))
+    .filter(c=>c.html);
 }
 /* Where a team took defenders on and where it stepped in — the three events share ONE map
    per side, told apart by colour. They are two different actions though, so they are
@@ -996,17 +947,8 @@ function radarPage(){
     g+=`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anch}" font-size="13" font-weight="800" fill="${C.ink}">${lbl}</text>`
       +`<text x="${lx.toFixed(1)}" y="${(ly+15).toFixed(1)}" text-anchor="${anch}" font-size="10.5" fill="${C.mut}">${h[k]} · ${a[k]}</text>`;
   });
-  // each side's strongest axes (largest normalised lead) for the insight line
-  const lead=s=>{const o=s===h?a:h;
-    return axes.map(([lbl,k])=>({lbl,d:(s[k]-o[k])/Math.max(1,Math.max(h[k],a[k]))}))
-      .sort((x,y)=>y.d-x.d).filter(x=>x.d>0).slice(0,2).map(x=>x.lbl.toLowerCase());};
-  const lh=lead(h), la=lead(a);
-  let ins='The radar exposes each side\'s defensive identity.';
-  if(lh.length)ins+=` ${esc(TN('home'))} pulls toward ${lh.join(' and ')}.`;
-  if(la.length)ins+=` ${esc(TN('away'))} stretches the shape toward ${la.join(' and ')}.`;
   return secTitle('Defensive — Profile Radar')+legend()
-    +`<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;margin:0 auto">${g}</svg>`
-    +insight(ins);
+    +`<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;margin:0 auto">${g}</svg>`;
 }
 
 /* foul maps — halves normalised, card halos, hatched own defensive third */
@@ -1159,11 +1101,6 @@ function gkPage(){
       +`<div class="rp-gkfig">${stat(s.saves,'Saves')}${stat(gc,'Conceded')}${stat(faced,'On target<br>faced')}</div>`
       +`</div></div>`;
   };
-  // the unit is spelled out once, then implied — reads like a note, not a template
-  const line=(team,s,faced,rate,brief)=>faced
-    ? `${esc(TN(team))} kept out ${s.saves} of ${faced}${brief?'':` shot${faced===1?'':'s'} on target`} (${rate}%)`
-    : `${esc(TN(team))} faced no shots on target`;
-  const ins=line('home',h,facedH,rateH,false)+'; '+line('away',a,facedA,rateA,true)+'.';
   // cards belong on a page called Discipline — they were missing entirely before
   const cardTot=team=>{const c=cardCounts(team); let yc=0,rc=0;
     Object.keys(c).forEach(k=>{yc+=c[k].yc;rc+=c[k].rc;}); return {yc,rc};};
@@ -1180,45 +1117,100 @@ function gkPage(){
   return secTitle('Goalkeeper &amp; Discipline')+legend()
     +`<div class="rp-cmphead">Goalkeeper</div>`
     +`<div class="rp-duo">${card('home',h,gcH,facedH,rateH)}${card('away',a,gcA,facedA,rateA)}</div>`
-    +insight(ins)
     +`<div class="rp-cmphead">Discipline</div>`
     +`<div class="rp-duo">${cardBox('home')}${cardBox('away')}</div>`
     +cmpRows(discRows)
     +`<div class="rp-cmphead">Set Pieces</div>`+cmpRows(spRows);
 }
 
+/* ================= table of contents ================= */
+/* Every page joins the report under the section it belongs to and, where a section
+   has several parts, under which part — the team, or which of its views. The
+   contents page is built from those two names: consecutive pages carrying the same
+   pair are one entry, so a section that runs over three pages is listed once, at
+   the page it opens on.
+
+   It sits after the timeline, which pushes everything behind it down by however
+   many pages the contents itself takes. That count is knowable before the numbers
+   are — it falls out of the entries, and an entry knows only which page of the
+   un-numbered report it opens — so the entries are gathered, split into pages, and
+   only then numbered. */
+const TOC_H1=23, TOC_H2=19;   // what a row of each level costs, in page px
+const TOC_BUDGET=900;         // what one contents page has left for them under the heading
+
+function tocEntries(pages){
+  const out=[]; let sec=null, sub=null;
+  pages.forEach((p,i)=>{
+    if(p.sec!==sec){out.push({lvl:1,label:p.sec,at:i}); sec=p.sec; sub=null;}
+    if(p.sub&&p.sub!==sub){out.push({lvl:2,label:p.sub,at:i}); sub=p.sub;}
+  });
+  return out;
+}
+function tocChunks(entries){
+  const out=[]; let cur=[], h=0;
+  entries.forEach(e=>{
+    const eh=e.lvl===1?TOC_H1:TOC_H2;
+    if(h+eh>TOC_BUDGET&&cur.length){out.push(cur);cur=[];h=0;}
+    cur.push(e); h+=eh;
+  });
+  if(cur.length)out.push(cur);
+  return out;
+}
+/* `lead` is how many pages come before the contents; a page at or after it is
+   numbered past however many pages the contents runs to. */
+function contentsPages(pages,lead){
+  const entries=tocEntries(pages);
+  if(!entries.length)return [];
+  const chunks=tocChunks(entries), n=chunks.length;
+  const row=e=>{
+    const no=e.at<lead?e.at+1:e.at+n+1;
+    return `<div class="rp-tocrow rp-toc${e.lvl}"><span class="rp-tocttl">${esc(e.label)}</span>`
+      +`<span class="rp-tocgap"></span><span class="rp-tocpg">${no}</span></div>`;
+  };
+  return chunks.map(ch=>`<div class="rp-toch">Table of Contents</div>`+ch.map(row).join(''));
+}
+
 /* ================= assembly + export ================= */
 function buildPages(host){
   sync();
   ensureCss();
-  const list=[
-    ...timelinePages(),
-    ...formationPages('home'),
-    ...formationPages('away'),
-    ...shotsAndGoalsPages('home'),
-    ...shotsAndGoalsPages('away'),
-    attackingComparisonPage(),
-    ...attackingPlayerPages(),
-    distributionPage(),
-    netMapsPage(),
-    ...netWindowPages(),
-    scatterPage(),
-    matrixPage('home'),
-    matrixPage('away'),
-    heatPage(),
-    passTypesPage(),
-    crossMapsPage(),
-    takeOnMapsPage(),
-    ...distributionPlayerPages(),
-    defensivePage(),
-    ...defCategoryPages(),
-    radarPage(),
-    ...defensivePlayerPages(),
-    foulMapsPage(),
-    foulWonMapsPage(),
-    offsideMapsPage(),
-    gkPage()
-  ].filter(Boolean);
+  /* Pages are gathered as (section, part, html) rather than as bare html: those two
+     names are what the contents page indexes on, so a page cannot join the report
+     without saying where it belongs, and cannot go unlisted. A part left null means
+     the section has only the one. */
+  const P=(sec,sub,pages)=>[].concat(pages).filter(Boolean).map(html=>({html,sec,sub:sub||null}));
+  const HOME=TN('home'), AWAY=TN('away');
+  const opening=P('Match Timeline',null,timelinePages());
+  const body=[
+    ...P('Lineups & Formation',HOME,formationPages('home')),
+    ...P('Lineups & Formation',AWAY,formationPages('away')),
+    ...P('Shots & Goals',HOME,shotsAndGoalsPages('home')),
+    ...P('Shots & Goals',AWAY,shotsAndGoalsPages('away')),
+    ...P('Attacking','Team Comparison',attackingComparisonPage()),
+    ...P('Attacking','Player Stats',attackingPlayerPages()),
+    ...P('Distribution','Team Comparison',distributionPage()),
+    ...P('Distribution','Pass Networks',netMapsPage()),
+    ...P('Distribution','Passes ( 15 Minute Intervals )',netWindowPages()),
+    ...P('Distribution','Passing Profile',scatterPage()),
+    ...P('Distribution','Pass Heatmap — '+HOME,matrixPage('home')),
+    ...P('Distribution','Pass Heatmap — '+AWAY,matrixPage('away')),
+    ...P('Distribution','Touch Heatmaps',heatPage()),
+    ...P('Distribution','Pass Types',passTypesPage()),
+    ...P('Distribution','Cross Maps',crossMapsPage()),
+    ...P('Distribution','Take-ons & Step-ins',takeOnMapsPage()),
+    ...P('Distribution','Player Stats',distributionPlayerPages()),
+    ...P('Defensive','Team Comparison',defensivePage()),
+    ...defCategoryPages().reduce((a,c)=>a.concat(P('Defensive',c.sub,c.html)),[]),
+    ...P('Defensive','Profile Radar',radarPage()),
+    ...P('Defensive','Player Stats',defensivePlayerPages()),
+    ...P('Discipline','Foul Maps',foulMapsPage()),
+    ...P('Discipline','Fouls Won',foulWonMapsPage()),
+    ...P('Discipline','Offsides',offsideMapsPage()),
+    ...P('Goalkeeper & Discipline',null,gkPage())
+  ];
+  const list=opening.map(p=>p.html)
+    .concat(contentsPages(opening.concat(body),opening.length))
+    .concat(body.map(p=>p.html));
   const els=list.map(html=>{
     const d=document.createElement('div');
     d.className='rp-page'; d.innerHTML=html;
