@@ -50,23 +50,47 @@ function sync(){
 }
 
 /* ---- palette: literal colours only — report pages are light-themed and must
-   not inherit the app's dark CSS variables ---- */
+   not inherit the app's dark CSS variables ----
+   Two entries per team rather than one. The saturated colour fills a bar, a dot,
+   a pitch marker; the darker `Ink` one is what that team's NAME is set in. Amber
+   at 11px on white is a legibility problem the fill colour cannot solve, and a
+   fill dark enough to read as text is no longer recognisably amber — so the two
+   jobs were given two colours instead of one compromise. */
 const C={
-  navy:'#1d3d5c', ink:'#2a3542', mut:'#8b94a3', line:'#e3e7ee',
-  home:'#2f6fd8', away:'#d9a012',               // home blue / away amber (reference report)
-  homeRGB:'47,111,216', awayRGB:'217,160,18',
-  green:'#2e9e5b', red:'#e5484d', grey:'#9aa0a6', gold:'#e8a817'
+  navy:'#12385c', ink:'#111c2b', mut:'#77839a',
+  line:'#e2e8f1', hair:'#eef2f8', panel:'#f7f9fc', band:'#edf3fa',
+  home:'#1e63d6', away:'#e0920b',               // home blue / away amber (reference report)
+  homeInk:'#1a56b8', awayInk:'#96650a',         // the same two, set as text
+  homeRGB:'30,99,214', awayRGB:'224,146,11',
+  green:'#17924f', red:'#d93a3f', grey:'#98a0ac', gold:'#e8a817',
+  grassA:'#1d6a41', grassB:'#217549',
+  /* Black or white — whichever of the two reads on this swatch. A shot's number is
+     drawn on gold, on green and on grey; a shirt number on either team's colour, and
+     on the won/lost pair of every defensive category. One ink for all of them left
+     half of them barely legible at the size these are printed. */
+  on(hex){
+    if(typeof hex!=='string'||hex.length!==7||hex[0]!=='#')return '#ffffff';
+    const v=i=>Math.pow(parseInt(hex.substr(i,2),16)/255,2.2);
+    return 0.2126*v(1)+0.7152*v(3)+0.0722*v(5)>0.32?'#152233':'#ffffff';
+  }
 };
+/* Every report page is set in this, not in the app's font: the pages are printed
+   through html2canvas, so whatever the browser resolves here is what the PDF gets. */
+const FONT='"Segoe UI",Roboto,"Helvetica Neue",Helvetica,Arial,sans-serif';
 const TC=t=>t==='home'?C.home:C.away;
+/* the same team as TEXT — see the note on C */
+const TI=t=>t==='home'?C.homeInk:C.awayInk;
 const TRGB=t=>t==='home'?C.homeRGB:C.awayRGB;
 const TN=t=>t==='home'?meta.home:meta.away;
+/* the line every page carries in its footer: who played, and how it finished */
+const matchLine=()=>`${TN('home')} ${teamGoals('home')} – ${teamGoals('away')} ${TN('away')}`;
 /* esc() lives in shared.js (loaded first) — both this file and the Stats page need it */
 const mmss=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 /* stoppage-time minutes are capped by the half: 45:52 in the 1st half is 45+1',
    95:30 in the 2nd is 90+6' (never 46' / 96') */
 const minLbl=(sec,half)=>{const L=+dur.halfLen||45, m=Math.floor(sec/60)+1, cap=(half||2)*L;
   return m>cap?`${cap}+${m-cap}'`:`${m}'`;};
-const dotv=v=>v?v:'<span style="color:#c9cfd9">·</span>';
+const dotv=v=>v?v:'<span style="color:#bfc8d5">·</span>';
 const pc0=(n,d)=>d?Math.round(n/d*100)+'%':'0%';
 const frac=(n,d)=>`${n}/${d}`;
 
@@ -87,71 +111,146 @@ function ensureCss(){
   const st=document.createElement('style'); st.id='rpCss';
   st.textContent=`
 .rp-page{width:794px;height:1123px;box-sizing:border-box;background:#fff;padding:46px 50px;
-  font-family:Arial,Helvetica,sans-serif;color:${C.ink};position:relative;overflow:hidden;line-height:1.35}
-.rp-sec{font-size:20px;font-weight:800;color:${C.navy};padding-bottom:8px;border-bottom:3px solid ${C.navy};margin-bottom:16px}
-.rp-sub{font-size:14px;font-weight:800;margin:4px 0 10px}
+  font-family:${FONT};color:${C.ink};position:relative;overflow:hidden;line-height:1.35;
+  font-variant-numeric:tabular-nums}
+/* ---- page furniture ----------------------------------------------------
+   The running foot sits INSIDE the page's bottom padding, absolutely placed:
+   the row counts that decide where a table breaks (FIRST/CONT, the timeline
+   chunks, the contents budget) are all measured against the flow box, so a
+   footer that took height out of it would silently clip the last row of a
+   full page — .rp-page is overflow:hidden. Out of flow, it costs nothing. */
+.rp-foot{position:absolute;left:50px;right:50px;bottom:16px;display:flex;align-items:center;
+  justify-content:space-between;gap:12px;border-top:1px solid ${C.line};padding-top:7px;
+  font-size:8px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:${C.mut}}
+.rp-footm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-footp{flex:none;color:${C.navy};letter-spacing:0.6px}
+.rp-footp em{font-style:normal;font-weight:600;color:${C.mut}}
+/* ---- section head: an accent bar, the title, and the rule under both ---- */
+.rp-sec{display:flex;align-items:center;gap:11px;border-bottom:3px solid ${C.navy};
+  padding-bottom:9px;margin-bottom:15px}
+.rp-secbar{flex:none;width:5px;height:23px;border-radius:3px;
+  background:linear-gradient(180deg,${C.home} 0 50%,${C.away} 50% 100%)}
+.rp-sect{flex:1;min-width:0;font-size:19.5px;font-weight:800;color:${C.navy};
+  letter-spacing:-0.3px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-sub{font-size:12px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;margin:6px 0 8px}
 .rp-note{font-size:9.5px;color:${C.mut};margin-top:10px}
-.rp-toch{font-size:27px;font-weight:400;color:${C.mut};text-align:center;letter-spacing:0.4px;margin:30px 0 38px}
+/* ---- page 1 masthead --------------------------------------------------- */
+.rp-mast{display:flex;align-items:center;gap:20px;background:${C.panel};border:1px solid ${C.line};
+  border-radius:12px;padding:20px 26px;margin:2px 0 22px}
+.rp-mastt{flex:1;min-width:0;font-size:21px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-mastt u{display:block;height:3px;border-radius:2px;margin-top:7px;text-decoration:none}
+.rp-masts{flex:none;font-size:40px;font-weight:800;color:${C.ink};letter-spacing:-1px;line-height:1}
+.rp-mastd{color:${C.grey};font-weight:400;padding:0 2px}
+/* ---- contents ---------------------------------------------------------- */
+.rp-toch{font-size:26px;font-weight:800;color:${C.navy};letter-spacing:-0.3px;
+  border-bottom:3px solid ${C.navy};padding-bottom:10px;margin:4px 0 20px}
 .rp-tocrow{display:flex;align-items:flex-end;gap:9px}
-.rp-toc1{font-size:12.5px;font-weight:800;color:${C.navy};padding:7px 0 4px}
-.rp-toc2{font-size:10.5px;font-weight:400;color:${C.mut};padding:3px 0 3px 24px}
-.rp-tocttl{flex:none;max-width:560px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-toc1{font-size:12px;font-weight:800;color:${C.navy};letter-spacing:0.5px;text-transform:uppercase;padding:9px 0 5px;
+  border-top:1px solid ${C.line}}
+.rp-toc2{font-size:10.5px;font-weight:400;color:#5d6a80;padding:3.5px 0 3.5px 22px}
+.rp-tocttl{flex:none;max-width:540px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* the leader is a bottom border lifted off the baseline by a margin rather than by
    a transform — html2canvas is what turns these pages into the PDF, and a margin is
    the one of the two it redraws exactly */
 .rp-tocgap{flex:1;min-width:14px;border-bottom:1px solid ${C.line};margin-bottom:4px}
+.rp-toc1 .rp-tocgap{border-bottom-color:${C.hair}}
 .rp-toc2 .rp-tocgap{border-bottom-style:dotted}
-.rp-tocpg{flex:none;min-width:20px;text-align:right}
-.rp-leg{display:flex;justify-content:center;gap:26px;font-size:11px;color:#3d4754;margin:2px 0 12px}
-.rp-leg span{display:inline-flex;align-items:center;gap:6px}
-.rp-leg i{width:12px;height:12px;border-radius:3px;display:inline-block}
-.rp-cmphead{background:${C.navy};color:#fff;font-size:12px;font-weight:700;padding:7px 12px;border-radius:4px;margin:12px 0 10px}
-.rp-cmprow{display:flex;align-items:center;gap:10px;margin:6px 0}
-.rp-cv{flex:none;width:52px;font-size:12px;font-weight:800;text-align:right}
-.rp-cl{flex:none;width:150px;text-align:center;font-size:11.5px;font-weight:700}
-.rp-track{flex:1;height:11px;background:#e9ecf2;border-radius:6px;position:relative;overflow:hidden}
-.rp-fill{position:absolute;top:0;left:0;height:100%;border-radius:6px}
+.rp-tocpg{flex:none;min-width:22px;text-align:right;font-weight:800}
+.rp-toc2 .rp-tocpg{font-weight:600;color:${C.mut}}
+/* ---- legends ----------------------------------------------------------- */
+.rp-leg{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin:0 0 13px}
+.rp-leg span{display:inline-flex;align-items:center;gap:7px;background:${C.panel};
+  border:1px solid ${C.line};border-radius:20px;padding:4px 12px;font-size:10px;font-weight:700;color:#3d4a5c}
+.rp-leg i{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+/* ---- team comparison --------------------------------------------------- */
+.rp-cmphead{display:flex;align-items:center;gap:9px;background:${C.band};color:${C.navy};
+  font-size:9.5px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;
+  padding:7px 13px;border-left:4px solid ${C.navy};border-radius:0 5px 5px 0;margin:14px 0 10px}
+/* A flex column of bands. Spacing a comparison page out by pushing the rows apart
+   left nine bars floating on a white field with nothing holding them together; each
+   row is a band of its own height instead, ruled off from the next, so the block
+   still reads as one table however much of the page it has to cover. */
+.rp-cmpbody{display:flex;flex-direction:column}
+.rp-cmprow{display:flex;align-items:center;gap:11px;border-bottom:1px solid ${C.hair}}
+.rp-cmpbody .rp-cmprow:last-child{border-bottom:none}
+.rp-cv{flex:none;width:58px;font-size:15px;font-weight:800;text-align:right;letter-spacing:-0.4px}
+.rp-cl{flex:none;width:158px;text-align:center;font-size:10px;font-weight:700;color:#4c596c;
+  letter-spacing:0.9px;text-transform:uppercase}
+.rp-track{flex:1;height:16px;background:${C.hair};border-radius:99px;position:relative;overflow:hidden}
+.rp-fill{position:absolute;top:0;left:0;height:100%;border-radius:99px}
 .rp-fill.rp-fh{left:auto;right:0}
+/* ---- tables ------------------------------------------------------------ */
 table.rpt{width:100%;border-collapse:collapse;font-size:10.5px}
-.rpt th{background:${C.navy};color:#fff;font-weight:700;padding:6px 5px;text-align:center;white-space:nowrap}
-.rpt td{padding:4.5px 5px;text-align:center;border-bottom:1px solid #eef1f5}
-.rpt td.rp-pl{text-align:left;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rpt tr:nth-child(even) td{background:#f6f8fb}
+.rpt th{background:${C.navy};color:#fff;font-weight:700;font-size:8.5px;letter-spacing:0.4px;
+  line-height:1.25;text-transform:uppercase;padding:7px 4px;text-align:center}
+.rpt th:first-child{border-radius:5px 0 0 0}
+.rpt th:last-child{border-radius:0 5px 0 0}
+.rpt td{padding:4.5px 5px;text-align:center;border-bottom:1px solid ${C.hair};color:#2b384a}
+.rpt td.rp-pl{text-align:left;font-weight:600;color:${C.ink};max-width:96px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.rpt tbody tr:nth-child(even) td{background:${C.panel}}
+.rp-rk .rpt td{padding:6px 5px}
+.rp-rk-lg .rpt{font-size:11.5px}
+.rp-rk-lg .rpt th{font-size:9.5px;padding:9px 5px}
+.rp-rk-lg .rpt td{padding:11px 6px}
 .rp-pill{display:inline-block;min-width:26px;padding:2px 7px;border-radius:11px;color:#fff;font-weight:800;font-size:10px;box-sizing:border-box}
 table.rpt-el td{text-align:left}
 .rpt-el th.el-c,.rpt-el td.el-c{text-align:center}
-.rp-elidx{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:50%;color:#123;font-weight:800;font-size:10px;text-align:center}
-table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
-.rpm th{background:${C.navy};color:#fff;padding:5px 4px;min-width:24px;font-weight:700}
-.rpm td{border:1px solid #f0f2f6;text-align:center;padding:5px 4px;font-weight:600}
+.rp-elidx{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:50%;color:#152233;
+  font-weight:800;font-size:10px;text-align:center;box-sizing:border-box}
+table.rpm{border-collapse:collapse;font-size:10px;width:100%;margin:0 auto}
+.rpm th{background:${C.navy};color:#fff;padding:7px 4px;min-width:24px;font-weight:700;font-size:9px;
+  letter-spacing:0.4px}
+.rpm td{border:1px solid ${C.hair};text-align:center;padding:6.5px 4px;font-weight:600;color:#2b384a}
+/* ---- match timeline ---------------------------------------------------- */
 .rp-tlwrap{position:relative;padding:2px 0}
-.rp-tlspine{position:absolute;left:50%;top:12px;bottom:12px;width:2px;margin-left:-1px;background:#dfe5ee}
-.rp-tlrow{display:flex;align-items:center;padding:4.5px 0;font-size:11px;position:relative}
-.rp-tlh{flex:1;min-width:0;display:flex;justify-content:flex-end;align-items:center;gap:7px;font-weight:700;padding-right:14px}
-.rp-tla{flex:1;min-width:0;display:flex;justify-content:flex-start;align-items:center;gap:7px;font-weight:700;padding-left:14px}
+.rp-tlspine{position:absolute;left:50%;top:10px;bottom:10px;width:2px;margin-left:-1px;background:${C.line}}
+.rp-tlrow{display:flex;align-items:center;padding:3.5px 0;font-size:10.5px;position:relative}
+.rp-tlh{flex:1;min-width:0;display:flex;justify-content:flex-end;align-items:center;padding-right:10px}
+.rp-tla{flex:1;min-width:0;display:flex;justify-content:flex-start;align-items:center;padding-left:10px}
+/* the event sits in a tinted card keyed to its side, so which team an entry
+   belongs to is readable before the words are */
+.rp-tlcard{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:100%;
+  border:1px solid;border-radius:7px;padding:4px 8px;font-weight:700;box-sizing:border-box}
 /* the label carries the player's name now, so it is the part that gives way on a long one */
 .rp-tltxt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rp-tlmin{flex:none;min-width:58px;box-sizing:border-box;text-align:center;background:${C.navy};color:#fff;
-  border-radius:15px;border:3px solid #fff;padding:3.5px 8px;font-size:10.5px;font-weight:800;position:relative}
-.rp-tlsc{flex:none;color:${C.navy};font-weight:800;font-size:9.5px;background:#eef3f9;border:1px solid #d9e3f0;border-radius:9px;padding:1.5px 7px;white-space:nowrap}
-.rp-tlsep{text-align:center;margin:10px 0;position:relative}
-.rp-tlsep span{display:inline-block;background:#eef3f9;color:${C.navy};border:1px solid #d9e3f0;border-radius:15px;
-  padding:4.5px 18px;font-size:9.5px;font-weight:800;letter-spacing:1.2px;position:relative}
-.rp-cardi{display:inline-block;width:10px;height:14px;border-radius:2px;border:1px solid rgba(0,0,0,0.25);vertical-align:-2px}
+.rp-tlmin{flex:none;min-width:52px;box-sizing:border-box;text-align:center;background:${C.navy};color:#fff;
+  border-radius:15px;border:3px solid #fff;padding:3px 8px;font-size:10px;font-weight:800;
+  letter-spacing:0.2px;position:relative}
+.rp-tlsc{flex:none;color:#fff;font-weight:800;font-size:9px;background:${C.navy};border-radius:9px;
+  padding:2px 7px;letter-spacing:0.4px;white-space:nowrap}
+.rp-tlsep{text-align:center;margin:9px 0;position:relative}
+.rp-tlsep span{display:inline-block;background:${C.navy};color:#fff;border-radius:15px;
+  padding:4px 18px;font-size:8.5px;font-weight:800;letter-spacing:1.6px;position:relative}
+.rp-cardi{display:inline-block;width:10px;height:14px;border-radius:2px;border:1px solid rgba(0,0,0,0.2);vertical-align:-2px}
 .rp-badge{display:inline-flex;width:16px;height:16px;border-radius:50%;color:#fff;font-size:8px;font-weight:800;align-items:center;justify-content:center;line-height:1}
-.rp-fgrid{display:flex;flex-wrap:wrap;gap:26px 14px;margin-top:6px}
-.rp-fcard{width:calc(50% - 7px);box-sizing:border-box;border:1px solid ${C.line};border-radius:8px;padding:12px 9px 14px;text-align:center}
-.rp-fttl{font-size:11.5px;color:#5b6572;margin-bottom:8px}
-.rp-fttl b{color:${C.ink}}
-.rp-fpitch{position:relative;width:206px;margin:0 auto}
+/* ---- lineups & formation ----------------------------------------------- */
+.rp-fgrid{display:flex;flex-wrap:wrap;gap:22px 14px;margin-top:8px}
+.rp-fcard{width:calc(50% - 7px);box-sizing:border-box;border:1px solid ${C.line};border-radius:10px;
+  padding:12px 9px 14px;text-align:center;background:${C.panel}}
+.rp-fttl{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${C.mut};margin-bottom:9px}
+.rp-fttl b{color:${C.navy};letter-spacing:0.6px}
+.rp-fpitch{position:relative;width:240px;margin:0 auto}
 .rp-fdot{position:absolute;transform:translate(-50%,-50%);width:22px;height:22px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;color:#fff;font-size:9.5px;font-weight:800;
-  border:2px solid rgba(255,255,255,0.9);box-shadow:0 1px 2px rgba(0,0,0,0.35)}
+  border:2px solid rgba(255,255,255,0.92)}
+/* ---- maps -------------------------------------------------------------- */
+/* the end-on pitch on a page that carries two of them; capped so a long ranking
+   under it still has room, and centred in its column */
+.rp-vmap{width:100%;max-width:336px;margin:0 auto 2px}
+.rp-vmap.rp-vmap-sm{max-width:298px}
 .rp-mapcard{margin-bottom:12px}
-.rp-mtitle{font-size:13px;font-weight:800;margin:0 0 7px}
-.rp-mleg{display:flex;justify-content:center;flex-wrap:wrap;gap:16px;font-size:10px;color:#3d4754;margin-top:6px}
-.rp-mleg i{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:-1px}
-.rp-donuts{display:flex;gap:14px;margin-bottom:4px}
+.rp-mtitle{font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 8px}
+/* which way a team is playing, said beside the map's title rather than across the
+   middle of the pitch, where the actions themselves are */
+.rp-mdir{float:right;font-weight:700;letter-spacing:0.6px;text-transform:none;color:${C.mut}}
+.rp-mleg{display:flex;justify-content:center;flex-wrap:wrap;gap:7px;font-size:9px;color:#3d4a5c;margin-top:8px}
+.rp-mleg span{display:inline-flex;align-items:center;background:${C.panel};border:1px solid ${C.line};
+  border-radius:16px;padding:3px 9px;font-weight:600}
+.rp-mleg i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;flex:none}
+.rp-mleg i.rp-ring{width:13px;height:13px;border:3px solid;box-sizing:border-box}
+/* ---- shots & goals ----------------------------------------------------- */
 .rp-sgwrap{display:flex;gap:18px;align-items:flex-start}
 .rp-sgleft{width:292px;flex:none}
 .rp-sgright{flex:1;min-width:0}
@@ -159,39 +258,46 @@ table.rpm{border-collapse:collapse;font-size:9.5px;margin:0 auto}
    less the 292 map column and the 18 gap — so an Event List that runs on to a
    page of its own is drawn at the size it had on the page it came from */
 .rp-sgcont{width:384px;margin:0 auto}
-.rp-goalmouth{margin:0 0 6px}
-.rp-sgleg{justify-content:flex-start;gap:9px;font-size:8.5px;margin-top:7px}
-.rp-sgleg i{width:8px;height:8px;margin-right:4px}
+.rp-goalmouth{margin:0 0 9px;background:${C.panel};border:1px solid ${C.line};border-radius:8px;padding:11px 10px 7px}
+.rp-sgleg{justify-content:flex-start;gap:5px;font-size:8px;margin-top:8px}
+.rp-sgleg span{padding:2.5px 7px}
+.rp-sgleg i{width:7px;height:7px;margin-right:4px}
+/* ---- goalkeeper, discipline, donut ------------------------------------- */
 .rp-duo{display:flex;gap:14px;margin-bottom:2px}
-.rp-gkcard{flex:1;border:1px solid ${C.line};border-radius:8px;padding:12px 14px}
-.rp-gkteam{font-size:12.5px;font-weight:800;margin-bottom:7px}
-.rp-gkwho{display:flex;align-items:center;gap:7px;margin-bottom:10px}
-.rp-gkname{font-size:11px;font-weight:700;color:#3d4754;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-gkcard{flex:1;border:1px solid ${C.line};border-radius:10px;padding:13px 15px;background:${C.panel}}
+.rp-gkteam{font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px}
+.rp-gkwho{display:flex;align-items:center;gap:7px;margin-bottom:11px}
+.rp-gkname{font-size:11px;font-weight:700;color:#3d4a5c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rp-gkbody{display:flex;align-items:center;gap:13px}
 .rp-gkarc{flex:none;text-align:center}
-.rp-gkarc div{font-size:9px;color:${C.mut};margin-top:1px}
+.rp-gkarc svg{display:block;margin:0 auto}
+.rp-gkarc div{font-size:8px;font-weight:700;letter-spacing:0.9px;text-transform:uppercase;color:${C.mut};margin-top:3px}
 .rp-gkfig{flex:1;display:flex;gap:8px}
 .rp-gkstat{flex:1}
-.rp-gkstat b{display:block;font-size:18px;font-weight:800;color:${C.navy};line-height:1.2}
-.rp-gkstat span{font-size:8.5px;color:${C.mut};display:block;line-height:1.25}
-.rp-dcbox{flex:1;border:1px solid ${C.line};border-radius:8px;padding:9px 13px;display:flex;align-items:center;gap:9px}
-.rp-dcteam{flex:1;font-size:11.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rp-dcv{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:${C.navy}}
-.rp-dcv em{font-style:normal;font-size:8.5px;font-weight:600;color:${C.mut}}
-.rp-dcard{flex:1;border:1px solid ${C.line};border-radius:8px;padding:12px;display:flex;gap:14px;align-items:center}
+.rp-gkstat b{display:block;font-size:19px;font-weight:800;color:${C.navy};line-height:1.15;letter-spacing:-0.5px}
+.rp-gkstat span{font-size:8px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase;color:${C.mut};display:block;line-height:1.3;margin-top:2px}
+.rp-dcbox{flex:1;border:1px solid ${C.line};border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:9px;background:${C.panel}}
+.rp-dcteam{flex:1;font-size:10px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-dcv{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:800;color:${C.navy}}
+.rp-dcv em{font-style:normal;font-size:8px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:${C.mut}}
+.rp-dcard{flex:1;border:1px solid ${C.line};border-radius:10px;padding:13px;display:flex;gap:14px;align-items:center;background:${C.panel}}
 .rp-drows{flex:1;font-size:10.5px}
-.rp-drow{display:flex;align-items:center;gap:6px;padding:3.5px 0;border-bottom:1px solid #f0f2f6}
-.rp-drow i{width:9px;height:9px;border-radius:50%;display:inline-block}
-.rp-drow b{margin-left:auto;font-size:11px}
+.rp-drow{display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid ${C.line}}
+.rp-drow i{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.rp-drow b{margin-left:auto;font-size:11.5px;font-weight:800;color:${C.navy}}
 `;
   document.head.appendChild(st);
 }
 
 /* ================= small building blocks ================= */
-const secTitle=t=>`<div class="rp-sec">${t}</div>`;
+/* The title is written into the page in one piece, never split around a tag:
+   the section a page belongs to is read back out of this markup (the contents
+   page indexes on it, and the suite checks a page named the category it drew),
+   so "Defensive — Tackles" has to survive as that exact run of characters. */
+const secTitle=t=>`<div class="rp-sec"><span class="rp-secbar"></span><span class="rp-sect">${t}</span></div>`;
 const legend=()=>`<div class="rp-leg"><span><i style="background:${C.home}"></i>${esc(TN('home'))}</span>`
   +`<span><i style="background:${C.away}"></i>${esc(TN('away'))}</span></div>`;
-const pill=(no,team)=>`<span class="rp-pill" style="background:${TC(team)}">${esc(no)}</span>`;
+const pill=(no,team)=>`<span class="rp-pill" style="background:${TC(team)};color:${C.on(TC(team))}">${esc(no)}</span>`;
 /* the goal marker is the ⚽ glyph rather than a drawn ball; line-height:1 keeps it
    on the row's centre line beside the label it sits with */
 const BALL=`<span style="font-size:13px;line-height:1">⚽</span>`;
@@ -202,15 +308,42 @@ const BALL=`<span style="font-size:13px;line-height:1">⚽</span>`;
    pinned whoever led at 100%, so every row the home side won looked maxed out and the
    two bars no longer said anything about how close the contest was. Nothing to compare
    (0 – 0) splits down the middle. */
-function cmpRows(rowsArr){
-  return rowsArr.map(([lbl,hv,av])=>{
+/* Which side won the row is said by the bars, not by a word: the trailing fill is
+   dropped to a third of its weight, so the eye lands on the leader first and the
+   row can still be read for its two numbers. A tie leaves both at full strength.
+
+   `fit` is the size the page has worked out for one of its rows — see cmpFit(). A
+   block that is only part of a page (the Goalkeeper page's three) is drawn at the
+   default and says nothing. */
+function cmpRows(rowsArr,fit){
+  const f=fit||{track:16,fs:15,row:30,lbl:10};
+  const body=rowsArr.map(([lbl,hv,av])=>{
     const hn=numOf(hv), an=numOf(av), tot=hn+an, hp=tot?hn/tot*100:50;
-    return `<div class="rp-cmprow"><span class="rp-cv" style="color:${C.home}">${hv}</span>`
-      +`<span class="rp-track"><span class="rp-fill rp-fh" style="width:${hp.toFixed(1)}%;background:${C.home}"></span></span>`
-      +`<span class="rp-cl">${lbl}</span>`
-      +`<span class="rp-track"><span class="rp-fill" style="width:${(100-hp).toFixed(1)}%;background:${C.away}"></span></span>`
-      +`<span class="rp-cv" style="color:${C.away};text-align:left">${av}</span></div>`;
+    const barH=an>hn?';opacity:0.32':'', barA=hn>an?';opacity:0.32':'';
+    const numH=an>hn?';opacity:0.72':'', numA=hn>an?';opacity:0.72':'';
+    const tr=`class="rp-track" style="height:${f.track}px"`;
+    const cv=`class="rp-cv" style="font-size:${f.fs}px`;
+    const cl=`class="rp-cl" style="font-size:${f.lbl}px"`;
+    return `<div class="rp-cmprow" style="min-height:${f.row}px"><span ${cv};color:${C.homeInk}${numH}">${hv}</span>`
+      +`<span ${tr}><span class="rp-fill rp-fh" style="width:${hp.toFixed(1)}%;background:${C.home}${barH}"></span></span>`
+      +`<span ${cl}>${lbl}</span>`
+      +`<span ${tr}><span class="rp-fill" style="width:${(100-hp).toFixed(1)}%;background:${C.away}${barA}"></span></span>`
+      +`<span ${cv};color:${C.awayInk};text-align:left${numA}">${av}</span></div>`;
   }).join('');
+  return `<div class="rp-cmpbody">${body}</div>`;
+}
+/* How big one comparison row should be on a page that carries nothing else.
+   The three sections are different lengths — nine rows under Attacking, ten under
+   Distribution, thirteen under Defensive — and drawn at one fixed size the short
+   ones stopped halfway down an A4 page while the long one filled it. Both the bar
+   and the air around it come from how much page there is per row, bounded so the
+   block can neither crowd nor drift apart. */
+const CMP_FILL=840;   // the flow box less a section head, a legend, a section bar and slack
+function cmpFit(n){
+  const per=Math.min(96,CMP_FILL/Math.max(1,n));
+  const track=Math.max(16,Math.min(24,Math.round(per*0.24)));
+  const fs=Math.max(15,Math.min(20,Math.round(per*0.20)));
+  return {track,fs,row:Math.round(per),lbl:Math.max(10,Math.min(13,Math.round(fs*0.66)))};
 }
 /* values for one TEAM_SECTIONS section index */
 function sectionRows(si){
@@ -218,21 +351,30 @@ function sectionRows(si){
   return TEAM_SECTIONS[si][1].map(([label,fn])=>[label,fn(h,a),fn(a,h)]);
 }
 
-/* ---- report pitches (literal colours, striped grass like the reference) ---- */
+/* ---- report pitches (literal colours, striped grass like the reference) ----
+   The turf was drawn out four times over — here twice, and again inside the cross
+   and foul maps, which build their own SVG around a margin. One helper now, so the
+   green is one decision rather than four that can drift apart. `across` stripes the
+   short way, for a pitch drawn end-on. */
+function grassSVG(W,H,across){
+  let g='';
+  for(let i=0;i<7;i++)g+=across
+    ?`<rect x="0" y="${(i*H/7).toFixed(1)}" width="${W}" height="${(H/7).toFixed(1)}" fill="${i%2?C.grassA:C.grassB}"/>`
+    :`<rect x="${(i*W/7).toFixed(1)}" y="0" width="${(W/7).toFixed(1)}" height="${H}" fill="${i%2?C.grassA:C.grassB}"/>`;
+  /* a dark inset edge: printed small, a pitch with no frame bleeds into the white
+     page and the touchline reads as the boundary it is not */
+  return g+`<rect x="1.5" y="1.5" width="${(W-3).toFixed(1)}" height="${(H-3).toFixed(1)}" fill="none" stroke="rgba(0,0,0,0.22)" stroke-width="3"/>`;
+}
 function hPitchSVG(inner,dir){   // dir: attacking direction arrow, defaults to right
   const d=PITCH_DIMS.football, W=d.w, H=d.h;
-  let g='';
-  for(let i=0;i<7;i++)g+=`<rect x="${(i*W/7).toFixed(1)}" y="0" width="${(W/7).toFixed(1)}" height="${H}" fill="${i%2?'#2a733f':'#2e7d46'}"/>`;
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;border-radius:6px">${g}`
-    +`<g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3">${pitchFootball(W,H,false)}</g>`
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;border-radius:7px">${grassSVG(W,H,false)}`
+    +`<g fill="none" stroke="rgba(255,255,255,0.88)" stroke-width="3">${pitchFootball(W,H,false)}</g>`
     +dirArrowSVG(dir||'right')+(inner||'')+'</svg>';
 }
 function vPitchSVG(inner){   // `inner` is drawn in vertical coords, on top of the markings
   const d=PITCH_DIMS.football, W=d.h, H=d.w;   // vertical: 680 wide x 1050 tall
-  let g='';
-  for(let i=0;i<7;i++)g+=`<rect x="0" y="${(i*H/7).toFixed(1)}" width="${W}" height="${(H/7).toFixed(1)}" fill="${i%2?'#2a733f':'#2e7d46'}"/>`;
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;border-radius:6px">${g}`
-    +`<g transform="translate(0 ${H}) rotate(-90)"><g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="4">${pitchFootball(H,W,false)}</g></g>`
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;border-radius:7px">${grassSVG(W,H,true)}`
+    +`<g transform="translate(0 ${H}) rotate(-90)"><g fill="none" stroke="rgba(255,255,255,0.88)" stroke-width="4">${pitchFootball(H,W,false)}</g></g>`
     +(inner||'')+'</svg>';
 }
 // "Attacking ↑" marker for the vertical shot map
@@ -269,10 +411,14 @@ function teamPeriods(team){
 // "Lineups & Formation" page, so the formation summary that used to sit under the
 // score is gone; the score block carries the spacing it used to add.
 function headerBlock(){
-  return `<div style="display:flex;align-items:center;justify-content:center;gap:24px;margin:14px 0 30px">`
-    +`<span style="flex:1;text-align:right;font-size:23px;font-weight:800;color:${C.home}">${esc(meta.home)}</span>`
-    +`<span style="flex:none;font-size:42px;font-weight:800;color:${C.ink}">${teamGoals('home')} <span style="color:${C.grey};font-weight:400">–</span> ${teamGoals('away')}</span>`
-    +`<span style="flex:1;text-align:left;font-size:23px;font-weight:800;color:${C.away}">${esc(meta.away)}</span></div>`;
+  /* the score is one text run — "5 – 2" with its spaces intact — because that is
+     how the suite reads the result back off the page */
+  return `<div class="rp-mast">`
+    +`<div class="rp-mastt" style="text-align:right;color:${C.homeInk}">${esc(meta.home)}`
+    +`<u style="background:${C.home};margin-left:auto;width:54px"></u></div>`
+    +`<div class="rp-masts">${teamGoals('home')} <span class="rp-mastd">–</span> ${teamGoals('away')}</div>`
+    +`<div class="rp-mastt" style="text-align:left;color:${C.awayInk}">${esc(meta.away)}`
+    +`<u style="background:${C.away};width:54px"></u></div></div>`;
 }
 /* "#9 Bacuna" — the shirt number always, plus the registered name when Player lists has
    one for it. playerLabel() would fall back to "Player 9", which only repeats the number,
@@ -355,8 +501,9 @@ function tlIcon(e){
   return `<span class="rp-cardi" style="background:#f5c518"></span><span class="rp-cardi" style="background:${C.red};margin-left:-4px"></span>`;
 }
 function tlRow(e,score){
-  const item=`${tlIcon(e)}<span class="rp-tltxt" style="color:${TC(e.team)}">${e.html}</span>`
-    +(score?`<span class="rp-tlsc">${score}</span>`:'');
+  const item=`<span class="rp-tlcard" style="border-color:rgba(${TRGB(e.team)},0.45);background:rgba(${TRGB(e.team)},0.08)">`
+    +`${tlIcon(e)}<span class="rp-tltxt" style="color:${TI(e.team)}">${e.html}</span>`
+    +(score?`<span class="rp-tlsc">${score}</span>`:'')+`</span>`;
   return `<div class="rp-tlrow"><div class="rp-tlh">${e.team==='home'?item:''}</div>`
     +`<span class="rp-tlmin">${minLbl(e.sec,e.half)}</span>`
     +`<div class="rp-tla">${e.team==='away'?item:''}</div></div>`;
@@ -380,9 +527,27 @@ function timelineItems(){
   items.push(sep(`FULL-TIME&nbsp;&nbsp;${teamGoals('home')} – ${teamGoals('away')}`));
   return items;
 }
+/* How many entries fit on a page is a question of height, not of count: an event
+   row and a HALF-TIME chip do not cost the same, and page one gives its top to the
+   masthead. The fixed 22-then-30 this replaces was measured against neither, so a
+   match with more than about fifty goals and cards ran off the bottom of a page
+   that cannot scroll — .rp-page is overflow:hidden, and the entries simply went
+   missing. Costs are the rendered heights of .rp-tlrow and .rp-tlsep; the budgets
+   are what is left of the 1031px flow box under each page's own heading. */
+const TL_ROW=34, TL_SEP=42, TL_FIRST=830, TL_REST=935;
+function timelineChunks(items){
+  const out=[]; let cur=[], h=0, budget=TL_FIRST;
+  items.forEach(it=>{
+    const c=it.indexOf('rp-tlsep')>=0?TL_SEP:TL_ROW;
+    if(h+c>budget&&cur.length){out.push(cur); cur=[]; h=0; budget=TL_REST;}
+    cur.push(it); h+=c;
+  });
+  if(cur.length)out.push(cur);
+  return out;
+}
 function timelinePages(){
   const items=timelineItems(), chunks=[];
-  if(items){chunks.push(items.slice(0,22)); for(let i=22;i<items.length;i+=30)chunks.push(items.slice(i,i+30));}
+  if(items)timelineChunks(items).forEach(c=>chunks.push(c));
   else chunks.push(null);
   return chunks.map((ch,ci)=>
     (ci===0?headerBlock():'')
@@ -397,7 +562,7 @@ function fmCard(p,team){
   const dots=p.xi.map(q=>{
     let x=+q.x, y=+q.y; if(p.dir==='rl'){x=100-x;y=100-y;}      // normalise to attacking RIGHT
     const left=y, top=100-x;                                     // rotate 90° CCW → attacking UP
-    return `<div class="rp-fdot" style="left:${left.toFixed(1)}%;top:${top.toFixed(1)}%;background:${TC(team)}">${esc(q.no)}</div>`;
+    return `<div class="rp-fdot" style="left:${left.toFixed(1)}%;top:${top.toFixed(1)}%;background:${TC(team)};color:${C.on(TC(team))}">${esc(q.no)}</div>`;
   }).join('');
   return `<div class="rp-fcard"><div class="rp-fttl"><b>${mmss(p.start)}–${mmss(p.end)}</b></div>`
     +`<div class="rp-fpitch">${vPitchSVG()}${dots}</div></div>`;
@@ -412,7 +577,7 @@ function formationPages(team){
     +`<div class="rp-note" style="font-size:11px">No starting lineup set for this team (see Player lists).</div>`];
   for(let i=0;i<ps.length;i+=4){
     let b=secTitle(title);
-    b+=`<div class="rp-sub" style="color:${TC(team)}">${esc(TN(team))}</div>`;
+    b+=`<div class="rp-sub" style="color:${TI(team)}">${esc(TN(team))}</div>`;
     b+=`<div class="rp-fgrid">${ps.slice(i,i+4).map(p=>fmCard(p,team)).join('')}</div>`;
     pages.push(b);
   }
@@ -436,7 +601,7 @@ function donutCard(team){
     +`<text x="${cx}" y="${cy+22}" text-anchor="middle" font-size="27" font-weight="800" fill="${C.ink}">${goals}</text></svg>`;
   const row=(dot,lbl,val)=>`<div class="rp-drow">${dot?`<i style="background:${dot}"></i>`:''}<span>${lbl}</span><b>${val}</b></div>`;
   return `<div class="rp-dcard">${svg}<div class="rp-drows">`
-    +`<div style="font-size:12.5px;font-weight:800;color:${TC(team)};margin-bottom:4px">${esc(TN(team))}</div>`
+    +`<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${TI(team)};margin-bottom:6px">${esc(TN(team))}</div>`
     +row('','Total Shots',total)
     +row(C.gold,'Goals',goals)
     +row(C.green,'On Target',`${pc0(s.shotsOn,total)} <span style="color:${C.mut};font-weight:400">${frac(s.shotsOn,total)}</span>`)
@@ -446,15 +611,21 @@ function donutCard(team){
 /* Attacking — team comparison on its own page (the donuts now live on each team's
    own "Shots & Goals" page, so this one is purely the head-to-head bars). */
 function attackingComparisonPage(){
+  const r=sectionRows(0);
   return secTitle('Attacking — Team Comparison')
     +legend()
-    +`<div class="rp-cmphead">Attacking</div>`+cmpRows(sectionRows(0));
+    +`<div class="rp-cmphead">Attacking</div>`+cmpRows(r,cmpFit(r.length));
 }
 /* ---- "Shots & Goals" — ONE page per team: the shot map on the left, the summary donut
    and the shot-by-shot Event List on the right. Map markers carry the same number as the
    list row, so the two read together. Both halves are normalised to attack UP. ---- */
 const SHOT_MAP_COLORS={'goal':C.gold,'shot on target':C.green,
-  'shot off target':'#aeb4bc','blocked shot':'#aeb4bc','miss shot':'#aeb4bc'};
+  'shot off target':'#a9b3c0','blocked shot':'#a9b3c0','miss shot':'#a9b3c0'};
+/* The number a shot carries is the same number in the goal, on the pitch and in the
+   list, so it is drawn in the same colour in all three. shared.js keeps a palette of
+   its own for the Stats tab, which is dark, and taking the list's marker from there
+   left it a different green from the dot it points at. */
+const shotInk=e=>SHOT_MAP_COLORS[evKey(e)]||'#a9b3c0';
 function shotDotsV(team){
   const N=normXY(team), d=PITCH_DIMS.football, W=d.h, H=d.w;
   // same filter + order as shotList(), so index N on the map is row N in the list
@@ -464,12 +635,12 @@ function shotDotsV(team){
       if(!r.pXY)return '';                       // no location tagged -> list only
       const p=N(r).a;
       // horizontal (attacking right) -> vertical (attacking up): left = y, top = 100 - x
-      const vx=p.y/100*W, vy=(100-p.x)/100*H, col=SHOT_MAP_COLORS[r.event]||'#aeb4bc';
+      const vx=p.y/100*W, vy=(100-p.x)/100*H, col=SHOT_MAP_COLORS[r.event]||'#a9b3c0';
       const shape=eventHalf(r)===1
         ?`<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="18" fill="${col}" stroke="#fff" stroke-width="3"/>`
         :`<rect x="${(vx-16).toFixed(1)}" y="${(vy-16).toFixed(1)}" width="32" height="32" rx="5" fill="${col}" stroke="#fff" stroke-width="3"/>`;
       return `<g>${shape}<text x="${vx.toFixed(1)}" y="${(vy+6.5).toFixed(1)}" text-anchor="middle" `
-        +`font-size="18" font-weight="800" fill="#fff">${i+1}</text></g>`;
+        +`font-size="18" font-weight="800" fill="${C.on(col)}">${i+1}</text></g>`;
     }).join('');
 }
 /* The same filter and order as shotDotsV, so a shot keeps ONE number across the goal
@@ -479,12 +650,12 @@ function goalMarksV(team){
   return rows.filter(r=>r.team===team&&SHOT_KINDS.has(r.event)&&r.t!=null)
     .sort((a,b)=>a.t-b.t)
     .map((r,i)=>r.gXY?{x:r.gXY.x,y:r.gXY.y,label:i+1,
-      color:SHOT_MAP_COLORS[r.event]||'#aeb4bc',square:eventHalf(r)===2}:null)
+      color:SHOT_MAP_COLORS[r.event]||'#a9b3c0',square:eventHalf(r)===2}:null)
     .filter(Boolean);
 }
 function shotsAndGoalsPages(team){
   const list=shotList(rows,team), names=squadNames(lineups,team);
-  const tr=s=>`<tr><td class="el-c"><span class="rp-elidx" style="background:${shotColor(s.event)}">${s.idx}</span></td>`
+  const tr=s=>`<tr><td class="el-c"><span class="rp-elidx" style="background:${shotInk(s.event)};color:${C.on(shotInk(s.event))}">${s.idx}</span></td>`
     +`<td class="el-c">${esc(minLbl(matchTime(s.t),eventHalf({t:s.t})))}</td>`
     +`<td>${esc(s.no)}. ${esc(playerLabel(names,s.no))}</td>`
     +`<td>${s.bodyPart?esc(s.bodyPart):'<span style="color:#c9cfd9">–</span>'}</td></tr>`;
@@ -494,12 +665,12 @@ function shotsAndGoalsPages(team){
   // where the on-target ones crossed the line. Numbered and coloured exactly like the map
   // and the Event List, so #7 in the goal is #7 on the pitch is #7 in the table.
   const gm=goalMarksV(team);
-  const left=`<div class="rp-sgleft"><div class="rp-mtitle" style="color:${TC(team)}">Shots</div>`
-    +`<div class="rp-goalmouth">${goalMouthSVG(gm,{net:'#c9cfd9',frame:'#98a0aa',ink:'#fff',ring:'#fff'})}</div>`
+  const left=`<div class="rp-sgleft"><div class="rp-mtitle" style="color:${TI(team)}">Shots</div>`
+    +`<div class="rp-goalmouth">${goalMouthSVG(gm,{net:'#c7d0dc',frame:'#8f99a6',ink:'#152233',ring:'#fff'})}</div>`
     +vPitchSVG(vUpArrowSVG()+shotDotsV(team))
     +`<div class="rp-mleg rp-sgleg"><span><i style="background:${C.gold}"></i>Goal</span>`
     +`<span><i style="background:${C.green}"></i>On target</span>`
-    +`<span><i style="background:#aeb4bc"></i>Off / blocked / missed</span>`
+    +`<span><i style="background:#a9b3c0"></i>Off / blocked / missed</span>`
     +`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
     +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span></div></div>`;
   // 26 rows exactly fill the column beside the map/summary (measured against the 1123px
@@ -538,7 +709,7 @@ function teamTable(team,headers,rowFor){
     +`<td>${minOf(no)}</td>`
     +`${rowFor(P[no],no,team).map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');
   return {rows:list.length,
-    html:`<div class="rp-sub" style="color:${TC(team)}">${esc(TN(team))}</div>`
+    html:`<div class="rp-sub" style="color:${TI(team)}">${esc(TN(team))}</div>`
       +`<table class="rpt"><thead><tr><th>No</th><th>Player</th><th>Min</th>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`};
 }
 function playerStatPages(title,headers,rowFor){
@@ -575,8 +746,11 @@ function defensivePlayerPages(){
 }
 
 /* ================= distribution ================= */
-const distributionPage=()=>secTitle('Distribution')+legend()
-  +`<div class="rp-cmphead">Distribution</div>`+cmpRows(sectionRows(1));
+const distributionPage=()=>{
+  const r=sectionRows(1);
+  return secTitle('Distribution')+legend()
+    +`<div class="rp-cmphead">Distribution</div>`+cmpRows(r,cmpFit(r.length));
+};
 
 /* pass-network map — nodes at average involvement, arrows = completed passes.
    `filter` restricts the passes (used for the 15-minute windows); `idSuffix`
@@ -611,18 +785,18 @@ function netMapSVG(team,filter,idSuffix){
     const [f,t]=k.split('>'), a=nodes[f], b=nodes[t];
     const dx=b.x-a.x, dy=b.y-a.y, dd=Math.hypot(dx,dy)||1, ux=dx/dd, uy=dy/dd;
     seg+=`<line x1="${(a.x+ux*R).toFixed(1)}" y1="${(a.y+uy*R).toFixed(1)}" x2="${(b.x-ux*(R+7)).toFixed(1)}" y2="${(b.y-uy*(R+7)).toFixed(1)}"`
-      +` stroke="#f2f5f9" stroke-opacity="0.85" stroke-width="${Math.min(7,1.2+n*0.7).toFixed(1)}" marker-end="url(#${mk})"/>`;
+      +` stroke="#ffffff" stroke-opacity="0.9" stroke-width="${Math.min(8,1.6+n*0.8).toFixed(1)}" marker-end="url(#${mk})"/>`;
   });
   const dots=Object.entries(nodes).map(([p,n])=>
     `<g><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${R}" fill="${TC(team)}" stroke="rgba(255,255,255,0.92)" stroke-width="2.5"/>`
-    +`<text x="${n.x.toFixed(1)}" y="${(n.y+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">${esc(p)}</text></g>`).join('');
-  const defs=`<defs><marker id="${mk}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#f2f5f9"/></marker></defs>`;
+    +`<text x="${n.x.toFixed(1)}" y="${(n.y+5).toFixed(1)}" text-anchor="middle" font-size="15" font-weight="800" fill="${C.on(TC(team))}">${esc(p)}</text></g>`).join('');
+  const defs=`<defs><marker id="${mk}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ffffff"/></marker></defs>`;
   return defs+seg+dots;
 }
 function netMapsPage(){
   const h=netMapSVG('home'), a=netMapSVG('away');
   if(!h&&!a)return null;
-  const card=(team,svg)=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Pass Network</div>`
+  const card=(team,svg)=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))} · Pass Network</div>`
     +`<div style="width:620px;margin:0 auto">${hPitchSVG(svg||'',team==='away'?'left':'right')}</div></div>`;
   return secTitle('Distribution — Pass Networks')+card('home',h)+card('away',a);
 }
@@ -646,7 +820,7 @@ function netWindowPages(){
   // one column of the interval row: team name, network pitch, stats line
   const half=(team,w,f,i)=>{
     const winP=all[team].filter(f), opp=team==='home'?'away':'home';
-    const head=`<div class="rp-mtitle" style="color:${TC(team)};font-size:11px;margin-bottom:4px">${esc(TN(team))}</div>`;
+    const head=`<div class="rp-mtitle" style="color:${TI(team)};font-size:11px;margin-bottom:4px">${esc(TN(team))}</div>`;
     // an empty window keeps the pitch; the stats line reads 0 / 0%
     const suc=winP.filter(r=>r.event==='pass success').length;
     const oppWin=all[opp].filter(f).length;
@@ -695,13 +869,13 @@ function scatterPanel(team){
   g+=`<line x1="${X(50)}" y1="0" x2="${X(50)}" y2="${H}" stroke="${C.line}" stroke-dasharray="4 4"/>`;
   g+=`<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="${C.line}" stroke-dasharray="4 4"/>`;
   g+=pts.map(p=>`<g><circle cx="${p.cx.toFixed(1)}" cy="${p.cy.toFixed(1)}" r="${p.rr.toFixed(1)}" fill="${TC(team)}" stroke="#fff" stroke-width="1.5"/>`
-    +`<text x="${p.cx.toFixed(1)}" y="${(p.cy+3.5).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="800" fill="#fff">${esc(p.no)}</text></g>`).join('');
+    +`<text x="${p.cx.toFixed(1)}" y="${(p.cy+3.5).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="800" fill="${C.on(TC(team))}">${esc(p.no)}</text></g>`).join('');
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">${g}</svg>`
     +`<div style="display:flex;justify-content:space-between;font-size:10px;color:${C.mut};padding:4px 2px 0">`
     +`<span>0%</span><span>Pass Accuracy →</span><span>100%</span></div>`;
 }
 function scatterPage(){
-  const card=team=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Passes by Volume &amp; Accuracy</div>${scatterPanel(team)}</div>`;
+  const card=team=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))} · Passes by Volume &amp; Accuracy</div>${scatterPanel(team)}</div>`;
   return secTitle('Distribution — Passing Profile')+card('home')+card('away');
 }
 
@@ -709,7 +883,7 @@ function scatterPage(){
 function matrixPage(team){
   const {players,mtx}=passMatrix(rows,team);
   let b=secTitle('Distribution — Pass Heatmap (From → To)')
-    +`<div class="rp-sub" style="color:${TC(team)}">${esc(TN(team))}</div>`;
+    +`<div class="rp-sub" style="color:${TI(team)}">${esc(TN(team))}</div>`;
   if(!players.length)return b+`<div class="rp-note" style="font-size:11px">No completed passes for this team yet.</div>`;
   let max=0; players.forEach(f=>players.forEach(t=>{if(f!==t)max=Math.max(max,(mtx[f]&&mtx[f][t])||0);}));
   const shade=v=>v?`background:rgba(${TRGB(team)},${(0.10+0.55*v/(max||1)).toFixed(3)})`:'';
@@ -732,7 +906,7 @@ function matrixPage(team){
 function heatPage(){
   const card=team=>{
     const pts=touchPoints(team);   // 0 touches -> empty pitch, blank canvas
-    return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Touch Heatmap`
+    return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))} · Touch Heatmap`
       +` <span style="color:${C.mut};font-weight:400;font-size:10px">(${pts.length} located touches)</span></div>`
       +`<div style="position:relative;width:620px;margin:0 auto">${hPitchSVG('',team==='away'?'left':'right')}`
       +`<canvas class="rp-heat" data-team="${team}" width="1050" height="680" style="position:absolute;left:0;top:0;width:100%;height:100%"></canvas></div></div>`;
@@ -746,16 +920,16 @@ function heatPage(){
 function passTypesPage(){
   const card=team=>{
     const D=passTypeData(team);
-    if(!D.tot)return `<div style="flex:1"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}</div>`
+    if(!D.tot)return `<div style="flex:1"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))}</div>`
       +`<div class="rp-note" style="font-size:11px">No passes yet.</div></div>`;
     const rate=(n,d)=>d?(Math.round(n/d*1000)/10).toFixed(1)+'%':'–';
     const section=(title,cat)=>{
       const base=Object.values(cat).reduce((s,v)=>s+v[1],0);
       return `<tr><th colspan="4" style="text-align:left">${title}</th></tr>`
         +Object.entries(cat).map(([lbl,[s,n]])=>
-          `<tr><td style="text-align:left;font-weight:700;color:${TC(team)}">${lbl}</td><td>${frac(s,n)}</td><td>${rate(s,n)}</td><td>${rate(n,base)}</td></tr>`).join('');
+          `<tr><td style="text-align:left;font-weight:700;color:${TI(team)}">${lbl}</td><td>${frac(s,n)}</td><td>${rate(s,n)}</td><td>${rate(n,base)}</td></tr>`).join('');
     };
-    return `<div style="flex:1"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}`
+    return `<div style="flex:1"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))}`
       +` <span style="color:${C.mut};font-weight:400;font-size:10px">${D.suc}/${D.tot} · ${rate(D.suc,D.tot)}</span></div>`
       +`<table class="rpt" style="font-size:9.5px"><thead><tr><th style="text-align:left">Passes</th><th>Made</th><th>Success</th><th>Ratio</th></tr></thead>`
       +`<tbody>${section('Pass Distance',D.catD)}${section('Pass Direction',D.catG)}${section('Area',D.catA)}</tbody></table></div>`;
@@ -790,7 +964,7 @@ function crossMapSVG(team){
   }).join('');
   const defs=`<defs><marker id="${okId}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#39d98a"/></marker>`
     +`<marker id="${noId}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#f7506b"/></marker></defs>`;
-  let grass=''; for(let i=0;i<7;i++)grass+=`<rect x="${(i*PW/7).toFixed(1)}" y="0" width="${(PW/7).toFixed(1)}" height="${PH}" fill="${i%2?'#2a733f':'#2e7d46'}"/>`;
+  const grass=grassSVG(PW,PH,false);
   const pitch=`<g transform="translate(0 ${mT})">${grass}`
     +`<g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG(flip?'left':'right')}${seg}</g>`;
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">${defs}${over}${pitch}</svg>`;
@@ -798,15 +972,18 @@ function crossMapSVG(team){
 function crossMapsPage(){
   const isCross=r=>(r.event==='cross success'||r.event==='cross fail')&&r.pXY;
   if(!rows.some(isCross))return null;   // page skipped only when NEITHER team crossed
-  const card=team=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Cross Map</div>`
+  const card=team=>`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))} · Cross Map</div>`
     +`<div style="width:660px;margin:0 auto">${crossMapSVG(team)}</div></div>`;
   return secTitle('Distribution — Cross Maps')+card('home')+card('away')
     +`<div class="rp-mleg"><span><i style="background:#39d98a"></i>Cross success</span><span><i style="background:#f7506b"></i>Cross fail</span></div>`;
 }
 
 /* ================= defensive ================= */
-const defensivePage=()=>secTitle('Defensive')+legend()
-  +`<div class="rp-cmphead">Defensive</div>`+cmpRows(sectionRows(2));
+const defensivePage=()=>{
+  const r=sectionRows(2);
+  return secTitle('Defensive')+legend()
+    +`<div class="rp-cmphead">Defensive</div>`+cmpRows(r,cmpFit(r.length));
+};
 
 /* Top-5 player ranking printed under a map. `rk` describes what to count and how to order:
      {events:[…]}            Rank · Player · Total, most events first
@@ -815,7 +992,7 @@ const defensivePage=()=>secTitle('Defensive')+legend()
      {…,label:'Take-ons'}    a caption above the table, for pages with more than one
    Counts ALL events of the type, located on the pitch or not. Ties (identical totals AND
    successes) share a rank shown blank, like the reference report. */
-function rankTable(team,rk){
+function rankTable(team,rk,big){
   const want={}; rk.events.forEach(ev=>want[evKey(ev)]=1);
   const okEv=rk.succ?evKey(rk.succ):null, two=!!okEv;
   const counts={};
@@ -828,27 +1005,36 @@ function rankTable(team,rk){
   const list=Object.entries(counts).sort((x,y)=>
     (rk.by==='rate'?rate(y[1])-rate(x[1]):0)
     ||y[1].t-x[1].t||y[1].s-x[1].s||(+x[0]||1e9)-(+y[0]||1e9)).slice(0,5);
+  /* A page that carries ONE ranking draws it as a block rather than as a footnote:
+     it has the room the two-ranking pages do not, and the ranking is the answer the
+     map above it was asked for. */
+  const cls=big?'rp-rk rp-rk-lg':'rp-rk';
   const cap=rk.label?`<div style="font-size:10.5px;font-weight:800;color:${C.navy};margin:9px 0 2px">${rk.label}`
     +(rk.by==='rate'?`<span style="color:${C.mut};font-weight:600"> · ranked by success rate</span>`:'')
     +'</div>':'';
-  const header=`${cap}<table class="rpt" style="font-size:9px;margin-top:${rk.label?'0':'8px'}"><thead><tr><th>Rank</th>`
+  const header=`${cap}<table class="rpt" style="font-size:10px;margin-top:${rk.label?'2px':'10px'}"><thead><tr><th>Rank</th>`
     +`<th style="text-align:left">Player</th><th>Total</th>${two?'<th>Succ.</th><th>Success Rate</th>':''}</tr></thead>`;
   if(!list.length){   // no data -> dashed placeholder rows, like the reference
     let h='';
     for(let i=1;i<=5;i++)h+=`<tr><td style="color:${C.mut}">${i}</td><td style="text-align:left;color:#c9cfd9">–</td>`
       +`<td style="color:#c9cfd9">–</td>${two?'<td style="color:#c9cfd9">–</td><td style="color:#c9cfd9">–</td>':''}</tr>`;
-    return header+`<tbody>${h}</tbody></table>`;
+    return `<div class="${cls}">`+header+`<tbody>${h}</tbody></table></div>`;
   }
   const roster=(lineups[team]&&lineups[team].roster)||[];
   const nameOf=no=>{const p=roster.find(q=>String(q.no)===String(no));return p&&p.name?p.name:'Player '+no;};
+  /* The top of the ranking is what the page was asked for, so it is set apart —
+     tinted and in the section's own navy. Carried on the cells rather than on the
+     row: the suite reads these tables back by matching a bare <tr>, and a class
+     there would hide the very row the ordering tests are about. */
   let prev=null;
   const trs=list.map(([no,c],i)=>{
     const tied=prev&&prev.t===c.t&&prev.s===c.s; prev=c;
-    return `<tr><td style="color:${C.mut}">${tied?'':i+1}</td>`
-      +`<td style="text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td>${c.t}</td>`
-      +(two?`<td>${c.s}</td><td>${pc0(c.s,c.t)}</td>`:'')+'</tr>';
+    const hi=i===0?`background:${C.band};color:${C.navy};font-weight:800;`:'';
+    return `<tr><td style="${hi}color:${i===0?C.navy:C.mut}">${tied?'':i+1}</td>`
+      +`<td style="${hi}text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td style="${hi}">${c.t}</td>`
+      +(two?`<td style="${hi}">${c.s}</td><td style="${hi}">${pc0(c.s,c.t)}</td>`:'')+'</tr>';
   }).join('');
-  return header+`<tbody>${trs}</tbody></table>`;
+  return `<div class="${cls}">`+header+`<tbody>${trs}</tbody></table></div>`;
 }
 /* One located-action map page for a category of events: home and away pitches side by
    side (home attacks RIGHT, away mirrored LEFT), one colour per event type, marker shape
@@ -866,22 +1052,30 @@ function actionMapsPage(cat,title,ranks){
   const acts=team=>rows.filter(r=>r.team===team&&col[evKey(r.event)]&&r.pXY);
   const hA=acts('home'), aA=acts('away');
   if(!hA.length&&!aA.length)return null;
-  // side-by-side row: home attacks RIGHT, away mirrored to attack LEFT;
-  // marker shape = half (circle 1st, square 2nd), colour = the event's part;
-  // a side with no data keeps the empty pitch
+  /* Side-by-side row, both sides drawn END-ON and attacking UP.
+     These two pitches share the page's width, so landscape gave each of them 219px
+     of a 1031px page — the maps were postage stamps with unreadable shirt numbers,
+     and the page ran half empty under them. End-on, the same column is 500px tall:
+     the page fills, the markers double, and the two sides line up goal-to-goal so a
+     defensive shape can be compared directly rather than through a mirror. It is the
+     orientation the Shots & Goals maps already use, so the rule across the report is
+     simply that a pitch drawn at half-width is drawn end-on.
+     Marker shape = half (circle 1st, square 2nd), colour = the event's part;
+     a side with no data keeps the empty pitch. */
   const card=(team,list)=>{
-    const flip=team==='away';
-    const N=normXY(team), d=PITCH_DIMS.football;
+    const N=normXY(team), d=PITCH_DIMS.football, W=d.h, H=d.w;
     const dots=list.map(r=>{
-      const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h, c=col[evKey(r.event)];
+      // normXY leaves both halves attacking RIGHT; end-on that is across = y, up = 100 - x
+      const p=N(r).a, x=p.y/100*W, y=(100-p.x)/100*H, c=col[evKey(r.event)];
       const shape=eventHalf(r)===1
-        ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${c}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
-        :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${c}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`;
-      return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
+        ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16" fill="${c}" fill-opacity="0.94" stroke="#fff" stroke-width="2.5"/>`
+        :`<rect x="${(x-14.5).toFixed(1)}" y="${(y-14.5).toFixed(1)}" width="29" height="29" rx="5" fill="${c}" fill-opacity="0.94" stroke="#fff" stroke-width="2.5"/>`;
+      return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+5.5).toFixed(1)}" text-anchor="middle" font-size="16" font-weight="800" fill="${C.on(c)}">${esc(String(r.playerFrom||'').trim())}</text></g>`;
     }).join('');
-    const map=hPitchSVG(dots,flip?'left':'right');
-    return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}</div>`
-      +map+rk.map(one=>rankTable(team,one)).join('')+'</div>';
+    const map=`<div class="rp-vmap${rk.length>1?' rp-vmap-sm':''}">${vPitchSVG(dots)}</div>`;
+    return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${team==='home'?C.homeInk:C.awayInk}">`
+      +`${esc(TN(team))}<span class="rp-mdir">▲ attacking</span></div>`
+      +map+rk.map(one=>rankTable(team,one,rk.length===1)).join('')+'</div>';
   };
   const legend=cat.parts.map(([,lbl,c])=>`<span><i style="background:${c}"></i>${lbl}</span>`).join('')
     +`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
@@ -936,7 +1130,7 @@ function radarPage(){
   axes.forEach((_,i)=>{const [x,y]=pt(i,1);g+=`<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#d7dde6" stroke-dasharray="4 4"/>`;});
   const poly=(s,rgb)=>{
     const p=axes.map(([,k],i)=>pt(i,axFrac(s,k)).map(v=>v.toFixed(1)).join(',')).join(' ');
-    return `<polygon points="${p}" fill="rgba(${rgb},0.28)" stroke="rgb(${rgb})" stroke-width="2.5"/>`
+    return `<polygon points="${p}" fill="rgba(${rgb},0.17)" stroke="rgb(${rgb})" stroke-width="3"/>`
       +axes.map(([,k],i)=>{const [x,y]=pt(i,axFrac(s,k));
         return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="rgb(${rgb})"/>`;}).join('');
   };
@@ -945,7 +1139,9 @@ function radarPage(){
     const [x,y]=pt(i,1), lx=cx+(R+38)*Math.cos(ang(i)), ly=cy+(R+38)*Math.sin(ang(i));
     const anch=Math.abs(Math.cos(ang(i)))<0.3?'middle':(Math.cos(ang(i))>0?'start':'end');
     g+=`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${anch}" font-size="13" font-weight="800" fill="${C.ink}">${lbl}</text>`
-      +`<text x="${lx.toFixed(1)}" y="${(ly+15).toFixed(1)}" text-anchor="${anch}" font-size="10.5" fill="${C.mut}">${h[k]} · ${a[k]}</text>`;
+      +`<text x="${lx.toFixed(1)}" y="${(ly+15).toFixed(1)}" text-anchor="${anch}" font-size="11" font-weight="700">`
+      +`<tspan fill="${C.homeInk}">${h[k]}</tspan><tspan fill="${C.mut}" font-weight="400"> · </tspan>`
+      +`<tspan fill="${C.awayInk}">${a[k]}</tspan></text>`;
   });
   return secTitle('Defensive — Profile Radar')+legend()
     +`<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;margin:0 auto">${g}</svg>`;
@@ -988,20 +1184,21 @@ function foulMapsPage(){
         const shape=f.half===1
           ?`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${TC(team)}" fill-opacity="0.92" ${ring}/>`
           :`<rect x="${(f.x-11).toFixed(1)}" y="${(f.y-11).toFixed(1)}" width="22" height="22" rx="3" fill="${TC(team)}" fill-opacity="0.92" ${ring}/>`;
-        return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${f.no}</text></g>`;
+        return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="14" font-weight="800" fill="${C.on(TC(team))}">${f.no}</text></g>`;
       }).join('');
-      let grass=''; for(let i=0;i<7;i++)grass+=`<rect x="${(i*PW/7).toFixed(1)}" y="0" width="${(PW/7).toFixed(1)}" height="${PH}" fill="${i%2?'#2a733f':'#2e7d46'}"/>`;
+      const grass=grassSVG(PW,PH,false);
       // dangerous zone = own defensive third: left when attacking right, right when mirrored
       const pitch=`<g transform="translate(0 ${mT})">${grass}<rect x="${flip?(2*PW/3).toFixed(1):0}" width="${PW/3}" height="${PH}" fill="url(#${patId})"/>`
         +`<g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG(flip?'left':'right')}${dots}</g>`;
       inner=`<div style="width:660px;margin:0 auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">${defs}${over}${pitch}</svg></div>`;
     }
-    return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))} · Foul Map</div>${inner}</div>`;
+    return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))} · Foul Map</div>${inner}</div>`;
   };
   const body=secTitle('Discipline — Foul Maps')+card('home')+card('away')
     +`<div class="rp-mleg"><span><i style="background:#98a0aa"></i>Circle = 1st half</span><span><i style="background:#98a0aa;border-radius:2px"></i>Square = 2nd half</span>`
-    +`<span><i style="background:repeating-linear-gradient(45deg,rgba(247,80,107,0.45) 0 4px,rgba(247,80,107,0.12) 4px 8px);border-radius:2px"></i>Dangerous zone (own third)</span>`
-    +`<span><i style="background:#98a0aa;box-shadow:0 0 0 2.5px #f5c518"></i>Led to yellow</span><span><i style="background:#98a0aa;box-shadow:0 0 0 2.5px ${C.red}"></i>Led to red</span></div>`;
+    +`<span><i style="background:rgba(247,80,107,0.3);border:1px solid rgba(247,80,107,0.55);border-radius:2px"></i>Dangerous zone (own third)</span>`
+    +`<span><i class="rp-ring" style="background:#98a0aa;border-color:#f5c518"></i>Led to yellow</span>`
+    +`<span><i class="rp-ring" style="background:#98a0aa;border-color:${C.red}"></i>Led to red</span></div>`;
   return any?body:null;
 }
 
@@ -1021,37 +1218,39 @@ function eventMapsPage(eventName,title){
     });
     const list=Object.entries(counts)
       .sort((x,y)=>y[1]-x[1]||(+x[0]||1e9)-(+y[0]||1e9)).slice(0,5);
-    const header=`<table class="rpt" style="font-size:9px;margin-top:8px"><thead><tr><th>Rank</th>`
+    const header=`<table class="rpt" style="margin-top:10px"><thead><tr><th>Rank</th>`
       +`<th style="text-align:left">Player</th><th>Total</th></tr></thead>`;
     if(!list.length){   // no data -> dashed placeholder rows, like the reference
       let h='';
       for(let i=1;i<=5;i++)h+=`<tr><td style="color:${C.mut}">${i}</td>`
         +`<td style="text-align:left;color:#c9cfd9">–</td><td style="color:#c9cfd9">–</td></tr>`;
-      return header+`<tbody>${h}</tbody></table>`;
+      return `<div class="rp-rk rp-rk-lg">`+header+`<tbody>${h}</tbody></table></div>`;
     }
     const roster=(lineups[team]&&lineups[team].roster)||[];
     const nameOf=no=>{const p=roster.find(q=>String(q.no)===String(no));return p&&p.name?p.name:'Player '+no;};
     let prev=null;
     const trs=list.map(([no,t],i)=>{
       const tied=prev===t; prev=t;
-      return `<tr><td style="color:${C.mut}">${tied?'':i+1}</td>`
-        +`<td style="text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td>${t}</td></tr>`;
+      const hi=i===0?`background:${C.band};color:${C.navy};font-weight:800;`:'';
+      return `<tr><td style="${hi}color:${i===0?C.navy:C.mut}">${tied?'':i+1}</td>`
+        +`<td style="${hi}text-align:left">${esc(no)}.&nbsp;${esc(nameOf(no))}</td><td style="${hi}">${t}</td></tr>`;
     }).join('');
-    return header+`<tbody>${trs}</tbody></table>`;
+    return `<div class="rp-rk rp-rk-lg">`+header+`<tbody>${trs}</tbody></table></div>`;
   };
-  // a side with no data keeps the empty pitch
+  // a side with no data keeps the empty pitch; drawn end-on and attacking UP, for the
+  // same reason the defensive category maps are (see actionMapsPage)
   const card=(team,list)=>{
-    const flip=team==='away';
-    const N=normXY(team), d=PITCH_DIMS.football;
+    const N=normXY(team), d=PITCH_DIMS.football, W=d.h, H=d.w;
     const dots=list.map(r=>{
-      const p=N(r).a, x=(flip?100-p.x:p.x)/100*d.w, y=(flip?100-p.y:p.y)/100*d.h;
+      const p=N(r).a, x=p.y/100*W, y=(100-p.x)/100*H;
       const shape=eventHalf(r)===1
-        ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13" fill="${TC(team)}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`
-        :`<rect x="${(x-12).toFixed(1)}" y="${(y-12).toFixed(1)}" width="24" height="24" rx="4" fill="${TC(team)}" fill-opacity="0.92" stroke="#fff" stroke-width="2"/>`;
-      return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+4.5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">${esc(String(r.playerFrom||'').trim())}</text></g>`;
+        ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16" fill="${TC(team)}" fill-opacity="0.94" stroke="#fff" stroke-width="2.5"/>`
+        :`<rect x="${(x-14.5).toFixed(1)}" y="${(y-14.5).toFixed(1)}" width="29" height="29" rx="5" fill="${TC(team)}" fill-opacity="0.94" stroke="#fff" stroke-width="2.5"/>`;
+      return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+5.5).toFixed(1)}" text-anchor="middle" font-size="16" font-weight="800" fill="${C.on(TC(team))}">${esc(String(r.playerFrom||'').trim())}</text></g>`;
     }).join('');
-    const map=hPitchSVG(dots,flip?'left':'right');
-    return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TC(team)}">${esc(TN(team))}</div>${map}${top5(team)}</div>`;
+    const map=`<div class="rp-vmap">${vPitchSVG(dots)}</div>`;
+    return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TI(team)}">`
+      +`${esc(TN(team))}<span class="rp-mdir">▲ attacking</span></div>${map}${top5(team)}</div>`;
   };
   const legend=`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
     +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span>`;
@@ -1080,6 +1279,7 @@ function gkArcSVG(rate,col){
     +`<text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="15" font-weight="800" fill="${C.navy}">`
     +`${rate==null?'–':rate+'%'}</text></svg>`;
 }
+const GK_FIT={track:18,fs:16,row:54,lbl:11};
 function gkPage(){
   const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
   const gcH=teamGoals('away'), gcA=teamGoals('home');
@@ -1091,7 +1291,7 @@ function gkPage(){
   const card=(team,s,gc,faced,rate)=>{
     const no=gkNo(team), names=squadNames(lineups,team);
     const stat=(v,l)=>`<div class="rp-gkstat"><b>${v}</b><span>${l}</span></div>`;
-    return `<div class="rp-gkcard"><div class="rp-gkteam" style="color:${TC(team)}">${esc(TN(team))}</div>`
+    return `<div class="rp-gkcard"><div class="rp-gkteam" style="color:${TI(team)}">${esc(TN(team))}</div>`
       +`<div class="rp-gkwho">`
       +(no!=null?`<span class="rp-pill" style="background:${TC(team)}">${esc(no)}</span>`
                 +`<span class="rp-gkname">${esc(playerLabel(names,no))}</span>`
@@ -1105,7 +1305,7 @@ function gkPage(){
   const cardTot=team=>{const c=cardCounts(team); let yc=0,rc=0;
     Object.keys(c).forEach(k=>{yc+=c[k].yc;rc+=c[k].rc;}); return {yc,rc};};
   const cardBox=team=>{const t=cardTot(team);
-    return `<div class="rp-dcbox"><span class="rp-dcteam" style="color:${TC(team)}">${esc(TN(team))}</span>`
+    return `<div class="rp-dcbox"><span class="rp-dcteam" style="color:${TI(team)}">${esc(TN(team))}</span>`
       +`<span class="rp-dcv"><span class="rp-cardi" style="background:#f5c518"></span>${t.yc} <em>Yellow</em></span>`
       +`<span class="rp-dcv"><span class="rp-cardi" style="background:${C.red}"></span>${t.rc} <em>Red</em></span></div>`;};
   const discRows=[['Fouls',h.fouls,a.fouls],['Fouls Won',h.foulsWon,a.foulsWon],['Offsides',h.offsides,a.offsides]];
@@ -1119,8 +1319,8 @@ function gkPage(){
     +`<div class="rp-duo">${card('home',h,gcH,facedH,rateH)}${card('away',a,gcA,facedA,rateA)}</div>`
     +`<div class="rp-cmphead">Discipline</div>`
     +`<div class="rp-duo">${cardBox('home')}${cardBox('away')}</div>`
-    +cmpRows(discRows)
-    +`<div class="rp-cmphead">Set Pieces</div>`+cmpRows(spRows);
+    +cmpRows(discRows,GK_FIT)
+    +`<div class="rp-cmphead">Set Pieces</div>`+cmpRows(spRows,GK_FIT);
 }
 
 /* ================= table of contents ================= */
@@ -1135,8 +1335,8 @@ function gkPage(){
    are — it falls out of the entries, and an entry knows only which page of the
    un-numbered report it opens — so the entries are gathered, split into pages, and
    only then numbered. */
-const TOC_H1=23, TOC_H2=19;   // what a row of each level costs, in page px
-const TOC_BUDGET=900;         // what one contents page has left for them under the heading
+const TOC_H1=31.5, TOC_H2=21.5;   // what a row of each level costs, in page px
+const TOC_BUDGET=950;             // what one contents page has left for them under the heading
 
 function tocEntries(pages){
   const out=[]; let sec=null, sub=null;
@@ -1211,9 +1411,20 @@ function buildPages(host){
   const list=opening.map(p=>p.html)
     .concat(contentsPages(opening.concat(body),opening.length))
     .concat(body.map(p=>p.html));
-  const els=list.map(html=>{
+  /* Every page says which page it is and which match it belongs to. The contents
+     page has always printed page numbers; until now no page printed its own, so
+     the one thing the contents was for could not be acted on. Written here rather
+     than by each builder — a page's number is a fact about the report, not about
+     the section — and out of the flow box, so no builder's row count moves. */
+  const line=matchLine(), total=list.length;
+  const els=list.map((html,i)=>{
     const d=document.createElement('div');
     d.className='rp-page'; d.innerHTML=html;
+    const f=document.createElement('div');
+    f.className='rp-foot';
+    f.innerHTML=`<span class="rp-footm">${esc(line)}</span>`
+      +`<span class="rp-footp">${i+1}<em> / ${total}</em></span>`;
+    d.appendChild(f);
     host.appendChild(d);
     return d;
   });

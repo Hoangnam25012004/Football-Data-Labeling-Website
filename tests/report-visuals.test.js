@@ -24,6 +24,9 @@ function makeReport(opts,names,src){
     PITCH_DIMS:{football:{w:1050,h:680}},
     eventHalf:r=>r.half||1, matchTime:t=>t,
     pitchFootball:()=>'', dirArrowSVG:()=>'', hPitchSVG:(inner)=>`<svg>${inner||''}</svg>`,
+    // the located-action maps are drawn end-on now, so the vertical pitch is chrome
+    // this suite stubs as well — it is about the numbers, not the SVG furniture
+    vPitchSVG:(inner)=>`<svg>${inner||''}</svg>`, vUpArrowSVG:()=>'',
     normXY:()=>r=>({a:r.pXY,b:r.rXY}), attackDir:()=>'right',
     DEF_CATS:opts.DEF_CATS||{}};
   // a Stats-page global the report reads: own goals count to the other side
