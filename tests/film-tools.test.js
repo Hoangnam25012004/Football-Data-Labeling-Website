@@ -283,17 +283,17 @@ test('every one of the six things a meeting needs is on it', () => {
   const {m}=model();
   const flat=[];
   (function walk(list){list.forEach(i=>{
-    if(i.label)flat.push(i.label);          // a branch has a label too — "Tốc độ" is one
+    if(i.label)flat.push(i.label);          // a branch has a label too — "Speed" is one
     if(i.sub)walk(i.sub);
   });})(m);
   const joined=flat.join(' | ');
-  [['frame','Bước tới 1 frame'],['tốc độ','Tốc độ'],['spotlight','Rọi đèn vào đây'],
-   ['dim','Làm tối phần còn lại'],['zoom','Phóng to vùng này'],['mũi tên','Mũi tên'],
-   ['bút','Bút tự do'],['vùng','Vùng (half-space, pocket)'],['chữ','Chữ'],
-   ['mark in','Đánh dấu ĐẦU clip'],['mark out','Đánh dấu CUỐI clip'],
-   ['clip from event','Clip quanh event này (±6s)'],['png','Lưu khung hình (.png)'],
-   ['mp4','Tải đoạn đã đánh dấu (.mp4)'],['link','Chép link tới khoảnh khắc này'],
-   ['exit','Thoát toàn màn hình']
+  [['frame','Step forward one frame'],['speed','Speed'],['spotlight','Spotlight here'],
+   ['dim','Dim everything else'],['zoom','Zoom in here'],['arrow','Arrow'],
+   ['freehand','Freehand'],['zone','Zone (half-space, pocket)'],['text','Text'],
+   ['mark in','Mark clip START'],['mark out','Mark clip END'],
+   ['clip from event','Clip around this event (±6s)'],['png','Save this frame (.png)'],
+   ['mp4','Download the marked section (.mp4)'],['link','Copy a link to this moment'],
+   ['exit','Exit full screen']
   ].forEach(([what,label])=>ok(joined.indexOf(label)>=0,'the menu offers '+what));
 });
 
@@ -334,7 +334,7 @@ test('z is gone, and nothing still advertises it', () => {
   notOk(hit('Z'),'in both cases');
   const model=grabFunction('menuModel',TOOLS,'client/assets/film-tools.js');
   notOk(/key:\s*'Z'/.test(model),'and the menu no longer offers it');
-  ok(/lăn chuột/.test(model),'it points at the wheel instead');
+  ok(/use the wheel/.test(model),'it points at the wheel instead');
 });
 
 /* The window keys answer only when there is something to apply them to. A key
@@ -395,7 +395,7 @@ test('mp4 is preferred, and webm is the honest fallback', () => {
   eq(load({mimes:['video/webm;codecs=vp9']}).T._internals.pickMime(),
      'video/webm;codecs=vp9','WebM when that is all there is');
   eq(load({mimes:[]}).T._internals.pickMime(),'','and nothing is not a format');
-  ok(/chỉ tạo được \.webm/.test(TOOLS),
+  ok(/only make \.webm/.test(TOOLS),
      'and the analyst is told, rather than handed a file a coach cannot open');
 });
 
@@ -449,7 +449,7 @@ test('a player who opens no clip gets no layer and no query', () => {
 test('a mark is alive at its moment and nowhere else', () => {
   const {I,v,live,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
   const s=I.state().shapes[0];
   eq(s.t,194,'anchored to the frame it was drawn on');
   eq(s.in,194); eq(s.out,198,'four seconds, which is what Q2 settled');
@@ -462,11 +462,11 @@ test('a mark is alive at its moment and nowhere else', () => {
 test('pinning is the ONE way back to being there for the whole file', () => {
   const {I,v,live,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
   const s=I.state().shapes[0];
   I.selectShape(s.id);
-  ok(/📌/.test(pick(menu(194,{x:900,y:500}),'📌 Giữ suốt clip').label),'offered, not assumed');
-  pick(menu(194,{x:900,y:500}),'📌 Giữ suốt clip').run();
+  ok(/📌/.test(pick(menu(194,{x:900,y:500}),'📌 Keep for the whole clip').label),'offered, not assumed');
+  pick(menu(194,{x:900,y:500}),'📌 Keep for the whole clip').run();
   eq(I.state().shapes[0].life,'pinned');
   [0,194,2000,9999].forEach(t=>{ v.currentTime=t; I.paint(t,0); eq(live(),1,'alive at t='+t); });
 });
@@ -489,7 +489,7 @@ test('the fade is a function of time, so the export can have it too', () => {
 test('a stroke that outlasts its own window is not born dead', () => {
   const {I,c,v,live,layerOf,menu,pick}=mounted();
   v.currentTime=100;
-  pick(menu(100,{x:1,y:1}),'Bút tự do').run();
+  pick(menu(100,{x:1,y:1}),'Freehand').run();
   c.stage.on['pointerdown'][0]({button:0,clientX:300,clientY:300,pointerId:1,
     preventDefault(){},stopPropagation(){}});
   const svg=layerOf();
@@ -506,7 +506,7 @@ test('a stroke that outlasts its own window is not born dead', () => {
    copy, and the next persist() wrote that truncated list to disk. */
 test('playing a clip leaves the match drawing alone', () => {
   const {I,v,menu,pick}=mounted();
-  [194,600,1200].forEach(t=>{v.currentTime=t;pick(menu(t,{x:900,y:500}),'Rọi đèn vào đây').run();});
+  [194,600,1200].forEach(t=>{v.currentTime=t;pick(menu(t,{x:900,y:500}),'Spotlight here').run();});
   eq(I.state().shapes.length,3);
   const clip=I.saveClip(190,200,'Clip A');
   eq(clip.shapes.length,1,'the clip still carries only what overlaps it');
@@ -520,7 +520,7 @@ test('playing a clip leaves the match drawing alone', () => {
 test('a frame that changes nothing touches no DOM', () => {
   const {I,v,grp,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
   I.paint(194,0);
   const n1=grp('fmt-shapes').children[0];
   I.paint(194.01,0.1);
@@ -530,7 +530,7 @@ test('a frame that changes nothing touches no DOM', () => {
 test('the dim mask is rebuilt when a spotlight moves, and only then', () => {
   const {I,v,grp,key,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
   key('d');                                     // dim on
   const idOf=()=>{const m=grp('fmt-dim').children.find(n=>n.tag==='mask');return m&&m.attrs.id;};
   I.paint(194,0); const first=idOf();
@@ -568,13 +568,13 @@ test('a menu item anchors to the frame that was right-clicked, not to now', () =
   v.currentTime=300;
   const model=menu(300,{x:800,y:400});
   v.currentTime=303;                       // three seconds spent reading the menu
-  pick(model,'Rọi đèn vào đây').run();
+  pick(model,'Spotlight here').run();
   const s=I.state().shapes.slice(-1)[0];
   eq(s.t,300,'the light lands on the frame that was pointed at');
   eq(s.in,300);
 });
 
-/* #1 — S has been printed beside "Rọi đèn vào đây" since the day this file was
+/* #1 — S has been printed beside "Spotlight here" since the day this file was
    written, and nothing was ever bound to it. */
 test('S places a spotlight where the pointer is', () => {
   const {I,c,key}=mounted();
@@ -674,7 +674,7 @@ test('the zoom origin is worked out in each element own box', () => {
 test('the lane shows one bar per shape, at its own window', () => {
   // a 200s window, so a four-second mark is 2% wide and clears the floor below
   const {I,v,menu,pick}=mounted({win:{half:1,label:'1st Half',start:0,end:200},end:()=>200});
-  [20,60,120].forEach(t=>{v.currentTime=t;pick(menu(t,{x:900,y:500}),'Rọi đèn vào đây').run();});
+  [20,60,120].forEach(t=>{v.currentTime=t;pick(menu(t,{x:900,y:500}),'Spotlight here').run();});
   const st=I.state().strip;
   ok(st,'it is up as soon as the match has a drawing (Q4)');
   eq(Object.keys(st.bars).length,3,'one bar each');
@@ -689,7 +689,7 @@ test('the lane shows one bar per shape, at its own window', () => {
 test('a very short window still gets a bar you can hit', () => {
   const {I,v,menu,pick}=mounted();                 // the default 3000s half
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
   const bar=I.state().strip.lane.children[0];
   ok(Math.abs(parseFloat(bar.style.left)-194/3000*100)<0.01,'placed exactly');
   eq(parseFloat(bar.style.width),0.4,'but floored at 0.4% so it can be seen and hit');
@@ -733,7 +733,7 @@ test('the lane is a full-screen thing, and goes when full screen does', () => {
 test('the number row sets the window, and 0 pins it', () => {
   const {I,v,key,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
   const s=I.state().shapes[0];
   I.selectShape(s.id);
   ok(key('8'),'claimed, because there is something to apply it to');
@@ -749,7 +749,7 @@ test('the number row sets the window, and 0 pins it', () => {
 test('shift+arrow nudges the window by a frame, and leaves the transport keys alone', () => {
   const {I,v,key,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
   I.selectShape(I.state().shapes[0].id);
   const before=I.state().shapes[0].in;
   ok(key('ArrowRight',{shiftKey:true}),'shift+right is ours');
@@ -792,11 +792,11 @@ test('a freeze segment holds one frame, and the file comes out longer for it', (
 test('a shape can be given a freeze from the menu it belongs to', () => {
   const {I,v,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Rọi đèn vào đây').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
   const model=menu(194,{x:900,y:500-81});          // on the ring of the light
   const item=pick(model,'4 s');
   ok(item,'the freeze lengths are offered on the shape that was hit');
-  pick(model,'Chọn để sửa').run();
+  pick(model,'Select to edit').run();
   pick(menu(194,{x:900,y:500-81}),'3 s').run();
   ok(I.state().shapes[0].freeze===3||I.state().shapes[0].out===197,
      'either the freeze or the window took the number — both live on that submenu');
@@ -878,9 +878,9 @@ test('the export asks twice, and the second answer picks the message', () => {
      'and only ever in that order — beat two is a diagnosis, not a fallback');
   ok(/fail\(NEED_CORS\)/.test(ex),
      'it opened without the header, so the file is fine and the SERVER is what to fix');
-  ok(/URL hỏng hoặc file không còn/.test(ex),
+  ok(/bad URL, or the file is gone/.test(ex),
      'neither opened, so this really is the file');
-  notOk(/Không mở được video để kết xuất/.test(TOOLS),
+  notOk(/video could not be opened for rendering/i.test(TOOLS),
      'the old sentence blamed the video for a missing header and is gone');
 });
 
@@ -922,7 +922,7 @@ test('an overlay that will not rasterise stops the render instead of shipping a 
   const then=ex.slice(ex.indexOf('overlayImage(str).then'));
   notOk(/overlayImage\(str\)\.then\(function \(img\) \{ lastImg = img; after\(\); \}, after\)/.test(ex),
      'the rejection no longer falls through to after() with lastImg still null');
-  ok(/Không dựng được lớp đồ hoạ/.test(then),'it fails, loudly');
+  ok(/The graphics layer could not be built/.test(then),'it fails, loudly');
   ok(then.indexOf('fail(')<then.indexOf('} else after();'),'and fails rather than continuing');
 });
 

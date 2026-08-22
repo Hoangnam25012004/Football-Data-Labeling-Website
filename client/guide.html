@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Film — how to use it · HoangNam Analytics</title>
+<meta name="description" content="Everything the match player can do, in the order you will need it.">
+<link rel="stylesheet" href="assets/site.css?v=3">
+<link rel="stylesheet" href="assets/app.css?v=18">
+<link rel="stylesheet" href="assets/guide.css?v=1">
+</head>
+<body class="guide">
+
+<header class="app-top">
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg width="15" height="15" viewBox="0 0 48 48" fill="#fff"><path d="M13 39V11l22 28V11" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="39" r="5.4"/><circle cx="13" cy="11" r="5.4"/><circle cx="35" cy="39" r="5.4"/><circle cx="35" cy="11" r="5.4"/></svg>
+    </span>
+    <span class="brand-name">Hoang<em>Nam</em></span>
+  </a>
+  <span class="divider" aria-hidden="true"></span>
+  <span class="chan"><span>Guidelines</span></span>
+  <span class="app-user">
+    <a class="btn btn-ghost" href="app.html">Back to your channel</a>
+  </span>
+</header>
+
+<div class="guide-body">
+
+  <!-- The one contents list in this file. guide.js clones it into #tocMob for a
+       narrow screen, so a section added here cannot end up in only half of the
+       navigation. -->
+  <nav class="guide-toc" aria-label="Contents">
+    <p class="toc-h">Contents</p>
+    <ol>
+      <li><a href="#s-quick">In one minute</a></li>
+      <li><a href="#s-screen">What is on the screen</a></li>
+      <li><a href="#s-play">Playing the match</a></li>
+      <li><a href="#s-halves">The two halves</a></li>
+      <li><a href="#s-filters">Showing only what you want</a></li>
+      <li><a href="#s-list">The event list</a></li>
+      <li><a href="#s-pitch">The pitch map</a></li>
+      <li><a href="#s-full">Full screen</a></li>
+      <li><a href="#s-tools">The analyst tools</a></li>
+      <li><a href="#s-draw">Drawing on the frame</a></li>
+      <li><a href="#s-time">How long a drawing stays</a></li>
+      <li><a href="#s-clips">Clips and playlists</a></li>
+      <li><a href="#s-export">Taking work out of the app</a></li>
+      <li><a href="#s-keys">Every keyboard shortcut</a></li>
+      <li><a href="#s-help">If something does not work</a></li>
+      <li><a href="#s-limits">What Film does not do</a></li>
+    </ol>
+  </nav>
+
+  <main class="guide-main">
+
+    <h1>Using Film</h1>
+    <p class="guide-lede">Film plays your match back over the video it was tagged against —
+      every pass, tackle and shot placed on the exact second it happened. This page walks
+      through everything it can do, in the order you are likely to need it. Nothing here
+      needs installing, and nothing here can damage your data: <strong>Film only ever
+      reads.</strong></p>
+    <p class="guide-lede"><strong>Keep this tab open beside your match.</strong> It opened in
+      a new tab on purpose, so the video you were watching is still where you left it.</p>
+
+    <details class="toc-mob" id="tocMob"><summary>Contents</summary></details>
+
+    <!-- ============================ 1 ============================ -->
+    <section id="s-quick">
+      <h2><span class="h2-n">01</span>In one minute</h2>
+      <p>If you read nothing else, read this.</p>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>Do this</th><th>And this happens</th></tr></thead>
+          <tbody>
+            <tr><td>Press <kbd>Space</kbd></td><td>the match plays, or pauses</td></tr>
+            <tr><td>Press <kbd>&larr;</kbd> or <kbd>&rarr;</kbd></td><td>you move two seconds back or forward</td></tr>
+            <tr><td class="wrap">Click any row in the list on the right</td><td>the video jumps to that moment</td></tr>
+            <tr><td>Press <kbd>F</kbd></td><td>the match fills the screen — this is where the analyst tools live</td></tr>
+            <tr><td class="wrap">Right-click the picture <em>(in full screen)</em></td><td>the analyst menu opens: draw, spotlight, cut a clip, export</td></tr>
+            <tr><td>Press <kbd>Esc</kbd></td><td>you come back out of full screen</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Everything else on this page is detail on those six lines.</p>
+    </section>
+
+    <!-- ============================ 2 ============================ -->
+    <section id="s-screen">
+      <h2><span class="h2-n">02</span>What is on the screen</h2>
+      <p>Film is six things arranged around one video.</p>
+
+      <h3>1 &middot; The half buttons</h3>
+      <p>Above the video: <strong>1st Half</strong> and <strong>2nd Half</strong>. They only
+        appear when the match has both halves marked up.</p>
+
+      <h3>2 &middot; The picture</h3>
+      <p>The match video. <strong>Clicking it does nothing, on purpose</strong> — you are
+        watching a moving passage of play, and a mis-click that stopped it would cost you your
+        place. Use <kbd>Space</kbd> to play and pause.</p>
+
+      <h3>3 &middot; The caption strip</h3>
+      <p>The dark band along the bottom of the picture. It shows the entry happening right
+        now — for example <em>18 pass success 9 pass success 14</em>. <strong>The home team is
+        written from the left edge, the away team from the right edge</strong>, so you can tell
+        which side did what before you have read a single word.</p>
+
+      <h3>4 &middot; The transport bar</h3>
+      <p>Under the picture: the play button, the scrub bar, and the clock.</p>
+      <div class="g-note">
+        <p><strong>The clock is match time, not video time.</strong> It reads
+          <code>00:00</code> at kick-off and <code>45:00</code> at the start of the second
+          half, whatever point of the video file that actually is. So if you switch to the
+          second half and see <code>45:00 / 90:00</code>, that is correct.</p>
+      </div>
+
+      <h3>5 &middot; The pitch map</h3>
+      <p>Top right. A scale pitch showing where on the grass the current action happened.</p>
+
+      <h3>6 &middot; The filters and the event list</h3>
+      <p>The right-hand column: three filters across the top, then every tagged entry of this
+        half in time order.</p>
+
+      <figure class="g-demo" data-clip="tour">
+        <figcaption>A tour of the six areas</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 3 ============================ -->
+    <section id="s-play">
+      <h2><span class="h2-n">03</span>Playing the match</h2>
+      <ol class="g-steps">
+        <li>Press <kbd>Space</kbd> to start. Press it again to pause.</li>
+        <li>Press <kbd>&larr;</kbd> to go back two seconds, <kbd>&rarr;</kbd> to go forward two
+          seconds. Hold the key down to keep moving.</li>
+        <li>To jump somewhere: <strong>click anywhere on the scrub bar</strong>, or press and
+          drag the round handle along it.</li>
+        <li>The play button beside the bar does the same as <kbd>Space</kbd>, for when you
+          would rather use the mouse.</li>
+      </ol>
+
+      <h3>Two things worth knowing</h3>
+      <ul class="g-bul">
+        <li><strong>You cannot leave the half you are in.</strong> The bar covers the first
+          half only, or the second half only, and the video is held inside it. That is why it
+          fills up over 45-odd minutes rather than over the whole file.</li>
+        <li><strong><kbd>Space</kbd> works wherever your mouse is</strong>, as long as you are
+          not typing in a box. If a filter panel is open and your cursor is in it,
+          <kbd>Space</kbd> ticks the box under it instead — press <kbd>Esc</kbd> to close the
+          panel and <kbd>Space</kbd> is the video's again.</li>
+      </ul>
+
+      <figure class="g-demo" data-clip="play">
+        <figcaption>Playing, pausing and moving through the match</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 4 ============================ -->
+    <section id="s-halves">
+      <h2><span class="h2-n">04</span>The two halves</h2>
+      <p>The match is one video file, but Film treats each half as its own window.</p>
+      <ol class="g-steps">
+        <li>Click <strong>2nd Half</strong> above the picture.</li>
+        <li>The video jumps to the second-half kick-off, the clock resets to
+          <code>45:00</code>, and the event list refills with the second half's entries.</li>
+        <li>Click <strong>1st Half</strong> to go back.</li>
+      </ol>
+      <p><strong>If you only see one button, or none:</strong> that match was submitted without
+        both halves marked. Film then plays the whole file in one window labelled
+        <em>Full Match</em>. Everything else on this page still works.</p>
+      <p><strong>What you keep and what you lose when you switch:</strong> your three filters
+        stay exactly as you set them. Your place in the half you were watching does not —
+        switching half is a deliberate move to somewhere else. Any drawings you made are kept,
+        and are still on the frames they belong to.</p>
+
+      <figure class="g-demo" data-clip="halves">
+        <figcaption>Switching between the halves</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 5 ============================ -->
+    <section id="s-filters">
+      <h2><span class="h2-n">05</span>Showing only what you want</h2>
+      <p>Three filters sit above the event list: <strong>Both teams</strong>,
+        <strong>All players</strong>, <strong>All events</strong>. They are not drop-downs —
+        each opens a list of tick boxes, and <strong>you can tick as many as you like</strong>.
+        That is the point: "9 and 14" is a question a drop-down cannot ask.</p>
+      <ol class="g-steps">
+        <li>Click <strong>All players</strong>. A panel opens.</li>
+        <li>Tick <strong>9</strong>, then tick <strong>14</strong>. The list narrows as you
+          tick — the panel stays open.</li>
+        <li>The button now reads <strong>2 players</strong>. Tick one only and it reads
+          <strong>9</strong>; tick none and it goes back to <strong>All players</strong>.</li>
+        <li>Click somewhere else, or press <kbd>Esc</kbd>, to close the panel.</li>
+        <li>To clear it, open it again and tick <strong>All players</strong> at the top of the
+          list.</li>
+      </ol>
+
+      <h3>Rules that save you time</h3>
+      <ul class="g-bul">
+        <li><strong>The three filters combine.</strong> Team <em>and</em> player <em>and</em>
+          event, all at once. <em>Saint Lucia</em> + <em>9</em> + <em>pass fail</em> is one
+          question.</li>
+        <li><strong>Ticking everything is the same as ticking nothing.</strong> Film normalises
+          it back to "all", so the button and the list can never disagree.</li>
+        <li><strong>The options are this half's.</strong> The player list holds the numbers
+          that touched the ball in <em>this</em> half — plus whatever you currently have
+          ticked, so a pick is never silently dropped when you change half.</li>
+        <li><strong>An empty list is a real answer.</strong> <em>No events match this
+          filter.</em> means exactly that: he did not do that in this half.</li>
+      </ul>
+
+      <figure class="g-demo" data-clip="filters">
+        <figcaption>Filtering to two players at once</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 6 ============================ -->
+    <section id="s-list">
+      <h2><span class="h2-n">06</span>The event list</h2>
+      <p>Every tagged entry of this half, in the order it happened.</p>
+      <p><strong>Reading a row.</strong> The time on the left is match time. The rest is the
+        entry as it was typed: <em>18 recovery pass success 4</em> is <em>one</em> thing that
+        happened — number 18 won the ball and passed it to number 4 — not two separate touches.
+        Shirt numbers are coloured by side.</p>
+      <ol class="g-steps">
+        <li><strong>Click a row</strong> and the video jumps to that moment. The row lights up
+          as the video reaches it, so you can also just watch the list scroll itself.</li>
+        <li><strong>The &#9197; button</strong> beside the filters jumps to the next entry
+          <em>that matches your filters</em> and starts playing, landing two seconds early so
+          you see the build-up rather than the result.</li>
+        <li>Filter to <em>9</em> + <em>shot</em>, then press <strong>&#9197;</strong>
+          repeatedly, and you have a shot reel for number 9 without cutting anything.</li>
+      </ol>
+      <p><strong>Why an entry holds the screen for longer than an instant:</strong> a pass has
+        a beginning and an end, and Film shows it for its whole flight. A clearance or an
+        aerial duel has no span at all, so it is held on screen for about a second instead.
+        That is why some captions linger and others flick past.</p>
+
+      <figure class="g-demo" data-clip="list">
+        <figcaption>Jumping by row, and stepping clip to clip</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 7 ============================ -->
+    <section id="s-pitch">
+      <h2><span class="h2-n">07</span>The pitch map</h2>
+      <p>The pitch in the top right is a scale drawing of the real one, and every dot is where
+        the action actually happened — the position the analyst marked while tagging, not an
+        estimate.</p>
+      <ul class="g-bul">
+        <li><strong>A dot</strong> is a touch. Its colour is the side that made it.</li>
+        <li><strong>A line between two dots</strong> is a pass or a cross: where it was struck,
+          and where it arrived.</li>
+        <li><strong>The moving dot</strong> is the ball, travelling between the two along that
+          line, in step with the video.</li>
+      </ul>
+      <p>The pitch does not move with the camera. The camera pans and zooms; the pitch stays a
+        pitch. That is what makes it readable — a wide switch of play looks like a wide switch
+        of play, even when the broadcast cannot fit both touchlines in the frame.</p>
+
+      <figure class="g-demo" data-clip="pitch">
+        <figcaption>Dots, the pass line, and the ball</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 8 ============================ -->
+    <section id="s-full">
+      <h2><span class="h2-n">08</span>Full screen</h2>
+      <p><strong>This is the important section on this page</strong>, because it is the door to
+        everything in the three sections after it.</p>
+      <ol class="g-steps">
+        <li>Click the <strong>&#9974;</strong> button at the right-hand end of the transport
+          bar, or just press <kbd>F</kbd>.</li>
+        <li>The match fills the screen. Everything is still there — the picture, the caption,
+          the pitch, the filters and the list — just bigger, sized so a shirt number can be
+          read from the back of a meeting room.</li>
+        <li>Press <kbd>Esc</kbd>, or <kbd>F</kbd> again, to come back.</li>
+      </ol>
+      <h3>Two things only exist in full screen</h3>
+      <ul class="g-bul">
+        <li>the <strong>right-click analyst menu</strong>, and everything it opens</li>
+        <li>the <strong>frame-by-frame, drawing, clip and export keys</strong> —
+          <kbd>,</kbd> <kbd>.</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>H</kbd> <kbd>T</kbd>
+          <kbd>L</kbd> <kbd>[</kbd> <kbd>]</kbd> <kbd>C</kbd></li>
+      </ul>
+      <p>Outside full screen those keys do nothing at all. That is deliberate: at normal size
+        the picture is about 1300 pixels wide, and drawing an accurate offside line across a
+        player 40 pixels tall is not serious work.</p>
+      <div class="g-note flat">
+        <p>The <strong>Guidelines</strong> link is hidden while you are in full screen — the
+          projector room is not for reading. Read here first, then press <kbd>F</kbd>.</p>
+      </div>
+
+      <figure class="g-demo" data-clip="full">
+        <figcaption>In and out of full screen</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 9 ============================ -->
+    <section id="s-tools">
+      <h2><span class="h2-n">09</span>The analyst tools</h2>
+      <p><strong>Go full screen, then right-click anywhere on the picture.</strong> A menu
+        opens at the point you clicked — and that matters, because half of what is in it means
+        "do something <em>here</em>".</p>
+      <p><strong>The video does not stop when the menu opens.</strong> That is on purpose, and
+        it is why every drawing you create from the menu is anchored to the frame you
+        right-clicked on, not to wherever the match has run on to while you were reading.</p>
+
+      <h3>The menu, item by item</h3>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>On the menu</th><th>What it does</th><th>Key</th></tr></thead>
+          <tbody>
+            <tr><td><em>12:34 &middot; 1st Half</em></td><td>the moment you right-clicked — not a button</td><td></td></tr>
+            <tr><td>Step back one frame</td><td>one frame back</td><td><kbd>,</kbd></td></tr>
+            <tr><td>Step forward one frame</td><td>one frame forward</td><td><kbd>.</kbd></td></tr>
+            <tr><td>Speed &#9656;</td><td>playback speed: 0.25&times; 0.5&times; 1&times; 1.5&times; 2&times;</td><td></td></tr>
+            <tr><td class="wrap">Loop A&ndash;B from here</td><td>loop the next 8 seconds over and over. <em>Stop the A–B loop</em> ends it</td><td><kbd>L</kbd></td></tr>
+            <tr><td>Spotlight here</td><td>put a circle of light on this spot</td><td><kbd>S</kbd></td></tr>
+            <tr><td class="wrap">Dim everything else</td><td>darken everything except the spotlights. <em>Undim</em> lifts it</td><td><kbd>D</kbd></td></tr>
+            <tr><td class="wrap">Zoom in here (or use the wheel)</td><td>zoom into this spot. <em>Reset the zoom</em> returns to full size</td><td></td></tr>
+            <tr><td>Draw &#9656;</td><td>the drawing tools — see the next section</td><td></td></tr>
+            <tr><td class="wrap">Hide the drawings</td><td>hide every drawing without deleting any. <em>Show the drawings</em> brings them back</td><td><kbd>H</kbd></td></tr>
+            <tr><td class="wrap">Hide the timeline</td><td>hide the drawing timeline. <em>Show the timeline</em> shows it</td><td><kbd>T</kbd></td></tr>
+            <tr><td class="wrap">Drawing here: &hellip; &#9656;</td><td><strong>only appears if you right-clicked on top of a drawing</strong> — see section 11</td><td></td></tr>
+            <tr><td class="wrap">Mark clip START</td><td>mark the start of a clip here</td><td><kbd>[</kbd></td></tr>
+            <tr><td class="wrap">Mark clip END</td><td>mark the end of a clip — the clip saves as soon as both ends exist</td><td><kbd>]</kbd></td></tr>
+            <tr><td class="wrap">Clip around this event (&plusmn;6s)</td><td>save a 12-second clip centred on the nearest tagged event. The fastest way to cut a goal</td><td></td></tr>
+            <tr><td>Clip list&hellip;</td><td>open the clip list</td><td><kbd>C</kbd></td></tr>
+            <tr><td class="wrap">Save this frame (.png)</td><td>save this frame as a picture, with your drawings on it</td><td></td></tr>
+            <tr><td class="wrap">Download the marked section (.mp4)</td><td>render the marked section to a video file on your computer</td><td></td></tr>
+            <tr><td class="wrap">Copy a link to this moment</td><td>copy a link that reopens the match at this second</td><td></td></tr>
+            <tr><td>Exit full screen</td><td>leave full screen</td><td><kbd>Esc</kbd></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="g-note">
+        <p><strong>Backing out of anything: press <kbd>Backspace</kbd>.</strong> It closes the
+          innermost thing first — the menu, then a half-drawn shape, then the spotlight you are
+          positioning, then the armed tool, then the selected drawing, then the clip list.
+          Press it a few times and you are back to plain playback.</p>
+      </div>
+
+      <figure class="g-demo" data-clip="menu">
+        <figcaption>The right-click menu, top to bottom</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 10 ============================ -->
+    <section id="s-draw">
+      <h2><span class="h2-n">10</span>Drawing on the frame</h2>
+      <p><strong>Choose a tool from <em>Draw</em>, then drag on the picture.</strong> The tool
+        stays armed until you press <kbd>Backspace</kbd>, so you can draw several arrows
+        without going back to the menu each time.</p>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>On the menu</th><th>What you get</th><th>How to draw it</th></tr></thead>
+          <tbody>
+            <tr><td>Arrow</td><td>a straight arrow</td><td>drag from start to end</td></tr>
+            <tr><td>Curved arrow</td><td>a curved arrow</td><td>drag; the curve is drawn for you</td></tr>
+            <tr><td class="wrap">Dashed arrow (run without the ball)</td><td>a dashed arrow — the convention for a run made without the ball</td><td>drag</td></tr>
+            <tr><td>Freehand</td><td>a freehand line</td><td>draw as if with a pen</td></tr>
+            <tr><td class="wrap">Zone (half-space, pocket)</td><td>a shaded area — a half-space, a pocket, a zone left open</td><td>drag out a box</td></tr>
+            <tr><td>Text</td><td>a text label</td><td>click, type, press <kbd>Enter</kbd></td></tr>
+            <tr><td>Player marker</td><td>a ring around a player</td><td>click on him</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Two more entries at the bottom of the same submenu: <strong>Undo the last shape</strong>
+        undoes the last one, <strong>Clear all drawings</strong> removes them all.</p>
+
+      <h3>The spotlight — the one you will use most</h3>
+      <ol class="g-steps">
+        <li>Press <kbd>S</kbd> (or choose <em>Spotlight here</em>). A circle of light
+          appears.</li>
+        <li><strong>Drag it</strong> onto the player you mean. It stays in positioning mode, so
+          you do not have to start again.</li>
+        <li><strong>Roll the mouse wheel</strong> to make it bigger or smaller.</li>
+        <li>Press <kbd>D</kbd> to darken everything outside it. Press <kbd>D</kbd> again to
+          lift the darkness.</li>
+      </ol>
+
+      <h3>Changing a drawing after you have made it</h3>
+      <p>Right-click on top of it. A new group appears in the menu,
+        <strong>Drawing here: &hellip;</strong>, holding everything about that one shape:
+        select it, set how long it lasts, keep it up for the whole clip, freeze the frame on it
+        when exporting, change its colour (Red &middot; White &middot; Yellow), or delete
+        it.</p>
+      <p>With a drawing selected: <kbd>Delete</kbd> removes it,
+        <kbd>Shift</kbd>&nbsp;+&nbsp;<kbd>&larr;</kbd>&nbsp;/&nbsp;<kbd>&rarr;</kbd> slides it
+        one frame earlier or later.</p>
+
+      <div class="g-note">
+        <p><strong>Where your drawings are kept.</strong> In this browser, on this computer,
+          against this match. They survive closing the tab and coming back. They are
+          <strong>not</strong> uploaded and <strong>not</strong> shared — a colleague opening
+          the same match on their own machine sees a clean picture.</p>
+        <p>To hand a drawing to somebody, export it: a <strong>.png</strong> of the frame, or
+          an <strong>.mp4</strong> of the clip with the graphics burned in.</p>
+      </div>
+
+      <figure class="g-demo" data-clip="draw">
+        <figcaption>Every drawing tool in turn</figcaption>
+      </figure>
+      <figure class="g-demo" data-clip="spot">
+        <figcaption>Placing, sizing and dimming around a spotlight</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 11 ============================ -->
+    <section id="s-time">
+      <h2><span class="h2-n">11</span>How long a drawing stays</h2>
+      <p>A drawing belongs to the <strong>moment</strong> it was made on, not to the whole
+        match. Draw an arrow on the 12th minute and it is not still hanging there in the
+        60th.</p>
+      <p>Press <kbd>T</kbd> and a thin lane appears above the picture, with one bar per drawing
+        sitting at the stretch of time it is alive for. That lane is the whole feature made
+        visible.</p>
+      <ol class="g-steps">
+        <li>Press <kbd>T</kbd> to show the lane.</li>
+        <li><strong>Click a bar</strong> to select that drawing. (Right-clicking the drawing
+          itself and choosing <em>Select to edit</em> does the same.)</li>
+        <li>Press a number <kbd>1</kbd>&ndash;<kbd>9</kbd> to set how many seconds it lasts. Do
+          this with nothing selected and it becomes the default for the next shape you
+          draw.</li>
+        <li>Press <kbd>0</kbd> to keep it up for the whole clip. Press <kbd>0</kbd> again to
+          release it.</li>
+        <li><kbd>Shift</kbd>&nbsp;+&nbsp;<kbd>&larr;</kbd>&nbsp;/&nbsp;<kbd>&rarr;</kbd> slides
+          it one frame at a time until it sits exactly on the touch you mean.</li>
+        <li>Press <kbd>T</kbd> again to hide the lane. Hiding the lane does not change any
+          drawing.</li>
+      </ol>
+      <p><strong>Freeze frame on export</strong> (in the <em>Drawing here</em> group) is a
+        different kind of duration: it holds the <em>video</em> still on that drawing for 2 to
+        5 seconds <strong>in the exported file only</strong>, so the coach watching the .mp4
+        gets time to read it. It changes nothing about how the clip plays here.</p>
+
+      <figure class="g-demo" data-clip="time">
+        <figcaption>The timeline lane, and setting a window</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 12 ============================ -->
+    <section id="s-clips">
+      <h2><span class="h2-n">12</span>Clips and playlists</h2>
+      <p>A clip is a start time and an end time. Nothing is copied and nothing is re-encoded
+        until you actually ask for a file, so making clips costs nothing.</p>
+
+      <h3>Three ways to make one</h3>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th></th><th>How</th><th>Best for</th></tr></thead>
+          <tbody>
+            <tr><td>Mark the ends</td><td>press <kbd>[</kbd> where it should start, <kbd>]</kbd> where it should end</td><td>a passage you are watching now</td></tr>
+            <tr><td>Around an event</td><td>right-click &#9656; <em>Clip around this event (&plusmn;6s)</em></td><td>goals, shots, turnovers — anything already tagged</td></tr>
+            <tr><td>From the list</td><td>click the row, then press <kbd>[</kbd>, play on, press <kbd>]</kbd></td><td>working down a filtered list</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The clip saves itself the moment both ends exist. Press <kbd>[</kbd> and <kbd>]</kbd>
+        the wrong way round and Film swaps them for you.</p>
+
+      <h3>The clip list</h3>
+      <p>Press <kbd>C</kbd>. A drawer opens showing <em>Clips (n)</em> and one row per clip.</p>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>Control</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td>&#9654; Play all</td><td>play every clip in order, back to back — your team meeting, in one press</td></tr>
+            <tr><td>&#9654; on a row</td><td>play that clip</td></tr>
+            <tr><td>&#11015; on a row</td><td>render that clip to an .mp4 on your computer, graphics included</td></tr>
+            <tr><td>&#10005; on a row</td><td>remove that clip from the list</td></tr>
+            <tr><td>&#10005; in the header</td><td>close the drawer</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Press <kbd>C</kbd> again, or <kbd>Backspace</kbd>, to close it.</p>
+      <div class="g-note">
+        <p><strong>Clips are kept the same way drawings are:</strong> in this browser, against
+          this match, not uploaded and not shared. To give somebody a clip, download it with
+          <strong>&#11015;</strong> and send them the file.</p>
+      </div>
+
+      <figure class="g-demo" data-clip="clips">
+        <figcaption>Marking, listing and playing clips</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 13 ============================ -->
+    <section id="s-export">
+      <h2><span class="h2-n">13</span>Taking work out of the app</h2>
+
+      <h3>A picture — <em>Save this frame (.png)</em></h3>
+      <p>Saves the frame you are on, at the video's own resolution, with your drawings on it.
+        Instant. This is the one to use for a slide, a WhatsApp message, or a report.</p>
+
+      <h3>A video — <em>Download the marked section (.mp4)</em></h3>
+      <p>Renders the marked section — or the <strong>&#11015;</strong> button renders one clip
+        from the list — into a real video file with the graphics burned in, saved to your
+        computer.</p>
+      <ul class="g-bul">
+        <li><strong>It is not instant.</strong> Rendering runs at roughly real time: a
+          12-second clip takes about 12 seconds. Only one clip renders at a time.</li>
+        <li><strong>Nothing is uploaded.</strong> The file is built in your browser and written
+          straight to your disk. It never touches our servers.</li>
+        <li><strong>Keep the tab visible while it renders.</strong> Some browsers slow hidden
+          tabs down.</li>
+        <li><strong>Use Chrome or Edge for .mp4.</strong> Firefox can only produce
+          <strong>.webm</strong>, and Film tells you so before it starts. A .webm plays fine on
+          a computer but is awkward to put into PowerPoint.</li>
+      </ul>
+
+      <h3>A link — <em>Copy a link to this moment</em></h3>
+      <p>Copies a web link pointing at the exact second you are on. Whoever opens it lands on
+        this match, on the Film tab, at that second. Paste it into an email or a message the
+        way you would any other link.</p>
+
+      <figure class="g-demo" data-clip="export">
+        <figcaption>A frame, a clip and a link, leaving the app</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============================ 14 ============================ -->
+    <section id="s-keys">
+      <h2><span class="h2-n">14</span>Every keyboard shortcut</h2>
+
+      <h3>Anywhere in Film</h3>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>Key</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td><kbd>Space</kbd></td><td>play / pause</td></tr>
+            <tr><td><kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>back / forward two seconds</td></tr>
+            <tr><td><kbd>F</kbd></td><td>full screen on / off</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>leave full screen</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>In full screen only — the analyst tools</h3>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>Key</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td><kbd>,</kbd> <kbd>.</kbd></td><td>one frame back / forward</td></tr>
+            <tr><td><kbd>S</kbd></td><td>spotlight where the mouse is</td></tr>
+            <tr><td><kbd>D</kbd></td><td>darken everything else</td></tr>
+            <tr><td><kbd>H</kbd></td><td>hide / show all drawings</td></tr>
+            <tr><td><kbd>T</kbd></td><td>show / hide the drawing timeline</td></tr>
+            <tr><td><kbd>L</kbd></td><td>loop the next 8 seconds</td></tr>
+            <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>mark clip start / end</td></tr>
+            <tr><td><kbd>C</kbd></td><td>open / close the clip list</td></tr>
+            <tr><td><kbd>1</kbd>&ndash;<kbd>9</kbd></td><td>how many seconds the selected drawing lasts</td></tr>
+            <tr><td><kbd>0</kbd></td><td>keep / release the selected drawing for the whole clip</td></tr>
+            <tr><td><kbd>Delete</kbd></td><td>delete the selected drawing</td></tr>
+            <tr><td><kbd>Shift</kbd> <kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>move the selected drawing one frame</td></tr>
+            <tr><td><kbd>Backspace</kbd></td><td>close the innermost thing that is open</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Mouse</h3>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>Action</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td class="wrap">left-click the picture</td><td>nothing — deliberately</td></tr>
+            <tr><td class="wrap">right-click the picture <em>(full screen)</em></td><td>open the analyst menu here</td></tr>
+            <tr><td class="wrap">wheel over the picture <em>(full screen)</em></td><td>zoom in and out — or resize the spotlight you are positioning</td></tr>
+            <tr><td class="wrap"><kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + wheel</td><td>your browser's own zoom, untouched</td></tr>
+            <tr><td class="wrap">drag on the picture</td><td>draw, once a tool is chosen</td></tr>
+            <tr><td class="wrap">click or drag the scrub bar</td><td>jump there</td></tr>
+            <tr><td class="wrap">click a row in the list</td><td>jump to that entry</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================ 15 ============================ -->
+    <section id="s-help">
+      <h2><span class="h2-n">15</span>If something does not work</h2>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>What you see</th><th>Why</th><th>What to do</th></tr></thead>
+          <tbody>
+            <tr><td class="wrap"><em>No video for this match.</em></td><td>the match was tagged against a file on the analyst's own computer, so there is no shared video to play</td><td>everything else — Overall, Dashboard, Stats, the report — still works. Ask your analyst to publish the video with the match</td></tr>
+            <tr><td class="wrap">Right-click does nothing</td><td>you are not in full screen</td><td>press <kbd>F</kbd> first. The analyst tools only exist in full screen</td></tr>
+            <tr><td class="wrap"><kbd>Space</kbd> scrolls instead of playing</td><td>your cursor is in a filter panel</td><td>press <kbd>Esc</kbd> to close it</td></tr>
+            <tr><td class="wrap">The clock says <code>45:00</code> and I expected <code>00:00</code></td><td>that is match time, and you are in the second half</td><td>correct behaviour — see section 2</td></tr>
+            <tr><td class="wrap"><em>Right-click on the picture itself</em></td><td>you right-clicked the black bar, not the picture</td><td>right-click on the grass</td></tr>
+            <tr><td class="wrap"><em>This browser can only make .webm</em></td><td>Firefox cannot write MP4</td><td>use Chrome or Edge for .mp4</td></tr>
+            <tr><td class="wrap"><em>The video host has not enabled CORS&hellip;</em></td><td>the video host is not yet sending the header the renderer needs</td><td>tell us — it is a one-line setting on our side, not something you can fix. The .png export and everything else are unaffected</td></tr>
+            <tr><td class="wrap">A drawing I made yesterday is gone</td><td>drawings live in the browser you made them in</td><td>they do not follow you between computers, or into a private window</td></tr>
+            <tr><td class="wrap">A demo video here will not play</td><td>it may not be recorded yet</td><td>the written steps beside each video are complete on their own</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Anything not on this list: send us the match, the half, and the clock reading.</p>
+    </section>
+
+    <!-- ============================ 16 ============================ -->
+    <section id="s-limits">
+      <h2><span class="h2-n">16</span>What Film does not do</h2>
+      <p>Said plainly, so nobody spends an afternoon looking for it.</p>
+      <ul class="g-bul">
+        <li><strong>It does not follow players by itself.</strong> Every dot, every spotlight,
+          every arrow is somewhere a person pointed. Automatic tracking is a different class of
+          product and needs tracking data, not a feature.</li>
+        <li><strong>It does not share your drawings or clips.</strong> They are kept in your own
+          browser. Export is how work leaves.</li>
+        <li><strong>It does not change the match.</strong> Film only reads. Nothing you do here
+          can alter a tagged event, a line-up or a score.</li>
+        <li><strong>It does not edit the video.</strong> No trimming the source, no joining two
+          matches, no re-ordering a playlist yet.</li>
+        <li><strong>The analyst tools need a real screen.</strong> Playback, filters and the
+          list are fine on a tablet; drawing needs a mouse.</li>
+      </ul>
+    </section>
+
+  </main>
+</div>
+
+<footer class="guide-foot">
+  <div class="wrap">
+    <span>HoangNam Analytics</span>
+    <a href="app.html">Back to your channel</a>
+    <a href="index.html">About</a>
+  </div>
+</footer>
+
+<script src="assets/guide.js?v=1"></script>
+</body>
+</html>

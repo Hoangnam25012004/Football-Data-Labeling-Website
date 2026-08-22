@@ -1443,6 +1443,19 @@ function filmHTML(wins,win,cues,choices){
           +' aria-pressed="false" aria-label="Full screen (F)" title="Full screen (F)">'
           +filmFullIcon(false)+'</button>':'')
       +'</div>'
+      /* The way in to the documentation, and deliberately a plain <a>: no
+         onclick, no listener, so filmStart()/filmStop() do not have to know it
+         is there and a redraw leaves nothing behind. target=_blank keeps the
+         reader's place in the match — this is read to be followed NOW, not
+         instead of what they were doing. Only a host that asked, same rule as
+         the full-screen button above. */
+      +(filmGuideOK()
+        ?'<a class="film-guide" href="'+esc(opts.guide)+'" target="_blank"'
+          +' rel="noopener noreferrer">'
+          +'<span class="fg-mark" aria-hidden="true">?</span>'
+          +'<span class="fg-txt">Guidelines</span>'
+          +'<span class="fg-out" aria-hidden="true">&#8599;</span></a>'
+        :'')
     +'</div>'
     +'<div class="film-side">'
       +`<div class="film-pitch" id="fmPitch">${pitchSVG(meta.sport||'football')}</div>`
@@ -1624,6 +1637,12 @@ function filmStop(){
    {fullscreen:true}, the Stats page mounts as it always has and gets no button,
    no key and no way in. */
 const filmFullOK=()=>!!opts.fullscreen;
+
+/* Twin of the line above, for the Guidelines link under the transport bar. The
+   href is the HOST's, never this file's: guide.html belongs to the client site,
+   and the tagging app's Stats page lives under /tagger once deployed, so a
+   relative path written in here would 404 over there. No option, no link. */
+const filmGuideOK=()=>!!(opts.guide&&String(opts.guide).trim());
 let filmFull=false;        // the layout is up (natively, or by the fallback below)
 let filmFullNative=false;  // ...and whether the browser is really holding the screen
 

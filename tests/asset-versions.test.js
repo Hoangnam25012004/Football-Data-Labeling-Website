@@ -30,7 +30,7 @@ const MANIFEST=path.join(__dirname,'asset-versions.json');
    so it is scanned as well, with its refs resolved against the deployed root
    rather than against its own folder (see taggerRoot() in that file). */
 const PAGES=['index.html','auth.html','Stats/index.html','Player-Lists/index.html',
-             'client/index.html','client/app.html','client/login.html'];
+             'client/index.html','client/app.html','client/login.html','client/guide.html'];
 /* file -> the bases its refs may resolve against, in order.
    app.js addresses two different places. Refs into the tagging app are written
    against the deployed root, where this site sits and the tagger is moved under

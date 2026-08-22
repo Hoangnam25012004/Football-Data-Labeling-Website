@@ -139,6 +139,17 @@
     });
 
     var view = $('#view');
+    /* Film holds a video, an animation loop and four listeners on `document`.
+       Emptying #view takes the elements away but not any of that: the video
+       goes on playing where nobody can see it, and Space on the next page is
+       still swallowed by a player that is no longer on screen.
+
+       stats-view.js has always had the answer — destroy() calls filmStop() —
+       and this is the one caller that was missing. Guarded on the holder rather
+       than on a flag, because a match navigated away from before its report
+       arrived has a holder and no mount, and destroy() has to be safe there
+       too. */
+    if (window.PTStats && window.PTStats.destroy && $('.pt-stats')) window.PTStats.destroy();
     view.innerHTML = '';
     if (parts[0] === 'match' && parts[1]) {
       var slug = decodeURIComponent(parts[1]);
@@ -260,12 +271,24 @@
         return;
       }
       /* {fullscreen:true}: a club watches this on a projector, with the squad in
-         the room, so Film gets the control that fills the screen with it. The
-         analyst's own Stats page mounts without it and is unchanged. */
-      window.PTStats.mount(holder, rep.payload, { fullscreen: true });
+         the room, so Film gets the control that fills the screen with it.
+         {guide}: and the way out to the documentation, under the transport bar.
+         Both are the host asking; the analyst's own Stats page mounts without
+         either and is unchanged. The href is written against THIS document, so
+         it resolves beside app.html on the live site and in client/ locally. */
+      window.PTStats.mount(holder, rep.payload,
+        { fullscreen: true, guide: 'guide.html' });
       /* the PDF button is part of the chrome that mount() just drew, so it did
          not exist when report.js ran */
       if (window.PTReport && window.PTReport.bind) window.PTReport.bind();
+      /* A ?t= link names a second of the video, so it means Film — and Film is
+         not the tab a fresh page opens on. The button mount() just drew is the
+         one place that knows how to change view, so it is pressed rather than
+         reached around; film-tools.js does the seeking once it is attached. */
+      if (/[?&]t=\d/.test(location.search)) {
+        var film = document.getElementById('viewFilmBtn');
+        if (film) film.click();
+      }
     }).catch(function (e) {
       if (!holder.parentNode) return;
       holder.innerHTML = '';
@@ -1605,17 +1628,17 @@
   function loadStatsView() {
     var r = taggerRoot();
     loadOnce(r + 'shared.css?v=14', 'css');
-    loadOnce(r + 'Stats/stats-view.css?v=7', 'css');
+    loadOnce(r + 'Stats/stats-view.css?v=8', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
-      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=18'); })
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=19'); })
       .then(function () { return loadOnce(r + 'Stats/report.js?v=34'); })
       /* The analyst's toolkit. This site's file, not the tagging app's — Q1 was
          answered B, so the right-click menu, the drawing layer, clips and the
          exports exist in the channel and nowhere else. It registers itself with
          the mounted view through the one hook stats-view.js publishes; a host
          that never loads it is a host where none of it exists. */
-      .then(function () { return loadOnce('assets/film-tools.js?v=3'); })
+      .then(function () { return loadOnce('assets/film-tools.js?v=4'); })
       .then(function () {
         loadOnce('assets/film-tools.css?v=3', 'css');
         if (window.PTStats && window.PTStats.registerFilmTools && window.PTFilmTools)

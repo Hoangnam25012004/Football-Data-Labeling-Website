@@ -46,6 +46,7 @@ jobs:
           cp client/index.html  _site/index.html
           cp client/app.html    _site/app.html
           cp client/login.html  _site/login.html
+          cp client/guide.html  _site/guide.html
           mkdir -p _site/assets
           cp client/assets/site.css _site/assets/site.css
           cp client/assets/app.css  _site/assets/app.css
@@ -53,6 +54,8 @@ jobs:
           cp client/assets/app.js   _site/assets/app.js
           cp client/assets/film-tools.js  _site/assets/film-tools.js
           cp client/assets/film-tools.css _site/assets/film-tools.css
+          cp client/assets/guide.css _site/assets/guide.css
+          cp client/assets/guide.js  _site/assets/guide.js
           cp client/assets/hanley-town.png _site/assets/hanley-town.png
 
           # ---------- tagging app, relocated under /tagger ----------

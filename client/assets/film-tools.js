@@ -247,7 +247,7 @@ window.PTFilmTools = (function () {
                   x: p ? p.x : (zoom ? zoom.x : W / 2),
                   y: p ? p.y : (zoom ? zoom.y : H / 2) };
     applyZoom();
-    toast(zoom ? 'Phóng ' + zoom.k.toFixed(1) + '×' : 'Cỡ thật');
+    toast(zoom ? 'Zoom ' + zoom.k.toFixed(1) + '×' : 'Full size');
   }
 
   /* ---------------------------------------------------------------
@@ -584,9 +584,9 @@ window.PTFilmTools = (function () {
     if (s) {
       s.life = 'moment'; s.in = s.t; s.out = s.t + defaultDur;
       touch(s);
-      toast('Cửa sổ ' + defaultDur.toFixed(1) + ' s · ' + clock(s.in) + '–' + clock(s.out));
+      toast('Window ' + defaultDur.toFixed(1) + ' s · ' + clock(s.in) + '–' + clock(s.out));
     } else {
-      toast('Hình sau: ' + defaultDur.toFixed(1) + ' s');
+      toast('Next shape: ' + defaultDur.toFixed(1) + ' s');
     }
   }
   function togglePin() {
@@ -595,7 +595,7 @@ window.PTFilmTools = (function () {
     s.life = s.life === 'pinned' ? 'moment' : 'pinned';
     if (s.life === 'moment') { s.in = s.t; s.out = s.t + defaultDur; }
     touch(s);
-    toast(s.life === 'pinned' ? '📌 Giữ suốt clip' : 'Trở lại một khoảnh khắc');
+    toast(s.life === 'pinned' ? '📌 Kept for the whole clip' : 'Back to a single moment');
     return true;
   }
   function nudge(frames) {
@@ -612,7 +612,7 @@ window.PTFilmTools = (function () {
     if (!s) return;
     s.freeze = sec > 0 ? sec : 0;
     touch(s);
-    toast(s.freeze ? 'Đứng hình ' + s.freeze + ' s khi xuất clip' : 'Không đứng hình');
+    toast(s.freeze ? 'Freeze ' + s.freeze + ' s on export' : 'No freeze');
   }
   function resizeSpot(sid, f) {
     var s = shapeById(sid);
@@ -654,13 +654,13 @@ window.PTFilmTools = (function () {
     ensureLayer();
     armCursor();
     toast(mode
-      ? toolName(kind) + ' · ' + defaultDur.toFixed(1) + ' s — kéo trên khung hình. '
-        + '1–9 đổi thời lượng, Backspace để thoát.'
+      ? toolName(kind) + ' · ' + defaultDur.toFixed(1) + ' s — drag on the picture. '
+        + '1–9 sets the duration, Backspace to leave.'
       : '');
   }
   function toolName(k) {
-    return { arrow: 'Mũi tên', pen: 'Bút vẽ', zone: 'Vùng', text: 'Chữ',
-             marker: 'Đánh dấu cầu thủ', spotlight: 'Rọi đèn' }[k] || k;
+    return { arrow: 'Arrow', pen: 'Freehand', zone: 'Zone', text: 'Text',
+             marker: 'Player marker', spotlight: 'Spotlight' }[k] || k;
   }
 
   function onDown(e) {
@@ -873,7 +873,7 @@ window.PTFilmTools = (function () {
   function toggleStrip(on) {
     stripOn = on == null ? !stripOn : !!on;
     if (stripOn) ensureStrip(); else dropStrip();
-    toast(stripOn ? 'Hiện thanh thời gian' : 'Ẩn thanh thời gian');
+    toast(stripOn ? 'Timeline shown' : 'Timeline hidden');
   }
 
   /* A real input, placed where the click was: typing into a prompt() would take
@@ -881,7 +881,7 @@ window.PTFilmTools = (function () {
   function textAt(p, base, at) {
     var r = pictureRect(), s = ctx.stage.getBoundingClientRect();
     var inp = el('input', 'fmt-text-in');
-    inp.type = 'text'; inp.placeholder = 'Nhập chữ, Enter để đặt';
+    inp.type = 'text'; inp.placeholder = 'Type, then press Enter';
     inp.style.left = (r.x - s.x + p.x / layer.w * r.w) + 'px';
     inp.style.top = (r.y - s.y + p.y / layer.h * r.h) + 'px';
     ctx.stage.appendChild(inp);
@@ -931,7 +931,7 @@ window.PTFilmTools = (function () {
   function setSpeed(k) {
     if (!ctx) return;
     ctx.video.playbackRate = k;
-    toast('Tốc độ ' + k + '×');
+    toast('Speed ' + k + '×');
   }
   /* fps is not exposed by any API, so it is measured: rVFC reports how many
      frames the compositor has actually presented, and the difference over a
@@ -964,7 +964,7 @@ window.PTFilmTools = (function () {
     if (mark.in != null && mark.out != null && mark.out < mark.in) {
       var t = mark.in; mark.in = mark.out; mark.out = t;
     }
-    toast(which === 'in' ? 'Đầu clip ' + clock(mark.in) : 'Cuối clip ' + clock(mark.out));
+    toast(which === 'in' ? 'Clip start ' + clock(mark.in) : 'Clip end ' + clock(mark.out));
     if (mark.in != null && mark.out != null) saveClip(mark.in, mark.out);
   }
   function saveClip(a, b, title) {
@@ -977,7 +977,7 @@ window.PTFilmTools = (function () {
     };
     list.push(c); setClips(list);
     mark = { in: null, out: null };
-    toast('Đã lưu "' + c.title + '" (' + Math.round(b - a) + 's)');
+    toast('Saved "' + c.title + '" (' + Math.round(b - a) + 's)');
     if (panel) renderPanel();
     return c;
   }
@@ -991,7 +991,7 @@ window.PTFilmTools = (function () {
       var d = Math.abs(c.t - now);
       if (d < bd) { bd = d; best = c; }
     });
-    if (!best) { toast('Không có event nào gần đây'); return; }
+    if (!best) { toast('No tagged event near here'); return; }
     pad = pad || 6;
     var a = Math.max(ctx.win.start, best.t - pad), b = Math.min(ctx.end(), best.t + pad);
     var label = (best.rows[0] && best.rows[0].event) || 'event';
@@ -1015,7 +1015,7 @@ window.PTFilmTools = (function () {
   }
   function playAll() {
     var list = clips();
-    if (!list.length) { toast('Chưa có clip nào'); return; }
+    if (!list.length) { toast('No clips yet'); return; }
     play = { list: list, i: 0, clip: list[0] };
     playClip(list[0]);
     play.list = list; play.i = 0;
@@ -1023,7 +1023,7 @@ window.PTFilmTools = (function () {
   function advancePlaylist() {
     if (!play || !play.list) { play = null; return; }
     var next = play.list[play.i + 1];
-    if (!next) { play = null; ctx.pause(); toast('Hết playlist'); return; }
+    if (!next) { play = null; ctx.pause(); toast('End of playlist'); return; }
     play.i++; play.clip = next;
     playClip(next);
     play.list = clips(); play.i = play.i;
@@ -1074,15 +1074,15 @@ window.PTFilmTools = (function () {
     c.width = v.videoWidth; c.height = v.videoHeight;
     var g = c.getContext('2d');
     try { g.drawImage(v, 0, 0, c.width, c.height); }
-    catch (e) { toast('Không đọc được pixel của video này — xem §11 trong thiết kế'); return; }
+    catch (e) { toast('This video will not let the page read its pixels — see §11 of the design'); return; }
     overlayImage(overlaySVGString(v.currentTime, 0)).then(function (img) {
       g.drawImage(img, 0, 0, c.width, c.height);
       c.toBlob(function (b) {
-        if (!b) { toast('Trình duyệt từ chối đọc khung hình (CORS)'); return; }
+        if (!b) { toast('The browser refused to read the frame (CORS)'); return; }
         download(b, fileStem() + '_' + clock(v.currentTime).replace(':', 'm') + 's.png');
-        toast('Đã lưu ảnh');
+        toast('Frame saved');
       }, 'image/png');
-    }).catch(function () { toast('Không dựng được lớp đồ hoạ'); });
+    }).catch(function () { toast('The graphics layer could not be built'); });
   }
   function fileStem() {
     var m = ctx.meta || {};
@@ -1129,9 +1129,9 @@ window.PTFilmTools = (function () {
      succeeds the file is fine and the header is missing — which is a different
      sentence, pointing at a different thing to go and fix. The second element
      renders nothing and is thrown away the moment it has answered. */
-  var NEED_CORS = 'Máy chủ video chưa bật CORS nên không kết xuất được. '
-    + 'Cần thêm Access-Control-Allow-Origin cho bucket — xem docs/film-export-cors-design.md §3.';
-  var corsState = null;      // null = chưa biết · false = đã đo và thiếu CORS
+  var NEED_CORS = 'The video host has not enabled CORS, so clips cannot be rendered. '
+    + 'The bucket needs an Access-Control-Allow-Origin header — see docs/film-export-cors-design.md §3.';
+  var corsState = null;      // null = not known yet · false = measured, and the header is missing
 
   function openSource(src, withCors) {
     return new Promise(function (ok, no) {
@@ -1153,16 +1153,16 @@ window.PTFilmTools = (function () {
   }
 
   function exportClip(a, b, title) {
-    if (busy) { toast('Đang kết xuất một clip khác'); return; }
+    if (busy) { toast('Another clip is already rendering'); return; }
     if (!ctx) return;
-    if (a == null || b == null || b <= a) { toast('Chưa có đoạn nào được đánh dấu'); return; }
+    if (a == null || b == null || b <= a) { toast('Nothing has been marked yet'); return; }
     // once one render has proved the header is missing, say so at once rather
     // than build a recorder, an audio graph and a canvas to learn it again
     if (corsState === false) { toast(NEED_CORS, true); return; }
     var mime = pickMime();
-    if (!mime) { toast('Trình duyệt này không kết xuất được video'); return; }
+    if (!mime) { toast('This browser cannot render video'); return; }
     var mp4 = mime.indexOf('mp4') >= 0;
-    if (!mp4) toast('Trình duyệt này chỉ tạo được .webm — dùng Chrome hoặc Edge để có .mp4', true);
+    if (!mp4) toast('This browser can only make .webm — use Chrome or Edge for .mp4', true);
 
     busy = true;
     var src = ctx.video.currentSrc || ctx.video.src;
@@ -1234,7 +1234,7 @@ window.PTFilmTools = (function () {
         if (panel) renderPanel();
         fail(NEED_CORS);
       }, function () {
-        fail('Không mở được file video — URL hỏng hoặc file không còn.');
+        fail('The video file could not be opened — bad URL, or the file is gone.');
       });
     });
 
@@ -1264,7 +1264,7 @@ window.PTFilmTools = (function () {
         catch (e) {
           corsState = false;
           if (panel) renderPanel();
-          fail('Video này không cho trang đọc pixel (CORS) — không kết xuất được'); return;
+          fail('This video will not let the page read its pixels (CORS) — cannot render'); return;
         }
         start();
       });
@@ -1273,14 +1273,14 @@ window.PTFilmTools = (function () {
     function start() {
       try {
         rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6e6 });
-      } catch (e) { fail('MediaRecorder từ chối: ' + (e && e.message)); return; }
+      } catch (e) { fail('MediaRecorder refused: ' + (e && e.message)); return; }
       rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
       rec.onstop = function () {
         finish();
         if (stopped) return;
         var blob = new Blob(chunks, { type: mime.split(';')[0] });
         download(blob, name);
-        toast('Đã lưu ' + name + ' (' + (blob.size / 1048576).toFixed(1) + ' MB)', true);
+        toast('Saved ' + name + ' (' + (blob.size / 1048576).toFixed(1) + ' MB)', true);
       };
       rec.start(1000);
       v.playbackRate = 1;
@@ -1302,8 +1302,8 @@ window.PTFilmTools = (function () {
         if (lastImg) g.drawImage(lastImg, 0, 0, W, H);
         track.requestFrame();
         outT += 1 / fps;
-        toast('Đang kết xuất — ' + Math.round(clamp(outT / total, 0, 1) * 100) + '% ('
-              + Math.round(outT) + 's / ' + Math.round(total) + 's). Giữ tab này mở.', true);
+        toast('Rendering — ' + Math.round(clamp(outT / total, 0, 1) * 100) + '% ('
+              + Math.round(outT) + 's / ' + Math.round(total) + 's). Keep this tab open.', true);
         cb();
       };
       if (str !== lastSvg) {
@@ -1313,7 +1313,7 @@ window.PTFilmTools = (function () {
            graphics on it at all. A render that cannot draw the drawing must stop
            and say so, not hand over a clip that is quietly wrong. */
         overlayImage(str).then(function (img) { lastImg = img; after(); },
-          function () { fail('Không dựng được lớp đồ hoạ — dừng, để không giao ra một clip thiếu hình.'); });
+          function () { fail('The graphics layer could not be built — stopping, rather than hand over a clip with the drawings missing.'); });
       } else after();
     }
     function pump() {
@@ -1368,8 +1368,8 @@ window.PTFilmTools = (function () {
     var list = clips();
     panel.innerHTML = '';
     var head = el('div', 'fmt-p-head');
-    head.appendChild(el('b', null, 'Clip (' + list.length + ')'));
-    var bAll = el('button', 'fmt-p-btn', '▶ Phát hết');
+    head.appendChild(el('b', null, 'Clips (' + list.length + ')'));
+    var bAll = el('button', 'fmt-p-btn', '▶ Play all');
     bAll.type = 'button'; bAll.onclick = playAll;
     var bX = el('button', 'fmt-p-btn', '✕');
     bX.type = 'button'; bX.onclick = function () { togglePanel(false); };
@@ -1377,8 +1377,8 @@ window.PTFilmTools = (function () {
     panel.appendChild(head);
 
     if (!list.length) {
-      panel.appendChild(el('div', 'fmt-p-none', 'Chưa có clip. Bấm [ và ] trên khung hình, '
-        + 'hoặc dùng "Clip quanh event này".'));
+      panel.appendChild(el('div', 'fmt-p-none', 'No clips yet. Press [ and ] on the picture, '
+        + 'or use "Clip around this event".'));
       return;
     }
     list.forEach(function (c, i) {
@@ -1392,9 +1392,9 @@ window.PTFilmTools = (function () {
       // instead of letting the analyst find out again forty seconds at a time
       if (corsState === false) {
         dl.classList.add('off');
-        dl.title = 'Máy chủ video chưa bật CORS — chưa kết xuất được';
+        dl.title = 'The video host has not enabled CORS — cannot render yet';
       } else {
-        dl.title = 'Tải .mp4 về máy';
+        dl.title = 'Download .mp4';
       }
       dl.onclick = function () { exportClip(c.in, c.out, c.title); };
       var rm = el('button', 'fmt-p-btn', '✕'); rm.type = 'button';
@@ -1482,22 +1482,55 @@ window.PTFilmTools = (function () {
     return bd <= (layer ? layer.h * 0.05 : 40) ? best : null;
   }
 
+  /* A link to one second of the match, in a page that is addressed by its HASH.
+
+     It used to be `location.href.split('?')[0] + '?t=' + …`, and that is wrong
+     in both of the two shapes the channel actually takes:
+
+       app.html#/match/SLB01            -> app.html#/match/SLB01?t=742.10
+         the query lands INSIDE the fragment, so route() reads the slug as
+         "SLB01?t=742.10", matches no match, and sends the reader to #/home
+       app.html?club=slu#/match/SLB01   -> app.html?t=742.10
+         split('?') threw the fragment away with the query, so the reader lands
+         on the channel's front page and the match is gone entirely
+
+     `t` belongs in the REAL query string, ahead of the hash. Then every other
+     reader goes on seeing exactly what it saw — route() gets a clean hash, the
+     ?club= that picks the channel survives, the tagging app's #match= survives
+     — and attach()'s /[?&]t=/ finds it either way.
+
+     Written by hand rather than with URL/URLSearchParams so it has no ambient
+     dependency to stub, and so copying a link twice replaces `t` instead of
+     stacking a second one. */
+  function momentLink(t) {
+    var href = location.href, hash = '';
+    var h = href.indexOf('#');
+    if (h >= 0) { hash = href.slice(h); href = href.slice(0, h); }
+    var q = href.indexOf('?');
+    var base = q >= 0 ? href.slice(0, q) : href;
+    var parts = (q >= 0 ? href.slice(q + 1) : '').split('&').filter(function (p) {
+      return p !== '' && p !== 't' && p.slice(0, 2) !== 't=';
+    });
+    parts.push('t=' + t.toFixed(2));
+    return base + '?' + parts.join('&') + hash;
+  }
+
   function menuModel(hit) {
     var t = hit.t, hs = hitShape(hit.p, t);
     return [
       { head: clock(t) + ' · ' + (ctx.win.label || '') },
-      { label: 'Bước lùi 1 frame', key: ',', run: function () { step(-1); } },
-      { label: 'Bước tới 1 frame', key: '.', run: function () { step(1); } },
-      { label: 'Tốc độ', sub: [0.25, 0.5, 1, 1.5, 2].map(function (k) {
+      { label: 'Step back one frame', key: ',', run: function () { step(-1); } },
+      { label: 'Step forward one frame', key: '.', run: function () { step(1); } },
+      { label: 'Speed', sub: [0.25, 0.5, 1, 1.5, 2].map(function (k) {
           return { label: k + '×', run: function () { setSpeed(k); } };
         }) },
-      { label: loopAB ? 'Bỏ lặp A–B' : 'Lặp A–B từ đây', key: 'L', run: function () {
-          if (loopAB) { loopAB = null; toast('Đã bỏ lặp'); }
-          else { loopAB = { a: t, b: Math.min(ctx.end(), t + 8) }; toast('Lặp ' + clock(loopAB.a) + '–' + clock(loopAB.b)); }
+      { label: loopAB ? 'Stop the A–B loop' : 'Loop A–B from here', key: 'L', run: function () {
+          if (loopAB) { loopAB = null; toast('Loop off'); }
+          else { loopAB = { a: t, b: Math.min(ctx.end(), t + 8) }; toast('Looping ' + clock(loopAB.a) + '–' + clock(loopAB.b)); }
         } },
       { sep: true },
-      { label: 'Rọi đèn vào đây', key: 'S', run: function () {
-          if (!hit.p) { toast('Bấm vào trong khung hình'); return; }
+      { label: 'Spotlight here', key: 'S', run: function () {
+          if (!hit.p) { toast('Right-click on the picture itself'); return; }
           ensureLayer();
           // anchored to hit.t, not to now: the video kept playing under the menu
           var sp = addShape({ kind: 'spotlight', space: 'S', at: hit.p,
@@ -1505,31 +1538,31 @@ window.PTFilmTools = (function () {
                      style: { color: ACCENT, width: strokeW(), pulse: true } }, t);
           selectShape(sp.id);           // straight into adjust: drag to place, wheel to size
         } },
-      { label: dim ? 'Bỏ làm tối' : 'Làm tối phần còn lại', key: 'D', run: function () {
+      { label: dim ? 'Undim' : 'Dim everything else', key: 'D', run: function () {
           dim = !dim; ensureLayer(); paint(ctx.video.currentTime, 0);
         } },
       // the Z hint is gone with the key: a menu advertising a shortcut that does
       // nothing is the exact defect this change went in to fix
-      { label: zoom ? 'Bỏ phóng to' : 'Phóng to vùng này (hoặc lăn chuột)', run: function () {
-          if (zoom) { zoom = null; applyZoom(); toast('Cỡ thật'); }
+      { label: zoom ? 'Reset the zoom' : 'Zoom in here (or use the wheel)', run: function () {
+          if (zoom) { zoom = null; applyZoom(); toast('Full size'); }
           else zoomBy(2, hit.p);
         } },
-      { label: 'Vẽ', sub: [
-          { label: 'Mũi tên', run: function () { armTool('arrow'); } },
-          { label: 'Mũi tên cong', run: function () { armTool('arrow', { curved: true }); } },
-          { label: 'Mũi tên nét đứt (chạy không bóng)', run: function () { armTool('arrow', { dash: true }); } },
-          { label: 'Bút tự do', run: function () { armTool('pen'); } },
-          { label: 'Vùng (half-space, pocket)', run: function () { armTool('zone'); } },
-          { label: 'Chữ', run: function () { armTool('text'); } },
-          { label: 'Đánh dấu cầu thủ', run: function () { armTool('marker'); } },
+      { label: 'Draw', sub: [
+          { label: 'Arrow', run: function () { armTool('arrow'); } },
+          { label: 'Curved arrow', run: function () { armTool('arrow', { curved: true }); } },
+          { label: 'Dashed arrow (run without the ball)', run: function () { armTool('arrow', { dash: true }); } },
+          { label: 'Freehand', run: function () { armTool('pen'); } },
+          { label: 'Zone (half-space, pocket)', run: function () { armTool('zone'); } },
+          { label: 'Text', run: function () { armTool('text'); } },
+          { label: 'Player marker', run: function () { armTool('marker'); } },
           { sep: true },
-          { label: 'Hoàn tác nét cuối', run: undo },
-          { label: 'Xoá hết đồ hoạ', run: clearShapes }
+          { label: 'Undo the last shape', run: undo },
+          { label: 'Clear all drawings', run: clearShapes }
         ] },
-      { label: hidden ? 'Hiện lại đồ hoạ' : 'Ẩn đồ hoạ', key: 'H', run: function () {
+      { label: hidden ? 'Show the drawings' : 'Hide the drawings', key: 'H', run: function () {
           hidden = !hidden; if (layer) paint(ctx.video.currentTime, 0);
         } },
-      { label: stripOn ? 'Ẩn thanh thời gian' : 'Hiện thanh thời gian', key: 'T',
+      { label: stripOn ? 'Hide the timeline' : 'Show the timeline', key: 'T',
         run: function () { toggleStrip(); } },
 
       /* Everything about ONE drawing, and it only appears when the right-click
@@ -1537,50 +1570,50 @@ window.PTFilmTools = (function () {
          first is clicking its bar on the lane. The drawing layer itself still
          takes no click, which is the rule Film has had since it was written. */
       hs ? { sep: true } : null,
-      hs ? { label: 'Hình ở đây: ' + toolName(hs.kind), sub: [
-          { label: 'Chọn để sửa', run: function () { selectShape(hs.id); } },
-          { label: 'Cửa sổ thời gian', sub: [1, 2, 3, 4, 5, 6, 8, 10].map(function (n) {
+      hs ? { label: 'Drawing here: ' + toolName(hs.kind), sub: [
+          { label: 'Select to edit', run: function () { selectShape(hs.id); } },
+          { label: 'Time window', sub: [1, 2, 3, 4, 5, 6, 8, 10].map(function (n) {
               return { label: n + ' s', key: n < 10 ? String(n) : null,
                        run: function () { selectShape(hs.id); setDur(n); } };
             }) },
-          { label: hs.life === 'pinned' ? 'Bỏ giữ suốt clip' : '📌 Giữ suốt clip', key: '0',
+          { label: hs.life === 'pinned' ? 'Stop keeping it up' : '📌 Keep for the whole clip', key: '0',
             run: function () { selectShape(hs.id); togglePin(); } },
-          { label: 'Đứng hình khi xuất clip', sub: [0, 2, 3, 4, 5].map(function (n) {
-              return { label: n ? n + ' s' : 'Tắt',
+          { label: 'Freeze frame on export', sub: [0, 2, 3, 4, 5].map(function (n) {
+              return { label: n ? n + ' s' : 'Off',
                        run: function () { selectShape(hs.id); setFreeze(n); } };
             }) },
-          { label: 'Màu', sub: [['Đỏ', ACCENT], ['Trắng', HOME], ['Vàng', AWAY]].map(function (c) {
+          { label: 'Colour', sub: [['Red', ACCENT], ['White', HOME], ['Yellow', AWAY]].map(function (c) {
               return { label: c[0], run: function () {
                 hs.style = hs.style || {}; hs.style.color = c[1]; touch(hs);
               } };
             }) },
           { sep: true },
-          { label: 'Xoá hình này', key: 'Del', run: function () { removeShape(hs.id); } }
+          { label: 'Delete this drawing', key: 'Del', run: function () { removeShape(hs.id); } }
         ] } : null,
       { sep: true },
-      { label: 'Đánh dấu ĐẦU clip', key: '[', run: function () { markAt('in'); } },
-      { label: 'Đánh dấu CUỐI clip', key: ']', run: function () { markAt('out'); } },
-      { label: 'Clip quanh event này (±6s)', run: function () { clipFromEvent(6); } },
-      { label: 'Danh sách clip…', key: 'C', run: function () { togglePanel(true); } },
+      { label: 'Mark clip START', key: '[', run: function () { markAt('in'); } },
+      { label: 'Mark clip END', key: ']', run: function () { markAt('out'); } },
+      { label: 'Clip around this event (±6s)', run: function () { clipFromEvent(6); } },
+      { label: 'Clip list…', key: 'C', run: function () { togglePanel(true); } },
       { sep: true },
-      { label: 'Lưu khung hình (.png)', run: savePNG },
-      { label: 'Tải đoạn đã đánh dấu (.mp4)', run: function () {
+      { label: 'Save this frame (.png)', run: savePNG },
+      { label: 'Download the marked section (.mp4)', run: function () {
           if (mark.in != null && mark.out != null) exportClip(mark.in, mark.out);
           else {
             var l = clips();
             if (l.length) exportClip(l[l.length - 1].in, l[l.length - 1].out, l[l.length - 1].title);
-            else toast('Đánh dấu [ và ] trước đã');
+            else toast('Mark [ and ] first');
           }
         } },
-      { label: 'Chép link tới khoảnh khắc này', run: function () {
-          var u = location.href.split('?')[0] + '?t=' + t.toFixed(2);
+      { label: 'Copy a link to this moment', run: function () {
+          var u = momentLink(t);
           if (navigator.clipboard) navigator.clipboard.writeText(u).then(
-            function () { toast('Đã chép link'); }, function () { toast(u); });
+            function () { toast('Link copied'); }, function () { toast(u); });
           else toast(u);
         } },
       { sep: true },
-      { label: 'Thoát toàn màn hình', key: 'Esc', run: function () { ctx.exitFull(); } }
-    ].filter(function (it) { return !!it; });   // the "Hình ở đây" pair drops out on a miss
+      { label: 'Exit full screen', key: 'Esc', run: function () { ctx.exitFull(); } }
+    ].filter(function (it) { return !!it; });   // the "Drawing here" pair drops out on a miss
   }
 
   function openMenu(e) {
@@ -1676,7 +1709,7 @@ window.PTFilmTools = (function () {
                           r: Math.round(layer.h * 0.075),
                           style: { color: ACCENT, width: strokeW(), pulse: true } });
       selectShape(sp.id);
-      toast('Rọi đèn — kéo để dời, lăn chuột để đổi cỡ');
+      toast('Spotlight — drag to move it, wheel to resize');
       return true;
     }
 
@@ -1702,7 +1735,7 @@ window.PTFilmTools = (function () {
     if (k === 'l' || k === 'L') {
       var t = ctx.video.currentTime;
       loopAB = loopAB ? null : { a: t, b: Math.min(ctx.end(), t + 8) };
-      toast(loopAB ? 'Lặp ' + clock(loopAB.a) + '–' + clock(loopAB.b) : 'Đã bỏ lặp');
+      toast(loopAB ? 'Looping ' + clock(loopAB.a) + '–' + clock(loopAB.b) : 'Loop off');
       return true;
     }
     return false;
@@ -1790,6 +1823,7 @@ window.PTFilmTools = (function () {
     _internals: {
       pictureRect: pictureRect, toVideo: toVideo, shapeNode: shapeNode,
       pickMime: pickMime, menuModel: function (h) { return menuModel(h); },
+      momentLink: momentLink,
       state: function () {
         return { shapes: shapes, dim: dim, zoom: zoom, hidden: hidden,
                  mode: mode, loopAB: loopAB, mark: mark, full: full, fps: fps,
