@@ -275,12 +275,9 @@ test('an estimate is marked as one, and says why on hover', () => {
 const VIEW=readSrc('Stats/stats-view.js'), REPORT=readSrc('Stats/report.js');
 
 test('the XLSX (and so the CSV) sheet carries the same column, in the same place', () => {
-  const fn=/function statsSheet\(team\)\{[\s\S]*?\n\}/.exec(VIEW)[0];
-  ok(/const headers=\[STAT_HEADERS\[0\],'Player','Minutes Played',\.\.\.STAT_HEADERS\.slice\(1\)\]/.test(fn),
-     'third column, straight after the name');
-  ok(/span=i===0\?g\[1\]\+2:g\[1\]/.test(fn),
-     'the unnamed first group spans No + Player + Minutes Played, or every band above is one out');
-  ok(/\{s:\{r:0,c:2\},e:\{r:1,c:2\}\}/.test(fn),'and its header is merged down like the other two');
+  const fn=/function catSheet\(team,cat\)\{[\s\S]*?\n\}/.exec(VIEW)[0];
+  ok(/const headers=\['No','Player','Minutes Played',\.\.\.cols\.map\(c=>c\[0\]\)\]/.test(fn),
+     'third column, straight after the name — in every one of the four category sheets');
   ok(/minOf\(no\)/.test(fn)&&/return m\?m\.min:''/.test(fn),
      'a bare number a spreadsheet can sort and add up, blank when there is nothing to say');
 });

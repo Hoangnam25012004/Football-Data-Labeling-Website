@@ -1608,7 +1608,7 @@
     loadOnce(r + 'Stats/stats-view.css?v=7', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
-      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=17'); })
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=18'); })
       .then(function () { return loadOnce(r + 'Stats/report.js?v=34'); })
       /* The analyst's toolkit. This site's file, not the tagging app's — Q1 was
          answered B, so the right-click menu, the drawing layer, clips and the

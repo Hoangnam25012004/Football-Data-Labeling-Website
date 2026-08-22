@@ -429,7 +429,7 @@
       <article class="mod">
         <div class="mod-ico"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 4v16m0 0-5.5-5.5M16 20l5.5-5.5"/><path d="M5 22v4a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2v-4"/></svg></div>
         <h3>Exports</h3>
-        <p>The whole match as one workbook: every event in match order, both squads' player stats, both passing matrices and the team comparison. XLSX for Excel, a CSV per sheet, PDF for the report itself.</p>
+        <p>Every player's match as one workbook: Shooting, Distribution, Defensive and Other — the four tables you read on screen — for both squads, eight sheets in all. XLSX for Excel, one CSV with the eight stacked inside it, PDF for the report itself.</p>
       </article>
     </div>
   </div>
@@ -490,26 +490,26 @@
       <p class="eyebrow">Raw data</p>
       <h2 class="display">You own the data,<br>not a screenshot of it</h2>
       <p class="lede">
-        Every event is a structured row. Whoever does your analysis opens the workbook —
-        or one CSV per sheet — and works from exactly the numbers the report was built on.
-        Nobody has to retype anything out of a PDF.
+        Every player's match is a structured row. Whoever does your analysis opens the
+        workbook — eight sheets, four per side — or the single CSV, and works from exactly
+        the numbers the report was built on. Nobody has to retype anything out of a PDF.
       </p>
     </div>
     <div class="spec reveal">
       <div class="code">
-        <div class="code-h"><span style="color:var(--red)">●</span> events_1st_half.csv</div>
-<pre><span class="c">// one row of the workbook: a shot on target</span>
-<span class="k">no</span>              <span class="n">7</span>
-<span class="k">timecode</span>        <span class="s">12:04.65</span>
-<span class="k">match_seconds</span>   <span class="n">724.65</span>    <span class="c">// match clock, not video time</span>
-<span class="k">team_name</span>       <span class="s">Saint Lucia</span>
-<span class="k">event</span>           <span class="s">shot on target</span>
-<span class="k">player_from</span>     <span class="n">14</span>
-<span class="k">player_x</span>        <span class="n">78.4</span>      <span class="c">// where it was struck (0–100)</span>
-<span class="k">player_y</span>        <span class="n">41.2</span>
-<span class="k">player_to</span>       <span class="c">—         // a shot has no receiver</span>
-<span class="k">receiver_x</span>      <span class="c">—</span>
-<span class="k">receiver_y</span>      <span class="c">—</span></pre>
+        <div class="code-h"><span style="color:var(--red)">●</span> Saint_Lucia_vs_Aruba_stats.csv</div>
+<pre><span class="c">### shooting_home     // one of the eight tables in the file</span>
+<span class="k">No</span>                  <span class="n">11</span>
+<span class="k">Player</span>              <span class="s">Stanislas</span>
+<span class="k">Minutes Played</span>      <span class="n">89</span>        <span class="c">// a number, not 89'</span>
+<span class="k">Goals</span>               <span class="n">1</span>
+<span class="k">Assists</span>             <span class="n">0</span>
+<span class="k">Key Passes</span>          <span class="n">2</span>
+<span class="k">Total Shots</span>         <span class="n">5</span>
+<span class="k">Shots On Target</span>     <span class="n">3</span>
+<span class="k">Shots Off Target</span>    <span class="n">1</span>
+<span class="k">Blocked Shots</span>       <span class="n">1</span>
+<span class="k">Shooting Accuracy</span>   <span class="s">60.0%</span>     <span class="c">// a percent cell, not text</span></pre>
       </div>
       <div>
         <p class="card-h" style="margin-bottom:12px">Event dictionary <span class="right">18 of 38</span></p>
@@ -530,11 +530,11 @@
             <table class="dt">
               <thead><tr><th>Field</th><th>What it is</th></tr></thead>
               <tbody>
-                <tr><td class="mono" style="color:var(--rival)">event</td><td style="text-align:left;color:var(--ash)">What happened</td></tr>
-                <tr><td class="mono" style="color:var(--rival)">player_from / player_to</td><td style="text-align:left;color:var(--ash)">Who played it · who received it</td></tr>
-                <tr><td class="mono" style="color:var(--rival)">player_x,y / receiver_x,y</td><td style="text-align:left;color:var(--ash)">Both ends of the action, 0–100</td></tr>
-                <tr><td class="mono" style="color:var(--rival)">timecode / match_seconds</td><td style="text-align:left;color:var(--ash)">Where in the match it happened</td></tr>
-                <tr><td class="mono" style="color:var(--rival)">team / team_name</td><td style="text-align:left;color:var(--ash)">Which side played it</td></tr>
+                <tr><td class="mono" style="color:var(--rival)">No / Player</td><td style="text-align:left;color:var(--ash)">The shirt, and the name it was tagged under</td></tr>
+                <tr><td class="mono" style="color:var(--rival)">Minutes Played</td><td style="text-align:left;color:var(--ash)">How long he was actually on the pitch</td></tr>
+                <tr><td class="mono" style="color:var(--rival)">shooting_home … other_away</td><td style="text-align:left;color:var(--ash)">One table per tab, per side</td></tr>
+                <tr><td class="mono" style="color:var(--rival)">Goals · Passes · Tackles · Fouls</td><td style="text-align:left;color:var(--ash)">Every column you read on screen</td></tr>
+                <tr><td class="mono" style="color:var(--rival)">Accuracy · Success</td><td style="text-align:left;color:var(--ash)">Percent cells Excel can sort and average</td></tr>
               </tbody>
             </table>
           </div>

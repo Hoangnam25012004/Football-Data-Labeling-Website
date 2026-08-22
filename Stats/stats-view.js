@@ -1112,73 +1112,69 @@ function benchListHTML(team){
     +`</div><div class="gf-blist">${list}</div></div>`;
 }
 
-/* ---- exports (full workbook: events + stats + pass distribution) ---- */
+/* ---- exports: the Stats tab's four category tables, one per side ----
+   Eight sheets, in the order the tabs are read — shooting_home … other_away —
+   and nothing else in the book. What is downloaded is what was on screen: the
+   same columns, the same padded squad, the same order of players.
+
+   Formatting is everything the spreadsheet library can actually write here:
+   column widths, a filter across the header row, and cells typed so a column
+   sorts and adds up. Percentages go in as real percent cells (0.6 carrying a
+   0.0% format) rather than the text "60.0%" — Excel and the CSV still read
+   "60.0%", but a spreadsheet can now average a column of them. */
 let dur=blankDur();
 function fmt(t){const m=Math.floor(t/60),s=Math.floor(t%60),cs=Math.floor((t%1)*100);return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;}
 function matchTime(vt){const d=dur; if(!d.enabled)return vt; const off=(+d.halfLen||45)*60;
   if(d.h2Start>0 && vt>=d.h2Start) return off+(vt-d.h2Start); return Math.max(0, vt-(d.h1Start||0));}
 function eventHalf(r){const h2=dur.h2Start; return (h2>0 && r.t>=h2)?2:1;}
-function buildData(half){
-  const rs=rows.filter(r=>r.t!=null).sort((a,b)=>a.t-b.t).filter(r=>!half||eventHalf(r)===half);
-  return rs.map((r,i)=>({no:i+1,timecode:fmt(matchTime(r.t)),match_seconds:+matchTime(r.t).toFixed(2),
-    video_seconds:+(+r.t).toFixed(2),team:r.team,team_name:r.teamName||(r.team==='home'?meta.home:meta.away),event:r.event,
-    player_from:r.playerFrom,player_x:r.pXY?+r.pXY.x.toFixed(1):'',player_y:r.pXY?+r.pXY.y.toFixed(1):'',
-    player_to:r.playerTo,receiver_x:r.rXY?+r.rXY.x.toFixed(1):'',receiver_y:r.rXY?+r.rXY.y.toFixed(1):'',
-    action_code:r.action,raw_input:r.raw}));
+
+/* One value on its way into a cell. A percentage arrives from PLAYER_CATS
+   already written out as "60.0%"; a spreadsheet wants the number behind it and
+   the format beside it. Everything else goes in as it came. */
+const PCT_CELL=/^-?\d+(?:\.\d+)?%$/;
+function statCell(v){
+  if(typeof v==='number')return v;
+  const s=String(v==null?'':v);
+  return PCT_CELL.test(s)?{v:parseFloat(s)/100,t:'n',z:'0.0%'}:s;
 }
-function eventsSheet(half){
-  const ws=XLSX.utils.json_to_sheet(buildData(half));
-  ws['!cols']=[{wch:5},{wch:10},{wch:13},{wch:13},{wch:7},{wch:14},{wch:14},{wch:11},{wch:8},{wch:8},{wch:9},{wch:9},{wch:9},{wch:9},{wch:16}];
-  return ws;
-}
-function passSheet(team){
-  const {players,mtx}=passMatrix(rows,team);
-  const aoa=[['From \\ To',...players,'Σ']]; const colSum={}; let grand=0;
-  players.forEach(f=>{let rowSum=0; const row=[f];
-    players.forEach(t=>{if(f===t){row.push('–');return;}
-      const v=(mtx[f]&&mtx[f][t])||0; rowSum+=v; colSum[t]=(colSum[t]||0)+v; grand+=v; row.push(v);});
-    row.push(rowSum); aoa.push(row);});
-  aoa.push(['Σ recv',...players.map(p=>colSum[p]||0),grand]);
-  const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=aoa[0].map((h,i)=>({wch:i===0?9:Math.max(4,String(h).length+1)}));
-  return ws;
-}
-function buildSheets(){
-  return [['events_1st_half',eventsSheet(1)],['events_2nd_half',eventsSheet(2)],
-          ['stats_home',statsSheet('home')],['stats_away',statsSheet('away')],
-          ['pass_home',passSheet('home')],['pass_away',passSheet('away')],
-          ['team_stats',teamStatsSheet()]];
-}
-function statsSheet(team){
+/* One category, one side: the table under that tab, as a worksheet. */
+function catSheet(team,cat){
   // same squad padding + name column as the on-screen table, so the export matches it
   const P=withSquad(computeStats(rows,team),lineups,team), players=sortedPlayers(P);
   const names=squadNames(lineups,team);
-  /* Minutes played travels with the name here too (the CSV export is these same
-     sheets). A bare number, not "64'": a spreadsheet column of minutes is there to be
-     sorted and added up. Blank where there is no line-up to work it out from. */
+  /* Minutes played travels with the name here too, in all four sheets — the rest
+     of a row is a tally, and a tally reads differently against 12 minutes than
+     against 90. A bare number, not "64'": a spreadsheet column of minutes is there
+     to be sorted and added up. Blank where there is no line-up to work it out from. */
   const mins=playedMinutes(lineups,dur,team,rows);
   const minOf=no=>{const m=mins&&mins[String(no==null?'':no).trim()];return m?m.min:'';};
-  const headers=[STAT_HEADERS[0],'Player','Minutes Played',...STAT_HEADERS.slice(1)];
-  const h1=new Array(headers.length).fill(''); const merges=[];
-  let c=0; STAT_GROUPS.forEach((g,i)=>{const span=i===0?g[1]+2:g[1];   // the 'No' group also holds Player and Minutes Played
-    if(g[0]){h1[c]=g[0]; if(span>1)merges.push({s:{r:0,c},e:{r:0,c:c+span-1}});} c+=span;});
-  merges.push({s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}});
-  const aoa=[h1,headers,...players.map(no=>{const r=statRow(no,P[no]);
-    return [r[0],playerLabel(names,no),minOf(no),...r.slice(1)];})];
-  const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!merges']=merges;
-  ws['!cols']=headers.map((h,i)=>({wch:i===0?5:i===1?18:Math.max(7,h.length)}));
+  const cols=STAT_CATS[cat]||[];
+  const headers=['No','Player','Minutes Played',...cols.map(c=>c[0])];
+  const aoa=[headers,...players.map(no=>{
+    const k=String(no==null?'':no).trim(), n=+k;   // a squad number sorts as a number;
+    return [k!==''&&!isNaN(n)?n:k,                 // a player tagged by name stays text
+      playerLabel(names,no),minOf(no),...cols.map(c=>statCell(c[1](P[no])))];
+  })];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=headers.map((h,i)=>({wch:i===0?5:i===1?20:Math.max(9,h.length+2)}));
+  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:aoa.length-1,c:headers.length-1}})};
   return ws;
 }
-function teamStatsSheet(){
-  const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
-  const aoa=[[meta.home,'Team Comparison',meta.away]];
-  TEAM_SECTIONS.forEach(sec=>{
-    aoa.push([sec[0],'','']);
-    sec[1].forEach(([label,fn])=>aoa.push([fn(h,a),label,fn(a,h)]));
-    aoa.push(['','','']);
-  });
-  const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:14},{wch:20},{wch:14}];
-  return ws;
+/* The book: four categories, home side then away. The categories are read off
+   STAT_CATS rather than a list kept here, so a tab added to the view is a sheet
+   added to the export and neither can drift from the other. */
+function buildSheets(){
+  const out=[];
+  ['home','away'].forEach(team=>Object.keys(STAT_CATS).forEach(cat=>
+    out.push([cat+'_'+team,catSheet(team,cat)])));
+  return out;
+}
+/* A CSV holds one table, not eight — so the eight are stacked into one file,
+   each under the name of its sheet with a blank line before the next. Written
+   from the very same worksheets, so the two downloads cannot disagree. */
+function buildCsv(){
+  return buildSheets().map(([name,ws])=>
+    '### '+name+'\n'+XLSX.utils.sheet_to_csv(ws).replace(/[\r\n]+$/,'')).join('\n\n')+'\n';
 }
 const matchName=()=>(meta.home||'Home')+'_vs_'+(meta.away||'Away');
 
@@ -2026,18 +2022,15 @@ function bindControls(){
     if(!rows.length){alert('No data yet.');return;}
     const wb=XLSX.utils.book_new();
     buildSheets().forEach(([name,ws])=>XLSX.utils.book_append_sheet(wb,ws,name));
-    XLSX.writeFile(wb,matchName()+'_events.xlsx');
+    XLSX.writeFile(wb,matchName()+'_stats.xlsx');
   };
-  // CSV can't hold multiple sheets -> download one .csv per sheet
+  // CSV can't hold multiple sheets -> the eight go into one file, stacked
   $('expCsv').onclick=()=>{
     if(!rows.length){alert('No data yet.');return;}
-    buildSheets().forEach(([name,ws],i)=>{
-      const csv=XLSX.utils.sheet_to_csv(ws);
-      const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
-      const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-      a.download=matchName()+'_'+name+'.csv';
-      setTimeout(()=>{a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);},i*300);
-    });
+    const blob=new Blob(['\ufeff'+buildCsv()],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=matchName()+'_stats.csv';
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   };
 
   $('viewOverallBtn').onclick=()=>{statView='overall';renderStats();};
