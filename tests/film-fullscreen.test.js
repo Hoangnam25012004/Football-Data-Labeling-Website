@@ -278,11 +278,32 @@ test('Escape with nothing to close does nothing, as before', () => {
 test('a slicer still owns the keyboard while the focus is in it', () => {
   const P=sandbox({slicers:true});
   P.filmFullOn();
-  const inside=node('input'); P.slicers[0].add(inside);
-  eq(key(P,'f',inside),0,'F does not toggle from inside a panel');
+  const sl=P.slicers[0];
+  const inside=node('input'); sl.add(inside);
+  sl.classList.add('open');                  // filmFullOn() shuts them; this one is up
+  eq(key(P,'f',inside),0,'F does not toggle from inside an open panel');
   ok(big(P));
   eq(key(P,'Escape',inside),1,'and Escape there still just shuts the panel');
   ok(big(P),'it did not also take the screen down');
+});
+
+/* The other half of that rule, and the bug it was hiding.
+
+   A mouse click on a <button> IS focus, and nothing blurs a slicer button the
+   way #fmFull and #fmNext blur themselves. So with "owns the keyboard" resting
+   on the focus alone, one press of "All players" left the whole Film keyboard
+   dead — measured on the live site: [ never reached the toolkit and no clip
+   could be marked. Shut, the slicer keeps only the two keys that work its own
+   button; everything else goes back to Film. */
+test('a slicer that is shut keeps only the keys that open it', () => {
+  const P=sandbox({slicers:true});
+  P.filmFullOn();
+  const sl=P.slicers[0], btn=sl.querySelector('.fm-sl-btn');
+  notOk(sl.classList.contains('open'),'the panel is down');
+  eq(key(P,' ',btn),0,'Space still presses the button rather than the video');
+  eq(key(P,'Enter',btn),0,'and so does Enter');
+  eq(key(P,'f',btn),1,'but F is Film again — this is the key that used to die');
+  notOk(big(P),'and it really did toggle');
 });
 
 test('and a text field anywhere else keeps its f', () => {

@@ -1814,13 +1814,22 @@ function filmDocClick(e){
 function filmKeys(e){
   if(!film||e.altKey||e.ctrlKey||e.metaKey)return;
   const t=e.target,tag=(t&&t.tagName)||'';
-  /* A slicer owns the keyboard while the focus is in it: Escape shuts it, and
+  /* A slicer owns the keyboard while its panel is OPEN: Escape shuts it, and
      everything else is the browser's — Space above all, which has to tick the
      box under the cursor or press the button rather than start the video. No
-     preventDefault on that path, or the button would stop opening. */
-  if(t&&t.closest&&t.closest('.fm-slicer')){
-    if(e.key==='Escape'){filmSlicerOpen(null,false);e.preventDefault();}
-    return;
+     preventDefault on that path, or the button would stop opening.
+
+     SHUT, it owns only the two keys that work the button itself. It used to own
+     every key for as long as the button held the focus — and a mouse click on a
+     <button> IS focus, with nothing here blurring it the way #fmFull and #fmNext
+     do. So one press of "All players" left the whole Film keyboard dead: [ and ]
+     above all, but also , . H D C T S L and the transport keys, until the
+     analyst happened to click something else. Measured, and the reason clips
+     could not be marked. */
+  const sl=t&&t.closest&&t.closest('.fm-slicer');
+  if(sl){
+    if(e.key==='Escape'){filmSlicerOpen(null,false);e.preventDefault();return;}
+    if(sl.classList.contains('open')||e.key===' '||e.key==='Spacebar'||e.key==='Enter')return;
   }
   if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||(t&&t.isContentEditable))return;
   /* Escape under NATIVE full screen belongs to the browser and cannot be

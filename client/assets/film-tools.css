@@ -150,6 +150,20 @@
 }
 .fmt-toast.on{opacity:1}
 
+/* ---------- the clip mark still waiting for its other end ---------- */
+/* Top-left, the one corner of the full-screen box nothing else uses: the clip
+   drawer is top-right, the caption and the toast are along the bottom. It takes
+   no pointer, so it can never sit between the analyst and the picture. */
+.fmt-mark{
+  position:absolute; left:14px; top:14px; z-index:39;
+  max-width:min(46ch,60%); padding:6px 12px; border-radius:999px;
+  background:rgba(10,8,9,.92); border:1px solid #E0122B; color:#EFEAE8;
+  font-size:12.5px; font-weight:700; font-variant-numeric:tabular-nums;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  opacity:0; transition:opacity .16s; pointer-events:none;
+}
+.fmt-mark.on{opacity:1}
+
 /* while a tool is armed the whole box says so, so nobody wonders why the
    pointer stopped behaving like a pointer */
 .film-full.fmt-drawing{cursor:crosshair}

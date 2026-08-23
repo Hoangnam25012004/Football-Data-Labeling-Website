@@ -388,6 +388,108 @@ test('clips are kept per match, in this browser only', () => {
   ok(/localStorage/.test(TOOLS),'localStorage, per Q2 answered A');
 });
 
+/* ================= marking one, which is two presses apart =================
+
+   Everything below was measured on the live site before it was written. The two
+   marks are the only pair of items in this menu that need a SECOND press to
+   mean anything, and every one of these was a way for the first press to be
+   thrown away without a word. */
+
+/* The menu does not pause the video — that was settled deliberately — so an
+   item read for two seconds is chosen two seconds after it was asked for.
+   Every drawing item already anchors to hit.t; these two did not, and a mark
+   asked for at 47:30 landed at 47:31.8. */
+test('the menu marks the frame that was right-clicked, not the one playing now', () => {
+  const {I,v,menu,pick}=mounted();
+  v.currentTime=200;
+  const m1=menu(200,{x:900,y:500});
+  v.currentTime=214;                       // the clock ran on while the menu was read
+  pick(m1,'Mark clip START').run();
+  eq(I.state().mark.in,200,'the start is the frame under the click');
+  const m2=menu(230,{x:900,y:500});
+  v.currentTime=246;
+  pick(m2,'Mark clip END').run();
+  eq(I.clips().length,1);
+  eq(I.clips()[0].in,200);
+  eq(I.clips()[0].out,230,'and so is the end');
+});
+
+test('the keyboard still marks now, because that is what a key press means', () => {
+  const {I,v,key}=mounted();
+  v.currentTime=311.5;
+  ok(key('['));
+  eq(I.state().mark.in,311.5);
+});
+
+/* filmStart() re-attaches on every redraw of the view. attach() used to clear
+   the marks with everything else, so [ , a redraw, ] saved nothing at all. */
+test('a pending mark survives the redraw that used to eat it', () => {
+  const {T,I,v,key}=mounted();
+  const redraw=extra=>{T.detach();T.fullscreen(true);T.attach(ctxFor(v,extra));};
+  v.currentTime=100;
+  ok(key('['));
+  redraw();
+  eq(I.state().mark.in,100,'the same match and the same half keep it');
+  v.currentTime=130;
+  ok(key(']'));
+  eq(I.clips().length,1,'so [ and ] across a redraw still make a clip');
+  eq(I.clips()[0].in,100);
+});
+
+test('…and is let go of wherever it stops meaning anything', () => {
+  const {T,I,v,key}=mounted();
+  const redraw=extra=>{T.detach();T.fullscreen(true);T.attach(ctxFor(v,extra));};
+  v.currentTime=100; key('[');
+  redraw({win:{half:2,label:'2nd Half',start:0,end:3000}});
+  eq(I.state().mark.in,null,'another half is another window on the file');
+  v.currentTime=100; key('[');
+  redraw({meta:{home:'A',away:'B',matchId:'m2'}});
+  eq(I.state().mark.in,null,'and another match is another match');
+});
+
+/* A 0-second clip was saved happily and then refused by the export with
+   "Nothing has been marked yet" — a clip that existed only to say no. */
+test('both ends on one frame is not a clip, and does not cost the end already taken', () => {
+  const {I,v,key}=mounted();
+  v.currentTime=100;
+  ok(key('['));
+  ok(key(']'),'the press is still claimed');
+  eq(I.clips().length,0,'nothing was saved');
+  eq(I.state().mark.in,100,'and the start is still standing');
+  v.currentTime=112;
+  ok(key(']'));
+  eq(I.clips().length,1,'closing it properly does save');
+  eq(I.clips()[0].out,112);
+});
+
+/* Between the two presses the only thing that said a mark was waiting was a
+   toast that had already gone. */
+test('a mark waiting for its other end says so, for as long as it waits', () => {
+  const {c,v,key}=mounted();
+  const badge=()=>c.box.children.filter(n=>n.className==='fmt-mark')[0];
+  notOk(badge(),'nothing on screen while there is nothing to say');
+  v.currentTime=100; ok(key('['));
+  ok(badge(),'the line is up');
+  ok(/Clip start/.test(badge().textContent),'and it names the end that is waiting');
+  ok(badge().classList.contains('on'));
+  v.currentTime=130; ok(key(']'));
+  notOk(badge().classList.contains('on'),'and it goes when the clip closes');
+});
+
+test('the line goes with the room it hangs in', () => {
+  const {T,c,v,key}=mounted();
+  v.currentTime=100; key('[');
+  const badge=()=>c.box.children.filter(n=>n.className==='fmt-mark')[0];
+  ok(badge().classList.contains('on'));
+  T.fullscreen(false);
+  notOk(badge().classList.contains('on'),'telestration is a full-screen room only');
+  T.detach();
+  notOk(badge(),'and a redraw replaces the box, so the node may not be held past it');
+  ok(/\.fmt-mark\{/.test(TOOLS_CSS),'it has a style of its own');
+  ok(/pointer-events:none/.test(TOOLS_CSS.slice(TOOLS_CSS.indexOf('.fmt-mark{'))),
+     'and it never sits between the analyst and the picture');
+});
+
 /* ================= the export format ================= */
 test('mp4 is preferred, and webm is the honest fallback', () => {
   eq(load({mimes:['video/mp4;codecs=avc1.640028','video/webm;codecs=vp9']})
@@ -812,6 +914,21 @@ test('detach takes off every listener attach put on', () => {
     eq((c.stage.on[t]||[]).length,0,t+' is gone again'));
   eq((winL.resize||[]).length,0,'and so is the window resize');
   eq((v.on['loadedmetadata']||[]).length,0,'and the metadata handler');
+});
+
+/* A toast hides itself 2.6 seconds later, from a timer closing over the node.
+   detach() drops that node, so a redraw inside those 2.6 seconds woke the timer
+   up to a null — an uncaught TypeError, seen in the console every time the
+   analyst was told something and then changed half. Both ends are held: the
+   timer is cancelled with everything else, and it checks before it reaches. */
+test('a toast still counting down cannot outlive the box it hangs in', () => {
+  const det=grabFunction('detach',TOOLS,'client/assets/film-tools.js');
+  ok(/clearTimeout\(toastT\)/.test(det),'detach cancels the countdown');
+  ok(det.indexOf('clearTimeout(toastT)')<det.indexOf('toastEl = null'),
+     'before the node it would have reached for is dropped');
+  const t=grabFunction('toast',TOOLS,'client/assets/film-tools.js');
+  ok(/if \(toastEl\) toastEl\.classList\.remove\('on'\)/.test(t),
+     'and the timer looks before it touches');
 });
 
 /* ============================================================================

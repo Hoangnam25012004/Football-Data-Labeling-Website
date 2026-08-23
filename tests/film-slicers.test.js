@@ -439,13 +439,22 @@ test('the outside-click listener goes when Film goes', () => {
 
 /* Space is play/pause on the document. Inside a slicer it has to tick the box or
    press the button instead, and it must not be swallowed on the way. */
-test('the keyboard belongs to a slicer while the focus is in one', () => {
+test('the keyboard belongs to a slicer while its panel is OPEN', () => {
   ok(filmKeys.indexOf("closest('.fm-slicer')")>=0,'filmKeys checks for one');
   const inside=filmKeys.slice(filmKeys.indexOf("closest('.fm-slicer')"));
   ok(/Escape/.test(inside.slice(0,200)),'Escape shuts it');
   ok(inside.indexOf('return;')>=0,'and everything else is handed back to the browser');
   ok(filmKeys.indexOf("closest('.fm-slicer')")<filmKeys.indexOf("tag==='INPUT'"),
      'checked before the tag test, so the button is covered as well as the boxes');
+  /* The focus alone is NOT the test any more. A click on the button focuses it
+     and nothing here blurs it, so resting on the focus meant one press of a
+     filter killed every Film key — [ and ] first among them. The panel being up
+     is what hands the keyboard over; with it down only Space and Enter, which
+     work the button itself, stay the browser's. */
+  ok(/classList\.contains\('open'\)/.test(inside.slice(0,400)),
+     'it asks whether the panel is open, not merely where the focus is');
+  ok(/e\.key===' '\|\|e\.key==='Spacebar'\|\|e\.key==='Enter'/.test(inside.slice(0,400)),
+     'and a shut slicer still gets the two keys that open it');
 });
 
 test('handing over a match empties the three lists', () => {

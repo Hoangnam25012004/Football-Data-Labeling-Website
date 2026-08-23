@@ -55,6 +55,7 @@ window.PTFilmTools = (function () {
   var zoom = null;         // {k, x, y} in video pixels
   var loopAB = null;       // {a, b}
   var mark = { in: null, out: null };
+  var markKey = null;      // the match+half those marks were taken in
   var play = null;         // playlist playback: {list, i, clip}
   var fps = 25;            // measured on the way in; 25 until it is
   var seq = 0;
@@ -917,7 +918,13 @@ window.PTFilmTools = (function () {
     clearTimeout(toastT);
     if (!msg) { toastEl.classList.remove('on'); return; }
     toastEl.textContent = msg; toastEl.classList.add('on');
-    if (!sticky) toastT = setTimeout(function () { toastEl.classList.remove('on'); }, 2600);
+    /* detach() drops the node this closes over, and a redraw inside the 2.6s
+       used to leave the timer waking up to a null: an uncaught TypeError every
+       time the analyst was told something and then changed half. detach() now
+       clears the timer as well; the guard is what makes that cheap to trust. */
+    if (!sticky) toastT = setTimeout(function () {
+      if (toastEl) toastEl.classList.remove('on');
+    }, 2600);
   }
 
   /* ---------------------------------------------------------------
@@ -958,15 +965,53 @@ window.PTFilmTools = (function () {
   /* ---------------------------------------------------------------
      Clips — a window on the same file, which is what Film has always played
      --------------------------------------------------------------- */
-  function markAt(which) {
+  var MIN_CLIP = 0.5;      // both ends on one frame is not a clip, it is a slip
+
+  /* `at` is the moment the mark belongs to, and the MENU passes it for the same
+     reason every drawing item passes hit.t: the video is NOT paused while the
+     menu is up, so by the time an item is chosen the clock has moved on.
+     Measured on the live site — the menu header said 47:30 and the mark landed
+     1.82s later, which is exactly how long the item took to read. The keyboard
+     passes nothing and gets "now", which is what a key press means. */
+  function markAt(which, at) {
     if (!ctx) return;
-    mark[which] = ctx.video.currentTime;
-    if (mark.in != null && mark.out != null && mark.out < mark.in) {
-      var t = mark.in; mark.in = mark.out; mark.out = t;
+    mark[which] = at != null ? at : ctx.video.currentTime;
+    var a = mark.in, b = mark.out;
+    /* Both ends on one frame used to be saved as a 0-second clip, which the
+       export then refused with "Nothing has been marked yet" — a clip that
+       existed only to say no. Drop the end just taken instead, so the other one
+       stays up and can still be closed properly. */
+    if (a != null && b != null && Math.abs(b - a) < MIN_CLIP) {
+      mark[which] = null;
+      toast('Both ends are on the same frame — move the clock, then mark again');
+      renderMark();
+      return;
     }
+    if (a != null && b != null && b < a) { mark.in = b; mark.out = a; }
     toast(which === 'in' ? 'Clip start ' + clock(mark.in) : 'Clip end ' + clock(mark.out));
     if (mark.in != null && mark.out != null) saveClip(mark.in, mark.out);
+    renderMark();
   }
+
+  /* ---------------------------------------------------------------
+     The pending mark, made visible.
+
+     A clip is two presses apart, and between them the only thing that said so
+     was a toast that had already gone: press [ , look for what changed, find
+     nothing, and conclude the key is dead. This line stays up for exactly as
+     long as one end is waiting for the other.
+     --------------------------------------------------------------- */
+  var markEl = null;
+  function renderMark() {
+    var want = !!(ctx && ctx.box && full && (mark.in != null || mark.out != null));
+    if (!want) { if (markEl) markEl.classList.remove('on'); return; }
+    if (!markEl) { markEl = el('div', 'fmt-mark'); ctx.box.appendChild(markEl); }
+    markEl.textContent = mark.in != null
+      ? '⟦ Clip start ' + clock(mark.in) + ' — press ] for the end'
+      : '⟧ Clip end ' + clock(mark.out) + ' — press [ for the start';
+    markEl.classList.add('on');
+  }
+
   function saveClip(a, b, title) {
     var list = clips();
     var c = {
@@ -977,6 +1022,7 @@ window.PTFilmTools = (function () {
     };
     list.push(c); setClips(list);
     mark = { in: null, out: null };
+    renderMark();                      // whoever called, the line above is over
     toast('Saved "' + c.title + '" (' + Math.round(b - a) + 's)');
     if (panel) renderPanel();
     return c;
@@ -1077,11 +1123,18 @@ window.PTFilmTools = (function () {
     catch (e) { toast('This video will not let the page read its pixels — see §11 of the design'); return; }
     overlayImage(overlaySVGString(v.currentTime, 0)).then(function (img) {
       g.drawImage(img, 0, 0, c.width, c.height);
-      c.toBlob(function (b) {
-        if (!b) { toast('The browser refused to read the frame (CORS)'); return; }
-        download(b, fileStem() + '_' + clock(v.currentTime).replace(':', 'm') + 's.png');
-        toast('Frame saved');
-      }, 'image/png');
+      /* A canvas tainted by the video THROWS here — measured, SecurityError
+         from both toBlob() and toDataURL() — it does not hand back the null
+         blob the callback was written for. Without this the throw travelled on
+         to .catch() below and blamed the graphics layer for a header the video
+         host never sent. Both routes are kept: browsers differ. */
+      try {
+        c.toBlob(function (b) {
+          if (!b) { toast('The browser refused to read the frame (CORS)'); return; }
+          download(b, fileStem() + '_' + clock(v.currentTime).replace(':', 'm') + 's.png');
+          toast('Frame saved');
+        }, 'image/png');
+      } catch (e) { toast('The browser refused to read the frame (CORS)'); }
     }).catch(function () { toast('The graphics layer could not be built'); });
   }
   function fileStem() {
@@ -1591,8 +1644,12 @@ window.PTFilmTools = (function () {
           { label: 'Delete this drawing', key: 'Del', run: function () { removeShape(hs.id); } }
         ] } : null,
       { sep: true },
-      { label: 'Mark clip START', key: '[', run: function () { markAt('in'); } },
-      { label: 'Mark clip END', key: ']', run: function () { markAt('out'); } },
+      /* anchored to hit.t, like every drawing item above: the video kept
+         playing while the menu was being read, and a mark taken from the live
+         clock landed wherever it had drifted to instead of on the frame the
+         analyst right-clicked */
+      { label: 'Mark clip START', key: '[', run: function () { markAt('in', t); } },
+      { label: 'Mark clip END', key: ']', run: function () { markAt('out', t); } },
       { label: 'Clip around this event (±6s)', run: function () { clipFromEvent(6); } },
       { label: 'Clip list…', key: 'C', run: function () { togglePanel(true); } },
       { sep: true },
@@ -1746,8 +1803,19 @@ window.PTFilmTools = (function () {
      --------------------------------------------------------------- */
   function attach(c) {
     ctx = c;
+    /* The pending clip mark is the one piece of state here that must SURVIVE a
+       re-attach. filmStart() re-attaches on every redraw of the view and on
+       every change of half, and this line used to throw the mark away with
+       everything else: the analyst pressed [ , the list redrew under them,
+       pressed ] , and no clip was saved and nothing said why.
+
+       It is dropped only where it stops meaning anything — another match, or
+       another half, which is a different window on the same file. */
+    var mk = matchKey() + '#' + ((c.win && c.win.half) || 0);
+    if (mk !== markKey) { mark = { in: null, out: null }; markKey = mk; }
+
     shapes = []; draft = null; mode = null; dim = false; zoom = null;
-    loopAB = null; mark = { in: null, out: null }; hidden = false;
+    loopAB = null; hidden = false;
     selected = null; adjust = null; ptr = null; anchor = null; strip = null;
     ctx.stage.addEventListener('contextmenu', openMenu);
     ctx.stage.addEventListener('pointerdown', onDown);
@@ -1758,6 +1826,9 @@ window.PTFilmTools = (function () {
     ctx.video.addEventListener('loadedmetadata', onMeta);
     measureFps();
     restore();
+    // full screen is set BEFORE this call (filmStart calls filmFullSet first),
+    // so a mark carried through the redraw says so again straight away
+    renderMark();
     // a ?t= link lands on the moment it names, once the file knows its own length
     var q = /[?&]t=(\d+(?:\.\d+)?)/.exec(location.href);
     if (q) ctx.video.addEventListener('loadedmetadata', function once() {
@@ -1773,9 +1844,13 @@ window.PTFilmTools = (function () {
     closeMenu();
     // a spotlight dragged in the last fifth of a second still owes the disk a write
     clearTimeout(saveT);
+    clearTimeout(toastT);          // …and a toast counting down owes the DOM nothing
     if (shapes.length) persist();
     if (panel) { panel.remove(); panel = null; }
     if (toastEl) { toastEl.remove(); toastEl = null; }
+    // renderFilm() replaces the innerHTML of the box this hangs in, so holding
+    // the node across a redraw would leave a live variable pointing at nothing
+    if (markEl) { markEl.remove(); markEl = null; }
     ctx.stage.removeEventListener('contextmenu', openMenu);
     ctx.stage.removeEventListener('pointerdown', onDown);
     ctx.stage.removeEventListener('pointermove', onPtr);
@@ -1813,6 +1888,9 @@ window.PTFilmTools = (function () {
     } else {
       ensureStrip();
     }
+    /* Called BEFORE attach() on a redraw, so ctx can still be null here —
+       renderMark() checks for it, and attach() calls it again once there is one. */
+    renderMark();
     // the stage just changed size; the picture inside it moved with it
     setTimeout(relayout, 0);
   }
