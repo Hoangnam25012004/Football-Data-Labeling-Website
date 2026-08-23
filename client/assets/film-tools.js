@@ -1186,6 +1186,24 @@ window.PTFilmTools = (function () {
     + 'The bucket needs an Access-Control-Allow-Origin header — see docs/film-export-cors-design.md §3.';
   var corsState = null;      // null = not known yet · false = measured, and the header is missing
 
+  /* The same file, under a URL the browser's cache has never seen.
+
+     THIS IS THE ONE THAT ACTUALLY BIT, and the bucket was innocent. Measured
+     2026-08-24: curl -H "Origin: https://hoangnams.com" gets back
+     `Access-Control-Allow-Origin: https://hoangnams.com` and a 206 — the CORS
+     policy is there and correct. The browser still refused, saying no such
+     header was present, because the PLAYER had already streamed that exact URL
+     with no crossorigin and therefore no Origin header. The response sitting in
+     the HTTP cache carries no ACAO, and the export's CORS request is answered
+     out of that cache. One parameter is a different cache entry, so the request
+     really goes to the network and comes back with the header on it.
+
+     A parameter can invalidate a signature, so this is a RETRY and never the
+     first attempt: a source that opens cleanly is never rewritten. */
+  function corsUrl(src) {
+    return src + (src.indexOf('?') < 0 ? '?' : '&') + 'cors=1';
+  }
+
   function openSource(src, withCors) {
     return new Promise(function (ok, no) {
       var el = document.createElement('video');
@@ -1280,14 +1298,24 @@ window.PTFilmTools = (function () {
 
     /* Two beats. The first is the only one that can produce a clean canvas; the
        second exists solely to tell the analyst WHICH thing is broken. */
+    /* Three questions, in the order that tells them apart:
+         1. does it open WITH crossorigin?            → render
+         2. does it open with crossorigin off the cache's path?  → render
+         3. does it open without crossorigin at all?  → the header really is missing
+       Step 2 is the one that rescues the ordinary case, where the only thing
+       wrong is that the player got there first — see corsUrl(). Only when the
+       header is genuinely absent does step 3 reach NEED_CORS, so that sentence
+       still means what it says. */
     openSource(src, true).then(opened, function () {
-      openSource(src, false).then(function (el) {
-        dropSource(el);                     // it opened, so the file is fine
-        corsState = false;                  // remembered: the drawer dims ⭳ from now on
-        if (panel) renderPanel();
-        fail(NEED_CORS);
-      }, function () {
-        fail('The video file could not be opened — bad URL, or the file is gone.');
+      openSource(corsUrl(src), true).then(opened, function () {
+        openSource(src, false).then(function (el) {
+          dropSource(el);                   // it opened, so the file is fine
+          corsState = false;                // remembered: the drawer dims ⭳ from now on
+          if (panel) renderPanel();
+          fail(NEED_CORS);
+        }, function () {
+          fail('The video file could not be opened — bad URL, or the file is gone.');
+        });
       });
     });
 
@@ -1913,7 +1941,7 @@ window.PTFilmTools = (function () {
       clips: clips, setClips: setClips, saveClip: saveClip, STORE_KEY: STORE_KEY,
       // the time model, so the window can be tested without a browser
       liveAt: liveAt, alpha: alpha, upgrade: upgrade, hitShape: hitShape,
-      openSource: openSource, NEED_CORS: NEED_CORS,
+      openSource: openSource, corsUrl: corsUrl, NEED_CORS: NEED_CORS,
       setCors: function (s) { corsState = s; },
       exportClip: function (a, b, t) { return exportClip(a, b, t); },
       selectShape: selectShape, originOnElement: originOnElement,

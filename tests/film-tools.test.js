@@ -987,18 +987,38 @@ test('a source that answers twice only settles once', async () => {
   ok(ok1,'the first answer is the answer');
 });
 
-test('the export asks twice, and the second answer picks the message', () => {
+test('the export asks three times, and the last answer picks the message', () => {
   const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
   ok(/openSource\(src,\s*true\)/.test(ex),'beat one, with the header demanded');
-  ok(/openSource\(src,\s*false\)/.test(ex),'beat two, without it');
-  ok(ex.indexOf('openSource(src, true)')<ex.indexOf('openSource(src, false)'),
-     'and only ever in that order — beat two is a diagnosis, not a fallback');
+  ok(/openSource\(corsUrl\(src\),\s*true\)/.test(ex),'beat two, off the cache path');
+  ok(/openSource\(src,\s*false\)/.test(ex),'beat three, without the header at all');
+  ok(ex.indexOf('openSource(src, true)')<ex.indexOf('openSource(corsUrl(src), true)'),
+     'the plain url is always tried first — a parameter can invalidate a signature');
+  ok(ex.indexOf('openSource(corsUrl(src), true)')<ex.indexOf('openSource(src, false)'),
+     'and the retry comes before anything is concluded about the server');
   ok(/fail\(NEED_CORS\)/.test(ex),
-     'it opened without the header, so the file is fine and the SERVER is what to fix');
+     'only beat three reaches it: it opened without the header and would not open with one');
   ok(/bad URL, or the file is gone/.test(ex),
-     'neither opened, so this really is the file');
+     'none opened, so this really is the file');
   notOk(/video could not be opened for rendering/i.test(TOOLS),
      'the old sentence blamed the video for a missing header and is gone');
+});
+
+/* The bucket was innocent. Measured 2026-08-24 against the object being played:
+   curl with an Origin header gets 206 + Access-Control-Allow-Origin, and the
+   preflight answers 204 — the policy is there and correct. The browser refused
+   anyway, because the PLAYER had already streamed that same URL with no
+   crossorigin, and the cached response carries no header for the export's CORS
+   request to be answered with. A URL the cache has not seen goes to the
+   network, and the header is on it. */
+test('a cache poisoned by the player is retried before the bucket is blamed', () => {
+  const {I}=opener();
+  eq(I.corsUrl('https://x.test/m.mp4'),'https://x.test/m.mp4?cors=1',
+     'the same file, one parameter, a different cache entry');
+  eq(I.corsUrl('https://x.test/m.mp4?a=1'),'https://x.test/m.mp4?a=1&cors=1',
+     'and a url that already carries a query keeps it');
+  const open=grabFunction('openSource',TOOLS,'client/assets/film-tools.js');
+  ok(/crossOrigin = 'anonymous'/.test(open),'the retry still demands the header');
 });
 
 test('the diagnosing element renders nothing and is thrown away at once', () => {

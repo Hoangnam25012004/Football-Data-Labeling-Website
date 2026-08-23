@@ -20,16 +20,16 @@
     "sha256": "ec9b53a076844289"
   },
   "client/assets/app.js": {
-    "v": 41,
-    "sha256": "3fe8fc3e8a3d9a91"
+    "v": 42,
+    "sha256": "f5ee3d1321d59d70"
   },
   "client/assets/film-tools.css": {
     "v": 4,
     "sha256": "f68b2b6724c08cb3"
   },
   "client/assets/film-tools.js": {
-    "v": 5,
-    "sha256": "dc300977f4ae11f2"
+    "v": 6,
+    "sha256": "0fd5daeb925cc848"
   },
   "client/assets/guide.css": {
     "v": 1,

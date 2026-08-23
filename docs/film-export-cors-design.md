@@ -1,5 +1,40 @@
 # Film — Xuất clip không mở được video, và tắt bảng Telestration bằng chuột trái
 
+> ## ⚠️ ĐÍNH CHÍNH — 2026-08-24
+>
+> **Chẩn đoán ở §0.1 dưới đây đã sai kể từ khi bucket được cấu hình. Bucket KHÔNG thiếu CORS.**
+> Đo lại vào 2026-08-24, đúng object đang phát:
+>
+> ```
+> $ curl -sI -H "Origin: https://hoangnams.com" -H "Range: bytes=0-1" \
+>        https://pub-9cdd…r2.dev/matches/…/…Barbados….mp4
+> HTTP/1.1 206 Partial Content
+> Access-Control-Allow-Origin: https://hoangnams.com
+> Vary: Origin
+> Access-Control-Expose-Headers: ETag,Content-Length,Content-Range,Accept-Ranges,Content-Type
+> ```
+>
+> Preflight `OPTIONS` trả `204` với `Access-Control-Allow-Methods: GET, PUT, HEAD`, và một
+> Origin lạ thì **không** được cấp header — tức policy đúng, không phải cấp bừa.
+>
+> **Nguyên nhân thật là cache HTTP của trình duyệt.** Player trên màn hình tải chính URL đó
+> **không** kèm `crossorigin`, nên bản nằm trong cache **không có** `Access-Control-Allow-Origin`.
+> Khi bộ kết xuất mở lại đúng URL ấy với `crossOrigin="anonymous"`, trình duyệt trả lời từ cache
+> và báo "No 'Access-Control-Allow-Origin' header is present" — một câu nói về **cache**, không
+> phải về bucket. Đo được: `fetch(url,{cache:'reload'})` → 206 OK; `fetch(url+'?cors=1')` → 206 OK;
+> `openSource(url+'?cors=1', true)` → mở được và **canvas đọc được** (`toDataURL()` không ném).
+>
+> Đã sửa trong `exportClip()`: mở với crossorigin → nếu hỏng, **thử lại trên `corsUrl(src)`** (một
+> tham số làm nó thành một entry cache khác) → chỉ khi cả hai hỏng mà bản không-crossorigin mở
+> được thì mới kết luận thiếu header và hiện `NEED_CORS`. Câu đó vì thế vẫn đúng ở chỗ nó xuất hiện.
+>
+> **Chưa sửa:** `savePNG()` vẽ từ player trên màn hình, vốn cố ý không mang `crossorigin`, nên
+> canvas vẫn bị taint và ảnh .png vẫn không lưu được. Đó là một quyết định riêng, chưa làm.
+>
+> **`worker/r2-cors.json` trong repo KHÔNG khớp policy đang chạy** — file chỉ cho `GET, HEAD`,
+> policy thật cho `GET, PUT, HEAD`. Áp file đó lên bucket sẽ **gỡ mất PUT** và làm hỏng upload
+> video. Đừng chạy `wrangler r2 bucket cors put` với file này.
+
 **Hai vấn đề, và chúng không cùng loại. Cái thứ nhất — `Không mở được video để kết xuất` — KHÔNG
 phải lỗi code: bucket R2 chứa video **không trả về header CORS nào cả**, nên phần tử `<video>` mà
 bộ kết xuất mở với `crossOrigin="anonymous"` bị trình duyệt từ chối ngay từ khâu tải. Sửa nó là
