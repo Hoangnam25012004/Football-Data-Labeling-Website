@@ -14,7 +14,7 @@ R2_BUCKET      = "football-videos"
 # TODO: paste the URL you got from "Public Development URL -> Enable" here (https://pub-XXXX.r2.dev)
 R2_PUBLIC_BASE = "https://pub-9cdd291bf181425b9738328ada297691.r2.dev"
 # Lock BOTH endpoints to your site's origin ("*" allows any origin — fine for testing).
-ALLOW_ORIGIN   = "https://hoangnam25012004.github.io"
+ALLOW_ORIGIN   = "https://hoangnams.com"
 
 # ---------- contact form (/contact) ----------
 # Where an enquiry is emailed to.
