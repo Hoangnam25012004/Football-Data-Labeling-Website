@@ -166,14 +166,20 @@ test('a demo costs nothing until somebody presses play', () => {
 
 test('every clip the page names is one the manifest can address', () => {
   const named=(PAGE.match(/data-clip="([^"]+)"/g)||[]).map(s=>/"([^"]+)"/.exec(s)[1]);
-  const manifest=GUIDE.slice(GUIDE.indexOf('clips: {'),GUIDE.indexOf('};',GUIDE.indexOf('clips: {')));
+  /* The slice starts AFTER `clips: {`, not at it: matched from the opening line
+     the reverse check below would count the container as a fourteenth entry —
+     and it would pass, silently, only because one of the clips happens to be
+     called `clips`. Rename that one and the test would have failed for a reason
+     that had nothing to do with the manifest. */
+  const open=GUIDE.indexOf('clips: {');
+  const manifest=GUIDE.slice(open+'clips: {'.length,GUIDE.indexOf('};',open));
   ok(named.length>=13,'the page shows the demos it promises');
   named.forEach(k=>ok(new RegExp('[\'"]?'+k+'[\'"]?\\s*:').test(manifest),
     'the manifest knows '+k));
-  (manifest.match(/^\s*"?([a-z]+)"?\s*:\s*\{/gm)||[]).forEach(line=>{
-    const k=/"?([a-z]+)"?\s*:/.exec(line)[1];
-    ok(named.indexOf(k)>=0,'nothing is downloaded that the page never shows: '+k);
-  });
+  const keys=(manifest.match(/^\s*"?([a-z]+)"?\s*:\s*\{/gm)||[])
+    .map(l=>/"?([a-z]+)"?\s*:/.exec(l)[1]);
+  eq(keys.length,named.length,'the manifest holds exactly the clips the page shows');
+  keys.forEach(k=>ok(named.indexOf(k)>=0,'nothing is fetched that the page never shows: '+k));
 });
 
 test('documentation opens when the rest of the app cannot', () => {
