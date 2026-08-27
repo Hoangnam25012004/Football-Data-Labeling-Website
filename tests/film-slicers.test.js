@@ -120,13 +120,20 @@ function sandbox(opts){
     'var filmFilter='+JSON.stringify(filter)+';',
     'var relists=0;',
     'function filmRelist(){relists++;}',
+    /* the event filter's order — a table, a rank and a comparator. All three are
+       arrow consts, so they come out with grabConst; grabFunction only matches
+       `function name(`. They go in ABOVE filmSlicers, which now calls the
+       comparator by name and would otherwise throw ReferenceError. */
+    grabConst('FILM_EV_ORDER',STATS,'Stats/stats-view.js'),
+    grabConst('filmEvRank',STATS,'Stats/stats-view.js'),
+    grabConst('filmEvCmp',STATS,'Stats/stats-view.js'),
     F('filmSlicers'),F('filmSlicerLabel'),F('filmSlicerHTML'),
     grabConst('FILM_SL_MAX',STATS,'Stats/stats-view.js'),
     F('filmSlicerFit'),F('filmSlicerOpen'),F('filmSyncSlicer'),
     F('filmBindSlicers'),F('filmDocClick'),
     ';globalThis.P={filmSlicers,filmSlicerLabel,filmSlicerHTML,filmSlicerOpen,',
     '  filmSlicerFit,filmSyncSlicer,filmBindSlicers,filmDocClick,doc:document,',
-    '  MAX:FILM_SL_MAX,MIN:FILM_SL_MIN,',
+    '  MAX:FILM_SL_MAX,MIN:FILM_SL_MIN,ORDER:FILM_EV_ORDER,evRank:filmEvRank,',
     '  filter:()=>filmFilter,relists:()=>relists};'
   ].join('\n'),ctx,{filename:'film-slicers.js'});
   return ctx.P;
@@ -157,7 +164,109 @@ test('a side with no name still has something to click', () => {
 test('players and events are the half own, in the order they are read in', () => {
   const P=sandbox();
   eq(byKey(P,'player').opts.map(o=>o.v).join(','),'2,9,14','numerically, not "14" before "2"');
-  eq(byKey(P,'event').opts.map(o=>o.v).join(','),'goal,pass success','alphabetically');
+  eq(byKey(P,'event').opts.map(o=>o.v).join(','),'goal,pass success',
+     'shooting before distribution — not alphabetically, which agreed here by accident');
+});
+
+/* ================= the order the event filter is read in =================
+
+   Shooting · Distribution · Defensive · Other · Body part: shared.js's own
+   PLAYER_CATS — the four tabs the player table has always been read in — with
+   BODY_PARTS after them.
+
+   A–Z was the old answer. It sat `block` (a defensive stop) next to
+   `blocked shot` (an attempt), two characters apart; it left `goal` between
+   `free-kick` and `goal kick`; and it printed `pass fail` before `pass success`.
+   The filter is used to build a themed playlist, so a set that belongs together
+   has to READ together. What follows is that pair, and the four other things
+   A–Z got wrong, plus the two properties nothing may cost us: every name still
+   offered, and every value still exactly as it was tagged. */
+const evOrder=(P,list)=>P.filmSlicers({players:[],events:list})
+  .filter(s=>s.key==='event')[0].opts.map(o=>o.v).join(',');
+
+test('the five groups come out in order, whatever order they went in', () => {
+  eq(evOrder(sandbox(),['head','foul','tackle success','cross fail','shot on target']),
+     'shot on target,cross fail,tackle success,foul,head',
+     'shooting, distribution, defensive, other, body part');
+});
+
+test('block is defensive, blocked shot is a shot — the pair A-Z put side by side', () => {
+  eq(evOrder(sandbox(),['block','blocked shot']),'blocked shot,block');
+});
+
+test('inside a group: the column order of PLAYER_CATS, success before failure', () => {
+  const P=sandbox();
+  eq(evOrder(P,['pass fail','pass success']),'pass success,pass fail');
+  eq(evOrder(P,['miss shot','goal','key pass']),'goal,key pass,miss shot');
+  eq(evOrder(P,['aerial duel fail','recovery','tackle success']),
+     'tackle success,recovery,aerial duel fail');
+  eq(evOrder(P,['free-kick','yellow card','corner-kick','save']),
+     'corner-kick,free-kick,save,yellow card','set pieces, then the keeper, then the card');
+});
+
+test('body parts come last, in the order a shot is read in', () => {
+  eq(evOrder(sandbox(),['head','lower body','right foot','upper body','left foot','goal']),
+     'goal,right foot,left foot,upper body,head,lower body');
+});
+
+test('a name the table never heard of is still offered — last, and A-Z with its kind', () => {
+  const P=sandbox();
+  eq(evOrder(P,['zzz custom','goal']),'goal,zzz custom');
+  eq(evOrder(P,['whistle','apple','goal']),'goal,apple,whistle',
+     'the unknown bucket has an order of its own');
+});
+
+test('capitalisation ranks the same, and the VALUE is left exactly as tagged', () => {
+  const P=sandbox();
+  eq(evOrder(P,['pass success','Goal']),'Goal,pass success','ranked through evKey');
+  eq(evOrder(P,['throw-Ins','goal']),'goal,throw-Ins','the tagger spelling ranks as a throw-in');
+  /* One rank, so the raw strings break the tie and "Goal" lands first (G < g in
+     UTF-16). WHICH of the two comes first does not matter; that both are still
+     offered, and next to each other, does — filmMatches compares the value to
+     r.event exactly, so merging them would drop a filter the data can answer. */
+  eq(evOrder(P,['goal','Goal']),'Goal,goal',
+     'two spellings are two filter values: both stay, side by side');
+});
+
+/* The pick carried in from the other half by union() is sorted with everything
+   else rather than appended, or a filter set in the first half would sit at the
+   bottom of the second half's panel. */
+test('a pick carried in from the other half is ranked, not appended', () => {
+  const P=sandbox({filter:{event:['goal']}});
+  eq(evOrder(P,['pass success','tackle success']),'goal,pass success,tackle success');
+});
+
+test('nothing is added, dropped or merged — only the order moves', () => {
+  const list=['head','block','goal','zzz','pass fail','save','Goal','right foot',
+              'interception','key pass','cross success','offside'];
+  const out=evOrder(sandbox(),list).split(',');
+  eq(out.length,list.length,'same count');
+  eq(out.slice().sort().join(','),list.slice().sort().join(','),'same set');
+});
+
+test('the order is decided rather than incidental: sorting it again changes nothing', () => {
+  const P=sandbox();
+  const once=evOrder(P,['zzz','goal','Goal','head','block','pass fail']);
+  eq(evOrder(P,once.split(',')),once);
+});
+
+test('every name in the table is lower case and appears once', () => {
+  const P=sandbox(), seen={};
+  P.ORDER.forEach(n=>{
+    eq(n,String(n).trim().toLowerCase(),n+': the lookup goes through evKey, so the table is lower case');
+    notOk(seen[n],n+' is in the table twice'); seen[n]=1;
+  });
+  eq(P.evRank('Goal'),0,'the first name of the table is goal');
+  eq(P.evRank('no such event'),P.ORDER.length,'and an unknown one ranks past the end');
+});
+
+/* Both call sites, asserted against the source: filmChoices sorts the half's own
+   names and filmSlicers sorts them again after union() has added the carried-in
+   picks. One of the two left on a bare .sort() would be a second answer to
+   "how are events ordered" sitting in the same file. */
+test('both call sites sort with the comparator, not with A-Z', () => {
+  ok(/events:Object\.keys\(events\)\.sort\(filmEvCmp\)/.test(STATS),'filmChoices');
+  ok(/union\(choices\.events,picked\('event'\)\)\.sort\(filmEvCmp\)/.test(STATS),'filmSlicers');
 });
 
 /* A pick made in one half must stay visible in the next, or the button would

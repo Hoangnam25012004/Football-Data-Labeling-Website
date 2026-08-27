@@ -1316,6 +1316,49 @@ function filmMatches(r){
 // an entry is shown whole or not at all: one touch of #2 brings the move with it
 const filmCueMatches=c=>c.rows.some(filmMatches);
 
+/* The order the EVENT filter is read in: shooting · distribution · defensive ·
+   other · body part.
+
+   A–Z was the old answer and it put `block` (a defensive stop) next to
+   `blocked shot` (an attempt), two characters apart, and left `goal` between
+   `free-kick` and `goal kick`. The filter is used to build a themed playlist —
+   tick the four or five names that make up "chance creation" — and A–Z scatters
+   every such set across a panel that scrolls at 230px.
+
+   These four groups are NOT a new convention: they are shared.js's own
+   PLAYER_CATS, the four tabs the player table has always been read in, and the
+   fifth group is its BODY_PARTS. Within a group the names follow that category's
+   column order, success before failure.
+
+   LOWER CASE, because every lookup goes through evKey(): the event list is
+   user-editable, so "Goal" and "throw-Ins" are spellings the data really carries.
+   The rank is all that is normalised — the option VALUE stays the raw string,
+   because filmMatches() compares it to r.event exactly.
+
+   A name that is not here does NOT disappear: it ranks last and sorts A–Z among
+   its own kind (see filmEvCmp), which is what keeps a match tagged with a custom
+   event list filterable. */
+const FILM_EV_ORDER=[
+  'goal','assist','key pass','shot on target','shot off target','blocked shot','miss shot',
+  'pass success','pass fail','cross success','cross fail',
+  'take-on succes','take-on success','take-on fail','step in',
+  'tackle success','tackle fail','interception','clearance','block','recovery',
+  'ground duel success','ground duel fail','aerial duel success','aerial duel fail',
+  'take-on concern','mistake',
+  'corner-kick','free-kick','penalty kick','throw-ins','throw-in','goal kick',
+  'foul','foul throw','handball foul','foul won','offside','save',
+  'yellow card','red card','substitution','gain possesion','pause',
+  'right foot','left foot','upper body','head','lower body'
+];
+const filmEvRank=e=>{const i=FILM_EV_ORDER.indexOf(evKey(e));
+  return i<0?FILM_EV_ORDER.length:i;};
+/* Rank first, then A–Z, so two names of one rank — and the whole "not known
+   here" bucket — have an order that is decided rather than incidental. Two
+   renders of one half must produce the same list, including the picks union()
+   carries in from the half before. */
+const filmEvCmp=(a,b)=>{const d=filmEvRank(a)-filmEvRank(b); if(d)return d;
+  const x=evKey(a),y=evKey(b); return x<y?-1:x>y?1:(a<b?-1:a>b?1:0);};
+
 function filmChoices(cues){
   const players={},events={};
   cues.forEach(c=>c.rows.forEach(r=>{
@@ -1323,7 +1366,7 @@ function filmChoices(cues){
     if(r.event)events[r.event]=1;
   }));
   return {players:Object.keys(players).sort((a,b)=>(+a||0)-(+b||0)),
-          events:Object.keys(events).sort()};
+          events:Object.keys(events).sort(filmEvCmp)};
 }
 
 /* The passer's number, then his events, then the receiver's — the same shape the
@@ -1378,7 +1421,7 @@ function filmSlicers(choices){
     {key:'player',all:'All players',many:'players',
      opts:union(choices.players,picked('player')).sort((a,b)=>(+a||0)-(+b||0)).map(plain)},
     {key:'event',all:'All events',many:'events',
-     opts:union(choices.events,picked('event')).sort().map(plain)}
+     opts:union(choices.events,picked('event')).sort(filmEvCmp).map(plain)}
   ];
 }
 
