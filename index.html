@@ -851,7 +851,7 @@ const DEFAULT_EVENTS = {
     {"name":"ground duel success","key":"x"},
     {"name":"ground duel fail","key":"xx"},
     {"name":"mistake","key":"m"},
-    {"name":"take-on succes","key":"e"},
+    {"name":"take-on success","key":"e"},
     {"name":"take-on fail","key":"ee"},
     {"name":"take-on concern","key":"er"},
     {"name":"step in","key":"r"},
@@ -861,7 +861,7 @@ const DEFAULT_EVENTS = {
     {"name":"handball foul","key":"hf"},
     {"name":"save","key":"v"},
     {"name":"pause","key":"pa"},
-    {"name":"gain possesion","key":"gp"}
+    {"name":"gain possession","key":"gp"}
   ],
   "football7": [],
   "futsal": [],
@@ -3715,7 +3715,9 @@ const EVENT_INC={
   'pass fail':['passes'],
   'cross success':['crosses','crossesComp'],
   'cross fail':['crosses'],
-  'take-on succes':['takeOns','takeOnsWon'],
+  // keyed on the corrected spelling; EV_ALIAS below is what brings the months of
+  // rows tagged 'take-on succes' to this line (twin of the one in shared.js)
+  'take-on success':['takeOns','takeOnsWon'],
   'take-on fail':['takeOns'],
   'take-on concern':['takeOns'],
   'step in':['stepIns'],
@@ -3752,13 +3754,20 @@ function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,s
   clearances:0,blocks:0,recoveries:0,groundDuels:0,groundDuelsWon:0,aerialDuels:0,aerialDuelsWon:0,
   corners:0,freeKicks:0,penalties:0,throwIns:0,goalKicks:0,fouls:0,offsides:0,mistakes:0,saves:0};}
 const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
+/* Twin of shared.js's EV_ALIAS — this file carries its own copy of the stat engine,
+   since it does not load shared.js. Keep the two in step: a rename shipped in
+   DEFAULT_EVENTS has to be readable here, or this page's own Stats tab reports zero
+   for every match tagged under the old name. */
+const EV_ALIAS={'take-on succes':'take-on success','gain possesion':'gain possession'};
+const evKey=e=>{const k=String(e==null?'':e).trim().toLowerCase();
+  return EV_ALIAS[k]||k;};
 function computeStats(team){
   const P={}; const get=n=>{if(!P[n])P[n]=newStat();return P[n];};
   state.rows.filter(r=>r.team===team).forEach(r=>{
     const a=(r.playerFrom||'').toString().trim(); if(!a)return;
     // event names are user-editable, so match the dictionary case-insensitively —
     // an event tagged "throw-Ins" must still count as a throw-in (same as shared.js)
-    const inc=EVENT_INC[String(r.event==null?'':r.event).trim().toLowerCase()];
+    const inc=EVENT_INC[evKey(r.event)];
     if(inc){const p=get(a);inc.forEach(k=>p[k]++);}
   });
   return P;

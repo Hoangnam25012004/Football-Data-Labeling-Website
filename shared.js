@@ -200,7 +200,9 @@ const EVENT_INC={
   'pass fail':['passes'],
   'cross success':['crosses','crossesComp'],
   'cross fail':['crosses'],
-  'take-on succes':['takeOns','takeOnsWon'],
+  // keyed on the corrected spelling; EV_ALIAS is what brings the months of rows
+  // tagged 'take-on succes' to this line
+  'take-on success':['takeOns','takeOnsWon'],
   'take-on fail':['takeOns'],
   // a take-on the defender made uncomfortable: still one of this player's take-ons
   // (Distribution), and counted on its own under Defensive
@@ -239,10 +241,27 @@ function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,s
   clearances:0,blocks:0,recoveries:0,groundDuels:0,groundDuelsWon:0,aerialDuels:0,aerialDuelsWon:0,
   corners:0,freeKicks:0,penalties:0,throwIns:0,goalKicks:0,fouls:0,foulsWon:0,offsides:0,mistakes:0,saves:0};}
 const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
+/* Two names in the shipped event list went out misspelt, and were tagged that way for
+   months. The list now ships the corrected spelling, so BOTH are in the data: every match
+   tagged before today says "take-on succes", every match tagged after says "take-on
+   success", and one analyst may well have fixed the typo by hand somewhere in between.
+
+   They are folded onto one name HERE rather than in each dictionary, because "here" is the
+   single point every lookup in this file, in Stats/stats-view.js and in Stats/report.js
+   already goes through. That matters most for the ones that CANNOT hold two spellings:
+   DIST_CATS.takeons and the report's take-on ranking read parts[0] as "the winning event",
+   so a second entry beside it would be read as a third category rather than as the same
+   one twice.
+
+   The rule for adding to this: only ever a rename of the SAME event. Two events that are
+   genuinely different must not be folded together — the fold is invisible in the data and
+   there would be nothing to un-fold it by. */
+const EV_ALIAS={'take-on succes':'take-on success','gain possesion':'gain possession'};
 /* Event names come from a user-editable list, so the spelling of a type is whatever the
    tagger typed ("throw-Ins", "Goal"). Every lookup against a fixed dictionary here goes
    through evKey, or an event tagged with different capitalisation silently counts zero. */
-const evKey=e=>String(e==null?'':e).trim().toLowerCase();
+const evKey=e=>{const k=String(e==null?'':e).trim().toLowerCase();
+  return EV_ALIAS[k]||k;};
 function computeStats(rows,team){
   const P={}; const get=n=>{if(!P[n])P[n]=newStat();return P[n];};
   rows.filter(r=>r.team===team).forEach(r=>{

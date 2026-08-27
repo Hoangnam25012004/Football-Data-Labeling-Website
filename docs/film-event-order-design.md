@@ -11,6 +11,12 @@ Trạng thái: **đã triển khai** (2026-08-27), sau khi Q2 và Q4 được ch
 test mới**. Chỉ `tests/film-slicers.test.js` bị sửa; 16 file test khác cũng đọc
 `Stats/stats-view.js` và không phải sửa một dòng nào.
 
+> **Bản sửa 2 (cùng ngày, đã được cho phép):** ba mục §9 để ngỏ nay đã làm — **tiêu đề nhóm
+> trong panel** (§9.1), **tick cả nhóm một phát** (§9.2) và **sửa chính tả `take-on succes` /
+> `gain possesion`** (§9.4), cái sau bằng một bảng alias tại `evKey` nên **không migration và
+> không mất một dòng dữ liệu nào**. §9.3 vẫn không làm. Toàn bộ ở **§11**;
+> `node tests/run.js` → **1298/1298**.
+
 Quy mô thực tế: `Stats/stats-view.js` **+45 / −2** (trong đó **đúng 2 dòng** là sửa code sẵn
 có — hai lời gọi `.sort()`; 43 dòng còn lại là bảng thứ tự và comment), `tests/film-slicers.test.js`
 **+111 / −2**, và **3 dòng `?v=`**. Không file mới ⇒ không phải thêm dòng `cp` nào vào
@@ -569,7 +575,11 @@ node tests/run.js
 
 ## 9. Cố ý KHÔNG làm trong bản này
 
-Ghi ra để không ai tưởng là quên. Mỗi mục là một thay đổi **riêng**, cần được cho phép riêng:
+Ghi ra để không ai tưởng là quên. Mỗi mục là một thay đổi **riêng**, cần được cho phép riêng.
+
+> **Cập nhật 2026-08-27:** 9.1, 9.2 và 9.4 **đã được duyệt và đã làm** — chi tiết ở **§11**.
+> Phần văn bản dưới đây giữ nguyên như lúc còn là đề xuất, vì nó là lý do vì sao ba việc đó
+> phải tách ra khỏi bản đổi thứ tự chứ không kèm vào. **9.3 vẫn KHÔNG làm.**
 
 ### 9.1 Tiêu đề nhóm trong panel
 
@@ -631,3 +641,160 @@ Custom Event
 
 44 vào, 44 ra. `throw-Ins` xếp đúng chỗ của một quả ném biên dù viết hoa chữ I (tra qua `evKey`),
 và `Custom Event` — tên bảng chưa từng nghe — vẫn được cung cấp, nằm ở cuối.
+
+---
+
+## 11. Bản sửa 2 — §9.1, §9.2 và §9.4 đã làm (2026-08-27)
+
+Ba mục §9 để ngỏ nay đã được duyệt và triển khai. **§9.3 vẫn không làm.**
+`node tests/run.js` → **1298/1298 passed**, trong đó **1281 test cũ pass** và **17 test mới**.
+
+| | Việc | Kết quả |
+|---|---|---|
+| **9.1** | Tiêu đề nhóm trong panel | `SHOOTING` · `DISTRIBUTION` · `DEFENSIVE` · `OTHER` · `BODY PART` · `OTHER EVENTS` |
+| **9.2** | Tick cả nhóm một phát | Chính cái tiêu đề đó là ô tick |
+| **9.4** | Sửa chính tả 2 tên | `take-on success`, `gain possession` — **không migration, không mất một dòng dữ liệu nào** |
+
+### 11.1 §9.4 — gấp hai chính tả về một tên, ở đúng một chỗ
+
+Vấn đề thật: danh sách sự kiện xuất xưởng sai chính tả suốt nhiều tháng, nên **dữ liệu đã tag
+mang chính tả cũ**, còn danh sách từ nay mang chính tả mới. Đổi khoá từ điển mà không làm gì
+thêm = mọi trận cũ đọc ra 0 take-on, im lặng, đúng kiểu sự cố "Throw-ins đọc ra 0" hồi
+2026-07-24.
+
+Cách làm: **một bảng alias ngay tại `evKey`** trong `shared.js`.
+
+```js
+const EV_ALIAS={'take-on succes':'take-on success','gain possesion':'gain possession'};
+const evKey=e=>{const k=String(e==null?'':e).trim().toLowerCase();
+  return EV_ALIAS[k]||k;};
+```
+
+Vì sao ở đây chứ không phải thêm khoá vào từng từ điển:
+
+* `evKey` là **điểm duy nhất** mà mọi tra cứu trong `shared.js`, `Stats/stats-view.js` và
+  `Stats/report.js` đã đi qua — kỷ luật có sẵn từ lần sửa lỗi throw-Ins. Sửa một chỗ, cả ba
+  file được theo.
+* Hai chỗ **không thể** chứa hai chính tả: `DIST_CATS.takeons` (Stats) và `TAKEON_RANKS`
+  (report) đọc `parts[0]` là "sự kiện thắng"; thêm một mục nữa bên cạnh sẽ bị hiểu thành một
+  **loại thứ ba**, và cột Succ. / % của bảng xếp hạng sai theo. Alias tránh hẳn chuyện đó —
+  hai file này **không phải sửa một dòng logic nào**, chỉ đổi chuỗi cho sạch.
+* Đổi lại: alias là **vô hình trong dữ liệu**, không có gì để "gỡ gấp" về sau. Nên có luật kèm
+  theo, viết ngay trong comment và có test canh: **chỉ được gấp hai cách viết của CÙNG một sự
+  kiện**, không bao giờ gấp hai sự kiện khác nhau.
+
+Tagger `index.html` **không nạp `shared.js`** — nó giữ bản sao riêng của cả bộ máy thống kê —
+nên bản sao `EV_ALIAS` + `evKey` được đặt cạnh `computeStats` của nó, thay cho dòng
+`String(...).trim().toLowerCase()` viết thẳng. Không có bước này thì tab Stats của chính tagger
+đọc ra 0 cho mọi trận cũ.
+
+**Ba chỗ khác mang tên sự kiện, và cách xử lý từng chỗ:**
+
+1. `DEFAULT_EVENTS` (index.html) + `pitchtagger_events.json` → **đổi sang chính tả đúng**. Chỉ
+   ảnh hưởng trình duyệt chưa từng mở app; người đang dùng giữ danh sách trong localStorage,
+   và nhờ alias, họ **đổi tên bằng tay lúc nào cũng an toàn** — đó chính là thứ §9.4 mua được.
+2. `Stats/stats-view.js` DIST_CATS + `Stats/report.js` TAKEON_CAT/RANKS → đổi chuỗi sang chính
+   tả đúng. Cả hai đi qua `evKey` nên **hành vi không đổi một ly**; đây thuần tuý là dọn chính
+   tả khỏi source.
+3. **`supabase/migrations/0015_match_stats_event_names.sql`** — view `match_stats` khớp tên sự
+   kiện **bằng SQL**, nơi `evKey` không với tới. May mắn: nó **đã** khớp cả hai chính tả từ
+   trước (`ev in ('take-on succes','take-on success','take-on fail')`), nên **không phải sửa,
+   và migration đã chạy thì không được sửa**. Chỉ có `tests/client-channels.test.js` phải đổi
+   chiều: bộ `allowed` giờ liệt kê chính tả **cũ** là ngoại lệ, thay vì chính tả mới. Test này
+   là thứ bắt được vấn đề — nó so mọi tên trong view với danh sách xuất xưởng.
+
+**Bằng chứng mạnh nhất:** 6 file test đang tag dữ liệu bằng `take-on succes`
+(`analysis-gate` · `events-table` · `report-visuals` · `stats-distribution` ×2 …) **pass nguyên
+trạng, không sửa một dòng**. Nếu alias không hoạt động, chúng đỏ trước tiên.
+
+### 11.2 §9.1 + §9.2 — tiêu đề nhóm, và chính nó là ô tick
+
+Bảng thứ tự phẳng được xếp lại thành `FILM_EV_GROUPS` (tên nhóm → danh sách tên), còn
+`FILM_EV_ORDER` **suy ra** từ nó bằng một `reduce`. Một bảng, hai việc: thứ tự và nhóm **không
+thể** bất đồng về chỗ đặt tiêu đề. `filmEvGroup(e)` đọc cùng bảng đó.
+
+`filmSlicers` gắn `grp` vào từng option **chỉ của slicer event**; hai slicer kia không mang
+`grp` nên không sinh tiêu đề nào — hai đội và một dãy số áo không có gì để nhóm.
+`filmSlicerHTML` mở một tiêu đề mỗi khi `grp` đổi.
+
+**Toàn bộ lập luận an toàn nằm ở một dòng markup:** tiêu đề là `.fm-sl-head`, **không bao giờ**
+`.fm-sl-opt`, và **không mang `value`**. Ba thứ đếm option từ panel này:
+
+| Đọc bằng | Ai đọc | Nếu tiêu đề lọt vào |
+|---|---|---|
+| `.fm-sl-opt input[value]` | ngưỡng "tick hết = không tick" | ngưỡng lệch, **vĩnh viễn không với tới** |
+| `.fm-sl-opt input` | binder gắn `onchange` | tiêu đề chạy nhầm nhánh của option |
+| `.fm-sl-opt input` | `filmSyncSlicer` | tiêu đề bị set `checked` theo `sel.indexOf(undefined)` |
+
+Ba test cuối của mục này chính là lập luận đó, đo bằng số: 4 option · 5 (kèm All) · 3 tiêu đề —
+và một test riêng chứng minh **tick tay đủ mọi option vẫn về được All**.
+
+Ô tick nhóm tuân đúng hai luật của ô tick lẻ, để chỉ có **một** trạng thái phải đọc dù người
+dùng bấm bằng đường nào: **cộng thêm** vào cái đang chọn (không thay thế), và **tick hết thì
+chuẩn hoá về rỗng** = "All events". Tiêu đề sáng đúng khi mọi option dưới nó được chọn —
+`filmSyncSlicer` đọc ngược lại từ DOM sau mỗi lần tick, nên tick tay nốt ô cuối của một nhóm
+cũng làm tiêu đề sáng lên.
+
+Tên lạ có tiêu đề riêng — `OTHER EVENTS` — nên một danh sách sự kiện tự đặt cũng dùng được ô
+tick nhóm, y như bộ xuất xưởng.
+
+### 11.3 Đo trên bộ từ vựng thật
+
+44 tên vào (gồm cả `take-on succes`, `gain possesion`, `throw-Ins` viết theo kiểu tagger, và
+một `Custom Event`), panel dựng ra:
+
+```
+[ ] All events
+  -- SHOOTING --      goal · assist · key pass · shot on target · shot off target · blocked shot
+  -- DISTRIBUTION --  pass success · pass fail · cross success · cross fail
+                      · take-on succes · take-on fail · step in
+  -- DEFENSIVE --     tackle success · tackle fail · interception · clearance · block · recovery
+                      · ground duel … · aerial duel … · take-on concern · mistake
+  -- OTHER --         corner-kick · free-kick · throw-Ins · goal kick · foul · foul throw
+                      · handball foul · offside · save · yellow card · red card
+                      · substitution · gain possesion · pause
+  -- BODY PART --     right foot · left foot · upper body · head
+  -- OTHER EVENTS --  Custom Event
+
+51 input = 1 All + 44 option + 6 tiêu đề
+```
+
+Chú ý dòng `take-on succes` và `gain possesion`: chúng **vẫn hiện đúng chuỗi đã tag** — giá trị
+lọc phải khớp tuyệt đối với `r.event` — nhưng **được xếp đúng nhóm** nhờ alias. Đó chính là
+ranh giới của §4.4, nay áp cho cả nhóm chứ không riêng thứ tự.
+
+### 11.4 Phạm vi và cache-bust của bản sửa 2
+
+| File | Thay đổi |
+|---|---|
+| `shared.js` | +`EV_ALIAS`, `evKey` tra qua nó; `EVENT_INC` đổi khoá sang chính tả đúng |
+| `index.html` (tagger) | bản sao `EV_ALIAS`+`evKey` cạnh `computeStats`; `EVENT_INC` đổi khoá; `DEFAULT_EVENTS` sửa 2 tên |
+| `pitchtagger_events.json` | sửa 2 tên |
+| `Stats/stats-view.js` | `FILM_EV_GROUPS`/`FILM_EV_REST`/`filmEvGroup`; `grp` trong `filmSlicers`; tiêu đề trong `filmSlicerHTML`; nhóm trong `filmSyncSlicer` + `filmBindSlicers`; DIST_CATS đổi chuỗi |
+| `Stats/stats-view.css` | `.fm-sl-head` · `.fm-sl-gtxt` + hai dòng cho toàn màn hình |
+| `Stats/report.js` | TAKEON_CAT + TAKEON_RANKS đổi chuỗi (hành vi không đổi) |
+| `client/demo-film.html` | 1 comment đã lỗi thời — **file này nằm ngoài repo** (`.git/info/exclude`), nên sửa chỉ có trên máy |
+| `tests/harness.js` | xuất thêm `EV_ALIAS` |
+| `tests/film-slicers.test.js` | stub biết tiêu đề; +13 test |
+| `tests/event-name-case.test.js` | +4 test cho alias |
+| `tests/client-channels.test.js` | bộ `allowed` đổi chiều |
+
+**Cache-bust — bốn asset, chín con số:**
+
+1. `shared.js` `21 → 22`: `Stats/index.html:62`, `Player-Lists/index.html:98`, `client/assets/app.js:1623`
+2. `Stats/stats-view.js` `21 → 22`: `Stats/index.html:63`, `client/assets/app.js:1634`
+3. `Stats/stats-view.css` `8 → 9`: `Stats/index.html:12`, `client/assets/app.js:1631`
+4. `Stats/report.js` `34 → 35`: `Stats/index.html:72`, `client/assets/app.js:1635`
+5. …và vì cả bốn tham chiếu trên **nằm trong** `client/assets/app.js`, chính nó bump
+   `43 → 44` tại `client/app.html:81` — đúng bậc thang §6 bước 2.
+
+Chạy `node tests/asset-versions.test.js` **không cờ** trước: 5/5 xanh, chứng minh chín con số
+đã đúng; rồi mới `--update`.
+
+### 11.5 Không đụng tới trong bản sửa 2 (0 dòng)
+
+`cloud-sync.js` · `supabase/migrations/*` (0015 đã khớp cả hai chính tả, và migration đã chạy
+thì không sửa) · `worker/*` · `client/index.html` · `client/guide.html` · `client/login.html` ·
+`Player-Lists/*` (ngoài một con số `?v=`) · `auth.js` · `.github/workflows/deploy.yml` · cổng
+phân tích `DUEL_MIRRORS` trong tagger (nó **vốn đã** nhận cả hai chính tả) · thứ tự sự kiện ở
+tagger, hotkey, macro, và thứ tự cột Stats/Data/report (**§9.3, không được duyệt**).

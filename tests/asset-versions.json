@@ -1,15 +1,15 @@
 {
   "Stats/report.js": {
-    "v": 34,
-    "sha256": "4ccbcb9aa4a17e16"
+    "v": 35,
+    "sha256": "bf8c3476e61234a2"
   },
   "Stats/stats-view.css": {
-    "v": 8,
-    "sha256": "08f2262d2049dadb"
+    "v": 9,
+    "sha256": "f87e1a410f5b9e9a"
   },
   "Stats/stats-view.js": {
-    "v": 21,
-    "sha256": "a42797ba851d2995"
+    "v": 22,
+    "sha256": "075c4a70902d2cd6"
   },
   "auth.js": {
     "v": 1,
@@ -20,8 +20,8 @@
     "sha256": "ec9b53a076844289"
   },
   "client/assets/app.js": {
-    "v": 43,
-    "sha256": "5287395d538f6d6d"
+    "v": 44,
+    "sha256": "9206231d3fdc809b"
   },
   "client/assets/film-tools.css": {
     "v": 4,
@@ -64,7 +64,7 @@
     "sha256": "103be207c19f844c"
   },
   "shared.js": {
-    "v": 21,
-    "sha256": "5d0a7858403b1150"
+    "v": 22,
+    "sha256": "7182fe9ee410c1ba"
   }
 }

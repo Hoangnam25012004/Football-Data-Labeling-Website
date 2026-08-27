@@ -21,7 +21,10 @@ const F=n=>grabFunction(n,STATS,'Stats/stats-view.js');
 
 /* ================= a stub DOM, only as wide as the selectors used ================= */
 const SELS=['.fm-slicer','.fm-sl-btn','.fm-sl-panel','.fm-sl-lbl',
-            '.fm-sl-opt input','.fm-sl-opt input[value]'];
+            '.fm-sl-opt input','.fm-sl-opt input[value]',
+            // the group headings: a separate class on purpose, so neither of the
+            // two selectors above can see them (see filmSlicerHTML)
+            '.fm-sl-head input'];
 
 function node(tag,cls,attrs){
   const n={tag:tag,cls:(cls||'').split(' ').filter(Boolean),dataset:{},attrs:attrs||{},
@@ -66,7 +69,8 @@ function qsa(root,sel){
 }
 
 /* The stub's shape IS filmSlicerHTML's shape — the contract test below is what
-   keeps that true. `opts` is [[value,label],…]; `sel` is what is picked. */
+   keeps that true. `opts` is [[value,label,group?],…]; `sel` is what is picked.
+   A group opens a heading, exactly as the real markup does when o.grp changes. */
 function slicerEl(key,all,many,opts,sel){
   const sl=node('div','fm-slicer');
   sl.dataset.key=key; sl.dataset.all=all; sl.dataset.many=many;
@@ -83,11 +87,25 @@ function slicerEl(key,all,many,opts,sel){
     i.checked=on;
     if(attrs.value!=null)i.value=attrs.value;
     if(attrs['data-all'])i.dataset.all='1';
+    if(attrs['data-grp'])i.dataset.grp=attrs['data-grp'];
     l.add(node('span','fm-sl-txt')).textContent=text;
     return i;
   };
+  // a heading: .fm-sl-head, no value, ticked when every option under it is
+  const head=(g,on)=>{
+    const l=panel.add(node('label','fm-sl-head'));
+    const i=l.add(node('input',null,{'data-grp':g}));
+    i.checked=on; i.dataset.grp=g;
+    l.add(node('span','fm-sl-gtxt')).textContent=g;
+    return i;
+  };
   opt({'data-all':'1'},all,!sel.length);
-  opts.forEach(o=>opt({value:o[0]},o[1],sel.indexOf(o[0])>=0));
+  opts.forEach((o,i)=>{
+    const g=o[2];
+    if(g&&(!i||opts[i-1][2]!==g))
+      head(g,opts.filter(x=>x[2]===g).every(x=>sel.indexOf(x[0])>=0));
+    opt(g?{value:o[0],'data-grp':g}:{value:o[0]},o[1],sel.indexOf(o[0])>=0);
+  });
   return sl;
 }
 
@@ -97,8 +115,13 @@ function stage(filter){
   doc.add(slicerEl('team','Both teams','teams',[['home','Rangers'],['away','Celtic']],filter.team));
   doc.add(slicerEl('player','All players','players',
     [['2','2'],['9','9'],['14','14']],filter.player));
+  /* Four names over three groups, in the order filmEvCmp puts them, so the
+     headings and the group ticks have something real to work on. `goal` stays
+     first: the tests below reach for it by index. */
   doc.add(slicerEl('event','All events','events',
-    [['goal','goal'],['pass success','pass success']],filter.event));
+    [['goal','goal','Shooting'],['shot on target','shot on target','Shooting'],
+     ['pass success','pass success','Distribution'],
+     ['tackle success','tackle success','Defensive']],filter.event));
   return doc;
 }
 
@@ -124,8 +147,12 @@ function sandbox(opts){
        arrow consts, so they come out with grabConst; grabFunction only matches
        `function name(`. They go in ABOVE filmSlicers, which now calls the
        comparator by name and would otherwise throw ReferenceError. */
+    // in dependency order: the flat list is built from the groups
+    grabConst('FILM_EV_GROUPS',STATS,'Stats/stats-view.js'),
+    grabConst('FILM_EV_REST',STATS,'Stats/stats-view.js'),
     grabConst('FILM_EV_ORDER',STATS,'Stats/stats-view.js'),
     grabConst('filmEvRank',STATS,'Stats/stats-view.js'),
+    grabConst('filmEvGroup',STATS,'Stats/stats-view.js'),
     grabConst('filmEvCmp',STATS,'Stats/stats-view.js'),
     F('filmSlicers'),F('filmSlicerLabel'),F('filmSlicerHTML'),
     grabConst('FILM_SL_MAX',STATS,'Stats/stats-view.js'),
@@ -134,6 +161,7 @@ function sandbox(opts){
     ';globalThis.P={filmSlicers,filmSlicerLabel,filmSlicerHTML,filmSlicerOpen,',
     '  filmSlicerFit,filmSyncSlicer,filmBindSlicers,filmDocClick,doc:document,',
     '  MAX:FILM_SL_MAX,MIN:FILM_SL_MIN,ORDER:FILM_EV_ORDER,evRank:filmEvRank,',
+    '  GROUPS:FILM_EV_GROUPS,REST:FILM_EV_REST,evGroup:filmEvGroup,',
     '  filter:()=>filmFilter,relists:()=>relists};'
   ].join('\n'),ctx,{filename:'film-slicers.js'});
   return ctx.P;
@@ -267,6 +295,130 @@ test('every name in the table is lower case and appears once', () => {
 test('both call sites sort with the comparator, not with A-Z', () => {
   ok(/events:Object\.keys\(events\)\.sort\(filmEvCmp\)/.test(STATS),'filmChoices');
   ok(/union\(choices\.events,picked\('event'\)\)\.sort\(filmEvCmp\)/.test(STATS),'filmSlicers');
+});
+
+/* ================= the headings, and the tick that takes a whole group =========
+
+   The order alone still leaves five runs with nothing between them, and an
+   analyst building "chance creation" still ticking four boxes one at a time. A
+   heading names each run and IS the tick that takes it.
+
+   The safety argument is one line of markup: .fm-sl-head, never .fm-sl-opt, and
+   no `value`. Three things count the options off this panel — the "everything
+   ticked is nothing ticked" threshold (`.fm-sl-opt input[value]`), the tick
+   binder and the re-sync (`.fm-sl-opt input`) — and a heading answering any of
+   them would be an option nobody can pick, with the threshold left one short
+   forever. The last three tests here are that argument, measured. */
+const evSlicer=(P,list)=>P.filmSlicers({players:[],events:list})
+  .filter(s=>s.key==='event')[0];
+const evHTML=(P,list)=>P.filmSlicerHTML(evSlicer(P,list));
+const gtxt=html=>(html.match(/<span class="fm-sl-gtxt">[^<]*<\/span>/g)||[])
+  .map(s=>s.replace(/<[^>]*>/g,''));
+const heads=el=>el.querySelectorAll('.fm-sl-head input');
+
+test('each run gets a heading, in the order the groups are read in', () => {
+  eq(gtxt(evHTML(sandbox(),['head','foul','tackle success','cross fail','shot on target']))
+     .join(','),'Shooting,Distribution,Defensive,Other,Body part');
+});
+
+test('one heading per run, not one per option', () => {
+  const html=evHTML(sandbox(),['goal','shot on target','blocked shot']);
+  eq((html.match(/fm-sl-head/g)||[]).length,1,'three shots under one Shooting');
+  eq(gtxt(html).join(','),'Shooting');
+});
+
+test('names the table never heard of get a heading of their own, at the end', () => {
+  const P=sandbox();
+  eq(gtxt(evHTML(P,['goal','zzz custom','apple'])).join(','),'Shooting,'+P.REST);
+  eq(P.evGroup('zzz custom'),P.REST);
+  eq(P.evGroup('GOAL'),'Shooting','through evKey, like the rank');
+  eq(P.evGroup('take-on succes'),'Distribution','and through the alias with it');
+});
+
+test('the other two slicers get no headings — there is nothing to group', () => {
+  const P=sandbox();
+  ok(P.filmSlicerHTML(byKey(P,'player')).indexOf('fm-sl-head')<0,'shirt numbers');
+  ok(P.filmSlicerHTML(byKey(P,'team')).indexOf('fm-sl-head')<0,'two sides');
+});
+
+test('the markup: a heading label, a group tick with no value, and grouped options', () => {
+  const html=evHTML(sandbox(),['goal','pass success']);
+  ok(/<label class="fm-sl-head"><input type="checkbox" data-grp="Shooting">/.test(html),
+     'the heading input carries a group and no value at all');
+  ok(html.indexOf('<span class="fm-sl-gtxt">Shooting</span>')>=0,'and the name of the run');
+  ok(html.indexOf('<input type="checkbox" value="goal" data-grp="Shooting">')>=0,
+     'each option says which run it is in, so the group tick can find it');
+});
+
+test('a heading is ticked exactly when everything under it is', () => {
+  const on=sandbox({filter:{event:['goal','shot on target']}});
+  const html=evHTML(on,['goal','shot on target','pass success']);
+  ok(/data-grp="Shooting" checked/.test(html),'both of Shooting picked');
+  ok(/data-grp="Distribution">/.test(html),'the run with an unpicked option is not');
+  const none=sandbox();
+  ok(!/data-grp="[^"]*" checked/.test(evHTML(none,['goal','pass success'])),
+     'and with nothing picked at all — which is what All means — no heading is');
+});
+
+test('one tick on a heading takes the whole group', () => {
+  const P=sandbox(); P.filmBindSlicers();
+  const el=sl(P,'event');
+  click(heads(el)[0],true);
+  eq(P.filter().event.join(','),'goal,shot on target','both shooting names at once');
+  eq(label(el),'2 events','the button counts them');
+  eq(P.relists(),1,'and the list is redrawn once, not twice');
+});
+
+test('unticking a heading takes only its own run back out', () => {
+  const P=sandbox({filter:{event:['goal','shot on target','pass success']}});
+  P.filmBindSlicers();
+  const el=sl(P,'event');
+  click(heads(el)[0],false);
+  eq(P.filter().event.join(','),'pass success','the other run is left alone');
+});
+
+test('a group is ADDED to what is already picked, the same as a single box', () => {
+  const P=sandbox({filter:{event:['pass success']}}); P.filmBindSlicers();
+  click(heads(sl(P,'event'))[0],true);
+  eq(P.filter().event.join(','),'pass success,goal,shot on target');
+});
+
+test('taking every group is normalised back to All, like taking every box', () => {
+  const P=sandbox(); P.filmBindSlicers();
+  const el=sl(P,'event');
+  heads(el).forEach(g=>click(g,true));
+  eq(P.filter().event.length,0,'everything ticked is nothing ticked');
+  eq(label(el),'All events');
+  ok(boxes(el)[0].checked,'and All is ticked back');
+});
+
+test('ticking the last box of a run by hand lights its heading, and out again', () => {
+  const P=sandbox(); P.filmBindSlicers();
+  const el=sl(P,'event');
+  click(boxes(el)[1],true);                       // goal
+  notOk(heads(el)[0].checked,'one of the two is not the run');
+  click(boxes(el)[2],true);                       // shot on target
+  ok(heads(el)[0].checked,'both of the two is');
+  click(boxes(el)[1],false);
+  notOk(heads(el)[0].checked,'and taking one back out puts it out');
+});
+
+/* The three counts the binder lives by, over a panel that now has headings in it.
+   If a heading ever answered one of these selectors, the number here would move
+   and the test below it would stop being reachable. */
+test('a heading is invisible to every selector the binder counts options with', () => {
+  const el=sl(sandbox(),'event');
+  eq(el.querySelectorAll('.fm-sl-opt input[value]').length,4,'four options — the threshold');
+  eq(el.querySelectorAll('.fm-sl-opt input').length,5,'plus All — the tick binder');
+  eq(heads(el).length,3,'and three headings, counted by neither');
+});
+
+test('the threshold is still reachable by hand: every option ticked is All', () => {
+  const P=sandbox(); P.filmBindSlicers();
+  const el=sl(P,'event');
+  [1,2,3,4].forEach(i=>click(boxes(el)[i],true));
+  eq(P.filter().event.length,0,'the headings did not inflate the count');
+  eq(label(el),'All events');
 });
 
 /* A pick made in one half must stay visible in the next, or the button would

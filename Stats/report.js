@@ -1098,11 +1098,11 @@ function defCategoryPages(){
    step-ins simply on how many. Ranking the three together compared unlike things and hid
    who was actually winning his duels. */
 const TAKEON_CAT={label:'Take-ons & Step-ins',parts:[
-  ['take-on succes','Take-on success','#39d98a'],
+  ['take-on success','Take-on success','#39d98a'],
   ['take-on fail','Take-on fail','#f7506b'],
   ['step in','Step-in','#2f81f7']]};
 const TAKEON_RANKS=[
-  {label:'Take-ons',events:['take-on succes','take-on fail'],succ:'take-on succes',by:'rate'},
+  {label:'Take-ons',events:['take-on success','take-on fail'],succ:'take-on success',by:'rate'},
   {label:'Step-ins',events:['step in']}];
 const takeOnMapsPage=()=>actionMapsPage(TAKEON_CAT,'Distribution — Take-ons &amp; Step-ins',TAKEON_RANKS);
 

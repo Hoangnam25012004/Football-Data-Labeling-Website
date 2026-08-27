@@ -451,7 +451,7 @@ const DIST_CATS={
   crosses:{label:'Crosses',arrow:true,
     parts:[['cross success','Succeeded','#39d98a'],['cross fail','Failed','#f7506b']]},
   takeons:{label:'Take-ons',
-    parts:[['take-on succes','Succeeded','#39d98a'],['take-on fail','Failed','#f7506b']]},
+    parts:[['take-on success','Succeeded','#39d98a'],['take-on fail','Failed','#f7506b']]},
   stepins:{label:'Step-ins',
     parts:[['step in','Step-in','#2f81f7']]}
 };
@@ -1335,23 +1335,39 @@ const filmCueMatches=c=>c.rows.some(filmMatches);
    The rank is all that is normalised — the option VALUE stays the raw string,
    because filmMatches() compares it to r.event exactly.
 
-   A name that is not here does NOT disappear: it ranks last and sorts A–Z among
-   its own kind (see filmEvCmp), which is what keeps a match tagged with a custom
-   event list filterable. */
-const FILM_EV_ORDER=[
-  'goal','assist','key pass','shot on target','shot off target','blocked shot','miss shot',
-  'pass success','pass fail','cross success','cross fail',
-  'take-on succes','take-on success','take-on fail','step in',
-  'tackle success','tackle fail','interception','clearance','block','recovery',
-  'ground duel success','ground duel fail','aerial duel success','aerial duel fail',
-  'take-on concern','mistake',
-  'corner-kick','free-kick','penalty kick','throw-ins','throw-in','goal kick',
-  'foul','foul throw','handball foul','foul won','offside','save',
-  'yellow card','red card','substitution','gain possesion','pause',
-  'right foot','left foot','upper body','head','lower body'
+   A name that is not here does NOT disappear: it ranks last, under a heading of
+   its own, and sorts A–Z among its own kind (see filmEvCmp) — which is what keeps
+   a match tagged with a custom event list filterable.
+
+   The groups are also what the panel PRINTS, as a heading above each run and as
+   the tick that takes the whole run at once. One table, two jobs: an order and a
+   set of names can never disagree about where a heading belongs. */
+const FILM_EV_GROUPS=[
+  ['Shooting',['goal','assist','key pass','shot on target','shot off target',
+               'blocked shot','miss shot']],
+  ['Distribution',['pass success','pass fail','cross success','cross fail',
+                   'take-on success','take-on fail','step in']],
+  ['Defensive',['tackle success','tackle fail','interception','clearance','block','recovery',
+                'ground duel success','ground duel fail','aerial duel success','aerial duel fail',
+                'take-on concern','mistake']],
+  ['Other',['corner-kick','free-kick','penalty kick','throw-ins','throw-in','goal kick',
+            'foul','foul throw','handball foul','foul won','offside','save',
+            'yellow card','red card','substitution','gain possession','pause']],
+  ['Body part',['right foot','left foot','upper body','head','lower body']]
 ];
+/* The heading a name the table has never heard of is filed under. It is a heading
+   like the five above — the group tick works on it too — so a custom event list is
+   as easy to pick from as the shipped one. */
+const FILM_EV_REST='Other events';
+const FILM_EV_ORDER=FILM_EV_GROUPS.reduce((a,g)=>a.concat(g[1]),[]);
 const filmEvRank=e=>{const i=FILM_EV_ORDER.indexOf(evKey(e));
   return i<0?FILM_EV_ORDER.length:i;};
+/* Which heading a name sits under. Read off the same table the order comes from,
+   so a name cannot be ordered into one group and printed under another. */
+const filmEvGroup=e=>{const k=evKey(e);
+  for(let i=0;i<FILM_EV_GROUPS.length;i++)
+    if(FILM_EV_GROUPS[i][1].indexOf(k)>=0)return FILM_EV_GROUPS[i][0];
+  return FILM_EV_REST;};
 /* Rank first, then A–Z, so two names of one rank — and the whole "not known
    here" bucket — have an order that is decided rather than incidental. Two
    renders of one half must produce the same list, including the picks union()
@@ -1415,13 +1431,17 @@ function filmSlicers(choices){
   const picked=k=>filmFilter[k]||[];
   const union=(list,sel)=>list.concat(sel.filter(v=>list.indexOf(v)<0));
   const plain=v=>({v:v,lbl:v});
+  /* `grp` is the ONLY thing that tells filmSlicerHTML to print headings, so the
+     other two slicers get none by simply not carrying one. Two sides and a set of
+     shirt numbers have nothing to be grouped by. */
+  const grouped=v=>({v:v,lbl:v,grp:filmEvGroup(v)});
   return [
     {key:'team',all:'Both teams',many:'teams',
      opts:[{v:'home',lbl:meta.home||'Home'},{v:'away',lbl:meta.away||'Away'}]},
     {key:'player',all:'All players',many:'players',
      opts:union(choices.players,picked('player')).sort((a,b)=>(+a||0)-(+b||0)).map(plain)},
     {key:'event',all:'All events',many:'events',
-     opts:union(choices.events,picked('event')).sort(filmEvCmp).map(plain)}
+     opts:union(choices.events,picked('event')).sort(filmEvCmp).map(grouped)}
   ];
 }
 
@@ -1447,6 +1467,24 @@ function filmSlicerHTML(s){
   const opt=(attr,lbl,on,cls)=>`<label class="fm-sl-opt${cls||''}">`
     +`<input type="checkbox" ${attr}${on?' checked':''}>`
     +`<span class="fm-sl-txt">${esc(lbl)}</span></label>`;
+  /* A heading, and the tick that takes its whole run at once.
+
+     .fm-sl-head, NOT .fm-sl-opt, and that is the whole safety argument. Three
+     things read the options off this markup — the "everything ticked is nothing
+     ticked" threshold (`.fm-sl-opt input[value]`), the tick binder and the
+     re-sync (`.fm-sl-opt input`) — and a heading must be invisible to all three
+     or it would be counted as an option that can never be picked, and the
+     threshold would stop being reachable. It carries no `value` either, so even
+     the narrower selector cannot see it.
+
+     It is checked when every option under it is picked. With nothing picked at
+     all — which is what "All events" means — it reads unticked, the same as the
+     options under it. */
+  const head=(g,on)=>`<label class="fm-sl-head"><input type="checkbox"`
+    +` data-grp="${esc(g)}"${on?' checked':''}>`
+    +`<span class="fm-sl-gtxt">${esc(g)}</span></label>`;
+  const allOf=g=>{const mine=s.opts.filter(o=>o.grp===g);
+    return !!mine.length&&mine.every(o=>sel.indexOf(o.v)>=0);};
   // the button is 97px and the label is cut with an ellipsis in it, so the title
   // carries the same words in full — and is moved on with them, never left
   // saying "All players" over a button that now reads "2 players"
@@ -1459,7 +1497,11 @@ function filmSlicerHTML(s){
       +'<span class="fm-sl-mark">&#9662;</span></button>'
     +'<div class="fm-sl-panel" hidden>'
       +opt('data-all="1"',s.all,!sel.length,' all')
-      +s.opts.map(o=>opt(`value="${esc(o.v)}"`,o.lbl,sel.indexOf(o.v)>=0)).join('')
+      // a heading opens each run; the options are already sorted into their runs,
+      // so "the group changed" is the whole test
+      +s.opts.map((o,i)=>(o.grp&&(!i||s.opts[i-1].grp!==o.grp)?head(o.grp,allOf(o.grp)):'')
+        +opt(`value="${esc(o.v)}"`+(o.grp?` data-grp="${esc(o.grp)}"`:''),
+             o.lbl,sel.indexOf(o.v)>=0)).join('')
     +'</div></div>';
 }
 
@@ -1812,6 +1854,15 @@ function filmSyncSlicer(sl){
     b.checked=sel.indexOf(b.value)>=0;
     if(sel.length===1&&b.value===sel[0])one=b;
   });
+  /* The group ticks, AFTER the options above have been set: each one reads its own
+     run back off the DOM, so a heading is ticked exactly when everything under it
+     is. Ticking the last option of a group has to light its heading, and taking
+     one back out has to put it out again. */
+  const opts=[].slice.call(sl.querySelectorAll('.fm-sl-opt input[value]'));
+  sl.querySelectorAll('.fm-sl-head input').forEach(g=>{
+    const mine=opts.filter(b=>b.dataset.grp===g.dataset.grp);
+    g.checked=!!mine.length&&mine.every(b=>b.checked);
+  });
   const txt=!sel.length?sl.dataset.all
     :sel.length>1?sel.length+' '+sl.dataset.many
     :(one?one.parentNode.textContent.trim():String(sel[0]));
@@ -1839,6 +1890,23 @@ function filmBindSlicers(){
           if(next.length>=boxes.length)next=[];
         }
         filmFilter[key]=next;                // All is the empty list, unticking it a no-op
+        filmSyncSlicer(sl);
+        filmRelist();
+      };
+    });
+    /* One tick for a whole group — the reason the headings are ticks and not just
+       words. Same two rules the single boxes obey, so there is one state to read
+       whichever control was used: a pick is ADDED to what is already there rather
+       than replacing it, and everything ticked normalises back to the empty list,
+       which is what "All events" means. */
+    sl.querySelectorAll('.fm-sl-head input').forEach(g=>{
+      g.onchange=()=>{
+        const mine=boxes.filter(b=>b.dataset.grp===g.dataset.grp).map(b=>b.value);
+        let next=(filmFilter[key]||[]).slice();
+        if(g.checked)mine.forEach(v=>{if(next.indexOf(v)<0)next.push(v);});
+        else next=next.filter(v=>mine.indexOf(v)<0);
+        if(next.length>=boxes.length)next=[];
+        filmFilter[key]=next;
         filmSyncSlicer(sl);
         filmRelist();
       };
