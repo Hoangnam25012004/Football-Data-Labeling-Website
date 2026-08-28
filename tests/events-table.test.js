@@ -34,7 +34,7 @@ test('every configured football event maps to exactly one known class', ()=>{
   // own goal joins the black badge without a rule of its own: SHOT_EVENTS has matched
   // /^own goal$/ since long before the dictionary shipped the name
   deepEq(Object.keys(seen).filter(n=>seen[n]==='shot').sort(),
-    ['blocked shot','goal','own goal','shot off target','shot on target']);
+    ['blocked shot','goal','miss shot','own goal','shot off target','shot on target']);
 });
 
 /* The split kinds get their own colour rather than inheriting their parent's, so the

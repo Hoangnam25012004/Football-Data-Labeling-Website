@@ -830,16 +830,21 @@ test('0015 stops match_stats looking for a hash that is never stored', () => {
 test('every name it matches on is a name the shipped dictionary actually has', () => {
   const view=viewBody(SQL15);
   const known=new Set((DICT.football||[]).map(e=>String(e.name||e).trim().toLowerCase()));
-  /* The two the dictionary does not ship: a kind a tagger may add, and the LEGACY
-     spelling of one it used to get wrong.
+  /* The one name the dictionary does not ship, and the story behind it.
 
-     That second one changed direction on 2026-08-27. The dictionary shipped
-     'take-on succes' for months and the view accepted the corrected spelling
-     beside it; now the dictionary ships 'take-on success' and the view keeps the
-     misspelling for every row tagged before the rename. The view needs no edit
-     either way — it already matches both — but 0015's own `--` comment describes
-     the old direction and is left as the historical record it is. */
-  const allowed=new Set(['miss shot','take-on succes']);
+     The view matches BOTH spellings of the take-on, which is what makes its list of
+     names longer than the dictionary rather than shorter. For a while this file
+     believed the direction had flipped — that the dictionary now shipped the
+     corrected 'take-on success' and the view was keeping the misspelling for
+     history. It had not. That correction only ever existed in
+     pitchtagger_events.json; it was never pushed anywhere, because
+     applyEventTypes() overwrites the local list with the cloud's on every load, so
+     every match went on being tagged 'take-on succes'. The dictionary was synced to
+     the live project on 2026-08-28 and says the misspelling again.
+
+     So the CORRECTED spelling is the one nothing is called — kept in the view on
+     purpose, so that fixing the typo one day does not silently zero the column. */
+  const allowed=new Set(['take-on success']);
   const used=new Set();
   const re=/'([a-z0-9 \-]+)'/g;
   for(let m;(m=re.exec(view));) used.add(m[1]);

@@ -20,8 +20,8 @@
     "sha256": "ec9b53a076844289"
   },
   "client/assets/app.js": {
-    "v": 45,
-    "sha256": "44db0c7c5d0afd5d"
+    "v": 46,
+    "sha256": "64b5f1736040aae8"
   },
   "client/assets/film-tools.css": {
     "v": 4,
@@ -64,7 +64,7 @@
     "sha256": "103be207c19f844c"
   },
   "shared.js": {
-    "v": 23,
-    "sha256": "1b3e2e6862bf05a4"
+    "v": 24,
+    "sha256": "08b23e27a1a05df2"
   }
 }

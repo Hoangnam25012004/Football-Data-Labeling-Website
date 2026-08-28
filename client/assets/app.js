@@ -1620,7 +1620,7 @@
      sake of a table it does not draw. Same URL as the line below, so whichever
      view is opened first is the one that pays for it. */
   function loadShared() {
-    return loadOnce(taggerRoot() + 'shared.js?v=23');
+    return loadOnce(taggerRoot() + 'shared.js?v=24');
   }
 
   /* Pulled in the first time someone opens a match's stats, not on every page

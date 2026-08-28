@@ -294,10 +294,21 @@ function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,s
      for truthiness, and summable so a season answers it match by match (see EVENT_INC). */
   duelDetail:0,saveDetail:0,gkTechDetail:0,gkCtrlDetail:0,concededDetail:0};}
 const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
-/* Two names in the shipped event list went out misspelt, and were tagged that way for
-   months. The list now ships the corrected spelling, so BOTH are in the data: every match
-   tagged before today says "take-on succes", every match tagged after says "take-on
-   success", and one analyst may well have fixed the typo by hand somewhere in between.
+/* Two names in the shipped event list went out misspelt, and are STILL what every match
+   is tagged with: the dictionary says "take-on succes" and "gain possesion" today, on the
+   live project and in this repo.
+
+   A correction was attempted once and never landed. Somebody fixed the two spellings in
+   pitchtagger_events.json, and a comment here said the list "now ships the corrected
+   spelling" — but that file is only read on a first open with nothing stored. Every
+   browser that had been to the site got the cloud's list instead (applyEventTypes), so
+   the fix sat in the repo, inert, for months while tagging carried on unchanged. The
+   dictionary was synced to the live list on 2026-08-28 and the misspellings are back in
+   it, because they are the truth.
+
+   So the map below is not "old spelling to new". It is the spelling in the data, folded
+   onto the spelling the dictionaries in this file are keyed by. Both directions are in
+   use, and an analyst who fixes one by hand is still counted.
 
    They are folded onto one name HERE rather than in each dictionary, because "here" is the
    single point every lookup in this file, in Stats/stats-view.js and in Stats/report.js

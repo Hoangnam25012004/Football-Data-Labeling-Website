@@ -830,16 +830,27 @@ const $ = id => document.getElementById(id);
   Object.defineProperty(el,'value',{get(){return el.textContent;},set(v){el.textContent=v==null?'':String(v);}});});
 const DEFAULT_KEYS=['a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m'];
 
-/* ---- events bundled with this file (loads automatically on first open) ---- */
-/* ---- events bundled with this file, in reading order ----
-   The order is FILM_EV_GROUPS' order (Stats/stats-view.js): shooting, distribution,
-   defensive, goalkeeping, set pieces & other, body part. One order for both, so the
-   modal and the Film filter can never disagree about where an event belongs.
+/* ---- the event dictionary, as the live project actually holds it ----
+   Names, hotkeys and order are a faithful copy of public.event_types, dumped from a
+   signed-in session. It had drifted a long way from this file. Ten names existed only in
+   the database — the five body parts, goal kick, throw-Ins, foul won, miss shot, hit —
+   added through the Event types modal before anyone thought to write them down. And two
+   names existed only HERE: "take-on success" and "gain possession", corrected spellings
+   that were never pushed anywhere, because applyEventTypes() overwrites this list with
+   the cloud's on every load. They sat in this file inert while every match went on being
+   tagged "take-on succes" and "gain possesion" — which is why EV_ALIAS keys off the
+   misspellings and not off the tidy ones, and why deleting those entries would zero the
+   take-on columns for every match ever tagged.
 
-   This list is only ever read on a FIRST open, before any dictionary has been fetched.
-   A browser that has been here, or an account with a cloud dictionary, gets that instead
-   (loadEvents / applyEventTypes), which is why seed_gk_events.js exists: it is what puts
-   the new names in front of an installation that already has a list of its own. */
+   Order is FILM_EV_GROUPS' order (Stats/stats-view.js) — shooting, distribution,
+   defensive, goalkeeping, other, body part — so the modal and the Film filter cannot
+   disagree about where an event belongs. The last two sit outside it because
+   seed_gk_events.js did not recognise their spellings and left them where it found them.
+
+   Read only on a FIRST open, before any dictionary has been fetched; a browser that has
+   been here, or an account with a cloud dictionary, gets that instead. Keep it equal to
+   pitchtagger_events.json (a test asserts it) and regenerate the seed migration after any
+   change: node tools/gen-event-types-sql.js */
 const DEFAULT_EVENTS = {
   "football": [
     {"name":"goal","key":"ddd"},
@@ -849,12 +860,13 @@ const DEFAULT_EVENTS = {
     {"name":"shot on target","key":"dd"},
     {"name":"shot off target","key":"d"},
     {"name":"blocked shot","key":"db"},
+    {"name":"miss shot","key":"dm"},
 
     {"name":"pass success","key":"s"},
     {"name":"pass fail","key":"ss"},
     {"name":"cross success","key":"c"},
     {"name":"cross fail","key":"cc"},
-    {"name":"take-on success","key":"e"},
+    {"name":"take-on succes","key":"e"},
     {"name":"take-on fail","key":"ee"},
     {"name":"step in","key":"r"},
 
@@ -866,41 +878,52 @@ const DEFAULT_EVENTS = {
     {"name":"recovery","key":"qq"},
     {"name":"aerial duel success","key":"b"},
     {"name":"aerial duel fail","key":"bb"},
-    {"name":"ground duel success","key":"x"},
-    {"name":"ground duel fail","key":"xx"},
-    {"name":"physical duel success","key":"pd"},
-    {"name":"physical duel fail","key":"pdd"},
-    {"name":"loose ball duel success","key":"lo"},
-    {"name":"loose ball duel fail","key":"loo"},
+    {"name":"ground duel success","key":"gd"},
+    {"name":"ground duel fail","key":"gdd"},
+    {"name":"physical duel success","key":"x"},
+    {"name":"physical duel fail","key":"xx"},
+    {"name":"loose ball duel success","key":"l"},
+    {"name":"loose ball duel fail","key":"ll"},
     {"name":"take-on concern","key":"er"},
     {"name":"mistake","key":"m"},
 
-    {"name":"catch","key":"ca"},
-    {"name":"parry","key":"pr"},
-    {"name":"save","key":"v"},
+    {"name":"catch","key":"v"},
+    {"name":"parry","key":"vv"},
+    {"name":"save","key":"va"},
     {"name":"save standing","key":"vs"},
     {"name":"save diving","key":"vd"},
     {"name":"save collapse","key":"vc"},
     {"name":"save overhead","key":"vo"},
     {"name":"save kneeling","key":"vk"},
-    {"name":"defensive line support success","key":"ln"},
-    {"name":"defensive line support fail","key":"lnn"},
-    {"name":"aerial control success","key":"ac"},
-    {"name":"aerial control fail","key":"acc"},
-    {"name":"goal conceded","key":"gc"},
+    {"name":"defensive line support success","key":"gx"},
+    {"name":"defensive line support fail","key":"gxx"},
+    {"name":"aerial control success","key":"gb"},
+    {"name":"aerial control fail","key":"gbb"},
+    {"name":"goal conceded","key":"p"},
 
     {"name":"corner-kick","key":"j"},
     {"name":"free-kick","key":"k"},
     {"name":"penalty kick","key":"pk"},
+    {"name":"throw-Ins","key":"tm"},
+    {"name":"goal kick","key":"gk"},
     {"name":"foul","key":"f"},
     {"name":"foul throw","key":"tf"},
     {"name":"handball foul","key":"hf"},
+    {"name":"foul won","key":"ff"},
     {"name":"offside","key":"o"},
     {"name":"yellow card","key":"yc"},
     {"name":"red card","key":"rc"},
     {"name":"substitution","key":"sub"},
-    {"name":"gain possession","key":"gp"},
-    {"name":"pause","key":"pa"}
+    {"name":"pause","key":"pa"},
+
+    {"name":"right foot","key":"rf"},
+    {"name":"left foot","key":"lf"},
+    {"name":"upper body","key":"ub"},
+    {"name":"head","key":"h"},
+    {"name":"lower body","key":"lb"},
+
+    {"name":"gain possesion","key":"gp"},
+    {"name":"hit","key":"i"}
   ],
   "football7": [],
   "futsal": [],
@@ -3889,7 +3912,11 @@ const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
 /* Twin of shared.js's EV_ALIAS — this file carries its own copy of the stat engine,
    since it does not load shared.js. Keep the two in step: a rename shipped in
    DEFAULT_EVENTS has to be readable here, or this page's own Stats tab reports zero
-   for every match tagged under the old name. */
+   for every match tagged under the old name.
+
+   Both spellings below are the MISSPELT ones, and they are what the live dictionary still
+   ships — see the long note by shared.js's copy for why the correction that was written
+   into pitchtagger_events.json never reached anybody. */
 const EV_ALIAS={'take-on succes':'take-on success','gain possesion':'gain possession'};
 const evKey=e=>{const k=String(e==null?'':e).trim().toLowerCase();
   return EV_ALIAS[k]||k;};

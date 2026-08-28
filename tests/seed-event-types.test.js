@@ -73,17 +73,37 @@ test('it only ever adds, so it can be run against production or an empty project
   ok(/^comment on table public\.event_types/.test(stmts[1]));
 });
 
-test('the ten names the live project has and this repo does not are declared, not hidden', () => {
-  /* The gap is real and this file is where it is written down: production carries about
-     ten more names than the repo ships, added through the app before anyone recorded
-     them. A seed that quietly claimed to be the whole list would be worse than one that
-     says what it is missing. */
-  ['goal kick','throw-Ins','foul won','miss shot'].forEach(n=>
-    ok(SQL.includes(n),'the note names "'+n+'" as one of the missing'));
-  ok(/NOT THE WHOLE LIVE LIST/.test(SQL),'and says so in capitals');
+test('the names that only ever lived in the database are in it now', () => {
+  /* Ten names existed in production and not in this repo, added through the modal before
+     anyone thought to write them down. Until they were, the seed could not claim to be
+     the dictionary, and no test could check the spelling of any of them. */
   const names=new Set(DICT.map(e=>e.name));
-  ['goal kick','throw-Ins','foul won','miss shot','right foot','left foot','head',
-   'upper body','lower body'].forEach(n=>
-    notOk(names.has(n),'"'+n+'" is still absent from the shipped dictionary — if it has '+
-      'been added, update the note in tools/gen-event-types-sql.js and regenerate'));
+  ['goal kick','throw-Ins','foul won','miss shot','hit',
+   'right foot','left foot','upper body','head','lower body'].forEach(n=>{
+    ok(names.has(n),'the dictionary is missing "'+n+'"');
+    ok(SQL.includes("'"+n+"'"),'and the seed does not carry it');
+  });
+  ok(names.has('throw-Ins'),'spelt with the capital I that macros "t" and "tt" match exactly');
+});
+
+test('and the two that only ever lived in the repo are gone', () => {
+  /* THE test of this file, and the bug it was written after. 'take-on success' and
+     'gain possession' were corrected spellings sitting in pitchtagger_events.json that
+     were never pushed anywhere — applyEventTypes() overwrites the local list with the
+     cloud's on every load, so every match went on being tagged with the misspellings.
+
+     A seed generated from that list was NOT a no-op. ON CONFLICT matches on event_name;
+     neither corrected name exists in the database, so DO NOTHING would have found no
+     conflict and inserted both — each carrying a key ('e', 'gp') already held by the
+     misspelling it was meant to replace. Two events answering to one code, and
+     eventForKey() returning whichever sorted first. */
+  const names=new Set(DICT.map(e=>e.name));
+  ok(names.has('take-on succes'),'the dictionary ships the spelling the data really uses');
+  notOk(names.has('take-on success'),'and not the tidy one, which nothing is tagged with');
+  ok(names.has('gain possesion'));
+  notOk(names.has('gain possession'));
+  // a key may be held by exactly one event, or the entry box cannot resolve it
+  const byKey={};
+  DICT.forEach(e=>{if(e.key){ok(!byKey[e.key],'"'+e.key+'" is on both '+byKey[e.key]+
+    ' and '+e.name); byKey[e.key]=e.name;}});
 });

@@ -25,13 +25,17 @@
 --    * against an empty project it bootstraps a working dictionary.
 --    * it is safe to run twice.
 --
---  NOT THE WHOLE LIVE LIST. The production dictionary carries about
---  ten more names this repo has never held — goal kick, throw-Ins,
---  foul won, miss shot and the five body parts among them. They were
---  added through the app before anyone thought to write them down,
---  and their hotkeys are not known here. Closing that gap means
---  dumping the live list, putting the real names and codes into
---  DEFAULT_EVENTS, and running the generator again.
+--  A faithful copy of public.event_types as it stood on 2026-08-28,
+--  dumped from a signed-in session. The first draft of this file was
+--  not, and would not have been a no-op: the repo held two names the
+--  database has never had — 'take-on success' and 'gain possession',
+--  corrected spellings that were never pushed anywhere — so DO NOTHING
+--  would have found no conflict and INSERTED them, each carrying a key
+--  ('e', 'gp') already in use by the misspelling it was meant to
+--  replace. Two events answering to one code, and eventForKey()
+--  picking whichever sorted first. The dictionary was synced to the
+--  live list instead, which is why the misspellings are below and the
+--  tidy spellings are not.
 --
 --  Safe to run and re-run:  supabase db push
 --                           (or paste into the SQL Editor)
@@ -45,54 +49,64 @@ insert into public.event_types (sport, event_name, key, ord) values
   ('football', 'shot on target', 'dd', 4),
   ('football', 'shot off target', 'd', 5),
   ('football', 'blocked shot', 'db', 6),
-  ('football', 'pass success', 's', 7),
-  ('football', 'pass fail', 'ss', 8),
-  ('football', 'cross success', 'c', 9),
-  ('football', 'cross fail', 'cc', 10),
-  ('football', 'take-on success', 'e', 11),
-  ('football', 'take-on fail', 'ee', 12),
-  ('football', 'step in', 'r', 13),
-  ('football', 'tackle success', 'a', 14),
-  ('football', 'tackle fail', 'aa', 15),
-  ('football', 'interception', 'q', 16),
-  ('football', 'clearance', 'w', 17),
-  ('football', 'block', 'qw', 18),
-  ('football', 'recovery', 'qq', 19),
-  ('football', 'aerial duel success', 'b', 20),
-  ('football', 'aerial duel fail', 'bb', 21),
-  ('football', 'ground duel success', 'x', 22),
-  ('football', 'ground duel fail', 'xx', 23),
-  ('football', 'physical duel success', 'pd', 24),
-  ('football', 'physical duel fail', 'pdd', 25),
-  ('football', 'loose ball duel success', 'lo', 26),
-  ('football', 'loose ball duel fail', 'loo', 27),
-  ('football', 'take-on concern', 'er', 28),
-  ('football', 'mistake', 'm', 29),
-  ('football', 'catch', 'ca', 30),
-  ('football', 'parry', 'pr', 31),
-  ('football', 'save', 'v', 32),
-  ('football', 'save standing', 'vs', 33),
-  ('football', 'save diving', 'vd', 34),
-  ('football', 'save collapse', 'vc', 35),
-  ('football', 'save overhead', 'vo', 36),
-  ('football', 'save kneeling', 'vk', 37),
-  ('football', 'defensive line support success', 'ln', 38),
-  ('football', 'defensive line support fail', 'lnn', 39),
-  ('football', 'aerial control success', 'ac', 40),
-  ('football', 'aerial control fail', 'acc', 41),
-  ('football', 'goal conceded', 'gc', 42),
-  ('football', 'corner-kick', 'j', 43),
-  ('football', 'free-kick', 'k', 44),
-  ('football', 'penalty kick', 'pk', 45),
-  ('football', 'foul', 'f', 46),
-  ('football', 'foul throw', 'tf', 47),
-  ('football', 'handball foul', 'hf', 48),
-  ('football', 'offside', 'o', 49),
-  ('football', 'yellow card', 'yc', 50),
-  ('football', 'red card', 'rc', 51),
-  ('football', 'substitution', 'sub', 52),
-  ('football', 'gain possession', 'gp', 53),
-  ('football', 'pause', 'pa', 54)
+  ('football', 'miss shot', 'dm', 7),
+  ('football', 'pass success', 's', 8),
+  ('football', 'pass fail', 'ss', 9),
+  ('football', 'cross success', 'c', 10),
+  ('football', 'cross fail', 'cc', 11),
+  ('football', 'take-on succes', 'e', 12),
+  ('football', 'take-on fail', 'ee', 13),
+  ('football', 'step in', 'r', 14),
+  ('football', 'tackle success', 'a', 15),
+  ('football', 'tackle fail', 'aa', 16),
+  ('football', 'interception', 'q', 17),
+  ('football', 'clearance', 'w', 18),
+  ('football', 'block', 'qw', 19),
+  ('football', 'recovery', 'qq', 20),
+  ('football', 'aerial duel success', 'b', 21),
+  ('football', 'aerial duel fail', 'bb', 22),
+  ('football', 'ground duel success', 'gd', 23),
+  ('football', 'ground duel fail', 'gdd', 24),
+  ('football', 'physical duel success', 'x', 25),
+  ('football', 'physical duel fail', 'xx', 26),
+  ('football', 'loose ball duel success', 'l', 27),
+  ('football', 'loose ball duel fail', 'll', 28),
+  ('football', 'take-on concern', 'er', 29),
+  ('football', 'mistake', 'm', 30),
+  ('football', 'catch', 'v', 31),
+  ('football', 'parry', 'vv', 32),
+  ('football', 'save', 'va', 33),
+  ('football', 'save standing', 'vs', 34),
+  ('football', 'save diving', 'vd', 35),
+  ('football', 'save collapse', 'vc', 36),
+  ('football', 'save overhead', 'vo', 37),
+  ('football', 'save kneeling', 'vk', 38),
+  ('football', 'defensive line support success', 'gx', 39),
+  ('football', 'defensive line support fail', 'gxx', 40),
+  ('football', 'aerial control success', 'gb', 41),
+  ('football', 'aerial control fail', 'gbb', 42),
+  ('football', 'goal conceded', 'p', 43),
+  ('football', 'corner-kick', 'j', 44),
+  ('football', 'free-kick', 'k', 45),
+  ('football', 'penalty kick', 'pk', 46),
+  ('football', 'throw-Ins', 'tm', 47),
+  ('football', 'goal kick', 'gk', 48),
+  ('football', 'foul', 'f', 49),
+  ('football', 'foul throw', 'tf', 50),
+  ('football', 'handball foul', 'hf', 51),
+  ('football', 'foul won', 'ff', 52),
+  ('football', 'offside', 'o', 53),
+  ('football', 'yellow card', 'yc', 54),
+  ('football', 'red card', 'rc', 55),
+  ('football', 'substitution', 'sub', 56),
+  ('football', 'pause', 'pa', 57),
+  ('football', 'right foot', 'rf', 58),
+  ('football', 'left foot', 'lf', 59),
+  ('football', 'upper body', 'ub', 60),
+  ('football', 'head', 'h', 61),
+  ('football', 'lower body', 'lb', 62),
+  ('football', 'gain possesion', 'gp', 63),
+  ('football', 'hit', 'i', 64)
 on conflict (sport, event_name) do nothing;
 
 comment on table public.event_types is

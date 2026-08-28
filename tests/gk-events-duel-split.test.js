@@ -34,7 +34,7 @@ const S=(()=>{
   const ctx={console,window:{},document:{createElement:()=>({}),getElementById:()=>null}};
   ctx.window=ctx; vm.createContext(ctx);
   vm.runInContext(SHARED+'\n;Object.assign(globalThis,{EVENT_INC,PLAYER_CATS,GK_COLS,'
-    +'TEAM_SECTIONS,STAT_GROUPS,STAT_HEADERS,evKey,pct});',ctx,{filename:'shared.js'});
+    +'TEAM_SECTIONS,STAT_GROUPS,STAT_HEADERS,evKey,pct,BODY_PARTS});',ctx,{filename:'shared.js'});
   return ctx;
 })();
 
@@ -129,13 +129,22 @@ test('T4 · every EVENT_INC key is lower case, and every shipped name reaches on
   /* evKey() lower-cases the name being looked up, so a key written 'saveStanding' could
      not be reached from any tagged row. Walk the shipped dictionary rather than a list
      typed here: a name added to the dictionary and forgotten in EVENT_INC counts zero
-     everywhere and says nothing about it. */
+     everywhere and says nothing about it.
+
+     The exceptions are events that deliberately book no player stat. Cards go through
+     classifyCards(), a substitution moves the formation board, pause is a marker, and a
+     body part is a modifier on the shot beside it — BODY_PARTS reads those, which is why
+     they are checked against it rather than simply waived. */
   const counted=new Set(Object.keys(S.EVENT_INC));
-  const uncounted=['pause','substitution','yellow card','red card','gain possession',
-                   'take-on concern','throw-Ins','goal kick'];
+  const noStat=new Set(['yellow card','red card','substitution','pause',
+                        'gain possesion','gain possession',
+                        // no stat and no meaning anywhere in the code: added through the
+                        // modal, never wired up. Left alone rather than guessed at.
+                        'hit']);
   EVENTS.football.forEach(e=>{
     const k=S.evKey(e.name);
-    ok(counted.has(k)||uncounted.includes(e.name),
+    if(S.BODY_PARTS&&S.BODY_PARTS[k]){ok(true);return;}      // a modifier, not an action
+    ok(counted.has(k)||noStat.has(e.name),
        '"'+e.name+'" is in the dictionary but books no stat');
   });
 });
@@ -325,14 +334,15 @@ test('T15 · every event the shipped macros point at is still in the dictionary'
      stay in the list precisely because macros (and months of tagged rows) point at them. */
   const MACROS=JSON.parse(/var MACROS = (\{[\s\S]*?\});/.exec(readSrc('restore_macros.js'))[1]);
   const dict=new Set(EVENTS.football.map(e=>e.name));
-  // the names this account's macros use that the shipped list has never carried — they
-  // live in the cloud dictionary only, and are excluded so this test speaks about the
-  // ones it can actually see
-  const notShipped=new Set(['goal kick','throw-Ins','right foot','left foot','head']);
+  /* No allowlist any more. It used to need one, because five of the names these macros
+     point at — goal kick, throw-Ins and three body parts — existed only in the live
+     database and not in this repo, so the test could not see them. The dictionary was
+     synced to the live project on 2026-08-28, and every name is now checkable. */
   const used=new Set();
   (MACROS.football||[]).forEach(m=>m.events.forEach(n=>used.add(n)));
-  [...used].filter(n=>!notShipped.has(n)).forEach(n=>
+  [...used].forEach(n=>
     ok(dict.has(n),'macro event "'+n+'" is no longer in the dictionary — that macro is dead'));
+  ok(dict.has('throw-Ins'),'including the capital I, which macros "t" and "tt" match exactly');
   ok(dict.has('ground duel success')&&dict.has('ground duel fail'),
      'the split kept its parents, which is what macro "xa"/"xxaa" depend on');
   ok(dict.has('save'),'and the save it split');

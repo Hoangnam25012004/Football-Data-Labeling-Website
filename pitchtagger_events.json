@@ -29,6 +29,10 @@
       "key": "db"
     },
     {
+      "name": "miss shot",
+      "key": "dm"
+    },
+    {
       "name": "pass success",
       "key": "s"
     },
@@ -45,7 +49,7 @@
       "key": "cc"
     },
     {
-      "name": "take-on success",
+      "name": "take-on succes",
       "key": "e"
     },
     {
@@ -90,27 +94,27 @@
     },
     {
       "name": "ground duel success",
-      "key": "x"
+      "key": "gd"
     },
     {
       "name": "ground duel fail",
-      "key": "xx"
+      "key": "gdd"
     },
     {
       "name": "physical duel success",
-      "key": "pd"
+      "key": "x"
     },
     {
       "name": "physical duel fail",
-      "key": "pdd"
+      "key": "xx"
     },
     {
       "name": "loose ball duel success",
-      "key": "lo"
+      "key": "l"
     },
     {
       "name": "loose ball duel fail",
-      "key": "loo"
+      "key": "ll"
     },
     {
       "name": "take-on concern",
@@ -122,15 +126,15 @@
     },
     {
       "name": "catch",
-      "key": "ca"
+      "key": "v"
     },
     {
       "name": "parry",
-      "key": "pr"
+      "key": "vv"
     },
     {
       "name": "save",
-      "key": "v"
+      "key": "va"
     },
     {
       "name": "save standing",
@@ -154,23 +158,23 @@
     },
     {
       "name": "defensive line support success",
-      "key": "ln"
+      "key": "gx"
     },
     {
       "name": "defensive line support fail",
-      "key": "lnn"
+      "key": "gxx"
     },
     {
       "name": "aerial control success",
-      "key": "ac"
+      "key": "gb"
     },
     {
       "name": "aerial control fail",
-      "key": "acc"
+      "key": "gbb"
     },
     {
       "name": "goal conceded",
-      "key": "gc"
+      "key": "p"
     },
     {
       "name": "corner-kick",
@@ -185,6 +189,14 @@
       "key": "pk"
     },
     {
+      "name": "throw-Ins",
+      "key": "tm"
+    },
+    {
+      "name": "goal kick",
+      "key": "gk"
+    },
+    {
       "name": "foul",
       "key": "f"
     },
@@ -195,6 +207,10 @@
     {
       "name": "handball foul",
       "key": "hf"
+    },
+    {
+      "name": "foul won",
+      "key": "ff"
     },
     {
       "name": "offside",
@@ -213,12 +229,36 @@
       "key": "sub"
     },
     {
-      "name": "gain possession",
+      "name": "pause",
+      "key": "pa"
+    },
+    {
+      "name": "right foot",
+      "key": "rf"
+    },
+    {
+      "name": "left foot",
+      "key": "lf"
+    },
+    {
+      "name": "upper body",
+      "key": "ub"
+    },
+    {
+      "name": "head",
+      "key": "h"
+    },
+    {
+      "name": "lower body",
+      "key": "lb"
+    },
+    {
+      "name": "gain possesion",
       "key": "gp"
     },
     {
-      "name": "pause",
-      "key": "pa"
+      "name": "hit",
+      "key": "i"
     }
   ],
   "hockey": []

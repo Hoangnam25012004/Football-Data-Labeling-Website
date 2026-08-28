@@ -73,13 +73,17 @@ function sql(dict) {
 --    * against an empty project it bootstraps a working dictionary.
 --    * it is safe to run twice.
 --
---  NOT THE WHOLE LIVE LIST. The production dictionary carries about
---  ten more names this repo has never held — goal kick, throw-Ins,
---  foul won, miss shot and the five body parts among them. They were
---  added through the app before anyone thought to write them down,
---  and their hotkeys are not known here. Closing that gap means
---  dumping the live list, putting the real names and codes into
---  DEFAULT_EVENTS, and running the generator again.
+--  A faithful copy of public.event_types as it stood on 2026-08-28,
+--  dumped from a signed-in session. The first draft of this file was
+--  not, and would not have been a no-op: the repo held two names the
+--  database has never had — 'take-on success' and 'gain possession',
+--  corrected spellings that were never pushed anywhere — so DO NOTHING
+--  would have found no conflict and INSERTED them, each carrying a key
+--  ('e', 'gp') already in use by the misspelling it was meant to
+--  replace. Two events answering to one code, and eventForKey()
+--  picking whichever sorted first. The dictionary was synced to the
+--  live list instead, which is why the misspellings are below and the
+--  tidy spellings are not.
 --
 --  Safe to run and re-run:  supabase db push
 --                           (or paste into the SQL Editor)

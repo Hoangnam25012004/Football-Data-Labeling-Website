@@ -95,7 +95,7 @@ test('with no macros at all, parsing is bit-for-bit what it was', () => {
   const a=app([]);
   deepEq(shape(a.parseChain('1s2s3s4').evs),
     ['pass success|1|2','pass success|2|3','pass success|3|4']);
-  deepEq(shape(a.parseChain('1xx*aa').evs),['ground duel fail|1|','tackle fail|1|']);
+  deepEq(shape(a.parseChain('1xx*aa').evs),['physical duel fail|1|','tackle fail|1|']);
   deepEq(shape(a.parseChain('1k*c2').evs),['free-kick|1|','cross success|1|2']);
   eq(a.parseChain('').evs.length,0);
 });
@@ -142,13 +142,20 @@ test('a macro ending in a failed pass asks for the opponent-recovery dot', () =>
 
 /* ================= ✎ Edit hands back the long form =================
    A macro is shorthand for typing, so the entry box must never show it back: ✎ on a row
-   tagged with "2xxaa" opens "2xx*aa" — the events those rows actually are. */
+   tagged with "2xxaa" opens the events those rows actually are.
+
+   The long form is written in TODAY'S codes, not the ones that were pressed. This macro
+   names `ground duel fail`, which used to be keyed "xx" and is now keyed "gdd" — the two
+   split kinds took the duel codes over when the dictionary was synced to the live project.
+   The macro is unmoved by that, because a macro stores event NAMES; only the shorthand it
+   expands to follows the keyboard. Worth asserting rather than avoiding: it is the whole
+   reason macros are stored by name. */
 const DUEL_TACKLE=[{key:'xxaa',events:['ground duel fail','tackle fail']}];
 
 test('a macro key in an entry is written out as the events it stands for', () => {
   const a=app(DUEL_TACKLE);
-  eq(a.expandMacros('2xxaa'),'2xx*aa');
-  eq(a.expandMacros('2XXAA'),'2xx*aa','typed in upper case, same answer');
+  eq(a.expandMacros('2xxaa'),'2gdd*aa');
+  eq(a.expandMacros('2XXAA'),'2gdd*aa','typed in upper case, same answer');
   eq(app(RECOVERY_PASS).expandMacros('1qs2'),'1qq*s2');
 });
 
@@ -173,7 +180,7 @@ test('✎ Edit on a macro chain opens its long form, dots and all', () => {
   submit(a,'2xxaa',[{x:40,y:55,t:612.4}]);
   eq(a.state.rows.length,2);
   a.startEditGroup(a.state.rows.slice());
-  eq(a.$('playerInput').value,'2xx*aa','not the shorthand that was typed');
+  eq(a.$('playerInput').value,'2gdd*aa','not the shorthand that was typed');
   eq(a.state.editingGroup,a.state.rows[0].grp,'and it is the chain that is being edited');
   deepEq(a.state.pendingDots,[{x:40,y:55,t:612.4}],'the touch dot is back');
 });
@@ -187,7 +194,7 @@ test('submitting that long form re-tags exactly the same rows', () => {
   eq(a.log.alerts.length,0,'no complaint');
   eq(a.state.rows.length,2,'still two rows, the old ones replaced');
   deepEq(a.state.rows.map(r=>[r.event,r.action,r.playerFrom,r.playerTo,r.t].join('|')),before);
-  deepEq(a.state.rows.map(r=>r.raw),['2xx*aa','2xx*aa'],'stored as what was submitted');
+  deepEq(a.state.rows.map(r=>r.raw),['2gdd*aa','2gdd*aa'],'stored as what was submitted');
 });
 
 test('a chain that never held a macro is edited exactly as before', () => {

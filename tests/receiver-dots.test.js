@@ -83,7 +83,7 @@ test('the active-event path is held to it too', () => {
    pass target. Only a pass, a cross or a substitution may be followed by a number. */
 test('an event that cannot be played to is refused the number that follows it', () => {
   [['9ddd3','goal'],                  // a goal "scored to" the next player
-   ['1xx2','ground duel fail'],       // a lost duel "played to" the winner
+   ['1xx2','physical duel fail'],     // a lost duel "played to" the winner
    ['13f*yc2','yellow card'],         // last in a '*' group, none of which transfers
    ['9j*ddd3','goal']                 // …even with another non-transfer event ahead of it
   ].forEach(([raw,name])=>{
