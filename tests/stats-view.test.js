@@ -12,7 +12,12 @@ const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk}=require('./tiny-test');
 
 const ROOT=path.join(__dirname,'..');
-const page=p=>fs.readFileSync(path.join(ROOT,p),'utf8');
+/* Folded to LF, the way harness.js's readSrc() has always folded it. Several assertions
+   below scan the source for a literal \n ("const CHROME =…;\n", "buildPages(host){\n"),
+   and git checks these files out with CRLF on Windows — so they matched on the machine
+   that wrote them and on CI (ubuntu), and stopped matching the moment the same files were
+   checked out fresh here. Nothing in this file wants a \r, so the fold costs nothing. */
+const page=p=>fs.readFileSync(path.join(ROOT,p),'utf8').replace(/\r\n/g,'\n');
 const VIEW=page('Stats/stats-view.js');
 const PAGE=page('Stats/index.html');
 const REPORT=page('Stats/report.js');
