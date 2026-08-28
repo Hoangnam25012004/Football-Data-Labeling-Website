@@ -1,20 +1,31 @@
 /* Analysis gate: what a match has to be before ⇪ Submit Analysis will publish it.
 
-   Designed in docs/submit-analysis-gate-design.md. Seven rules, scored against the
-   PAYLOAD — what buildReport() read back out of the database and what the club will
-   actually see — never against whatever this tab happens to be holding:
+   Designed in docs/submit-analysis-gate-design.md and extended in
+   docs/gk-events-and-duel-split-design.md. Eleven rules, scored against the PAYLOAD —
+   what buildReport() read back out of the database and what the club will actually see —
+   never against whatever this tab happens to be holding:
 
-     1  aerial duels        same number on both sides
-     2  aerial duels        home won = away lost, home lost = away won
-     3  ground duels        same number on both sides
-     4  ground duels        home won = away lost, home lost = away won
-     5  take-ons            home won = away concerns, home concerns = away won
-     6  shot on target      carries the spot the ball crossed the line at
-     7  shirt numbers       every number was one that side HAD, at that moment
+      1  aerial duels        same number on both sides
+      2  aerial duels        home won = away lost, home lost = away won
+      3  ground duels        same number on both sides
+      4  ground duels        home won = away lost, home lost = away won
+      5  physical duels      same number on both sides
+      6  physical duels      home won = away lost, home lost = away won
+      7  loose ball duels    same number on both sides
+      8  loose ball duels    home won = away lost, home lost = away won
+      9  take-ons            home won = away concerns, home concerns = away won
+     10  shot on target      carries the spot the ball crossed the line at
+     11  shirt numbers       every number was one that side HAD, at that moment
 
-   1 and 3 are implied by 2 and 4 (a side's total is its wins plus its losses) and are
-   still scored and still shown — the total is the line read first, the mirror is the
-   line that says where to look.
+   Every odd-numbered duel rule is implied by the even one after it (a side's total is its
+   wins plus its losses) and is still scored and still shown — the total is the line read
+   first, the mirror is the line that says where to look.
+
+   3/4 stay on the legacy `ground duel …` names while 5-8 cover the two kinds it was split
+   into. Folding all six into one pair would let a match tagged entirely in the new names
+   score 0 = 0 on a rule that was checking nothing; keeping them apart also means a duel
+   tagged `ground duel success` on one side and `physical duel fail` on the other fails
+   two rules at once, which is what that mistake looks like.
 
    The two that can point at a moment do: they name the half and the clock, read off the
    payload's own duration mapping, so the minute quoted is the minute the events table
@@ -122,11 +133,11 @@ test('C5 · the corrected spelling counts as the shipped misspelling', () => {
   ok(byId(v,'takeon-mirror').ok,'both spellings are the same event here');
 });
 
-test('C5 · take-on fail has no mirror — a match full of them still passes all seven', () => {
+test('C5 · take-on fail has no mirror — a match full of them still passes every rule', () => {
   // a beaten take-on is answered by whatever the defender did, or by nothing at all;
   // an identity for it would refuse matches that are tagged correctly
   const v=run(payload({rows:duels('home','take-on fail',5)}));
-  ok(v.ok,'all seven pass: '+v.checks.filter(c=>!c.ok).map(c=>c.label).join(', '));
+  ok(v.ok,'every rule passes: '+v.checks.filter(c=>!c.ok).map(c=>c.label).join(', '));
 });
 
 test('the duels are counted whatever case the event was renamed to', () => {
@@ -295,21 +306,33 @@ test('C7 · a side with an empty board says which side, at which minute', () => 
 
 /* ================= 7. the verdict as a whole ================= */
 
-test('all seven are scored, in the order they were asked for', () => {
+test('every check is scored, in the order they were asked for', () => {
   const v=run(payload());
   deepEq(v.checks.map(c=>c.id),
-    ['aerial-total','aerial-mirror','ground-total','ground-mirror','takeon-mirror',
-     'shot-spot','shirt-numbers']);
-  deepEq(v.checks.map(c=>c.n),[1,2,3,4,5,6,7],'and numbered the way the dialog prints them');
+    ['aerial-total','aerial-mirror','ground-total','ground-mirror',
+     'physical-total','physical-mirror','loose-total','loose-mirror',
+     'takeon-mirror','shot-spot','shirt-numbers']);
+  deepEq(v.checks.map(c=>c.n),[1,2,3,4,5,6,7,8,9,10,11],
+         'and numbered the way the dialog prints them');
+});
+
+/* Every total prints "See check N for which half of the duel is missing." N is written
+   by hand in DUEL_TOTALS, and it has to land on that total's OWN mirror — a number typed
+   one out of step sends the tagger to a check about a different kind of duel. */
+test('each duel total points at its own mirror, not at the one next to it', () => {
+  const v=run(payload()), at=n=>v.checks[n-1];
+  G.k.DUEL_TOTALS.forEach(d=>eq(at(d.n).id,d.from,d.id+' points at '+d.from));
 });
 
 test('nothing short-circuits: a match that breaks everything says so about everything', () => {
   const v=run(payload({lineups:null,rows:[
     ...duels('home','aerial duel success',2), ...duels('home','ground duel success',2,400),
+    ...duels('home','physical duel success',2,1200),
+    ...duels('home','loose ball duel success',2,1600),
     ...duels('home','take-on succes',2,800),  ev('home','9','shot on target',740),
     ev('home','99','foul',900)]}));
-  eq(v.checks.length,7);
-  eq(v.checks.filter(c=>c.ok).length,0,'all seven report, none is skipped');
+  eq(v.checks.length,11);
+  eq(v.checks.filter(c=>c.ok).length,0,'every one reports, none is skipped');
   notOk(v.ok);
 });
 
@@ -435,7 +458,7 @@ function startPublish(gate){
     .then(r=>{out.settled=true;out.r=r;},e=>{out.settled=true;out.err=e.message;});
   return out;
 }
-const REFUSED=startPublish(()=>'Nothing was published — 2 of the seven analysis checks are still failing.');
+const REFUSED=startPublish(()=>'Nothing was published — 2 of the 11 analysis checks are still failing.');
 const PASSED=startPublish(()=>null);
 const NO_GATE=startPublish(null);
 
@@ -443,7 +466,7 @@ test('a refused publish never reaches the database', () => {
   ok(REFUSED.settled,'the scenario ran to completion');
   eq(REFUSED.calls.built,1,'the payload is built once');
   eq(REFUSED.calls.rpc,0,'and the RPC is never called — no version, no channel move');
-  ok(/2 of the seven/.test(REFUSED.err||''),'the refusal is what surfaces: '+REFUSED.err);
+  ok(/2 of the 11/.test(REFUSED.err||''),'the refusal is what surfaces: '+REFUSED.err);
 });
 
 test('a clean match goes through, and the gate saw the very payload that was written', () => {
@@ -468,7 +491,8 @@ test('every passing check is drawn too, not only the failures', () => {
   const wire=/\/\* ---- Submit Analysis[\s\S]*?\n\}\)\(\);/.exec(SRC)[0];
   ok(/v\.checks\.forEach/.test(wire),'the whole list is walked');
   ok(/c\.ok\?'✓':'✗'/.test(wire),'each one marked either way');
-  ok(/all seven passed/.test(wire),'and a clean match is told so');
+  ok(/all '\+AN_ORDER\.length\+' passed/.test(wire),
+     'and a clean match is told so, with a count read off AN_ORDER rather than typed');
 });
 
 test('a long list of findings is cut, and says how many were cut', () => {

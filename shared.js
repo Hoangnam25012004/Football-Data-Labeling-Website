@@ -227,7 +227,52 @@ const EVENT_INC={
   'foul won':['foulsWon'],
   'offside':['offsides'],
   'mistake':['mistakes'],
-  'save':['saves']
+  'save':['saves'],
+  /* ---- a split event keeps feeding the total it was split out of ----
+     'ground duel success' was one event and is now three ways of saying a ground duel
+     was won. The old name is NOT retired: months of matches are tagged with it, and no
+     row of them says which of the two new kinds it was — that question was never asked
+     while they were being tagged, so nothing can answer it now.
+
+     So groundDuels/groundDuelsWon stop meaning "the ground duel event" and start meaning
+     "the ground duel FAMILY". Every member feeds it. A match tagged last month still
+     totals what it always totalled; a match tagged today totals the same way AND carries
+     the breakdown. Neither is rewritten to look like the other.
+
+     The *Detail counters are the same trick GK_COLS plays with `known`: they say whether
+     this match was tagged in enough detail for the question to have an answer, so a
+     column can print "—" instead of a 0 that would claim a duel kind nobody recorded.
+     They add up like every other field, so a season of 12 old + 6 new matches reports
+     the 6 rather than pretending the 12 were empty. */
+  'physical duel success':['groundDuels','groundDuelsWon','physicalDuels','physicalDuelsWon','duelDetail'],
+  'physical duel fail':['groundDuels','physicalDuels','duelDetail'],
+  'loose ball duel success':['groundDuels','groundDuelsWon','looseBallDuels','looseBallDuelsWon','duelDetail'],
+  'loose ball duel fail':['groundDuels','looseBallDuels','duelDetail'],
+  /* A save has two independent answers: did it stick (catch/parry) and how was it made
+     (standing/diving/…). Only the OUTCOME counts as a save — both together on one action
+     ("1ca*vd") would otherwise book saves twice and take Save Rate with it. */
+  'catch':['saves','catches','saveDetail'],
+  'parry':['saves','parries','saveDetail'],
+  'save standing':['saveStanding','gkTechDetail'],
+  'save diving':['saveDiving','gkTechDetail'],
+  'save collapse':['saveCollapse','gkTechDetail'],
+  'save overhead':['saveOverhead','gkTechDetail'],
+  'save kneeling':['saveKneeling','gkTechDetail'],
+  'defensive line support success':['defLineSupports','defLineSupportsWon','gkCtrlDetail'],
+  'defensive line support fail':['defLineSupports','gkCtrlDetail'],
+  'aerial control success':['aerialControls','aerialControlsWon','gkCtrlDetail'],
+  'aerial control fail':['aerialControls','gkCtrlDetail'],
+  /* Tagged by hand on the keeper, and deliberately NOT wired into either of the two
+     "goals conceded" figures that already exist (TEAM_SECTIONS' o.goals and GK_COLS'
+     g.conceded). Those two are derived and cannot be forgotten; this one can. It earns
+     its place by carrying a pitch spot, by being filterable in Film, and by having an
+     answer when the formation board is too empty for g.known. */
+  'goal conceded':['goalsConceded','concededDetail'],
+  /* An own goal is not a goal FOR the player who put it in, so it books none of goal's
+     metrics — goals feeds TEAM_SECTIONS' Goals and Goals Conceded, and crediting it here
+     would award the goal to the wrong side. The scoreline reads it separately: see
+     teamGoals() in Stats/stats-view.js and computeScore() in index.html. */
+  'own goal':['ownGoals']
 };
 const STAT_GROUPS=[['',1],['Shooting',8],['Distribution',10],['Defensive',9],['Duels',4],['Set Pieces',4],['Discipline',4]];
 const STAT_HEADERS=['No','Goals','Assists','Total Shots','Shots On Target','Shots Off Target','Blocked Shots','Miss Shots','Shooting Accuracy',
@@ -239,7 +284,15 @@ const STAT_HEADERS=['No','Goals','Assists','Total Shots','Shots On Target','Shot
 function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,shotsOff:0,shotsBlocked:0,missShots:0,passes:0,passesComp:0,
   crosses:0,crossesComp:0,takeOns:0,takeOnsWon:0,takeOnConcerns:0,stepIns:0,tackles:0,tacklesWon:0,interceptions:0,
   clearances:0,blocks:0,recoveries:0,groundDuels:0,groundDuelsWon:0,aerialDuels:0,aerialDuelsWon:0,
-  corners:0,freeKicks:0,penalties:0,throwIns:0,goalKicks:0,fouls:0,foulsWon:0,offsides:0,mistakes:0,saves:0};}
+  corners:0,freeKicks:0,penalties:0,throwIns:0,goalKicks:0,fouls:0,foulsWon:0,offsides:0,mistakes:0,saves:0,
+  /* the split duels, the two save outcomes, the five save techniques, the keeper's
+     control of the space in front of him, and the two figures tagged by hand */
+  ownGoals:0,physicalDuels:0,physicalDuelsWon:0,looseBallDuels:0,looseBallDuelsWon:0,
+  catches:0,parries:0,saveStanding:0,saveDiving:0,saveCollapse:0,saveOverhead:0,saveKneeling:0,
+  defLineSupports:0,defLineSupportsWon:0,aerialControls:0,aerialControlsWon:0,goalsConceded:0,
+  /* "was this match tagged in enough detail to answer" — never a measurement. Read only
+     for truthiness, and summable so a season answers it match by match (see EVENT_INC). */
+  duelDetail:0,saveDetail:0,gkTechDetail:0,gkCtrlDetail:0,concededDetail:0};}
 const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
 /* Two names in the shipped event list went out misspelt, and were tagged that way for
    months. The list now ships the corrected spelling, so BOTH are in the data: every match
@@ -305,6 +358,15 @@ const PLAYER_CATS={
     ['Tackles',s=>s.tackles],['Tackles Won',s=>s.tacklesWon],['Tackle Success',s=>pct(s.tacklesWon,s.tackles)],
     ['Interceptions',s=>s.interceptions],['Clearances',s=>s.clearances],['Blocks',s=>s.blocks],['Recoveries',s=>s.recoveries],
     ['Ground Duels',s=>s.groundDuels],['Ground Duels Won',s=>s.groundDuelsWon],
+    /* The two kinds a ground duel is now tagged as. They sit UNDER the total rather than
+       replacing it, because the total is the one figure that means the same thing in
+       every match ever tagged — see the note on EVENT_INC. A match from before the split
+       reads "—" here and its real number above; 0 would claim it had no physical duels,
+       which is a different statement from "nobody was asked". */
+    ['Physical Duels',s=>s.duelDetail?s.physicalDuels:'—'],
+    ['Physical Won',s=>s.duelDetail?s.physicalDuelsWon:'—'],
+    ['Loose Ball Duels',s=>s.duelDetail?s.looseBallDuels:'—'],
+    ['Loose Ball Won',s=>s.duelDetail?s.looseBallDuelsWon:'—'],
     ['Aerial Duels',s=>s.aerialDuels],['Aerial Duels Won',s=>s.aerialDuelsWon],
     ['Take-on Concerns',s=>s.takeOnConcerns],['Mistakes',s=>s.mistakes]],
   other:[
@@ -329,7 +391,30 @@ const GK_COLS=[
   ['On Target Faced',(s,g)=>g.known?s.saves+g.conceded:'—'],
   ['Save Rate',      (s,g)=>g.known?pct(s.saves,s.saves+g.conceded):'—'],
   ['Clean Sheets',   (s,g)=>g.known?g.clean:'—'],
-  ['Goal Kicks',     (s,g)=>s.goalKicks]
+  ['Goal Kicks',     (s,g)=>s.goalKicks],
+  /* ---- the keeper's own detail, added below the six above rather than into them ----
+     These are the columns that would be a wall of zeroes on every outfield player, which
+     is exactly why they belong here: GK_COLS is only ever drawn for a shirt that kept
+     goal. Every one reads its *Detail flag first, for the same reason `known` guards the
+     four above it — a match tagged before these events existed has no answer, and "—" is
+     what says so.
+
+     Catches + Parries are the same saves already counted in the Saves row, broken out by
+     whether the ball stuck; the five techniques are the same saves broken out by how they
+     were made. Neither is a second tally of saves (see EVENT_INC). */
+  ['Catches',        (s,g)=>s.saveDetail?s.catches:'—'],
+  ['Parries',        (s,g)=>s.saveDetail?s.parries:'—'],
+  ['Standing',       (s,g)=>s.gkTechDetail?s.saveStanding:'—'],
+  ['Diving',         (s,g)=>s.gkTechDetail?s.saveDiving:'—'],
+  ['Collapse',       (s,g)=>s.gkTechDetail?s.saveCollapse:'—'],
+  ['Overhead',       (s,g)=>s.gkTechDetail?s.saveOverhead:'—'],
+  ['Kneeling',       (s,g)=>s.gkTechDetail?s.saveKneeling:'—'],
+  ['Def. Line Support',(s,g)=>s.gkCtrlDetail?s.defLineSupportsWon+'/'+s.defLineSupports:'—'],
+  ['Aerial Control', (s,g)=>s.gkCtrlDetail?s.aerialControlsWon+'/'+s.aerialControls:'—'],
+  /* Beside Conceded, never instead of it. Conceded is derived from the formation board
+     and cannot be forgotten; this one is typed by hand and can. When they disagree, the
+     derived figure is the one to believe. */
+  ['Conceded (tagged)',(s,g)=>s.concededDetail?s.goalsConceded:'—']
 ];
 
 /* ---- shots + body part (Event List) ----
@@ -624,9 +709,14 @@ function sumTeam(rows,team){
   Object.values(P).forEach(s=>{for(const k in t)t[k]+=s[k];});
   return t;
 }
+/* `s` is this side's tally, `o` the other side's — which is what lets the two goal rows
+   below read own goals off the side that scored them. A team's goals are its own `goal`
+   events PLUS the opposition's own goals, the same sum teamGoals() takes in
+   Stats/stats-view.js and computeScore() takes in index.html. Left as `s.goals` alone,
+   this table would print "Goals 0 – 0" under a header already reading 0 – 1. */
 const TEAM_SECTIONS=[
   ['Attacking Stats',[
-    ['Goals',(s,o)=>s.goals],['Assists',(s,o)=>s.assists],['Key Passes',(s,o)=>s.keyPasses],['Total Shots',(s,o)=>s.totalShots],
+    ['Goals',(s,o)=>s.goals+o.ownGoals],['Assists',(s,o)=>s.assists],['Key Passes',(s,o)=>s.keyPasses],['Total Shots',(s,o)=>s.totalShots],
     ['Shots On Target',(s,o)=>s.shotsOn],['Shots Off Target',(s,o)=>s.shotsOff],
     ['Blocked Shots',(s,o)=>s.shotsBlocked],['Miss Shots',(s,o)=>s.missShots],
     ['Shooting Accuracy',(s,o)=>pct(s.shotsOn,s.totalShots)]]],
@@ -644,7 +734,7 @@ const TEAM_SECTIONS=[
     ['Ground Duels',(s,o)=>s.groundDuels],['Ground Duels Won',(s,o)=>s.groundDuelsWon],
     ['Take-on Concerns',(s,o)=>s.takeOnConcerns],['Mistakes',(s,o)=>s.mistakes]]],
   ['Discipline & GK',[
-    ['Goals Conceded',(s,o)=>o.goals],['Saves',(s,o)=>s.saves],['Fouls',(s,o)=>s.fouls],
+    ['Goals Conceded',(s,o)=>o.goals+s.ownGoals],['Saves',(s,o)=>s.saves],['Fouls',(s,o)=>s.fouls],
     ['Offsides',(s,o)=>s.offsides],['Corners',(s,o)=>s.corners],
     ['Free-kicks',(s,o)=>s.freeKicks],['Throw-ins',(s,o)=>s.throwIns],['Goal Kicks',(s,o)=>s.goalKicks],
     ['Penalty Kicks',(s,o)=>s.penalties]]]

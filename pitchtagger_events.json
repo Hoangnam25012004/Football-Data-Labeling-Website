@@ -1,6 +1,34 @@
 {
   "football": [
     {
+      "name": "goal",
+      "key": "ddd"
+    },
+    {
+      "name": "own goal",
+      "key": "og"
+    },
+    {
+      "name": "assist",
+      "key": "zz"
+    },
+    {
+      "name": "key pass",
+      "key": "z"
+    },
+    {
+      "name": "shot on target",
+      "key": "dd"
+    },
+    {
+      "name": "shot off target",
+      "key": "d"
+    },
+    {
+      "name": "blocked shot",
+      "key": "db"
+    },
+    {
       "name": "pass success",
       "key": "s"
     },
@@ -17,24 +45,32 @@
       "key": "cc"
     },
     {
-      "name": "shot on target",
-      "key": "dd"
+      "name": "take-on success",
+      "key": "e"
     },
     {
-      "name": "shot off target",
-      "key": "d"
+      "name": "take-on fail",
+      "key": "ee"
     },
     {
-      "name": "blocked shot",
-      "key": "db"
+      "name": "step in",
+      "key": "r"
     },
     {
-      "name": "foul",
-      "key": "f"
+      "name": "tackle success",
+      "key": "a"
     },
     {
-      "name": "goal",
-      "key": "ddd"
+      "name": "tackle fail",
+      "key": "aa"
+    },
+    {
+      "name": "interception",
+      "key": "q"
+    },
+    {
+      "name": "clearance",
+      "key": "w"
     },
     {
       "name": "block",
@@ -43,38 +79,6 @@
     {
       "name": "recovery",
       "key": "qq"
-    },
-    {
-      "name": "interception",
-      "key": "q"
-    },
-    {
-      "name": "tackle fail",
-      "key": "aa"
-    },
-    {
-      "name": "tackle success",
-      "key": "a"
-    },
-    {
-      "name": "free-kick",
-      "key": "k"
-    },
-    {
-      "name": "corner-kick",
-      "key": "j"
-    },
-    {
-      "name": "yellow card",
-      "key": "yc"
-    },
-    {
-      "name": "red card",
-      "key": "rc"
-    },
-    {
-      "name": "substitution",
-      "key": "sub"
     },
     {
       "name": "aerial duel success",
@@ -93,64 +97,128 @@
       "key": "xx"
     },
     {
-      "name": "mistake",
-      "key": "m"
+      "name": "physical duel success",
+      "key": "pd"
     },
     {
-      "name": "take-on success",
-      "key": "e"
+      "name": "physical duel fail",
+      "key": "pdd"
     },
     {
-      "name": "take-on fail",
-      "key": "ee"
+      "name": "loose ball duel success",
+      "key": "lo"
+    },
+    {
+      "name": "loose ball duel fail",
+      "key": "loo"
     },
     {
       "name": "take-on concern",
       "key": "er"
     },
     {
-      "name": "step in",
-      "key": "r"
+      "name": "mistake",
+      "key": "m"
     },
     {
-      "name": "foul throw",
-      "key": "tf"
+      "name": "catch",
+      "key": "ca"
     },
     {
-      "name": "clearance",
-      "key": "w"
-    },
-    {
-      "name": "offside",
-      "key": "o"
-    },
-    {
-      "name": "handball foul",
-      "key": "hf"
+      "name": "parry",
+      "key": "pr"
     },
     {
       "name": "save",
       "key": "v"
     },
     {
-      "name": "pause",
-      "key": "pa"
+      "name": "save standing",
+      "key": "vs"
+    },
+    {
+      "name": "save diving",
+      "key": "vd"
+    },
+    {
+      "name": "save collapse",
+      "key": "vc"
+    },
+    {
+      "name": "save overhead",
+      "key": "vo"
+    },
+    {
+      "name": "save kneeling",
+      "key": "vk"
+    },
+    {
+      "name": "defensive line support success",
+      "key": "ln"
+    },
+    {
+      "name": "defensive line support fail",
+      "key": "lnn"
+    },
+    {
+      "name": "aerial control success",
+      "key": "ac"
+    },
+    {
+      "name": "aerial control fail",
+      "key": "acc"
+    },
+    {
+      "name": "goal conceded",
+      "key": "gc"
+    },
+    {
+      "name": "corner-kick",
+      "key": "j"
+    },
+    {
+      "name": "free-kick",
+      "key": "k"
+    },
+    {
+      "name": "penalty kick",
+      "key": "pk"
+    },
+    {
+      "name": "foul",
+      "key": "f"
+    },
+    {
+      "name": "foul throw",
+      "key": "tf"
+    },
+    {
+      "name": "handball foul",
+      "key": "hf"
+    },
+    {
+      "name": "offside",
+      "key": "o"
+    },
+    {
+      "name": "yellow card",
+      "key": "yc"
+    },
+    {
+      "name": "red card",
+      "key": "rc"
+    },
+    {
+      "name": "substitution",
+      "key": "sub"
     },
     {
       "name": "gain possession",
       "key": "gp"
     },
     {
-      "name": "assist",
-      "key": "zz"
-    },
-    {
-      "name": "key pass",
-      "key": "z"
-    },
-    {
-      "name": "penalty kick",
-      "key": "pk"
+      "name": "pause",
+      "key": "pa"
     }
   ],
   "hockey": []

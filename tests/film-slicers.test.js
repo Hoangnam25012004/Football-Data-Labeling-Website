@@ -228,8 +228,14 @@ test('inside a group: the column order of PLAYER_CATS, success before failure', 
   eq(evOrder(P,['miss shot','goal','key pass']),'goal,key pass,miss shot');
   eq(evOrder(P,['aerial duel fail','recovery','tackle success']),
      'tackle success,recovery,aerial duel fail');
-  eq(evOrder(P,['free-kick','yellow card','corner-kick','save']),
-     'corner-kick,free-kick,save,yellow card','set pieces, then the keeper, then the card');
+  eq(evOrder(P,['free-kick','yellow card','corner-kick']),
+     'corner-kick,free-kick,yellow card','set pieces, then the card');
+  // the keeper used to sit in Other, between the set pieces and the card. He has a group
+  // of his own now, and it ranks ahead of Other — so a save leads a list it used to sit
+  // inside, and the two ways of asking about one save stay next to each other.
+  eq(evOrder(P,['free-kick','yellow card','save','catch','corner-kick']),
+     'catch,save,corner-kick,free-kick,yellow card',
+     'goalkeeping is its own group, and it comes before Other');
 });
 
 test('body parts come last, in the order a shot is read in', () => {

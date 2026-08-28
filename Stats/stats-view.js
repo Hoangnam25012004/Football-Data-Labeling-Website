@@ -1343,15 +1343,29 @@ const filmCueMatches=c=>c.rows.some(filmMatches);
    the tick that takes the whole run at once. One table, two jobs: an order and a
    set of names can never disagree about where a heading belongs. */
 const FILM_EV_GROUPS=[
-  ['Shooting',['goal','assist','key pass','shot on target','shot off target',
+  ['Shooting',['goal','own goal','assist','key pass','shot on target','shot off target',
                'blocked shot','miss shot']],
   ['Distribution',['pass success','pass fail','cross success','cross fail',
                    'take-on success','take-on fail','step in']],
+  /* The split ground duels sit next to the name they were split out of, not off in a
+     group of their own: an analyst picking "every duel on the floor" wants all six ticks
+     under one heading, and a match tagged either side of the split reads the same way. */
   ['Defensive',['tackle success','tackle fail','interception','clearance','block','recovery',
-                'ground duel success','ground duel fail','aerial duel success','aerial duel fail',
+                'ground duel success','ground duel fail',
+                'physical duel success','physical duel fail',
+                'loose ball duel success','loose ball duel fail',
+                'aerial duel success','aerial duel fail',
                 'take-on concern','mistake']],
+  /* Goalkeeping is its own heading because it is its own playlist — the whole group tick
+     is "show me the keeper's match". `save` moves here from Other and takes catch/parry
+     with it: they are the same event asked two ways, and splitting them across headings
+     would put a save's outcome under one tick and the save itself under another. */
+  ['Goalkeeping',['catch','parry','save','save standing','save diving','save collapse',
+                  'save overhead','save kneeling',
+                  'defensive line support success','defensive line support fail',
+                  'aerial control success','aerial control fail','goal conceded']],
   ['Other',['corner-kick','free-kick','penalty kick','throw-ins','throw-in','goal kick',
-            'foul','foul throw','handball foul','foul won','offside','save',
+            'foul','foul throw','handball foul','foul won','offside',
             'yellow card','red card','substitution','gain possession','pause']],
   ['Body part',['right foot','left foot','upper body','head','lower body']]
 ];

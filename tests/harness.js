@@ -75,7 +75,7 @@ const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
   'GOAL_SPOT_EVENTS','GOAL_VIEW','goalCapture',
   'OFF_PITCH_OK','sideName','entryAnchor',
   'scrollToRow','editPrevTeam',
-  // the analysis gate: the seven rules a match passes before it can be published
+  // the analysis gate: the rules a match passes before it can be published (AN_ORDER)
   'anKey','DUEL_MIRRORS','DUEL_TOTALS','SPOT_REQUIRED','AN_ORDER','AN_SPOT_MAX',
   'SNAP_WINDOW','DUEL_PAIR_WINDOW','anStamp','anSide','anDur','sumOf','inMouth','anShort'];
 const FUNCS=['fmt','parseTime','eventHalfIn','eventHalf','matchTimeIn','matchTime',

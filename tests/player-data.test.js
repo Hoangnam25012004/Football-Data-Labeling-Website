@@ -412,13 +412,20 @@ test('a keeper nothing is known about reads —, never 0', () => {
 
 test('the keeper columns are shared.js-s, and take the match as well as the man', () => {
   deepEq(A.GK_COLS.map(c=>c[0]),
-         ['Saves','Conceded','On Target Faced','Save Rate','Clean Sheets','Goal Kicks']);
+         ['Saves','Conceded','On Target Faced','Save Rate','Clean Sheets','Goal Kicks',
+          'Catches','Parries','Standing','Diving','Collapse','Overhead','Kneeling',
+          'Def. Line Support','Aerial Control','Conceded (tagged)']);
   ok(/const GK_COLS=\[/.test(SHARED),'the definition lives in shared.js, beside PLAYER_CATS');
   const s=stat({saves:4,goalKicks:9}), g={conceded:1,clean:0,known:1};
   const v=A.GK_COLS.map(c=>c[1](s,g));
-  deepEq(v,[4,1,5,'80.0%',0,9],'faced = kept out + let in, and the rate follows from it');
+  deepEq(v.slice(0,6),[4,1,5,'80.0%',0,9],'faced = kept out + let in, and the rate follows from it');
+  /* The ten added below them are the keeper's own detail, and this match carries none of
+     it: every *Detail flag is 0, so each reads "—". That is the whole point of the flags —
+     a 0 here would claim he made no diving saves rather than that nobody was asked. */
+  deepEq(v.slice(6),['—','—','—','—','—','—','—','—','—','—'],
+         'a match tagged before these events existed says so, and does not report zeroes');
   const unknown=A.GK_COLS.map(c=>c[1](s,{conceded:0,clean:0,known:0}));
-  deepEq(unknown,[4,'—','—','—','—',9],'what only he did still reads; what the match knows does not');
+  deepEq(unknown.slice(0,6),[4,'—','—','—','—',9],'what only he did still reads; what the match knows does not');
 });
 
 test('PLAYER_CATS is untouched, so the Stats tab cannot have moved', () => {

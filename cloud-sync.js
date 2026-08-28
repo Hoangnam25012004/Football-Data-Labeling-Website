@@ -301,10 +301,17 @@ const CONFIG = {
     const col = /^\d{5}$/.test(input) ? 'code' : 'id';
     const { data, error } = await sb.from('matches').select('*').eq(col, input).maybeSingle();
     if (error || !data) return null;
+    /* Same rule as computeScore() in index.html and teamGoals() in Stats/stats-view.js:
+       a side's goals are its own `goal` events plus the OTHER side's own goals. Asking
+       only for 'goal' made the preview read 1 – 0 for a match the scoreboard, the Stats
+       page and the report all read 0 – 1. */
     let h = 0, a = 0;
-    const { data: goals } = await sb.from('events').select('team')
-      .eq('match_id', data.id).eq('event_name', 'goal');
-    (goals || []).forEach(g => (g.team === 'home' ? h++ : a++));
+    const { data: goals } = await sb.from('events').select('team,event_name')
+      .eq('match_id', data.id).in('event_name', ['goal', 'own goal', 'own-goal']);
+    (goals || []).forEach(g => {
+      const own = g.event_name !== 'goal';           // an own goal counts for the other side
+      if (g.team === 'home' ? !own : own) h++; else a++;
+    });
     return { row: data, score: [h, a] };
   }
   async function joinMatch() {

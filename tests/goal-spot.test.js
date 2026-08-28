@@ -246,8 +246,17 @@ test('Esc backs out of the goal before it can pop a dot', () => {
   ok(esc<editEsc,'ahead of the edit-mode one, so Esc never does both');
 });
 
-test('only a shot on target and a goal ask for a spot', () => {
-  deepEq([...app().k.GOAL_SPOT_EVENTS].sort(),['goal','shot on target']);
+test('a shot on target, a goal and an own goal ask for a spot', () => {
+  deepEq([...app().k.GOAL_SPOT_EVENTS].sort(),['goal','own goal','shot on target']);
+});
+
+/* The capture and the analysis gate are one rule written twice, so they are asserted
+   against each other rather than each against a list typed out here. A name added to one
+   and forgotten in the other is the failure this catches: a gate looser than the UI it
+   backs up would let a spotless goal through Submit Analysis. */
+test('the analysis gate asks for a spot on exactly those events, no more and no less', () => {
+  const k=app().k;
+  deepEq([...k.SPOT_REQUIRED].sort(),[...k.GOAL_SPOT_EVENTS].sort());
 });
 
 /* ================= the goal is drawn to the reference recording ================= */

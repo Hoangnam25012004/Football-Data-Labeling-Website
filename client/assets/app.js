@@ -1620,7 +1620,7 @@
      sake of a table it does not draw. Same URL as the line below, so whichever
      view is opened first is the one that pays for it. */
   function loadShared() {
-    return loadOnce(taggerRoot() + 'shared.js?v=22');
+    return loadOnce(taggerRoot() + 'shared.js?v=23');
   }
 
   /* Pulled in the first time someone opens a match's stats, not on every page
@@ -1631,7 +1631,7 @@
     loadOnce(r + 'Stats/stats-view.css?v=9', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
-      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=22'); })
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=23'); })
       .then(function () { return loadOnce(r + 'Stats/report.js?v=35'); })
       /* The analyst's toolkit. This site's file, not the tagging app's — Q1 was
          answered B, so the right-click menu, the drawing layer, clips and the

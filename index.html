@@ -184,6 +184,12 @@
   .evt{font-weight:700;color:var(--ink)}   /* event names in the DEFAULT text colour (side = column) */
   .evt.duel-ground{color:#b5713f}          /* #ground duel success / fail — brown */
   .evt.duel-aerial{color:#ef4444}          /* #aerial duel success / fail — red */
+  /* The two kinds a ground duel is now tagged as. Physical stays in the warm family its
+     parent is in — it is still a duel on the floor — but well clear of #b5713f; loose ball
+     goes cold so the pair never reads as one shade of brown, and so neither collides with
+     --away (#FFFF66) in the away column. */
+  .evt.duel-physical{color:#d98a3f}        /* #physical duel success / fail — amber */
+  .evt.duel-loose{color:#3fb0a8}           /* #loose ball duel success / fail — teal */
   /* goal + every shot type: a BLACK badge. Plain black text would vanish into the dark
      table background, so the black is the fill and the label stays light on top of it. */
   .evt.shot{background:#000;color:#f2f6fa;border:1px solid #454e5e;border-radius:4px;
@@ -236,7 +242,7 @@
   .modal-close:hover{color:var(--danger)}
   .modal-body{padding:14px;overflow:auto}
   .modal-body .ev-list{max-height:none}
-  /* Submit Analysis — the seven checks. The green is the one Stats already paints a
+  /* Submit Analysis — the checks listed in AN_ORDER. The green is the one Stats already paints a
      won duel with, so the dialog and the bars speak the same language; there is no
      --ok token on purpose (see the note by :root — win/lose colours are not chrome). */
   .an-checks{margin-top:10px;font-size:12px;line-height:1.65;max-height:46vh;overflow:auto}
@@ -609,7 +615,7 @@
       <label class="fld"><span>Channel (the club that will see it)</span></label>
       <select class="txt" id="submitClub"></select>
       <div class="mini" id="submitCount" style="margin-top:10px;line-height:1.7"></div>
-      <!-- the seven analysis checks: all of them, passing ones included, so the dialog
+      <!-- every analysis check: all of them, passing ones included, so the dialog
            answers "is this match clean" and not only "what is broken" -->
       <div class="an-checks" id="submitChecks"></div>
       <button class="addbtn" id="submitGo" style="margin-top:12px">Publish this match</button>
@@ -825,43 +831,76 @@ const $ = id => document.getElementById(id);
 const DEFAULT_KEYS=['a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m'];
 
 /* ---- events bundled with this file (loads automatically on first open) ---- */
+/* ---- events bundled with this file, in reading order ----
+   The order is FILM_EV_GROUPS' order (Stats/stats-view.js): shooting, distribution,
+   defensive, goalkeeping, set pieces & other, body part. One order for both, so the
+   modal and the Film filter can never disagree about where an event belongs.
+
+   This list is only ever read on a FIRST open, before any dictionary has been fetched.
+   A browser that has been here, or an account with a cloud dictionary, gets that instead
+   (loadEvents / applyEventTypes), which is why seed_gk_events.js exists: it is what puts
+   the new names in front of an installation that already has a list of its own. */
 const DEFAULT_EVENTS = {
   "football": [
+    {"name":"goal","key":"ddd"},
+    {"name":"own goal","key":"og"},
+    {"name":"assist","key":"zz"},
+    {"name":"key pass","key":"z"},
+    {"name":"shot on target","key":"dd"},
+    {"name":"shot off target","key":"d"},
+    {"name":"blocked shot","key":"db"},
+
     {"name":"pass success","key":"s"},
     {"name":"pass fail","key":"ss"},
     {"name":"cross success","key":"c"},
     {"name":"cross fail","key":"cc"},
-    {"name":"shot on target","key":"dd"},
-    {"name":"shot off target","key":"d"},
-    {"name":"blocked shot","key":"db"},
-    {"name":"foul","key":"f"},
-    {"name":"goal","key":"ddd"},
+    {"name":"take-on success","key":"e"},
+    {"name":"take-on fail","key":"ee"},
+    {"name":"step in","key":"r"},
+
+    {"name":"tackle success","key":"a"},
+    {"name":"tackle fail","key":"aa"},
+    {"name":"interception","key":"q"},
+    {"name":"clearance","key":"w"},
     {"name":"block","key":"qw"},
     {"name":"recovery","key":"qq"},
-    {"name":"interception","key":"q"},
-    {"name":"tackle fail","key":"aa"},
-    {"name":"tackle success","key":"a"},
-    {"name":"free-kick","key":"k"},
-    {"name":"corner-kick","key":"j"},
-    {"name":"yellow card","key":"yc"},
-    {"name":"red card","key":"rc"},
-    {"name":"substitution","key":"sub"},
     {"name":"aerial duel success","key":"b"},
     {"name":"aerial duel fail","key":"bb"},
     {"name":"ground duel success","key":"x"},
     {"name":"ground duel fail","key":"xx"},
-    {"name":"mistake","key":"m"},
-    {"name":"take-on success","key":"e"},
-    {"name":"take-on fail","key":"ee"},
+    {"name":"physical duel success","key":"pd"},
+    {"name":"physical duel fail","key":"pdd"},
+    {"name":"loose ball duel success","key":"lo"},
+    {"name":"loose ball duel fail","key":"loo"},
     {"name":"take-on concern","key":"er"},
-    {"name":"step in","key":"r"},
-    {"name":"foul throw","key":"tf"},
-    {"name":"clearance","key":"w"},
-    {"name":"offside","key":"o"},
-    {"name":"handball foul","key":"hf"},
+    {"name":"mistake","key":"m"},
+
+    {"name":"catch","key":"ca"},
+    {"name":"parry","key":"pr"},
     {"name":"save","key":"v"},
-    {"name":"pause","key":"pa"},
-    {"name":"gain possession","key":"gp"}
+    {"name":"save standing","key":"vs"},
+    {"name":"save diving","key":"vd"},
+    {"name":"save collapse","key":"vc"},
+    {"name":"save overhead","key":"vo"},
+    {"name":"save kneeling","key":"vk"},
+    {"name":"defensive line support success","key":"ln"},
+    {"name":"defensive line support fail","key":"lnn"},
+    {"name":"aerial control success","key":"ac"},
+    {"name":"aerial control fail","key":"acc"},
+    {"name":"goal conceded","key":"gc"},
+
+    {"name":"corner-kick","key":"j"},
+    {"name":"free-kick","key":"k"},
+    {"name":"penalty kick","key":"pk"},
+    {"name":"foul","key":"f"},
+    {"name":"foul throw","key":"tf"},
+    {"name":"handball foul","key":"hf"},
+    {"name":"offside","key":"o"},
+    {"name":"yellow card","key":"yc"},
+    {"name":"red card","key":"rc"},
+    {"name":"substitution","key":"sub"},
+    {"name":"gain possession","key":"gp"},
+    {"name":"pause","key":"pa"}
   ],
   "football7": [],
   "futsal": [],
@@ -1261,7 +1300,11 @@ function refreshFormation(){ renderFormationMain(); }   // formation is always s
    panel is drawn at: goal_x 0 = left post → 100 = right post, goal_y 0 = crossbar →
    100 = the goal line. Both are clamped to the frame — a shot ON target is by
    definition inside it — so nothing outside the posts can be recorded. */
-const GOAL_SPOT_EVENTS=new Set(['shot on target','goal']);
+/* An own goal crossed the line like any other, so it carries a spot too. This Set and
+   SPOT_REQUIRED in the analysis gate are one rule written twice — the gate must never be
+   looser than the capture that backs it up, so the two are changed together or not at
+   all. Both are exact-match, so a name is spelt here exactly as the dictionary ships it. */
+const GOAL_SPOT_EVENTS=new Set(['shot on target','goal','own goal']);
 /* Measured off the reference recording, at its own scale: the frame there is 539×237 with
    8px posts, so these are the same numbers. GOAL_BACK is how far inside the mouth the back
    of the net sits — the net is drawn in perspective, and those four insets are what make
@@ -1418,10 +1461,21 @@ function eventHalfIn(dur,t){const h2=dur.h2Start; return (h2>0 && t>=h2)?2:1;}
 function eventHalf(r){return eventHalfIn(state.duration,r.t);}
 // scoreboard — auto-counted from tagged events
 const GOAL_SPORTS=['football','football7','futsal'];
+/* Deliberately a character-for-character twin of teamGoals() in Stats/stats-view.js: a
+   side's goals are its own `goal` events plus the OTHER side's own goals. Two functions
+   answering one question have to answer it the same way, or the scoreboard here and the
+   scoreline on the Stats page disagree about the same match.
+
+   That includes the exact-match comparison. Neither goes through evKey(), so a row tagged
+   "Goal" scores in neither place — wrong in both, but wrong identically, and fixing it is
+   a change to both at once rather than a drift introduced here. */
 function computeScore(){
   let home=0,away=0;
   if(GOAL_SPORTS.includes(state.sport)){
-    state.rows.forEach(r=>{ if(r.event==='goal'){ r.team==='home'?home++:away++; } });
+    state.rows.forEach(r=>{
+      if(r.event==='goal'){ r.team==='home'?home++:away++; }
+      else if(r.event==='own goal'||r.event==='own-goal'){ r.team==='home'?away++:home++; }
+    });
   }
   // basketball: scoring rules to be added later (2/3 points) — shows 0-0 for now
   return {home,away};
@@ -2129,7 +2183,19 @@ function renderEvents(){
     list.appendChild(item);
   });
 }
-function nextFreeKey(){const used=new Set(curEvents().map(e=>e.key));return DEFAULT_KEYS.find(k=>!used.has(k))||''}
+/* A code is free only if NOTHING answers to it — and a macro answers to one just as much
+   as an event does. This used to ask the events alone, so on the shipped keyboard the very
+   first ＋ Add handed out "g", which is the macro for goal kick + pass success. An event
+   hotkey beats a macro of the same code (see expandKey), so that macro stopped firing the
+   moment the event was created: the box turns red in the table below, but nothing says so
+   at the moment of creation, and the analyst who pressed ＋ has no reason to look.
+
+   '' when everything is taken, exactly as before — the row is then created without a code
+   and one is typed in by hand. */
+function nextFreeKey(){
+  const used=new Set(curEvents().map(e=>e.key).concat(curMacros().map(m=>m.key)));
+  return DEFAULT_KEYS.find(k=>!used.has(k))||'';
+}
 
 /* ---- Macro table (second table in the Event modal) ---- */
 // why a key can't work: an event hotkey of the same name always wins, and two macros
@@ -2753,7 +2819,7 @@ function selectEntryNumber(idx){
 }
 
 /* ===== ANALYSIS GATE =========================================================
-   The seven rules a match has to satisfy before ⇪ Submit Analysis will publish it.
+   The rules a match has to satisfy before ⇪ Submit Analysis will publish it (AN_ORDER).
 
    Where the shirt-number gate above judges ONE entry at the moment it is typed, this
    judges the WHOLE match at the moment it is frozen. The two are not the same question
@@ -2800,6 +2866,18 @@ const DUEL_MIRRORS=[
    a:['aerial duel success'],b:['aerial duel fail'],aName:'won',bName:'lost'},
   {id:'ground-mirror',label:'Ground duels won ↔ lost',
    a:['ground duel success'],b:['ground duel fail'],aName:'won',bName:'lost'},
+  /* The two kinds a ground duel is now tagged as, each mirrored on its own rather than
+     folded into the line above. Kept apart on purpose: a match tagged entirely in the new
+     names would make the legacy line 0 = 0 and pass without checking anything, and a gate
+     that has quietly stopped checking is worse than no gate at all.
+
+     Separate lines also catch the one mistake this rename can cause — one side tagging
+     `ground duel success` while the other tags `physical duel fail` for the same duel.
+     Both mirrors then fail, and the two failures together say exactly what happened. */
+  {id:'physical-mirror',label:'Physical duels won ↔ lost',
+   a:['physical duel success'],b:['physical duel fail'],aName:'won',bName:'lost'},
+  {id:'loose-mirror',label:'Loose ball duels won ↔ lost',
+   a:['loose ball duel success'],b:['loose ball duel fail'],aName:'won',bName:'lost'},
   {id:'takeon-mirror',label:'Take-ons won ↔ take-on concerns',
    a:['take-on succes','take-on success'],b:['take-on concern'],
    aName:'won',bName:'concerns'}
@@ -2813,13 +2891,22 @@ const DUEL_TOTALS=[
   {id:'aerial-total',label:'Aerial duels — the same number on both sides',
    of:['aerial duel success','aerial duel fail'],from:'aerial-mirror',n:2},
   {id:'ground-total',label:'Ground duels — the same number on both sides',
-   of:['ground duel success','ground duel fail'],from:'ground-mirror',n:4}
+   of:['ground duel success','ground duel fail'],from:'ground-mirror',n:4},
+  {id:'physical-total',label:'Physical duels — the same number on both sides',
+   of:['physical duel success','physical duel fail'],from:'physical-mirror',n:6},
+  {id:'loose-total',label:'Loose ball duels — the same number on both sides',
+   of:['loose ball duel success','loose ball duel fail'],from:'loose-mirror',n:8}
 ];
 /* A goal is on target by definition, and openGoalCapture() already holds one back for
-   a spot, so the gate covers the same two events the capture does. A gate looser than
-   the UI it is backing up is not a gate. */
-const SPOT_REQUIRED=new Set(['shot on target','goal']);
+   a spot, so the gate covers the same events the capture does — GOAL_SPOT_EVENTS above.
+   A gate looser than the UI it is backing up is not a gate, which is why 'own goal' is
+   in both or in neither. */
+const SPOT_REQUIRED=new Set(['shot on target','goal','own goal']);
+/* The order the checks are read in, and the numbering the "See check N" lines point at:
+   each total is followed by the mirror that says which half of it is missing, so a total's
+   `n` is its own position + 1. Adding a pair here means re-reading those four numbers. */
 const AN_ORDER=['aerial-total','aerial-mirror','ground-total','ground-mirror',
+                'physical-total','physical-mirror','loose-total','loose-mirror',
                 'takeon-mirror','shot-spot','shirt-numbers'];
 // a broken match can produce hundreds of offending moments; a dialog nobody scrolls to
 // the end of helps nobody, so the list is cut and the rest counted
@@ -3022,8 +3109,8 @@ function duelHints(rows,dur,meta){
 }
 
 /* -> {ok, checks:[{id,n,label,ok,lines,spots}], hints}
-   All seven are always scored — never short-circuited. The tagger has to see the whole
-   picture in one opening of the dialog, not fix-and-reopen seven times. */
+   All of them are always scored — never short-circuited. The tagger has to see the whole
+   picture in one opening of the dialog, not fix-and-reopen once per check. */
 function checkAnalysis(payload){
   const rows=(payload&&payload.rows)||[];
   const dur=anDur(payload&&payload.dur), meta=(payload&&payload.meta)||{};
@@ -3042,7 +3129,7 @@ function checkAnalysis(payload){
 function analysisRefusal(v){
   const bad=v.checks.filter(c=>!c.ok);
   if(!bad.length)return null;
-  return 'Nothing was published — '+bad.length+' of the seven analysis checks '
+  return 'Nothing was published — '+bad.length+' of the '+AN_ORDER.length+' analysis checks '
     +(bad.length===1?'is':'are')+' still failing ('
     +bad.map(c=>c.label.split(' — ')[0].toLowerCase()).join('; ')+').';
 }
@@ -3507,7 +3594,12 @@ function cancelEdit(){                     // leave edit mode without changing t
 // keyword, so both the success and fail variants are covered whatever hotkeys are
 // configured, and a renamed or newly added shot type is picked up on its own).
 const SHOT_EVENTS=/shot|^goal$|^own goal$/i;      // goal + shot on/off target, blocked, miss…
+// The two split kinds are tested BEFORE the parent: the patterns do not overlap today,
+// but "ground" is the general word and a later name of the form "ground …" should not be
+// able to swallow one of the specific ones by being listed first.
 const evtClass=n=>SHOT_EVENTS.test(n||'')?' shot'
+  :/^physical duel/i.test(n||'')?' duel-physical'
+  :/^loose ball duel/i.test(n||'')?' duel-loose'
   :/^ground duel/i.test(n||'')?' duel-ground'
   :/^aerial duel/i.test(n||'')?' duel-aerial':'';
 function chainHTML(grpRows,evClass){
@@ -3719,7 +3811,10 @@ const EVENT_INC={
   // rows tagged 'take-on succes' to this line (twin of the one in shared.js)
   'take-on success':['takeOns','takeOnsWon'],
   'take-on fail':['takeOns'],
-  'take-on concern':['takeOns'],
+  // a take-on the defender made uncomfortable: still one of this player's take-ons, and
+  // counted on its own under Defensive — the second key was missing here while shared.js
+  // has always had it, so this tab reported no take-on concerns for any match
+  'take-on concern':['takeOns','takeOnConcerns'],
   'step in':['stepIns'],
   'tackle success':['tackles','tacklesWon'],
   'tackle fail':['tackles'],
@@ -3737,22 +3832,59 @@ const EVENT_INC={
   'throw-ins':['throwIns'],'throw-in':['throwIns'],
   'goal kick':['goalKicks'],
   'foul':['fouls'],'foul throw':['fouls'],'handball foul':['fouls'],
+  'foul won':['foulsWon'],            // was missing here while shared.js had it
   'offside':['offsides'],
   'mistake':['mistakes'],
-  'save':['saves']
+  'save':['saves'],
+  /* ---- a split event keeps feeding the total it was split out of ----
+     Twin of the block in shared.js; read the long note there. In one line: the old names
+     are NOT retired, because no row tagged under them says which of the new kinds it was,
+     so groundDuels/saves become the FAMILY total and every member feeds it. The *Detail
+     counters say whether a match was tagged in enough detail to answer at all, so a
+     column prints "—" rather than a 0 that would claim something nobody recorded. */
+  'physical duel success':['groundDuels','groundDuelsWon','physicalDuels','physicalDuelsWon','duelDetail'],
+  'physical duel fail':['groundDuels','physicalDuels','duelDetail'],
+  'loose ball duel success':['groundDuels','groundDuelsWon','looseBallDuels','looseBallDuelsWon','duelDetail'],
+  'loose ball duel fail':['groundDuels','looseBallDuels','duelDetail'],
+  // outcome counts as a save; technique does not, or "1ca*vd" books the save twice
+  'catch':['saves','catches','saveDetail'],
+  'parry':['saves','parries','saveDetail'],
+  'save standing':['saveStanding','gkTechDetail'],
+  'save diving':['saveDiving','gkTechDetail'],
+  'save collapse':['saveCollapse','gkTechDetail'],
+  'save overhead':['saveOverhead','gkTechDetail'],
+  'save kneeling':['saveKneeling','gkTechDetail'],
+  'defensive line support success':['defLineSupports','defLineSupportsWon','gkCtrlDetail'],
+  'defensive line support fail':['defLineSupports','gkCtrlDetail'],
+  'aerial control success':['aerialControls','aerialControlsWon','gkCtrlDetail'],
+  'aerial control fail':['aerialControls','gkCtrlDetail'],
+  'goal conceded':['goalsConceded','concededDetail'],
+  // an own goal books none of goal's metrics — goals feeds Goals and Goals Conceded in
+  // TEAM_SECTIONS, so crediting it here would award the goal to the wrong side.
+  // computeScore() reads it separately, the way teamGoals() does on the Stats page.
+  'own goal':['ownGoals']
 };
 // column groups (label,span) matching the reference xlsx
-const STAT_GROUPS=[['',1],['Shooting',8],['Distribution',10],['Defensive',8],['Duels',4],['Set Pieces',4],['Discipline',3]];
+// Take-on Concerns and Fouls Won were in shared.js's copy of this sheet and not in this
+// one, so the same match exported two different shapes depending on which page did it.
+const STAT_GROUPS=[['',1],['Shooting',8],['Distribution',10],['Defensive',9],['Duels',4],['Set Pieces',4],['Discipline',4]];
 const STAT_HEADERS=['No','Goals','Assists','Total Shots','Shots On Target','Shots Off Target','Blocked Shots','Miss Shots','Shooting Accuracy',
   'Passes','Passes Completed','Pass Accuracy','Crosses','Crosses Completed','Cross Accuracy',
   'Take-ons','Take-ons Won','Take-on Success','Step-ins',
-  'Tackles','Tackles Won','Tackle Success','Interceptions','Clearances','Blocks','Recoveries','Mistakes',
+  'Tackles','Tackles Won','Tackle Success','Interceptions','Clearances','Blocks','Recoveries','Take-on Concerns','Mistakes',
   'Ground Duels','Ground Duels Won','Aerial Duels','Aerial Duels Won',
-  'Corners','Free-kicks','Throw-ins','Goal Kicks','Fouls','Offsides','Saves'];
+  'Corners','Free-kicks','Throw-ins','Goal Kicks','Fouls','Fouls Won','Offsides','Saves'];
 function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,shotsOff:0,shotsBlocked:0,missShots:0,passes:0,passesComp:0,
-  crosses:0,crossesComp:0,takeOns:0,takeOnsWon:0,stepIns:0,tackles:0,tacklesWon:0,interceptions:0,
+  crosses:0,crossesComp:0,takeOns:0,takeOnsWon:0,takeOnConcerns:0,stepIns:0,tackles:0,tacklesWon:0,interceptions:0,
   clearances:0,blocks:0,recoveries:0,groundDuels:0,groundDuelsWon:0,aerialDuels:0,aerialDuelsWon:0,
-  corners:0,freeKicks:0,penalties:0,throwIns:0,goalKicks:0,fouls:0,offsides:0,mistakes:0,saves:0};}
+  corners:0,freeKicks:0,penalties:0,throwIns:0,goalKicks:0,fouls:0,foulsWon:0,offsides:0,mistakes:0,saves:0,
+  // the split duels, the two save outcomes, the five techniques, the keeper's control of
+  // the space in front of him, and the two figures tagged by hand (twin of shared.js)
+  ownGoals:0,physicalDuels:0,physicalDuelsWon:0,looseBallDuels:0,looseBallDuelsWon:0,
+  catches:0,parries:0,saveStanding:0,saveDiving:0,saveCollapse:0,saveOverhead:0,saveKneeling:0,
+  defLineSupports:0,defLineSupportsWon:0,aerialControls:0,aerialControlsWon:0,goalsConceded:0,
+  // "was this match tagged in enough detail to answer" — never a measurement
+  duelDetail:0,saveDetail:0,gkTechDetail:0,gkCtrlDetail:0,concededDetail:0};}
 const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
 /* Twin of shared.js's EV_ALIAS — this file carries its own copy of the stat engine,
    since it does not load shared.js. Keep the two in step: a rename shipped in
@@ -3775,9 +3907,9 @@ function computeStats(team){
 function statRow(no,s){return[no,s.goals,s.assists,s.totalShots,s.shotsOn,s.shotsOff,s.shotsBlocked,s.missShots,pct(s.shotsOn,s.totalShots),
   s.passes,s.passesComp,pct(s.passesComp,s.passes),s.crosses,s.crossesComp,pct(s.crossesComp,s.crosses),
   s.takeOns,s.takeOnsWon,pct(s.takeOnsWon,s.takeOns),s.stepIns,
-  s.tackles,s.tacklesWon,pct(s.tacklesWon,s.tackles),s.interceptions,s.clearances,s.blocks,s.recoveries,s.mistakes,
+  s.tackles,s.tacklesWon,pct(s.tacklesWon,s.tackles),s.interceptions,s.clearances,s.blocks,s.recoveries,s.takeOnConcerns,s.mistakes,
   s.groundDuels,s.groundDuelsWon,s.aerialDuels,s.aerialDuelsWon,
-  s.corners,s.freeKicks,s.throwIns,s.goalKicks,s.fouls,s.offsides,s.saves];}
+  s.corners,s.freeKicks,s.throwIns,s.goalKicks,s.fouls,s.foulsWon,s.offsides,s.saves];}
 function sortedPlayers(P){return Object.keys(P).sort((a,b)=>{const na=+a,nb=+b;
   if(!isNaN(na)&&!isNaN(nb))return na-nb; return a.localeCompare(b);});}
 
@@ -3918,10 +4050,15 @@ function sumTeam(team){
   Object.values(P).forEach(s=>{for(const k in t)t[k]+=s[k];});
   return t;
 }
-// each row: [label, value(side, other) -> string]; sections mirror the reference sheet
+/* each row: [label, value(side, other) -> string]; sections mirror the reference sheet.
+   `o` being the OTHER side's tally is what lets the two goal rows read own goals off the
+   side that put them in: a team's goals are its own `goal` events plus the opposition's
+   own goals — the same sum computeScore() takes just above and teamGoals() takes on the
+   Stats page. Left as `s.goals` alone this table printed "Goals 0 – 0" under a scoreboard
+   already reading 0 – 1. Twin of the rows in shared.js. */
 const TEAM_SECTIONS=[
   ['Attacking Stats',[
-    ['Goals',(s,o)=>s.goals],['Assists',(s,o)=>s.assists],['Key Passes',(s,o)=>s.keyPasses],['Total Shots',(s,o)=>s.totalShots],
+    ['Goals',(s,o)=>s.goals+o.ownGoals],['Assists',(s,o)=>s.assists],['Key Passes',(s,o)=>s.keyPasses],['Total Shots',(s,o)=>s.totalShots],
     ['Shots On Target',(s,o)=>s.shotsOn],['Shots Off Target',(s,o)=>s.shotsOff],
     ['Blocked Shots',(s,o)=>s.shotsBlocked],['Miss Shots',(s,o)=>s.missShots],
     ['Shooting Accuracy',(s,o)=>pct(s.shotsOn,s.totalShots)]]],
@@ -3937,9 +4074,10 @@ const TEAM_SECTIONS=[
     ['Recoveries',(s,o)=>s.recoveries],['Clearances',(s,o)=>s.clearances],['Blocks',(s,o)=>s.blocks],
     ['Aerial Duels',(s,o)=>s.aerialDuels],['Aerial Duels Won',(s,o)=>s.aerialDuelsWon],
     ['Ground Duels',(s,o)=>s.groundDuels],['Ground Duels Won',(s,o)=>s.groundDuelsWon],
+    ['Take-on Concerns',(s,o)=>s.takeOnConcerns],   // shared.js has always had this row
     ['Mistakes',(s,o)=>s.mistakes]]],
   ['Discipline & GK',[
-    ['Goals Conceded',(s,o)=>o.goals],['Saves',(s,o)=>s.saves],['Fouls',(s,o)=>s.fouls],
+    ['Goals Conceded',(s,o)=>o.goals+s.ownGoals],['Saves',(s,o)=>s.saves],['Fouls',(s,o)=>s.fouls],
     ['Offsides',(s,o)=>s.offsides],['Corners',(s,o)=>s.corners],
     ['Free-kicks',(s,o)=>s.freeKicks],['Throw-ins',(s,o)=>s.throwIns],['Goal Kicks',(s,o)=>s.goalKicks],
     ['Penalty Kicks',(s,o)=>s.penalties]]]
@@ -4184,9 +4322,9 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
     if(!v){box.innerHTML='';return;}
     const pass=v.checks.filter(c=>c.ok).length, out=[];
     out.push('<div class="an-head">'+(v.ok
-      ? 'Analysis checks — all seven passed.'
-      : 'Analysis checks — '+pass+' of 7 passed.  Publishing is blocked until all seven'
-        +' pass.')+'</div>');
+      ? 'Analysis checks — all '+AN_ORDER.length+' passed.'
+      : 'Analysis checks — '+pass+' of '+AN_ORDER.length+' passed.  Publishing is blocked'
+        +' until all of them pass.')+'</div>');
     if(stale)out.push('<div class="an-head">The database is still behind this tab — these'
       +' numbers are counted from what it holds today, and some of them will change once'
       +' the sync finishes.</div>');
@@ -4243,7 +4381,7 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
       if(!built.payload.lineups)bits.push('⚠ No starting line-up saved for this match.');
       bits.push(last?('Last published: v'+last.version+', '+last.event_count+' events.'):'Never published.');
       say('submitCount',bits.join(' '),short);
-      /* The seven checks, scored last: they are a statement about the payload, and the
+      /* The analysis checks, scored last: they are a statement about the payload, and the
          payload is only worth judging once the two lines above have said it is the whole
          match. A failing check disables Publish exactly as a lagging sync does — the
          verdict here is a report, and the gate that actually refuses runs inside
@@ -4288,8 +4426,13 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
   };
 })();
 
-window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, applyUserPrefs, localPrefs, renderEvents, renderMacros, updateBanner, updateStoreStatus, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
+/* saveEvents is here for seed_gk_events.js — the console script that puts a new batch of
+   event types in front of an installation that already has a dictionary of its own.
+   applyEventTypes is the INBOUND path (cloud -> here) and deliberately does not push, so a
+   script adding events needs the outbound one. It is the same call the ＋ button makes:
+   seedSiteKeys(), localStorage, then Cloud.onEventTypesChanged(). */
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, applyUserPrefs, localPrefs, renderEvents, renderMacros, updateBanner, updateStoreStatus, saveEvents, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
 </script>
-<script src="cloud-sync.js?v=50"></script>
+<script src="cloud-sync.js?v=51"></script>
 </body>
 </html>

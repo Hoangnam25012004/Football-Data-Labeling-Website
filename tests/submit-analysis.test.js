@@ -81,7 +81,7 @@ test('it refuses to look ready when the database is behind this tab', () => {
   ok(/built\.localCount>0&&built\.eventCount<built\.localCount/.test(wire),'it compares the two counts');
   // the button is held down by this OR a failing analysis check; what this test has
   // always been about is that a lagging sync keeps its own veto either way
-  ok(/const blocked=short\|\|!verdict\.ok/.test(wire),'a lagging sync still vetoes, beside the seven checks');
+  ok(/const blocked=short\|\|!verdict\.ok/.test(wire),'a lagging sync still vetoes, beside the analysis checks');
   ok(/\$\('submitGo'\)\.disabled=blocked/.test(wire),'and the button stays down when they disagree');
   ok(/let the sync finish/.test(wire),'saying what to do about it');
 });

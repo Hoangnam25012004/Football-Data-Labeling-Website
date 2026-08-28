@@ -29,9 +29,25 @@ test('the duel colours are unchanged', ()=>{
 test('every configured football event maps to exactly one known class', ()=>{
   const seen={};
   EVENTS.football.forEach(e=>{seen[e.name]=cls(e.name);
-    ok(['','shot','duel-ground','duel-aerial'].includes(seen[e.name]),e.name+' -> '+seen[e.name]);});
+    ok(['','shot','duel-ground','duel-aerial','duel-physical','duel-loose'].includes(seen[e.name]),
+       e.name+' -> '+seen[e.name]);});
+  // own goal joins the black badge without a rule of its own: SHOT_EVENTS has matched
+  // /^own goal$/ since long before the dictionary shipped the name
   deepEq(Object.keys(seen).filter(n=>seen[n]==='shot').sort(),
-    ['blocked shot','goal','shot off target','shot on target']);
+    ['blocked shot','goal','own goal','shot off target','shot on target']);
+});
+
+/* The split kinds get their own colour rather than inheriting their parent's, so the
+   Events table can be read at a glance for which sort of duel it was. Asserted together
+   with the parent so a regex reordered in evtClass cannot quietly hand one name the
+   other's colour. */
+test('the two split ground duels each have a colour of their own', ()=>{
+  eq(cls('physical duel success'),'duel-physical');
+  eq(cls('physical duel fail'),'duel-physical');
+  eq(cls('loose ball duel success'),'duel-loose');
+  eq(cls('loose ball duel fail'),'duel-loose');
+  eq(cls('ground duel success'),'duel-ground','the parent name keeps the colour it had');
+  eq(cls('Loose Ball Duel Fail'),'duel-loose','the list is user-editable, so match any case');
 });
 
 test('a chain row carries the class into the markup, per event', ()=>{
