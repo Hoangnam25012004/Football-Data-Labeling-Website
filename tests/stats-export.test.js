@@ -71,12 +71,16 @@ const SHEETS=P.buildSheets();
 const byName=n=>SHEETS.find(s=>s[0]===n)[1].aoa;
 const rowFor=(n,no)=>byName(n).slice(1).find(r=>String(r[0])===String(no));
 
-/* ================= the eight ================= */
+/* ================= the twelve ================= */
 
-test('eight sheets, four per side, in the order the tabs are read', () => {
+test('twelve sheets, six per side, in the order the tabs are read', () => {
   deepEq(SHEETS.map(s=>s[0]),
-    ['shooting_home','distribution_home','defensive_home','other_home',
-     'shooting_away','distribution_away','defensive_away','other_away']);
+    ['shooting_home','distribution_home','defensive_home',
+     'goalkeeper_home','setPieces_home','fouls_home',
+     'shooting_away','distribution_away','defensive_away',
+     'goalkeeper_away','setPieces_away','fouls_away']);
+  // Excel refuses a sheet name over 31 characters, and would refuse the whole book
+  SHEETS.forEach(s=>ok(s[0].length<=31,s[0]+' fits a worksheet name'));
 });
 
 test('a sheet is its tab: the same columns, in the same order', () => {
@@ -102,7 +106,7 @@ test('each side is its own side', () => {
   eq(rowFor('shooting_home','9')[3],0,'and not on the other one');
   eq(rowFor('defensive_home','3')[3],2,'a tackle lands under Defensive, not Shooting');
   eq(rowFor('distribution_home','14')[3],2,'a pass under Distribution');
-  eq(rowFor('other_home','2')[3],1,'and a corner under Other');
+  eq(rowFor('setPieces_home','2')[8],1,'and a corner under Set Pieces');
 });
 
 /* ================= formatting ================= */

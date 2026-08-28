@@ -148,7 +148,8 @@ test('every function an inline handler names is published to window', () => {
 test('and nothing else is published, so the module is not leaking', () => {
   const {win}=load();
   const allowed=new Set(['PTStats','setDefHalf','setDefCat','setDistHalf','setDistCat',
-    'setHeatHalf','setOthCat','defHover','distHover','heatHover','shotHover']);
+    'setHeatHalf','setOthCat','setSpCat','setGkCat',
+    'defHover','distHover','heatHover','shotHover']);
   Object.keys(win).forEach(k=>ok(allowed.has(k),'window.'+k+' should not be there'));
 });
 
@@ -175,7 +176,15 @@ test('a host with no chrome of its own is given the same ids', () => {
    'viewOverallBtn','viewDashBtn','viewStatsBtn','statHomeBtn','statAwayBtn',
    'expXlsx','expCsv','expPdf'].forEach(id=>
     ok(chrome.includes('id="'+id+'"'),'the rendered chrome has #'+id));
-  ok(/data-cat="shooting"/.test(chrome)&&/data-cat="other"/.test(chrome),'and the four category tabs');
+  /* Read off PLAYER_CATS rather than typed out again: the tabs ARE its keys, and a
+     category added there has to appear in both chromes or it is a tab nobody can reach.
+     The Stats page's own markup is checked against the same list, so the two copies
+     cannot drift apart either. */
+  const keys=[...chrome.matchAll(/data-cat="([A-Za-z]+)"/g)].map(m=>m[1]);
+  eq(keys.join(' '),'shooting distribution defensive goalkeeper setPieces fouls',
+     'the six category tabs, in the order the table is read in');
+  keys.forEach(k=>ok(PAGE.includes('data-cat="'+k+'"'),
+    'Stats/index.html has the '+k+' tab too'));
 });
 
 /* ================= the PDF export follows the view ================= */

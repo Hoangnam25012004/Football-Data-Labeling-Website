@@ -45,7 +45,7 @@ public site.
 - **Home** — the fixture list with results, straight from `public.matches`.
   A fixture opens on **Overview** (head-to-head and the shot breakdown); the ▶
   on the end of a row opens **Analysis**, which is the whole Stats page mounted
-  inside this site — three views, both sides, the four categories, the maps and
+  inside this site — three views, both sides, the six categories, the maps and
   the XLSX / CSV / PDF exports.
 
   It is the same file the tagging app runs, not a copy: `Stats/stats-view.js`

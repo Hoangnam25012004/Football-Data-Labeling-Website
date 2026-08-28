@@ -237,7 +237,10 @@ test('a match with no full-time whistle runs to the last thing tagged', () => {
 
 /* ================= the column on screen ================= */
 
-const CATS=['shooting','distribution','defensive','other'];
+// every tab the player table is read in — Minutes Played sits beside the name in all of
+// them, because the rest of every row is a tally and a tally reads differently against
+// 12 minutes than against 90
+const CATS=Object.keys(S.PLAYER_CATS);
 // statCat/statTeam are declared on one shared `let` line in the view, so they come in as
 // globals rather than as lifted consts (see loadStats in harness.js)
 const NAMES={funcs:['statTableHTML','minsCell'],consts:['STAT_CATS']};

@@ -739,9 +739,16 @@ const distributionPlayerPages=()=>playerStatPages('Distribution — Player Stats
 // cards are reported on the Goalkeeper & Discipline page, not here
 function defensivePlayerPages(){
   return playerStatPages('Defensive — Player Stats',
-    ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Ground','Fouls','F.Won','T-on Con','Mistakes'],
+    /* "Physical" and "Loose" where one "Ground" column used to be — the two kinds a duel
+       on the floor is now tagged as, matching the Stats tab and the team comparison.
+       Both read the duelDetail flag first: frac() on its own would print 0/0 for a match
+       tagged before the split, which claims the player had no physical duels when the
+       truth is that nobody was asked. "—" is what says that, here as everywhere else. */
+    ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Physical','Loose','Fouls','F.Won','T-on Con','Mistakes'],
     s=>[frac(s.tacklesWon,s.tackles),pc0(s.tacklesWon,s.tackles),dotv(s.interceptions),dotv(s.clearances),
-      dotv(s.blocks),dotv(s.recoveries),frac(s.aerialDuelsWon,s.aerialDuels),frac(s.groundDuelsWon,s.groundDuels),
+      dotv(s.blocks),dotv(s.recoveries),frac(s.aerialDuelsWon,s.aerialDuels),
+      s.duelDetail?frac(s.physicalDuelsWon,s.physicalDuels):'—',
+      s.duelDetail?frac(s.looseBallDuelsWon,s.looseBallDuels):'—',
       dotv(s.fouls),dotv(s.foulsWon),dotv(s.takeOnConcerns),dotv(s.mistakes)]);
 }
 
@@ -1085,8 +1092,10 @@ function actionMapsPage(cat,title,ranks){
     +`<div style="display:flex;gap:18px;align-items:flex-start">${card('home',hA)}${card('away',aA)}</div>`;
 }
 /* one page per defensive action type, mirroring the Stats-tab dropdown (DEF_CATS:
-   Tackles, Interceptions, Clearances, Blocks, Recoveries, Ground/Aerial Duels,
-   Take-on Concern, Mistakes). Types with no located event on either side are skipped. */
+   Tackles, Interceptions, Clearances, Blocks, Recoveries, Physical / Loose Ball /
+   Aerial Duels, Take-on Concern, Mistakes). Types with no located event on either side
+   are skipped, so the two floor-duel pages simply do not appear on a report for a match
+   tagged before the split. */
 function defCategoryPages(){
   return Object.values(DEF_CATS)
     .map(cat=>({sub:cat.label,html:actionMapsPage(cat,`Defensive — ${cat.label}`)}))
@@ -1114,8 +1123,13 @@ const takeOnMapsPage=()=>actionMapsPage(TAKEON_CAT,'Distribution — Take-ons &a
 const RADAR_MAX=0.82;
 const RADAR_MIN=0.05;
 function radarPage(){
+  /* Eight axes, not seven: "Ground Won" split into the two kinds it is now tagged as.
+     Every axis is normalised against the higher of the two sides, so a match tagged
+     before the split leaves both new axes at zero for BOTH teams — the scale is a
+     comparison, and two zeroes compare to nothing rather than to a wrong shape. */
   const axes=[['Tackles Won','tacklesWon'],['Interceptions','interceptions'],['Recoveries','recoveries'],
-    ['Clearances','clearances'],['Blocks','blocks'],['Aerial Won','aerialDuelsWon'],['Ground Won','groundDuelsWon']];
+    ['Clearances','clearances'],['Blocks','blocks'],['Aerial Won','aerialDuelsWon'],
+    ['Physical Won','physicalDuelsWon'],['Loose Ball Won','looseBallDuelsWon']];
   const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
   const axFrac=(s,k)=>{const mx=Math.max(h[k],a[k]);
     return mx?Math.max(RADAR_MIN,s[k]/mx*RADAR_MAX):RADAR_MIN;};
