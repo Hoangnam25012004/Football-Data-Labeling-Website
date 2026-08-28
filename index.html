@@ -252,7 +252,10 @@
   .modal-close{margin-left:auto;background:transparent;border:none;color:var(--mut);font-size:20px;line-height:1;cursor:pointer;padding:0 4px}
   .modal-close:hover{color:var(--danger)}
   .modal-body{padding:14px;overflow:auto}
-  .modal-body .ev-list{max-height:none}
+  /* Inside the dialog both lists run their full length and the body scrolls once.
+     A list with its own scrollbar inside a scrolling panel is two things to drag and
+     hides its own end. */
+  .modal-body .ev-list,.modal-body .mac-list{max-height:none}
   /* Submit Analysis — the checks listed in AN_ORDER. The green is the one Stats already paints a
      won duel with, so the dialog and the bars speak the same language; there is no
      --ok token on purpose (see the note by :root — win/lose colours are not chrome). */
@@ -528,12 +531,13 @@
       <button class="modal-close" id="evModalClose" title="Close">×</button>
     </div>
     <div class="modal-body">
-      <div class="sec-head"><b>Event types</b><span class="mini">— one hotkey, one event</span></div>
+      <!-- No add row. The dictionary is the whole website's and is set in code — shipped
+           in DEFAULT_EVENTS and put on the cloud by seed_gk_events.js — so that a name,
+           its spelling and its place are decided once and reviewed, rather than typed into
+           a box by whoever had the modal open. What IS every analyst's own is the macro
+           table below, and the code in each box beside a name. -->
+      <div class="sec-head"><b>Event types</b><span class="mini">— one hotkey, one event · the list is the site's, the codes are yours</span></div>
       <div class="ev-list" id="evList"></div>
-      <div class="addrow">
-        <input class="txt" id="newEvName" placeholder="New event name">
-        <button id="addEvBtn" title="add">+</button>
-      </div>
 
       <!-- second, separate table: a macro is ONE hotkey for a whole run of events -->
       <div class="mac-sec">
@@ -2233,7 +2237,7 @@ function renderEvents(){
   if(!evs.length){
     const e=document.createElement('div');
     e.style.cssText='color:var(--mut);font-size:11px;padding:10px;text-align:center';
-    e.textContent='No events yet. Type a name in the box below and press + to create one.';
+    e.textContent='No events yet — the dictionary has not loaded. Sign in to fetch it from the cloud.';
     list.appendChild(e); return;
   }
   /* one row of the dialog: the name, right-aligned against its own code box. No × here.
@@ -2355,13 +2359,14 @@ function addMacro(){
   const boxes=$('macList').querySelectorAll('.mac-key');
   const box=boxes[boxes.length-1]; if(box){box.focus();box.scrollIntoView({block:'nearest'});}
 }
-$('addEvBtn').onclick=()=>{const n=$('newEvName').value.trim();if(!n)return;curEvents().push({name:n,key:nextFreeKey()});if(!state.activeEvent)state.activeEvent=n;$('newEvName').value='';saveEvents();renderEvents();renderMacros();updateBanner()};
-$('newEvName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('addEvBtn').click()}});
+/* Nothing here creates an event any more. saveEvents() is still what writes the list —
+   it is on window.PT, and seed_gk_events.js calls it — but the only way to reach it is
+   deliberate, reviewed code, not a text box in a dialog anybody can open mid-match. */
 $('addMacroBtn').onclick=addMacro;
 $('sportSel').onchange=e=>{state.sport=e.target.value;state.activeEvent=curEvents()[0]?.name||null;renderEvents();renderMacros();updateBanner();updateScore();saveMeta();if(pvRenderPitch)pvRenderPitch();};
 
 /* event modal (opened from the top bar button) */
-function openEvModal(){$('evModal').classList.add('show');renderEvents();renderMacros();updateStoreStatus();setTimeout(()=>$('newEvName').focus(),0);}
+function openEvModal(){$('evModal').classList.add('show');renderEvents();renderMacros();updateStoreStatus();}
 function closeEvModal(){$('evModal').classList.remove('show');$('playerInput').focus()}
 $('eventBtn').onclick=openEvModal;
 $('evModalClose').onclick=closeEvModal;

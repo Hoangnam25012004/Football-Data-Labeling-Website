@@ -294,9 +294,14 @@ test('the Event modal holds two separate tables', () => {
   ok(/<b>Macro<\/b>/.test(modal),'the macro table is named');
   ok(/id="evList"/.test(modal)&&/id="macList"/.test(modal),'each has its own list');
   ok(modal.indexOf('id="evList"')<modal.indexOf('id="macList"'),'events first, macro under it');
-  // the events half is untouched: same list, same add row
-  ok(/id="newEvName"/.test(modal)&&/id="addEvBtn"/.test(modal),'the add-an-event row stays');
-  ok(/id="addMacroBtn"/.test(modal),'and the macro table has its own add button');
+  /* The asymmetry is the point, and it is the other way round from how it started. The
+     dictionary is the whole site's and is set in code, so the dialog offers no way to add
+     to it — the box that used to sit under the list is gone, along with both handlers.
+     A macro is one analyst's own, so that table keeps its add button. */
+  notOk(/id="newEvName"/.test(modal),'no box for typing a new event name');
+  notOk(/id="addEvBtn"/.test(modal),'and no + beside it');
+  notOk(/addEvBtn/.test(SRC),'nor a handler left behind anywhere');
+  ok(/id="addMacroBtn"/.test(modal),'the macro table keeps its own add button');
 });
 
 test('macros are kept in their own store, away from the event dictionary', () => {

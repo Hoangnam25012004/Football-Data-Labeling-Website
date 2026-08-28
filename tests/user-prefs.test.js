@@ -158,10 +158,17 @@ test('macros are kept per account as well', () => {
 
 /* ===================== the event list is still everybody's ===================== */
 
-test('adding an event is still a change to the shared dictionary', () => {
+test('the dictionary is still shared — and now only code may change it', () => {
+  /* saveEvents() is unchanged and still pushes the list to every other client. What went
+     away is the dialog's way of calling it: there is no "New event name" box, so a name
+     and its spelling are decided in DEFAULT_EVENTS and put on the cloud by
+     seed_gk_events.js, rather than typed into a modal mid-match by whoever had it open.
+     The reach of a change was the argument for this — one analyst adding "Take on Sucess"
+     adds it for the whole site, forever, and nothing in the app can take it out again. */
   ok(/onEventTypesChanged/.test(grabFunction('saveEvents')),'saveEvents still pushes to the cloud');
-  const add=/\$\('addEvBtn'\)\.onclick=[^\n]*\n?/.exec(SRC)[0];
-  ok(/saveEvents\(\)/.test(add),'+ still writes the site list');
+  ok(/window\.PT=\{[^}]*saveEvents/.test(SRC),'and is reachable from a console script');
+  notOk(/addEvBtn/.test(SRC),'but nothing in the dialog calls it');
+  notOk(/id="newEvName"/.test(SRC),'because the box it belonged to is gone');
 });
 
 test('nobody can delete an event from the shared list any more', () => {
