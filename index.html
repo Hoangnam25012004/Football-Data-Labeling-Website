@@ -106,12 +106,23 @@
   input.txt,select.txt{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:7px 8px;font-size:13px}
   input.txt:focus{outline:none;border-color:var(--accent)}
 
-  .ev-list{display:flex;flex-direction:column;gap:5px;max-height:230px;overflow:auto;padding-right:2px}
-  .ev-item{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;cursor:pointer}
+  /* ---- Event types: five headings, and a grid rather than one long column ----
+     Sixty-five events in a single 520px column is a scroll nobody reads to the end of, and
+     the one you want is never on screen. The subjects are the same five the Film filter
+     sorts by, so a name sits under the same heading wherever it is read. */
+  .ev-list{display:flex;flex-direction:column;gap:12px;max-height:230px;overflow:auto;padding-right:2px}
+  .ev-grp{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+          color:var(--mut);padding-bottom:5px;margin-bottom:7px;border-bottom:1px solid var(--line)}
+  /* auto-fill, so the same markup is three columns in the widened dialog and one in the
+     narrow places .ev-list also appears — no breakpoint to keep in step with the width */
+  .ev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:5px}
+  .ev-item{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;cursor:pointer;min-width:0}
   .ev-item.sel{border-color:var(--accent);background:#2A0A1040}
-  .ev-key{width:46px;height:28px;text-align:center;background:#000;border:1px solid var(--line);border-radius:6px;font-weight:700;color:var(--accent);font-size:12px;text-transform:lowercase;padding:0 4px}
+  .ev-key{width:46px;flex:none;height:28px;text-align:center;background:#000;border:1px solid var(--line);border-radius:6px;font-weight:700;color:var(--accent);font-size:12px;text-transform:lowercase;padding:0 4px}
   .ev-key:focus{outline:none;border-color:var(--accent);background:#2A0A10}
-  .ev-name{flex:1;font-weight:600}
+  /* the label reads toward its own box, which is what lets three pairs sit in a row
+     without the eye having to work out which code belongs to which name */
+  .ev-name{flex:1;min-width:0;font-weight:600;font-size:12px;text-align:right;line-height:1.25;overflow-wrap:anywhere}
   .ev-x{color:var(--mut);font-weight:700;cursor:pointer;padding:0 4px}
   .ev-x:hover{color:var(--danger)}
   .addrow{display:flex;gap:6px;margin-top:8px}
@@ -263,6 +274,9 @@
 
   /* Stats modal */
   .stats-modal{max-width:96vw;width:1180px}
+  /* The Event types dialog only — three pairs to a row need the room, and 520px gives
+     one. Scoped to this modal so every other dialog keeps the width it had. */
+  .ev-modal{max-width:min(96vw,880px)}
   .stats-toggle{display:flex;gap:6px;margin-left:14px}
   .stats-toggle button{background:var(--panel2);border:1px solid var(--line);color:var(--mut);border-radius:6px;padding:5px 16px;cursor:pointer;font-weight:600;font-size:12px}
   .stats-toggle button.act-home{background:var(--home);color:var(--team-ink);border-color:var(--home)}
@@ -507,7 +521,7 @@
   </div>
 </div>
 <div class="modal-overlay" id="evModal">
-  <div class="modal">
+  <div class="modal ev-modal">
     <div class="modal-head">
       <b>Event types + Macro</b>
       <span class="mini" id="storeStatus">—</span>
@@ -2177,17 +2191,62 @@ function setKey(ev,val){
   mine[ev.name]=val;
   saveHotkeys(); resolveKeys(); renderEvents(); renderMacros(); updateBanner();
 }
+/* ---- which heading an event sits under in the Event types dialog ----
+   The same five subjects the Film filter sorts by (FILM_EV_GROUPS in
+   Stats/stats-view.js), with two differences that are about this dialog being a keyboard
+   rather than a playlist: its Shooting is called Attacking, and its Body part folds into
+   Other, because a body part is typed like everything else here.
+
+   Membership only — NOT order. The order inside a heading is the dictionary's own, which
+   is public.event_types.ord: shared by the whole site, and the one thing that decides
+   where a row appears. Listing names in a second order here would give this dialog an
+   opinion that nothing else shares.
+
+   Lower case, because the list is user-editable and "Goal" is a spelling the data really
+   carries. A name that is not here goes under Other, so a freshly created event is never
+   invisible — it appears at the end of that heading, where ord put it. */
+const EV_GROUPS=[
+  ['Attacking',['goal','own goal','assist','key pass','shot on target','shot off target',
+                'blocked shot','miss shot']],
+  ['Distribution',['pass success','pass fail','cross success','cross fail',
+                   'take-on succes','take-on success','take-on fail','step in']],
+  ['Defensive',['tackle success','tackle fail','interception','clearance','block','recovery',
+                'aerial duel success','aerial duel fail','ground duel success','ground duel fail',
+                'physical duel success','physical duel fail',
+                'loose ball duel success','loose ball duel fail','take-on concern','mistake']],
+  ['Goalkeeping',['catch','parry','save','save standing','save diving','save collapse',
+                  'save overhead','save kneeling','defensive line support success',
+                  'defensive line support fail','aerial control success','aerial control fail',
+                  'goal conceded']]
+];
+const EV_GROUP_REST='Other';
+const EV_GROUP_ORDER=EV_GROUPS.map(g=>g[0]).concat(EV_GROUP_REST);
+const evGroup=n=>{const k=evKeyName(n);
+  for(let i=0;i<EV_GROUPS.length;i++)if(EV_GROUPS[i][1].indexOf(k)>=0)return EV_GROUPS[i][0];
+  return EV_GROUP_REST;};
+// the same fold evKey() does, written out here because evKey is declared further down
+// with the stat engine and this runs from the modal, long before any of that is needed
+const evKeyName=e=>String(e==null?'':e).trim().toLowerCase();
 function renderEvents(){
   const list=$('evList'); list.innerHTML='';
-  if(!curEvents().length){
+  const evs=curEvents();
+  if(!evs.length){
     const e=document.createElement('div');
     e.style.cssText='color:var(--mut);font-size:11px;padding:10px;text-align:center';
     e.textContent='No events yet. Type a name in the box below and press + to create one.';
     list.appendChild(e); return;
   }
-  curEvents().forEach((ev)=>{
+  /* one row of the dialog: the name, right-aligned against its own code box. No × here.
+     The event list belongs to the whole website: one analyst deleting a row took the
+     event away from everybody, broke every macro pointing at it, and left the matches
+     already tagged with it naming something the dictionary no longer has. The ✎ / ✖ on
+     the Events table in the tagger are untouched — a tagged row is one person's work on
+     one match, and anyone may still edit or delete that. */
+  const cell=ev=>{
     const item=document.createElement('div');
     item.className='ev-item'+(state.activeEvent===ev.name?' sel':'');
+    const name=document.createElement('div');name.className='ev-name';name.textContent=ev.name;
+    name.onclick=()=>setActive(ev.name);
     const key=document.createElement('input');
     key.className='ev-key'; key.value=ev.key||''; key.maxLength=8;
     key.placeholder='—'; key.title='Type a hotkey (e.g. aa). Press Enter to save.';
@@ -2195,15 +2254,20 @@ function renderEvents(){
     key.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();key.blur()}};
     key.onchange=()=>setKey(ev,key.value);
     key.onblur=()=>setKey(ev,key.value);
-    const name=document.createElement('div');name.className='ev-name';name.textContent=ev.name;
-    name.onclick=()=>setActive(ev.name);
-    /* No × here. The event list belongs to the whole website: one analyst deleting a row
-       took the event away from everybody, broke every macro pointing at it, and left the
-       matches already tagged with it naming something the dictionary no longer has. The
-       ✎ / ✖ on the Events table in the tagger are untouched — a tagged row is one
-       person's work on one match, and anyone may still edit or delete that. */
-    item.appendChild(key);item.appendChild(name);
-    list.appendChild(item);
+    item.appendChild(name);item.appendChild(key);
+    return item;
+  };
+  // partitioned, never re-sorted: each event keeps the place ord gave it
+  const byGrp={}; EV_GROUP_ORDER.forEach(g=>byGrp[g]=[]);
+  evs.forEach(ev=>byGrp[evGroup(ev.name)].push(ev));
+  EV_GROUP_ORDER.forEach(g=>{
+    if(!byGrp[g].length)return;                 // an empty heading says nothing
+    const sec=document.createElement('div');
+    const head=document.createElement('div'); head.className='ev-grp'; head.textContent=g;
+    const grid=document.createElement('div'); grid.className='ev-grid';
+    byGrp[g].forEach(ev=>grid.appendChild(cell(ev)));
+    sec.appendChild(head); sec.appendChild(grid);
+    list.appendChild(sec);
   });
 }
 /* A code is free only if NOTHING answers to it — and a macro answers to one just as much

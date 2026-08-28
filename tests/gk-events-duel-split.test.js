@@ -467,3 +467,114 @@ test('the list reads in the order the Film filter groups it', () => {
      'the keeper reads outcome, then the save, then how it was made');
   ok(at('goal conceded')<at('corner-kick'),'goalkeeping comes before the set pieces');
 });
+
+/* ================= the Event types dialog ================= */
+/* Sixty-five events in one 520px column is a list nobody reads to the end of. The dialog
+   now prints five headings and lays each out as a grid. What matters is that it is only a
+   LAYOUT change: the same rows, the same order, the same handlers, and nothing new that
+   the macro table below it can trip over. */
+
+// the contiguous slice the dialog is built from, run against a DOM that only knows how to
+// become HTML — so these assertions are about the markup renderEvents() really produces
+function renderDialog(dict,active){
+  const src=SRC.replace(/\r\n/g,'\n');
+  const from=src.indexOf('const EV_GROUPS=[');
+  const rf=src.indexOf('function renderEvents(',from);
+  let d=0,end=-1;
+  for(let k=src.indexOf('{',rf);k<src.length;k++){
+    if(src[k]==='{')d++; else if(src[k]==='}'){d--; if(!d){end=k+1;break;}}}
+  const mk=tag=>({tag,className:'',textContent:'',value:undefined,children:[],style:{},
+    handlers:{},
+    set onclick(f){this.handlers.click=f;}, set onkeydown(f){this.handlers.keydown=f;},
+    set onchange(f){this.handlers.change=f;}, set onblur(f){this.handlers.blur=f;},
+    set maxLength(v){}, set placeholder(v){}, set title(v){},
+    appendChild(c){this.children.push(c);return c;},
+    find(cls){const out=[]; (function walk(n){ if((n.className||'').split(' ').includes(cls))out.push(n);
+      n.children.forEach(walk);})(this); return out;}});
+  const list=mk('div');
+  Object.defineProperty(list,'innerHTML',{set(v){if(v==='')this.children=[];},get(){return '';}});
+  const ctx={document:{createElement:mk},console};
+  vm.createContext(ctx);
+  vm.runInContext([src.slice(from,end),
+    'var state={activeEvent:'+JSON.stringify(active||null)+'};',
+    'var LIST=null; function $(){return LIST;}',
+    'function curEvents(){return DICT;}',
+    'var log={active:[],keys:[]};',
+    'function setActive(n){log.active.push(n);} function setKey(e,v){log.keys.push([e.name,v]);}',
+    ';globalThis.go=function(l,dic){LIST=l;globalThis.DICT=dic;renderEvents();return {list:l,log:log};};'
+  ].join('\n'),ctx);
+  return ctx.go(list,dict);
+}
+
+test('the dialog prints the five headings, in the order they were asked for', () => {
+  const {list}=renderDialog(EVENTS.football);
+  deepEq(list.find('ev-grp').map(h=>h.textContent),
+    ['Attacking','Distribution','Defensive','Goalkeeping','Other']);
+});
+
+test('every event is in exactly one of them, and none is lost', () => {
+  const {list}=renderDialog(EVENTS.football);
+  const shown=list.find('ev-name').map(n=>n.textContent);
+  eq(shown.length,EVENTS.football.length,'one cell per event');
+  deepEq([...new Set(shown)].length,shown.length,'and none printed twice');
+  deepEq(shown.slice().sort(),EVENTS.football.map(e=>e.name).sort());
+});
+
+test('order inside a heading is the dictionary-s own, not a second one kept here', () => {
+  /* ord is public.event_types.ord — shared by the whole site, and the only thing that
+     decides where a row appears. EV_GROUPS says which heading, never which position. */
+  const dict=EVENTS.football, {list}=renderDialog(dict);
+  const shown=list.find('ev-name').map(n=>n.textContent);
+  const pos={}; dict.forEach((e,i)=>pos[e.name]=i);
+  list.find('ev-grid').forEach(g=>{
+    const names=g.children.map(c=>c.children[0].textContent);
+    const ords=names.map(n=>pos[n]);
+    deepEq(ords.slice().sort((a,b)=>a-b),ords,'a heading re-sorted its own rows: '+names.join(', '));
+  });
+  // and the dictionary is already grouped, so the whole list comes out in ord order
+  deepEq(shown.map(n=>pos[n]),dict.map((_,i)=>i),'the five headings do not interleave');
+});
+
+test('a name the group table has never heard of still appears, under Other', () => {
+  const {list}=renderDialog(EVENTS.football.concat([{name:'zzz custom',key:'zc'}]));
+  const last=list.find('ev-grid').pop();
+  eq(last.children.pop().children[0].textContent,'zzz custom',
+     'a freshly created event is never invisible');
+});
+
+test('the row still does the two things it did before, and nothing else', () => {
+  const {list,log}=renderDialog(EVENTS.football,'goal');
+  const item=list.find('ev-item')[0];
+  eq(item.children.length,2,'a name and a code box — no third control');
+  eq(item.children[0].className,'ev-name'); eq(item.children[1].className,'ev-key');
+  ok(item.className.includes('sel'),'the active event is still marked');
+  eq(list.find('ev-item').filter(i=>i.className.includes('sel')).length,1,'and only it');
+  item.children[0].handlers.click();                       // clicking the name selects
+  deepEq(log.active,['goal']);
+  const box=item.children[1];
+  box.value='qz'; box.handlers.change();                   // typing a code rebinds
+  deepEq(log.keys,[['goal','qz']]);
+  ok(box.handlers.click,'the box still swallows the click that would select the row');
+  ok(box.handlers.keydown&&box.handlers.blur);
+});
+
+test('an empty dictionary still says so rather than drawing five empty headings', () => {
+  const {list}=renderDialog([]);
+  eq(list.find('ev-grp').length,0);
+  eq(list.children.length,1,'one message, and no grid');
+});
+
+test('the dialog is the only one widened, and the macro table is untouched by any of it', () => {
+  /* THE guard for this change. The two tables share a modal and nothing else: every rule
+     added is under .ev-*, so a macro row cannot inherit a column count or a heading. */
+  ok(/\.ev-modal\{max-width:min\(96vw,880px\)\}/.test(SRC),'the width is scoped to this dialog');
+  ok(/<div class="modal ev-modal">/.test(SRC),'and only this dialog carries the class');
+  eq((SRC.match(/class="modal ev-modal"/g)||[]).length,1);
+  ['ev-grp','ev-grid'].forEach(c=>{
+    ok(new RegExp('\.'+c+'\{').test(SRC),'.'+c+' is defined');
+    notOk(new RegExp('\.mac-[a-z]+[^{]*\.'+c).test(SRC),'.'+c+' never reaches a macro row');
+  });
+  const mac=grabFunction('renderMacros',SRC,'index.html');
+  notOk(/ev-grid|ev-grp|EV_GROUPS/.test(mac),'renderMacros knows nothing about the grouping');
+  ok(/mac-item/.test(mac)&&/mac-key/.test(mac),'and still builds the rows it always built');
+});
