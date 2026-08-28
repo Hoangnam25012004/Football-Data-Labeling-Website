@@ -85,7 +85,9 @@ test('T1 · a match tagged only in the old names totals exactly what it always d
   eq(t.saves,5);
   // …and the breakdown claims nothing about a match that was never asked
   eq(t.physicalDuels,0); eq(t.looseBallDuels,0); eq(t.catches,0); eq(t.parries,0);
-  eq(t.duelDetail,0,'the flag is what turns those zeroes into "—" at the column');
+  // no column reads the flag any more, but it is still the record of which matches
+  // could have answered the question at all — see newStat()
+  eq(t.duelDetail,0,'and the flag says the question was never put to this match');
   eq(t.saveDetail,0);
 });
 
@@ -180,25 +182,33 @@ test('T5c · the keeper-s control events count won and total the usual way', () 
   ok(t.gkCtrlDetail>0);
 });
 
-/* ================= T6 · "—" is not 0 ================= */
+/* ================= T6 · the tally, plainly ================= */
 
-test('T6 · a column with nothing to say says so, and never reports a zero', () => {
+/* These columns once read "—" for a match tagged before the split, on the grounds that a
+   0 would claim a duel kind nobody recorded. They print the tally now — a match table is
+   read for numbers — so an untagged match reads 0. duelDetail is still counted (T6d), and
+   is still the only record of the difference between "none" and "never asked". */
+test('T6 · the duel columns print their tally, and a match with none reads 0', () => {
   const cols={}; S.PLAYER_CATS.defensive.forEach(c=>cols[c[0]]=c[1]);
   const before=S.newStat();                       // a match tagged before the split
   ['Physical Duels','Physical Won','Loose Ball Duels','Loose Ball Won'].forEach(l=>
-    eq(cols[l](before),'—',l+' must not claim the match had none'));
+    eq(cols[l](before),0,l+' reads 0, not a dash'));
   const after=sum(many('home','physical duel fail',2));
-  eq(cols['Physical Duels'](after),2,'a match that CAN answer prints the number');
-  eq(cols['Physical Won'](after),0,'including a real zero, which is a different statement');
+  eq(cols['Physical Duels'](after),2,'a match that has them prints the number');
+  eq(cols['Physical Won'](after),0);
 });
 
 test('T6b · the keeper-s own columns do the same, and read the match as well as the man', () => {
   const gk={}; S.GK_COLS.forEach(c=>gk[c[0]]=c[1]);
   const g={conceded:0,clean:1,known:1};
   const before=S.newStat();
+  /* The keeper's own detail prints its tally too. Only `known` still guards the four
+     columns above them, because that flag answers a different question — whether a
+     line-up existed to say who was on the pitch at all (T6c). */
   ['Catches','Parries','Standing','Diving','Collapse','Overhead','Kneeling',
-   'Def. Line Support','Aerial Control','Conceded (tagged)'].forEach(l=>
-    eq(gk[l](before,g),'—',l));
+   'Conceded (tagged)'].forEach(l=>eq(gk[l](before,g),0,l));
+  eq(gk['Def. Line Support'](before,g),'0/0');
+  eq(gk['Aerial Control'](before,g),'0/0');
   const after=sum([...many('home','catch',2),...many('home','aerial control success',1),
                    ...many('home','aerial control fail',1),...many('home','goal conceded',3)]);
   eq(gk['Catches'](after,g),2);

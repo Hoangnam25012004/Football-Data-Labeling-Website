@@ -1040,7 +1040,16 @@
       return t[0] === 'shooting' ? ['goalkeeping', 'Goalkeeping'] : t;
     })
     .filter(function (t) { return t[0] !== 'goalkeeper'; });
-  var tabsFor = function (who) { return who.gk ? GK_TABS : TD_TABS; };
+  /* And the mirror of that for everyone else: an outfield player is offered no
+     Goalkeeper tab, because all fifteen of its columns are zero on him for ever.
+     The Stats tab draws the same conclusion from the formation board — see
+     catPlayers() in Stats/stats-view.js.
+
+     TD_TABS itself keeps the category: Team Data reads it for the name of the
+     TEAM_SECTIONS section, and a team does have a goalkeeper. Only the per-player
+     tab strip is cut. */
+  var OUT_TABS = TD_TABS.filter(function (t) { return t[0] !== 'goalkeeper'; });
+  var tabsFor = function (who) { return who.gk ? GK_TABS : OUT_TABS; };
 
   /* A campaign total in the same three readings the Stats tab gives one match:
      "—" where no line-up ever named him, a leading "~" where any of the
@@ -1643,7 +1652,7 @@
      sake of a table it does not draw. Same URL as the line below, so whichever
      view is opened first is the one that pays for it. */
   function loadShared() {
-    return loadOnce(taggerRoot() + 'shared.js?v=25');
+    return loadOnce(taggerRoot() + 'shared.js?v=26');
   }
 
   /* Pulled in the first time someone opens a match's stats, not on every page
@@ -1654,8 +1663,8 @@
     loadOnce(r + 'Stats/stats-view.css?v=10', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
-      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=24'); })
-      .then(function () { return loadOnce(r + 'Stats/report.js?v=36'); })
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=25'); })
+      .then(function () { return loadOnce(r + 'Stats/report.js?v=37'); })
       /* The analyst's toolkit. This site's file, not the tagging app's — Q1 was
          answered B, so the right-click menu, the drawing layer, clips and the
          exports exist in the channel and nowhere else. It registers itself with

@@ -4248,10 +4248,10 @@ const TEAM_SECTIONS=[
     ['Recoveries',(s,o)=>s.recoveries],['Clearances',(s,o)=>s.clearances],['Blocks',(s,o)=>s.blocks],
     ['Aerial Duels',(s,o)=>s.aerialDuels],['Aerial Duels Won',(s,o)=>s.aerialDuelsWon],
     // the floor duels by kind; the roll-up is still counted but no longer shown
-    ['Physical Duels',(s,o)=>s.duelDetail?s.physicalDuels:'—'],
-    ['Physical Duels Won',(s,o)=>s.duelDetail?s.physicalDuelsWon:'—'],
-    ['Loose Ball Duels',(s,o)=>s.duelDetail?s.looseBallDuels:'—'],
-    ['Loose Ball Duels Won',(s,o)=>s.duelDetail?s.looseBallDuelsWon:'—'],
+    ['Physical Duels',(s,o)=>s.physicalDuels],
+    ['Physical Duels Won',(s,o)=>s.physicalDuelsWon],
+    ['Loose Ball Duels',(s,o)=>s.looseBallDuels],
+    ['Loose Ball Duels Won',(s,o)=>s.looseBallDuelsWon],
     ['Take-on Concerns',(s,o)=>s.takeOnConcerns],   // shared.js has always had this row
     ['Mistakes',(s,o)=>s.mistakes]]],
   /* Three sections where "Discipline & GK" used to be one, APPENDED after index 2 —
@@ -4259,17 +4259,17 @@ const TEAM_SECTIONS=[
      never move. Twin of the rows in shared.js. */
   ['Goalkeeper Stats',[
     ['Goals Conceded',(s,o)=>o.goals+s.ownGoals],
-    ['Saves',(s,o)=>s.saveDetail?s.catches+s.parries:'—'],   // catches + parries
-    ['Catches',(s,o)=>s.saveDetail?s.catches:'—'],
-    ['Parries',(s,o)=>s.saveDetail?s.parries:'—'],
-    ['Def. Line Support',(s,o)=>s.gkCtrlDetail?s.defLineSupportsWon+'/'+s.defLineSupports:'—'],
-    ['Aerial Control',(s,o)=>s.gkCtrlDetail?s.aerialControlsWon+'/'+s.aerialControls:'—']]],
+    ['Saves',(s,o)=>s.catches+s.parries],   // catches + parries
+    ['Catches',(s,o)=>s.catches],
+    ['Parries',(s,o)=>s.parries],
+    ['Def. Line Support',(s,o)=>s.defLineSupportsWon+'/'+s.defLineSupports],
+    ['Aerial Control',(s,o)=>s.aerialControlsWon+'/'+s.aerialControls]]],
   ['Set Piece Stats',[
     ['Corners',(s,o)=>s.corners],['Free-kicks',(s,o)=>s.freeKicks],
     ['Penalty Kicks',(s,o)=>s.penalties],['Throw-ins',(s,o)=>s.throwIns],
     ['Goal Kicks',(s,o)=>s.goalKicks],
-    ['Set Piece Shots',(s,o)=>s.spDetail?s.setPieceShots:'—'],
-    ['Set Piece Goals',(s,o)=>s.spDetail?s.setPieceGoals:'—']]],
+    ['Set Piece Shots',(s,o)=>s.setPieceShots],
+    ['Set Piece Goals',(s,o)=>s.setPieceGoals]]],
   ['Fouls & Discipline',[
     ['Total Fouls',(s,o)=>s.fouls],['Fouls',(s,o)=>s.foulsPlain],
     ['Handball Fouls',(s,o)=>s.handballFouls],['Foul Throws',(s,o)=>s.foulThrows],

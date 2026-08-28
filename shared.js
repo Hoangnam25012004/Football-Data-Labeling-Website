@@ -246,11 +246,13 @@ const EVENT_INC={
      totals what it always totalled; a match tagged today totals the same way AND carries
      the breakdown. Neither is rewritten to look like the other.
 
-     The *Detail counters are the same trick GK_COLS plays with `known`: they say whether
-     this match was tagged in enough detail for the question to have an answer, so a
-     column can print "—" instead of a 0 that would claim a duel kind nobody recorded.
-     They add up like every other field, so a season of 12 old + 6 new matches reports
-     the 6 rather than pretending the 12 were empty. */
+     The *Detail counters say whether this match was tagged in enough detail for the
+     question to have an answer at all. They were once read by the columns, to print "—"
+     rather than a 0 that would claim a duel kind nobody recorded; the columns print the
+     tally either way now, because a match table is read for numbers. They are still
+     counted and still add up — kept because they are the only record of the difference
+     between "none" and "never asked", and because putting a guard back is one expression
+     per column. */
   'physical duel success':['groundDuels','groundDuelsWon','physicalDuels','physicalDuelsWon','duelDetail'],
   'physical duel fail':['groundDuels','physicalDuels','duelDetail'],
   'loose ball duel success':['groundDuels','groundDuelsWon','looseBallDuels','looseBallDuelsWon','duelDetail'],
@@ -305,13 +307,13 @@ function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,s
      by the third pass of computeStats(), never by EVENT_INC — no row carries the answer
      on its own, only a row read beside the others tagged in the same entry. */
   fkShotsOn:0,fkShotsOff:0,fkCrosses:0,fkCrossesComp:0,setPieceShots:0,setPieceGoals:0,
-  /* "was this match tagged in enough detail to answer" — never a measurement. Read only
-     for truthiness, and summable so a season answers it match by match (see EVENT_INC). */
+  /* "was this match tagged in enough detail to answer" — never a measurement, and no
+     longer read by any column: every table prints its tally, so a match from before an
+     event existed reads 0. Kept, and still summable, because they are the one record of
+     which matches could have answered at all. */
   duelDetail:0,saveDetail:0,gkTechDetail:0,gkCtrlDetail:0,concededDetail:0,
   /* spDetail is the odd one out: a flag about the MATCH, stamped on every player who was
-     tagged in it, not a count of events on one player. It has to be, or a striker who
-     headed in someone else's corner would carry setPieceGoals:1 behind a 0 flag and the
-     column would print "—" over a real number. See the end of computeStats(). */
+     tagged in it, rather than a count of events on one player. See computeStats(). */
   spDetail:0};}
 const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
 /* Two names in the shipped event list went out misspelt, and are STILL what every match
@@ -469,14 +471,14 @@ const PLAYER_CATS={
        to hold. `groundDuels` is still counted and still fed by all six names (EVENT_INC) —
        it is only no longer SHOWN, here or on the comparison, the dashboard or the report.
 
-       So a match tagged before the split reads "—" in all four: its duels are on file and
-       still add to the total behind the scenes, but nothing recorded which kind they were,
-       and 0 would claim it had no physical duels — a different statement from "nobody was
-       asked". Putting the total back is four lines, and no data has to be recovered. */
-    ['Physical Duels',s=>s.duelDetail?s.physicalDuels:'—'],
-    ['Physical Won',s=>s.duelDetail?s.physicalDuelsWon:'—'],
-    ['Loose Ball Duels',s=>s.duelDetail?s.looseBallDuels:'—'],
-    ['Loose Ball Won',s=>s.duelDetail?s.looseBallDuelsWon:'—'],
+       A tally, not a flagged reading: nothing tagged is 0. The *Detail counters below are
+       still kept and still add up — they say whether a match was tagged in enough detail
+       for the question to have been asked at all — but no column reads them any more. A
+       match from before the split therefore reads 0 here rather than "—". */
+    ['Physical Duels',s=>s.physicalDuels],
+    ['Physical Won',s=>s.physicalDuelsWon],
+    ['Loose Ball Duels',s=>s.looseBallDuels],
+    ['Loose Ball Won',s=>s.looseBallDuelsWon],
     ['Aerial Duels',s=>s.aerialDuels],['Aerial Duels Won',s=>s.aerialDuelsWon],
     ['Take-on Concerns',s=>s.takeOnConcerns],['Mistakes',s=>s.mistakes]],
   /* ---- the keeper's match, in one-argument columns ----
@@ -487,46 +489,50 @@ const PLAYER_CATS={
 
      Saves is the sum of its two outcomes, not the `save` event: a save either sticks or
      it does not, so catches + parries IS the number of saves, counted the way they are
-     now tagged. It reads "—" wherever no catch or parry was tagged, exactly as the two
-     columns under it do, rather than falling back to a legacy `save` count that would
-     mean something subtly different in the same column. The `saves` counter itself is
-     untouched and still carries all three names — GK_COLS, the team comparison and the
-     PDF all still read it. */
+     now tagged. A match tagged only with the old `save` name reads 0 in this column
+     rather than falling back to that count — one column, one meaning. The `saves` counter
+     itself is untouched and still carries all three names; GK_COLS' own Saves row, the
+     Save Rate built on it and the PDF all still read it.
+
+     Drawn only for a shirt that kept goal — see statTableHTML in Stats/stats-view.js and
+     tabsFor in client/assets/app.js. On an outfield player every one of these is a zero
+     that says nothing, which is a whole tab of noise. */
   goalkeeper:[
-    ['Saves',s=>s.saveDetail?s.catches+s.parries:'—'],
-    ['Catches',s=>s.saveDetail?s.catches:'—'],
-    ['Parries',s=>s.saveDetail?s.parries:'—'],
-    ['Save Standing',s=>s.gkTechDetail?s.saveStanding:'—'],
-    ['Save Collapse',s=>s.gkTechDetail?s.saveCollapse:'—'],
-    ['Save Diving',s=>s.gkTechDetail?s.saveDiving:'—'],
-    ['Save Kneeling',s=>s.gkTechDetail?s.saveKneeling:'—'],
-    ['Save Overhead',s=>s.gkTechDetail?s.saveOverhead:'—'],
-    ['Def. Line Support Success',s=>s.gkCtrlDetail?s.defLineSupportsWon:'—'],
+    ['Saves',s=>s.catches+s.parries],
+    ['Catches',s=>s.catches],
+    ['Parries',s=>s.parries],
+    ['Save Standing',s=>s.saveStanding],
+    ['Save Collapse',s=>s.saveCollapse],
+    ['Save Diving',s=>s.saveDiving],
+    ['Save Kneeling',s=>s.saveKneeling],
+    ['Save Overhead',s=>s.saveOverhead],
+    ['Def. Line Support Success',s=>s.defLineSupportsWon],
     // the fail side is the remainder of the total, never a third counter of its own:
     // one tally and one part settle the other, and three could disagree
-    ['Def. Line Support Fail',s=>s.gkCtrlDetail?s.defLineSupports-s.defLineSupportsWon:'—'],
-    ['Def. Line Support %',s=>s.gkCtrlDetail?pct(s.defLineSupportsWon,s.defLineSupports):'—'],
-    ['Aerial Control Success',s=>s.gkCtrlDetail?s.aerialControlsWon:'—'],
-    ['Aerial Control Fail',s=>s.gkCtrlDetail?s.aerialControls-s.aerialControlsWon:'—'],
-    ['Aerial Control %',s=>s.gkCtrlDetail?pct(s.aerialControlsWon,s.aerialControls):'—'],
-    /* "(tagged)" because the app already holds two other goals-conceded figures, both
-       DERIVED — the team's, off the opposition's goals (TEAM_SECTIONS), and the keeper's,
-       off who was on the pitch (GK_COLS). Those cannot be forgotten; this one is typed by
-       hand and can, so it is labelled as what it is and never stands in for them. */
-    ['Goals Conceded (tagged)',s=>s.concededDetail?s.goalsConceded:'—']],
+    ['Def. Line Support Fail',s=>s.defLineSupports-s.defLineSupportsWon],
+    ['Def. Line Support %',s=>pct(s.defLineSupportsWon,s.defLineSupports)],
+    ['Aerial Control Success',s=>s.aerialControlsWon],
+    ['Aerial Control Fail',s=>s.aerialControls-s.aerialControlsWon],
+    ['Aerial Control %',s=>pct(s.aerialControlsWon,s.aerialControls)],
+    /* The hand-tagged figure. Two others exist and are both DERIVED — the team's, off the
+       opposition's goals (TEAM_SECTIONS), and the keeper's, off who was on the pitch
+       (GK_COLS). This table holds neither of those, so the plain name is free here; in
+       GK_COLS, where the derived one sits in the same row of columns, it keeps its
+       "(tagged)" suffix, or that table would have two columns called Conceded. */
+    ['Goals Conceded',s=>s.goalsConceded]],
   /* Five columns that moved here from the old Other tab unchanged, and six that are read
      off the entry a set piece was tagged in (setPieceFold). The six are each a subset of
      a column on another tab, so they can be checked against it. */
   setPieces:[
     ['Freekicks',s=>s.freeKicks],
-    ['Freekicks: Shots Off Target',s=>s.spDetail?s.fkShotsOff:'—'],
-    ['Freekicks: Shots On Target',s=>s.spDetail?s.fkShotsOn:'—'],
-    ['Freekicks: Crosses',s=>s.spDetail?s.fkCrosses:'—'],
-    ['Freekicks: Crosses Succeeded',s=>s.spDetail?s.fkCrossesComp:'—'],
+    ['Freekicks: Shots Off Target',s=>s.fkShotsOff],
+    ['Freekicks: Shots On Target',s=>s.fkShotsOn],
+    ['Freekicks: Crosses',s=>s.fkCrosses],
+    ['Freekicks: Crosses Succeeded',s=>s.fkCrossesComp],
     ['Corners',s=>s.corners],['Penalty Kicks',s=>s.penalties],
     ['Throw-Ins',s=>s.throwIns],['Goal Kicks',s=>s.goalKicks],
-    ['Set Piece Shot',s=>s.spDetail?s.setPieceShots:'—'],
-    ['Set Piece Goal',s=>s.spDetail?s.setPieceGoals:'—']],
+    ['Set Piece Shot',s=>s.setPieceShots],
+    ['Set Piece Goal',s=>s.setPieceGoals]],
   /* No "—" anywhere in here, on purpose. Splitting the fouls apart is not the duel split:
      the three kinds have always been three separate events, so every match ever tagged
      answers all three exactly, and Total Fouls is still their sum. */
@@ -558,26 +564,26 @@ const GK_COLS=[
   /* ---- the keeper's own detail, added below the six above rather than into them ----
      These are the columns that would be a wall of zeroes on every outfield player, which
      is exactly why they belong here: GK_COLS is only ever drawn for a shirt that kept
-     goal. Every one reads its *Detail flag first, for the same reason `known` guards the
-     four above it — a match tagged before these events existed has no answer, and "—" is
-     what says so.
+     goal. They print their tally plainly, so a match tagged before these events existed
+     reads 0. `known` still guards the four above them, because that flag answers a
+     different question — whether a line-up existed to say who was on the pitch at all.
 
      Catches + Parries are the same saves already counted in the Saves row, broken out by
      whether the ball stuck; the five techniques are the same saves broken out by how they
      were made. Neither is a second tally of saves (see EVENT_INC). */
-  ['Catches',        (s,g)=>s.saveDetail?s.catches:'—'],
-  ['Parries',        (s,g)=>s.saveDetail?s.parries:'—'],
-  ['Standing',       (s,g)=>s.gkTechDetail?s.saveStanding:'—'],
-  ['Diving',         (s,g)=>s.gkTechDetail?s.saveDiving:'—'],
-  ['Collapse',       (s,g)=>s.gkTechDetail?s.saveCollapse:'—'],
-  ['Overhead',       (s,g)=>s.gkTechDetail?s.saveOverhead:'—'],
-  ['Kneeling',       (s,g)=>s.gkTechDetail?s.saveKneeling:'—'],
-  ['Def. Line Support',(s,g)=>s.gkCtrlDetail?s.defLineSupportsWon+'/'+s.defLineSupports:'—'],
-  ['Aerial Control', (s,g)=>s.gkCtrlDetail?s.aerialControlsWon+'/'+s.aerialControls:'—'],
+  ['Catches',        (s,g)=>s.catches],
+  ['Parries',        (s,g)=>s.parries],
+  ['Standing',       (s,g)=>s.saveStanding],
+  ['Diving',         (s,g)=>s.saveDiving],
+  ['Collapse',       (s,g)=>s.saveCollapse],
+  ['Overhead',       (s,g)=>s.saveOverhead],
+  ['Kneeling',       (s,g)=>s.saveKneeling],
+  ['Def. Line Support',(s,g)=>s.defLineSupportsWon+'/'+s.defLineSupports],
+  ['Aerial Control', (s,g)=>s.aerialControlsWon+'/'+s.aerialControls],
   /* Beside Conceded, never instead of it. Conceded is derived from the formation board
      and cannot be forgotten; this one is typed by hand and can. When they disagree, the
      derived figure is the one to believe. */
-  ['Conceded (tagged)',(s,g)=>s.concededDetail?s.goalsConceded:'—']
+  ['Conceded (tagged)',(s,g)=>s.goalsConceded]
 ];
 
 /* ---- shots + body part (Event List) ----
@@ -895,11 +901,11 @@ const TEAM_SECTIONS=[
     ['Recoveries',(s,o)=>s.recoveries],['Clearances',(s,o)=>s.clearances],['Blocks',(s,o)=>s.blocks],
     ['Aerial Duels',(s,o)=>s.aerialDuels],['Aerial Duels Won',(s,o)=>s.aerialDuelsWon],
     /* The floor duels, by kind. Same trade as PLAYER_CATS.defensive: the roll-up is still
-       counted but no longer shown, so a match tagged before the split reads "—" here. */
-    ['Physical Duels',(s,o)=>s.duelDetail?s.physicalDuels:'—'],
-    ['Physical Duels Won',(s,o)=>s.duelDetail?s.physicalDuelsWon:'—'],
-    ['Loose Ball Duels',(s,o)=>s.duelDetail?s.looseBallDuels:'—'],
-    ['Loose Ball Duels Won',(s,o)=>s.duelDetail?s.looseBallDuelsWon:'—'],
+       counted but no longer shown, so a match tagged before the split reads 0 here. */
+    ['Physical Duels',(s,o)=>s.physicalDuels],
+    ['Physical Duels Won',(s,o)=>s.physicalDuelsWon],
+    ['Loose Ball Duels',(s,o)=>s.looseBallDuels],
+    ['Loose Ball Duels Won',(s,o)=>s.looseBallDuelsWon],
     ['Take-on Concerns',(s,o)=>s.takeOnConcerns],['Mistakes',(s,o)=>s.mistakes]]],
   /* ---- three sections where "Discipline & GK" used to be one ----
      APPENDED after index 2, never inserted among the first three: Stats/report.js reaches
@@ -911,17 +917,17 @@ const TEAM_SECTIONS=[
     // event: this figure cannot be forgotten, and that one can. See PLAYER_CATS.goalkeeper.
     ['Goals Conceded',(s,o)=>o.goals+s.ownGoals],
     // catches + parries, the same reading the Goalkeeper tab takes — see PLAYER_CATS
-    ['Saves',(s,o)=>s.saveDetail?s.catches+s.parries:'—'],
-    ['Catches',(s,o)=>s.saveDetail?s.catches:'—'],
-    ['Parries',(s,o)=>s.saveDetail?s.parries:'—'],
-    ['Def. Line Support',(s,o)=>s.gkCtrlDetail?s.defLineSupportsWon+'/'+s.defLineSupports:'—'],
-    ['Aerial Control',(s,o)=>s.gkCtrlDetail?s.aerialControlsWon+'/'+s.aerialControls:'—']]],
+    ['Saves',(s,o)=>s.catches+s.parries],
+    ['Catches',(s,o)=>s.catches],
+    ['Parries',(s,o)=>s.parries],
+    ['Def. Line Support',(s,o)=>s.defLineSupportsWon+'/'+s.defLineSupports],
+    ['Aerial Control',(s,o)=>s.aerialControlsWon+'/'+s.aerialControls]]],
   ['Set Piece Stats',[
     ['Corners',(s,o)=>s.corners],['Free-kicks',(s,o)=>s.freeKicks],
     ['Penalty Kicks',(s,o)=>s.penalties],['Throw-ins',(s,o)=>s.throwIns],
     ['Goal Kicks',(s,o)=>s.goalKicks],
-    ['Set Piece Shots',(s,o)=>s.spDetail?s.setPieceShots:'—'],
-    ['Set Piece Goals',(s,o)=>s.spDetail?s.setPieceGoals:'—']]],
+    ['Set Piece Shots',(s,o)=>s.setPieceShots],
+    ['Set Piece Goals',(s,o)=>s.setPieceGoals]]],
   ['Fouls & Discipline',[
     ['Total Fouls',(s,o)=>s.fouls],['Fouls',(s,o)=>s.foulsPlain],
     ['Handball Fouls',(s,o)=>s.handballFouls],['Foul Throws',(s,o)=>s.foulThrows],

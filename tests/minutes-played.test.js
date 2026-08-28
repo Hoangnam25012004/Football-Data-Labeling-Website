@@ -243,7 +243,7 @@ test('a match with no full-time whistle runs to the last thing tagged', () => {
 const CATS=Object.keys(S.PLAYER_CATS);
 // statCat/statTeam are declared on one shared `let` line in the view, so they come in as
 // globals rather than as lifted consts (see loadStats in harness.js)
-const NAMES={funcs:['statTableHTML','minsCell'],consts:['STAT_CATS']};
+const NAMES={funcs:['statTableHTML','minsCell','catPlayers'],consts:['STAT_CATS']};
 const view=(cat,l,rows,dur)=>loadStats({rows:rows||[],lineups:l,dur:dur||DUR,
   meta:{home:'H',away:'A',sport:'football'},globals:{statCat:cat,statTeam:'home'}},NAMES);
 function tableHTML(cat,l,players){
@@ -252,7 +252,10 @@ function tableHTML(cat,l,players){
   return P.statTableHTML(stats,players);
 }
 
-CATS.forEach(cat=>{
+/* Goalkeeper is left out of this sweep: it lists the keepers rather than the squad, so
+   the three shirts these cases use would give it an empty table. It has a case of its
+   own below, which checks the same column AND the filter. */
+CATS.filter(c=>c!=='goalkeeper').forEach(cat=>{
   test('the '+cat+' table carries Minutes Played, right of the player', () => {
     const b=board('home').sub(v2(64),'7','3');
     const html=tableHTML(cat,b.l,['3','7','9']);
@@ -262,6 +265,37 @@ CATS.forEach(cat=>{
     ok(/<td class="mn"[^>]*>64'<\/td>/.test(html),"the man who went off at 64 reads 64'");
     ok(/<td class="mn"[^>]*>26'<\/td>/.test(html),'and his replacement 26');
     ok(html.includes('<td class="mn">—</td>'),'a player no line-up names reads —, not 0');
+  });
+});
+
+/* Fifteen keeper columns are zero on every outfield player for ever, so the tab lists
+   the shirts the formation board put on the GK square — the starter and anyone who
+   took the gloves later — and nobody else. */
+test('the goalkeeper table is the keepers, and carries Minutes Played too', () => {
+  const l=lineups();
+  l.home.xi=l.home.xi.map(p=>p.no==='1'?Object.assign({},p,{pos:'GK'}):p);
+  const html=tableHTML('goalkeeper',l,['1','7','9']);
+  ok(html.includes('<th class="mn">Minutes Played</th>'),'the column is there');
+  ok(/<td class="no">1<\/td>/.test(html),'the keeper is listed');
+  notOk(/<td class="no">7<\/td>/.test(html),'and the outfield players are not');
+  notOk(/<td class="no">9<\/td>/.test(html));
+  eq((html.match(/<tr>/g)||[]).length,2,'one header row and one keeper');
+});
+
+test('a side with no GK square filled says so instead of drawing an empty table', () => {
+  const html=tableHTML('goalkeeper',lineups(),['1','7']);
+  ok(html.includes('stats-empty'),'a notice, not a headed table with no body');
+  ok(/No goalkeeper/.test(html),'and it says what is missing');
+  notOk(/<table/.test(html),'nothing is drawn');
+});
+
+test('every other tab still lists the whole squad', () => {
+  const l=lineups();
+  l.home.xi=l.home.xi.map(p=>p.no==='1'?Object.assign({},p,{pos:'GK'}):p);
+  ['shooting','defensive','setPieces','fouls'].forEach(cat=>{
+    const html=tableHTML(cat,l,['1','7','9']);
+    ['1','7','9'].forEach(no=>ok(new RegExp('<td class="no">'+no+'<\/td>').test(html),
+      cat+' still lists '+no));
   });
 });
 

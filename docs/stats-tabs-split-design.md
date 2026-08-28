@@ -19,10 +19,69 @@ Trạng thái: **ĐÃ TRIỂN KHAI** (2026-08-29). Q1→bỏ hẳn, **kể cả 
 Q2→3 nhóm có dòng mới, nhãn `(tagged)` · Q3→**A**, ghi công **người dứt điểm** · Q4→không ·
 Q5→có. **Yêu cầu thêm:** `Saves` = `catches + parries`, không đọc event `save`.
 
-Test: `node tests/run.js` → **1395/1395 passed** (baseline 1358 + 34 test mới, 6 file test cũ sửa).
+Test: `node tests/run.js` → **1400/1400 passed** (baseline 1358 + 42 test mới, 9 file test cũ sửa).
 
 > **Có 5 câu hỏi phải trả lời trước khi code — §14.** Q1 (dữ liệu ground duel cũ đi đâu) và Q3
 > (cách suy ra cột set-piece) đổi cả kiến trúc, không chỉ đổi nhãn.
+
+---
+
+## 0-bis. Vòng sửa sau khi bạn xem màn hình thật (2026-08-29, cùng ngày)
+
+Ba yêu cầu sau khi nhìn tab Goalkeeper và trang Overall trên dữ liệu thật. Cả ba **đảo lại**
+những quyết định của bản thiết kế, và đây là lý do mỗi cái là đúng khi nhìn màn hình:
+
+### 0-bis.1 `—` → `0` ở **mọi** cột
+
+§4.5 của tài liệu trước lập luận rằng `0` là một lời khẳng định sai (*"trận này không có pha
+tranh chấp thể chất nào"*) trong khi sự thật là *"chưa ai hỏi câu đó"*. Lập luận ấy đúng về mặt
+dữ liệu và **sai về mặt bảng số**: một bảng cầu thủ 15 cột toàn dấu gạch không đọc được, và cái
+"sự trung thực" ấy không tới được người đọc — họ chỉ thấy bảng hỏng.
+
+**21 chỗ trong `shared.js`, 11 chỗ trong `index.html`, 2 chỗ trong `Stats/report.js`** bỏ cờ
+bảo vệ. Cụ thể:
+
+| Bỏ cờ | Giữ nguyên |
+|---|---|
+| `PLAYER_CATS` — 4 cột duel · 15 cột GK · 6 cột set piece | `GK_COLS` bốn cột đọc cờ **`known`**: `Conceded`, `On Target Faced`, `Save Rate`, `Clean Sheets` |
+| `GK_COLS` — 10 cột chi tiết của thủ môn | cột **Minutes Played** (`minsCell`) |
+| `TEAM_SECTIONS` — 4 dòng duel · 5 dòng GK · 2 dòng set piece | |
+| `Stats/report.js` — 2 cột duel (nay là `frac()` trần, `0/0`) | |
+
+> **Vì sao `known` ở lại:** nó hỏi một câu **khác**. `saveDetail` hỏi *"có event nào được tag
+> không"*; `known` hỏi *"có đội hình nào để biết ai đứng trên sân không"*. Trận không có đội hình
+> thì `Clean Sheets = 0` là bịa thật — không có gì để đếm cả. Test khoá cả hai vế.
+
+**Sáu counter cờ (`duelDetail` … `spDetail`) ĐƯỢC GIỮ.** Không cột nào đọc chúng nữa, nhưng chúng
+là bản ghi duy nhất của khác biệt giữa *"không có"* và *"chưa hỏi"*, chúng vẫn cộng dồn, và bật
+lại một cột chỉ là một biểu thức. Xoá chúng thì mất thông tin vĩnh viễn.
+
+### 0-bis.2 Bỏ chữ `(tagged)` ở `Goals Conceded` — nhưng **chỉ ở một trong hai bảng**
+
+`PLAYER_CATS.goalkeeper` → `Goals Conceded`. Bảng này **không chứa** con số suy ra nào, nên tên
+trần không đụng ai.
+
+`GK_COLS` **giữ** `Conceded (tagged)`, vì bảng đó có **cả hai** trong cùng một hàng cột — bỏ hậu
+tố ở đó sẽ cho ra **hai cột cùng tên `Conceded`** cạnh nhau. Đó không phải sự thiếu nhất quán;
+đó là hậu tố làm đúng việc của nó ở đúng chỗ cần nó.
+
+### 0-bis.3 Tab Goalkeeper chỉ liệt kê thủ môn
+
+15 cột thủ môn là 15 số 0 vĩnh viễn trên một cầu thủ ngoài sân — màn hình bạn gửi có **14 hàng
+gạch quanh 1 hàng đáng đọc**. Nay lọc theo bảng đội hình:
+
+| Nơi | Cách làm |
+|---|---|
+| Bảng Stats | `catPlayers()` mới, lọc qua `gkShirts(lineups,statTeam)` |
+| Sheet XLSX/CSV | `catSheet()` lọc **cùng luật**, nhưng theo `team`/`cat` của **sheet**, không theo màn hình |
+| Site khách, trang cầu thủ | `OUT_TABS` mới = `TD_TABS` bỏ `goalkeeper`; `tabsFor()` trả nó cho cầu thủ ngoài sân |
+| `TD_TABS` | **không đụng** — Team Data đọc nó để lấy **tên section** `TEAM_SECTIONS`, và một *đội* thì có thủ môn |
+
+`gkShirts()` đọc cả `lineups.history`, nên đội **đổi thủ môn giữa trận có đủ hai hàng**. Đội mà
+ô GK trên bảng đội hình còn trống thì hiện **một dòng nhắc**, không phải bảng rỗng có tiêu đề.
+
+**Test:** +5 (`stats-tabs-split.test.js` ×3, `minutes-played.test.js` ×3, trừ một case cũ được
+tách ra); 3 file test cũ sửa assertion `—` → `0`. Tổng **1400/1400**.
 
 ---
 

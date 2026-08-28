@@ -122,12 +122,30 @@ function minsCell(mins,no){
                      :'approximate — the match duration has not been set';
   return `<td class="mn" title="${esc(title)}">${m.exact?'':'~'}${m.min}'</td>`;
 }
+/* Which shirts a category's table is drawn for. Every tab lists the whole matchday squad
+   except Goalkeeper, which lists the keepers: its fifteen columns are all zero on an
+   outfield player, so a full squad there was fourteen rows of nothing wrapped around the
+   one row worth reading.
+
+   Read off the formation board through gkShirts(), which counts the keeper who started
+   AND any keeper who came on later (it walks lineups.history), so a side that changed
+   goalkeeper gets both rows. A board with no GK square filled gives an empty set, and the
+   caller says so rather than drawing a headed table with no body. */
+function catPlayers(players){
+  if(statCat!=='goalkeeper')return players;
+  const keepers=gkShirts(lineups,statTeam);
+  return players.filter(no=>keepers.has(String(no==null?'':no).trim()));
+}
 /* Stats view: the per-player table for the chosen category, and nothing else.
    Minutes played sits beside the name in every category rather than inside any
    one of them: the rest of every row is a tally, and a tally reads differently against
    12 minutes than against 90. */
 function statTableHTML(P,players){
   const names=squadNames(lineups,statTeam), cols=STAT_CATS[statCat];
+  players=catPlayers(players);
+  if(!players.length)
+    return '<div class="stats-empty">No goalkeeper in this side&rsquo;s line-up. '
+      +'Put a shirt on the GK square in Player lists and this table fills in.</div>';
   const mins=playedMinutes(lineups,dur,statTeam,rows);
   const head='<th class="no">No</th><th class="pl">Player</th><th class="mn">Minutes Played</th>'
     +cols.map(c=>`<th>${c[0]}</th>`).join('');
@@ -1188,9 +1206,18 @@ function statCell(v){
 /* One category, one side: the table under that tab, as a worksheet. */
 function catSheet(team,cat){
   // same squad padding + name column as the on-screen table, so the export matches it
-  const P=withSquad(computeStats(rows,team),lineups,team), players=sortedPlayers(P);
+  const P=withSquad(computeStats(rows,team),lineups,team);
+  /* …and the same rows: the goalkeeper sheet is the keepers, exactly as the tab is.
+     `team` and `cat` are the sheet's, not the view's, so this cannot go through
+     catPlayers() — the book is built for both sides and every category at once,
+     whatever the screen happens to be showing. */
+  let players=sortedPlayers(P);
+  if(cat==='goalkeeper'){
+    const keepers=gkShirts(lineups,team);
+    players=players.filter(no=>keepers.has(String(no==null?'':no).trim()));
+  }
   const names=squadNames(lineups,team);
-  /* Minutes played travels with the name here too, in all four sheets — the rest
+  /* Minutes played travels with the name here too, on every sheet — the rest
      of a row is a tally, and a tally reads differently against 12 minutes than
      against 90. A bare number, not "64'": a spreadsheet column of minutes is there
      to be sorted and added up. Blank where there is no line-up to work it out from. */

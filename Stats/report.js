@@ -741,14 +741,13 @@ function defensivePlayerPages(){
   return playerStatPages('Defensive — Player Stats',
     /* "Physical" and "Loose" where one "Ground" column used to be — the two kinds a duel
        on the floor is now tagged as, matching the Stats tab and the team comparison.
-       Both read the duelDetail flag first: frac() on its own would print 0/0 for a match
-       tagged before the split, which claims the player had no physical duels when the
-       truth is that nobody was asked. "—" is what says that, here as everywhere else. */
+       A plain frac(), like Aerial beside it: a match tagged before the split reads 0/0,
+       the same 0 the tables print for it. */
     ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Physical','Loose','Fouls','F.Won','T-on Con','Mistakes'],
     s=>[frac(s.tacklesWon,s.tackles),pc0(s.tacklesWon,s.tackles),dotv(s.interceptions),dotv(s.clearances),
       dotv(s.blocks),dotv(s.recoveries),frac(s.aerialDuelsWon,s.aerialDuels),
-      s.duelDetail?frac(s.physicalDuelsWon,s.physicalDuels):'—',
-      s.duelDetail?frac(s.looseBallDuelsWon,s.looseBallDuels):'—',
+      frac(s.physicalDuelsWon,s.physicalDuels),
+      frac(s.looseBallDuelsWon,s.looseBallDuels),
       dotv(s.fouls),dotv(s.foulsWon),dotv(s.takeOnConcerns),dotv(s.mistakes)]);
 }
 

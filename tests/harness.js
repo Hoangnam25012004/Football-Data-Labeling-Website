@@ -164,7 +164,7 @@ const SHARED_EXPORTS=['esc','squadOnPitch','squadNames','playerLabel','withSquad
   'playedMinutes','matchWindows',
   'computeStats','sortedPlayers','newStat','statRow','sumTeam','passMatrix','pct',
   'blankTeamLU','blankLineups','zoneAt','EVENT_INC','STAT_HEADERS','STAT_GROUPS',
-  'TEAM_SECTIONS','numOf','PLAYER_CATS','GK_COLS','SET_PIECE_EVENTS',
+  'TEAM_SECTIONS','numOf','PLAYER_CATS','GK_COLS','SET_PIECE_EVENTS','gkShirts',
   'SHOT_KINDS','BODY_PARTS','shotBodyPart','shotList','shotColor','evKey','EV_ALIAS','classifyCards',
   'GOAL_MAP','goalMouthSVG','goalMarks',
   'FORMATION_GRID','effCol','effRow','PZ_ROW_TOP','PZ_ROW_H','cellAt','cellCentre',

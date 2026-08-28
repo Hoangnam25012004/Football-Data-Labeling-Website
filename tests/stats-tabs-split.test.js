@@ -250,14 +250,16 @@ test('open play is not a set piece', () => {
   eq(P(SP_ROWS)['9'].shotsOn,1,'…but it is still a shot');
 });
 
-test('two events tagged as separate entries carry no join, and say so', () => {
+test('two events tagged as separate entries carry no join', () => {
   /* A free-kick and the shot after it typed as two Enters share no grp — a group id is
      only minted for an entry of two events or more. That is a real limit of reading the
-     answer off the entry, and the flag is what keeps it honest: nothing is claimed. */
+     answer off the entry: the column reads 0, and spDetail is the only thing that knows
+     the difference between "no set-piece shot" and "never tagged as one chain". */
   const p=P([ev({event:'free-kick',playerFrom:'10'}),ev({event:'shot on target',playerFrom:'10'})]);
   eq(p['10'].setPieceShots,0,'nothing joins them');
   eq(p['10'].spDetail,0,'and the match is not marked as chained');
-  eq(col('setPieces','Set Piece Shot')(p['10']),'—','so the column says "not asked", not 0');
+  eq(col('setPieces','Set Piece Shot')(p['10']),0,'the column prints the tally');
+  eq(p['10'].shotsOn,1,'while the shot itself is counted as it always was');
 });
 
 test('the detail flag is about the MATCH, so a finisher never hides behind a 0 flag', () => {
@@ -300,10 +302,10 @@ test('Saves on the Goalkeeper tab is catches + parries, not the save event', () 
   eq(S.GK_COLS.find(c=>c[0]==='Saves')[1](s,{known:1,conceded:0,clean:0}),4);
 });
 
-test('a match with no catch or parry says so rather than reporting a legacy count', () => {
+test('a match with no catch or parry reads 0, never the legacy save count', () => {
   const s=P([ev({event:'save',playerFrom:'1',t:1})])['1'];
-  eq(s.saves,1);
-  eq(col('goalkeeper','Saves')(s),'—','one column, one meaning — never a silent fallback');
+  eq(s.saves,1,'the counter still holds it, and Save Rate is still built on that');
+  eq(col('goalkeeper','Saves')(s),0,'one column, one meaning — never a silent fallback');
 });
 
 test('the fail side is the remainder, so the three figures cannot disagree', () => {
@@ -317,16 +319,25 @@ test('the fail side is the remainder, so the three figures cannot disagree', () 
   notOk('defLineSupportsFail' in s,'no third counter that could drift from the other two');
 });
 
-test('the tagged goals conceded is labelled as tagged, beside two derived figures', () => {
+test('the hand-tagged goals conceded is the plain name here, and suffixed in GK_COLS', () => {
   const s=P(GK_ROWS)['1'];
-  eq(col('goalkeeper','Goals Conceded (tagged)')(s),1);
-  notOk(S.PLAYER_CATS.goalkeeper.some(c=>c[0]==='Goals Conceded'),
-        'the bare name belongs to the derived figures, and is not reused here');
+  eq(col('goalkeeper','Goals Conceded')(s),1);
+  /* This table holds neither derived figure, so the plain name is free. GK_COLS does hold
+     one — the keeper's own Conceded, off who was on the pitch — so there the tagged one
+     keeps its suffix, or that table would print two columns called Conceded. */
+  const gk=S.GK_COLS.map(c=>c[0]);
+  ok(gk.indexOf('Conceded')>=0&&gk.indexOf('Conceded (tagged)')>=0,
+     'both live in GK_COLS, told apart by the suffix');
+  eq(S.PLAYER_CATS.goalkeeper.filter(c=>/Conceded/.test(c[0])).length,1,
+     'and only one of them is on the tab');
 });
 
-test('a keeper from before these events existed reads —, never 0', () => {
+test('a keeper from before these events existed reads 0, not a dash', () => {
   const s=S.newStat();
-  S.PLAYER_CATS.goalkeeper.forEach(c=>eq(c[1](s),'—',c[0]+' has no answer for an untagged match'));
+  S.PLAYER_CATS.goalkeeper.forEach(c=>{
+    const v=c[1](s);
+    ok(v===0||v==='0.0%',c[0]+' reads a plain zero, got '+JSON.stringify(v));
+  });
 });
 
 /* ================= 7. the duels the tables no longer show ================= */
@@ -344,10 +355,31 @@ test('Ground Duels is gone from every table, and still counted underneath', () =
   eq(P(OLD_ROWS)['4'].groundDuels,2,'a pre-split match still adds up behind the scenes');
 });
 
-test('a match tagged before the split reads — in the four duel columns', () => {
+test('a match tagged before the split reads 0 in the four duel columns', () => {
   const s=P(OLD_ROWS)['4'];
   ['Physical Duels','Physical Won','Loose Ball Duels','Loose Ball Won']
-    .forEach(l=>eq(col('defensive',l)(s),'—',l+' — nobody was asked, so nothing is claimed'));
+    .forEach(l=>eq(col('defensive',l)(s),0,l+' prints its tally'));
+  eq(s.groundDuels,2,'while the roll-up behind them is still the real figure');
+  eq(s.duelDetail,0,'and the flag still records that the question was never put');
+});
+
+/* ================= 7b. no column reads a *Detail flag any more ================= */
+
+test('every column prints a tally: no table anywhere falls back to a dash', () => {
+  /* The one exception is GK_COLS' `known` group — Conceded, On Target Faced, Save Rate,
+     Clean Sheets — which asks whether a line-up existed at all, not whether an event was
+     tagged. Those four keep their guard. */
+  const blank=S.newStat(), g={conceded:0,clean:0,known:1};
+  Object.keys(S.PLAYER_CATS).forEach(k=>S.PLAYER_CATS[k].forEach(c=>
+    notOk(String(c[1](blank))==='—',k+' / '+c[0]+' must not read a dash')));
+  S.TEAM_SECTIONS.forEach(sec=>sec[1].forEach(r=>
+    notOk(String(r[1](blank,blank))==='—',sec[0]+' / '+r[0]+' must not read a dash')));
+  S.GK_COLS.forEach(c=>notOk(String(c[1](blank,g))==='—',
+    'GK_COLS / '+c[0]+' must not read a dash when a board exists'));
+  // …and the four that legitimately still do, when no board can answer
+  const none={conceded:0,clean:0,known:0};
+  ['Conceded','On Target Faced','Save Rate','Clean Sheets'].forEach(l=>
+    eq(S.GK_COLS.find(c=>c[0]===l)[1](blank,none),'—',l+' still says so with no line-up'));
 });
 
 test('the dashboard and the PDF dropped it too, and gained the two kinds', () => {
@@ -359,6 +391,34 @@ test('the dashboard and the PDF dropped it too, and gained the two kinds', () =>
   // the player table and the radar name their counters directly and had to be changed
   notOk(/groundDuelsWon/.test(REPORT),'no ground duel left in the report');
   ok(/physicalDuelsWon/.test(REPORT)&&/looseBallDuelsWon/.test(REPORT),'both kinds are in it');
+});
+
+/* ================= 7c. the Goalkeeper tab is for keepers ================= */
+
+/* Fifteen keeper columns are zero on an outfield player for ever, so neither site offers
+   him the tab: the Stats page filters the rows off the formation board, the client site
+   drops the tab from his strip. TD_TABS itself keeps the category, because Team Data
+   reads it for the name of a TEAM_SECTIONS section and a team does have a keeper. */
+test('the Goalkeeper tab is for keepers only, on both sites', () => {
+  const fn=grabFunction('catPlayers',STATS,'Stats/stats-view.js');
+  ok(/statCat!=='goalkeeper'\)return players/.test(fn),'every other tab is left alone');
+  ok(/gkShirts\(lineups,statTeam\)/.test(fn),'and the keepers come off the board');
+  ok(/cat==='goalkeeper'/.test(grabFunction('catSheet',STATS,'Stats/stats-view.js')),
+     'the exported sheet is the same rows as the tab');
+  ok(/OUT_TABS = TD_TABS\.filter\(function \(t\) \{ return t\[0\] !== 'goalkeeper'; \}\)/.test(APPJS),
+     'the client site drops it for an outfield player');
+  ok(/who\.gk \? GK_TABS : OUT_TABS/.test(APPJS),'…and that is what tabsFor hands him');
+  ok(/var TD_TABS = \[[\s\S]*?'goalkeeper'/.test(APPJS),
+     'while TD_TABS keeps it, because Team Data still needs the section name');
+});
+
+test('gkShirts counts the keeper who came on, not only the one who started', () => {
+  const lu={home:{xi:[{no:'1',pos:'GK'},{no:'7',pos:'CM'}],subs:[],roster:[],dir:'lr'},
+            away:{xi:[],subs:[],roster:[],dir:'rl'},
+            history:[{t:100,team:'home',xi:[{no:'13',pos:'GK'},{no:'7',pos:'CM'}],subs:[]}]};
+  const k=S.gkShirts(lu,'home');
+  ok(k.has('1')&&k.has('13'),'a side that changed goalkeeper gets both rows');
+  notOk(k.has('7'),'and nobody else');
 });
 
 /* ================= 8. the two joins that fail silently ================= */
