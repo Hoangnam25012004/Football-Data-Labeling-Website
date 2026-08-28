@@ -69,7 +69,7 @@ function sandbox(state){
     ';globalThis.A={'+LIFT.join(',')+',PL_OUT,PL_GK,PLAYER_CATS,GK_COLS,'
       +'ROLES,ROLE_POS,ROLE_OF,ROLE_LABEL,ROLE_BADGE,MODES,'
       +'ROLE_KPIS,GK_KPIS,FALLBACK_KPIS,'
-      +'squadIds,gkShirts,onPitchAt,newStat,pct};'
+      +'squadIds,gkShirts,onPitchAt,newStat,pct,computeStats};'
   ].join('\n'),ctx,{filename:'client/assets/app.js-extract.js'});
   return ctx.A;
 }
@@ -291,7 +291,7 @@ const CARD_ROWS=[
 ];
 
 test('a second yellow is a yellow and a sending-off, counted once', () => {
-  const c=A.playerCards(CARD_ROWS,'home');
+  const c=A.playerCards(A.computeStats(CARD_ROWS,'home'));
   deepEq(c['7'],{y:2,r:1},'two yellows, one red — and the red row tagged with it adds nothing');
   deepEq(c['4'],{y:0,r:1});
   notOk(c['9'],'the opposition-s card is not ours');
@@ -300,7 +300,7 @@ test('a second yellow is a yellow and a sending-off, counted once', () => {
 test('a player-s cards add up to what the club-s card count says', () => {
   const B=sandbox({reports:{m1:{rows:CARD_ROWS}}});
   const team=B.discipline([{uuid:'m1',side:'home'}]);
-  const per=B.playerCards(CARD_ROWS,'home');
+  const per=B.playerCards(B.computeStats(CARD_ROWS,'home'));
   const y=Object.keys(per).reduce((n,k)=>n+per[k].y,0);
   const r=Object.keys(per).reduce((n,k)=>n+per[k].r,0);
   eq(y,team.yellow,'the same yellows the Overview shows');
@@ -428,12 +428,19 @@ test('the keeper columns are shared.js-s, and take the match as well as the man'
   deepEq(unknown.slice(0,6),[4,'—','—','—','—',9],'what only he did still reads; what the match knows does not');
 });
 
-test('PLAYER_CATS is untouched, so the Stats tab cannot have moved', () => {
-  deepEq(Object.keys(A.PLAYER_CATS),['shooting','distribution','defensive','other']);
+test('PLAYER_CATS is the six tabs this page and the Stats tab share', () => {
+  deepEq(Object.keys(A.PLAYER_CATS),
+    ['shooting','distribution','defensive','goalkeeper','setPieces','fouls']);
   ok(/const STAT_CATS=PLAYER_CATS;/.test(VIEW),'one array, two readers');
-  notOk(/Conceded|Clean Sheet/.test(JSON.stringify(Object.keys(A.PLAYER_CATS)
-    .map(k=>A.PLAYER_CATS[k].map(c=>c[0])))),
-    'nothing needing the match around a player was smuggled into the four categories');
+  /* The rule this used to police by looking for "Conceded" in a label, which the
+     Goalkeeper tab's own "Goals Conceded (tagged)" would now trip on. The rule was
+     never about the wording: it is that a PLAYER_CATS column takes ONE argument.
+     Anything needing the match around a player — Save Rate, Clean Sheets, the derived
+     Conceded — takes two, belongs in GK_COLS, and would read `undefined.known` here.
+     Checking the arity says exactly that, and cannot be fooled by a label. */
+  Object.keys(A.PLAYER_CATS).forEach(k=>A.PLAYER_CATS[k].forEach(c=>
+    eq(c[1].length,1,k+' / '+c[0]+' takes one stat object, like every column here')));
+  A.GK_COLS.forEach(c=>eq(c[1].length,2,'GK_COLS / '+c[0]+' takes the match as well'));
 });
 
 /* ================= what it must not touch ================= */

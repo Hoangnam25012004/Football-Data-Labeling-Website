@@ -46,6 +46,9 @@ let root=null, opts={}, mounted=false;
 const ourLineups=()=>lineupsAreFor(loadMeta().matchId)?loadLineups():blankLineups();
 // no shotHalf any more: the shooting map shows both halves at once, normalised to attack up
 let rows=[], meta=blankMeta(), lineups=blankLineups(), statView='overall', statTeam='home', statCat='shooting', defHalf=0, defCat='tackles', othCat='fouls';
+/* Which located event the two new dashboards are showing. They hold an event NAME, not a
+   category key, because that is what plainEventMapHTML matches on. */
+let spCat='free-kick', gkCat='catch';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
 let distCat='passes', distHalf=0;   // the distribution map: which action, and which half
 
@@ -120,7 +123,7 @@ function minsCell(mins,no){
   return `<td class="mn" title="${esc(title)}">${m.exact?'':'~'}${m.min}'</td>`;
 }
 /* Stats view: the per-player table for the chosen category, and nothing else.
-   Minutes played sits beside the name in all four categories rather than inside any
+   Minutes played sits beside the name in every category rather than inside any
    one of them: the rest of every row is a tally, and a tally reads differently against
    12 minutes than against 90. */
 function statTableHTML(P,players){
@@ -149,11 +152,17 @@ function dashboardHTML(team){
       +`<div class="chart-row">${distMapHTML(team)}</div>`;
   }else if(statCat==='defensive'){
     extra=`<div class="chart-row">${defMapHTML(team)}</div>`;
-  }else if(statCat==='other'){
+  }else if(statCat==='fouls'){
+    /* What the Other tab always drew, under the tab that inherited it. The dropdown is
+       unchanged: fouls conceded (with the cards they led to), fouls won, offsides. */
     const othMap=othCat==='fouls'?foulMapHTML(team)
       :othCat==='foulsWon'?plainEventMapHTML(team,'foul won')
       :plainEventMapHTML(team,'offside');
     extra=`<div class="chart-row">${othMap}</div>`;
+  }else if(statCat==='setPieces'){
+    extra=`<div class="chart-row">${plainEventMapHTML(team,spCat,spHead())}</div>`;
+  }else if(statCat==='goalkeeper'){
+    extra=`<div class="chart-row">${plainEventMapHTML(team,gkCat,gkHead())}</div>`;
   }
   return extra;
 }
@@ -183,7 +192,13 @@ const DEF_CATS={
   clearances:{label:'Clearances',parts:[['clearance','Clearance','#2f81f7']]},
   blocks:{label:'Blocks',parts:[['block','Block','#2f81f7']]},
   recoveries:{label:'Recoveries',parts:[['recovery','Recovery','#2f81f7']]},
-  ground:{label:'Ground Duels',parts:[['ground duel success','Won','#39d98a'],['ground duel fail','Lost','#f7506b']]},
+  /* The two kinds a duel on the floor is tagged as, where the one old name used to be.
+     `ground` is gone from here as it is gone from the tables: a match tagged before the
+     split simply has no dot on these two maps, the same way it reads "—" in the columns.
+     Stats/report.js builds one PDF page per entry of this object, so these two are two
+     pages there as well. */
+  physical:{label:'Physical Duels',parts:[['physical duel success','Won','#39d98a'],['physical duel fail','Lost','#f7506b']]},
+  looseBall:{label:'Loose Ball Duels',parts:[['loose ball duel success','Won','#39d98a'],['loose ball duel fail','Lost','#f7506b']]},
   aerial:{label:'Aerial Duels',parts:[['aerial duel success','Won','#39d98a'],['aerial duel fail','Lost','#f7506b']]},
   takeOnConcern:{label:'Take-on Concern',parts:[['take-on concern','Take-on Concern','#ff8a3d']]},
   mistakes:{label:'Mistakes',parts:[['mistake','Mistake','#f7b32f']]}
@@ -587,13 +602,40 @@ function distMapHTML(team){
 function setDistCat(v){distCat=v;renderStats();}
 function setDistHalf(h){distHalf=h;renderStats();}
 const FOUL_EVENTS=new Set(['foul','foul throw','handball foul']);
-/* Other tab: dropdown switches between the foul map, the foul-won map and the offside map */
+/* Fouls tab: dropdown switches between the foul map, the foul-won map and the offside map.
+   Inherited unchanged from the Other tab this one replaced — same three maps, same key
+   names in the store, so a session that was on "Fouls Won" stays there. */
 const OTH_CATS={fouls:'Fouls',foulsWon:'Fouls Won',offsides:'Offsides'};
 const othHead=()=>`<div class="chart-head"><div></div>`
   +`<select class="def-sel" onchange="setOthCat(this.value)">`
   +Object.entries(OTH_CATS).map(([k,l])=>`<option value="${k}"${k===othCat?' selected':''}>${l}</option>`).join('')
   +`</select></div>`;
 function setOthCat(v){othCat=v;renderStats();}
+/* ---- the two dashboards the Other tab never had ----
+   Keyed by the event NAME, because that is what the map matches on. The label beside it
+   is what the dropdown reads. Both draw through plainEventMapHTML, which is the same
+   picture the Fouls tab's offside map is — one located event type, both halves normalised
+   to attack right, circle for the first half and square for the second. */
+const SP_CATS={'free-kick':'Free-kicks','corner-kick':'Corners','penalty kick':'Penalty Kicks',
+  'throw-ins':'Throw-Ins','goal kick':'Goal Kicks'};
+const GK_CATS={'catch':'Catches','parry':'Parries','save':'Saves (old name)',
+  'defensive line support success':'Def. Line Support — won',
+  'defensive line support fail':'Def. Line Support — lost',
+  'aerial control success':'Aerial Control — won',
+  'aerial control fail':'Aerial Control — lost',
+  'goal conceded':'Goals Conceded (tagged)'};
+/* The two <select>s are written out in full rather than through one helper taking the
+   handler's name: the test that catches a dead control reads the handler names back out
+   of THIS SOURCE, and a name assembled from a variable is a name it cannot see. The
+   duplication is the point — it is what keeps the guard able to do its job. */
+const selOpts=(cats,cur)=>Object.entries(cats)
+  .map(([k,l])=>`<option value="${esc(k)}"${k===cur?' selected':''}>${esc(l)}</option>`).join('');
+const spHead=()=>`<div class="chart-head"><div></div>`
+  +`<select class="def-sel" onchange="setSpCat(this.value)">${selOpts(SP_CATS,spCat)}</select></div>`;
+const gkHead=()=>`<div class="chart-head"><div></div>`
+  +`<select class="def-sel" onchange="setGkCat(this.value)">${selOpts(GK_CATS,gkCat)}</select></div>`;
+function setSpCat(v){spCat=v;renderStats();}
+function setGkCat(v){gkCat=v;renderStats();}
 function foulMapHTML(team){
   const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
   const teamColor=team==='home'?'var(--home)':'var(--away)', fill=teamColor;
@@ -643,14 +685,20 @@ function foulMapHTML(team){
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block;max-width:1000px;margin:0 auto">${defs}${over}${pitch}</svg>`
     +`<div class="shotmap-legend">${legend}</div></div>`;
 }
-/* ---- Other: plain located-event map (offside, foul won…) — every located event of
-   that type, both halves normalised to attack RIGHT; circle = 1st half, square = 2nd
-   half; ratio bands like the foul map, but no cards / dangerous-zone overlay. */
-function plainEventMapHTML(team,eventName){
+/* ---- plain located-event map (offside, foul won, a set piece, a save…) — every located
+   event of that type, both halves normalised to attack RIGHT; circle = 1st half, square =
+   2nd half; ratio bands like the foul map, but no cards / dangerous-zone overlay.
+   `head` is the picker drawn above it, so the three tabs that share this map each bring
+   their own dropdown; it falls back to the Fouls tab's, which is what it always drew. */
+function plainEventMapHTML(team,eventName,head){
   const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
   const teamColor=team==='home'?'var(--home)':'var(--away)', fill=teamColor;
   // no data -> keep the pitch and 0% bands, just draw no dots
-  const evs=rows.filter(r=>r.team===team&&r.event===eventName&&r.pXY);
+  /* evKey, not a raw compare: the shipped dictionary spells the throw-in "throw-Ins"
+     with a capital I, so `r.event===eventName` drew an empty pitch for it -- and would
+     for any type an analyst had renamed with different capitalisation. */
+  const want=evKey(eventName);
+  const evs=rows.filter(r=>r.team===team&&evKey(r.event)===want&&r.pXY);
   const dir={1:attackDir(team,1),2:attackDir(team,2)};
   const fl=evs.map(r=>{
     const h=eventHalf(r), flip=dir[h]==='left';
@@ -677,7 +725,7 @@ function plainEventMapHTML(team,eventName){
     +`<g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG('right')}${dots}</g>`;
   const legend=`<span class="sm-leg"><span class="leg-dot" style="background:${fill}"></span>1st half</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:${fill};border-radius:3px"></span>2nd half</span>`;
-  return `<div class="chart-card oth-card">${othHead()}`
+  return `<div class="chart-card oth-card">${head||othHead()}`
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block;max-width:1000px;margin:0 auto">${over}${pitch}</svg>`
     +`<div class="shotmap-legend">${legend}</div></div>`;
 }
@@ -1112,8 +1160,8 @@ function benchListHTML(team){
     +`</div><div class="gf-blist">${list}</div></div>`;
 }
 
-/* ---- exports: the Stats tab's four category tables, one per side ----
-   Eight sheets, in the order the tabs are read — shooting_home … other_away —
+/* ---- exports: the Stats tab's six category tables, one per side ----
+   Twelve sheets, in the order the tabs are read — shooting_home … fouls_away —
    and nothing else in the book. What is downloaded is what was on screen: the
    same columns, the same padded squad, the same order of players.
 
@@ -1160,7 +1208,7 @@ function catSheet(team,cat){
   ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:aoa.length-1,c:headers.length-1}})};
   return ws;
 }
-/* The book: four categories, home side then away. The categories are read off
+/* The book: every category, home side then away. The categories are read off
    STAT_CATS rather than a list kept here, so a tab added to the view is a sheet
    added to the export and neither can drift from the other. */
 function buildSheets(){
@@ -1169,7 +1217,7 @@ function buildSheets(){
     out.push([cat+'_'+team,catSheet(team,cat)])));
   return out;
 }
-/* A CSV holds one table, not eight — so the eight are stacked into one file,
+/* A CSV holds one table, not twelve — so the twelve are stacked into one file,
    each under the name of its sheet with a blank line before the next. Written
    from the very same worksheets, so the two downloads cannot disagree. */
 function buildCsv(){
@@ -2323,7 +2371,9 @@ const CHROME =
     '<button type="button" data-cat="shooting">Shooting</button>'+
     '<button type="button" data-cat="distribution">Distribution</button>'+
     '<button type="button" data-cat="defensive">Defensive</button>'+
-    '<button type="button" data-cat="other">Other</button>'+
+    '<button type="button" data-cat="goalkeeper">Goalkeeper</button>'+
+    '<button type="button" data-cat="setPieces">Set Pieces</button>'+
+    '<button type="button" data-cat="fouls">Fouls</button>'+
   '</div>'+
   '<div class="stats-wrap"><div id="statsHolder"></div></div>';
 
@@ -2391,7 +2441,7 @@ function destroy(){
    not made: this is the same data the view is drawing. */
 function data(){return {rows:rows,meta:meta,lineups:lineups,dur:dur};}
 
-/* ---- the ten names that must stay global ----
+/* ---- the twelve names that must stay global ----
    The three maps draw their own controls as markup:
    onclick="setHeatHalf(1)", onmouseenter="shotHover(...)". An inline handler
    is compiled against the GLOBAL scope, never against this closure, so wrapping
@@ -2403,6 +2453,7 @@ function data(){return {rows:rows,meta:meta,lineups:lineups,dur:dur};}
 window.setDefHalf=setDefHalf;   window.setDefCat=setDefCat;
 window.setDistHalf=setDistHalf; window.setDistCat=setDistCat;
 window.setHeatHalf=setHeatHalf; window.setOthCat=setOthCat;
+window.setSpCat=setSpCat;       window.setGkCat=setGkCat;
 window.defHover=defHover;       window.distHover=distHover;
 window.heatHover=heatHover;     window.shotHover=shotHover;
 

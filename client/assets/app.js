@@ -317,12 +317,19 @@
      link somebody can send — so route() redraws on a tab click and the
      signature stays renderData(view).
      --------------------------------------------------------- */
+  /* Each row does double duty: the key is a PLAYER_CATS category (Player Data) AND the
+     third field names a TEAM_SECTIONS section (Team Data). Both halves are looked up by
+     value, and a miss draws an EMPTY TABLE rather than throwing — so a key or a title
+     that no longer exists in shared.js fails silently. The test beside this checks every
+     one of them against shared.js for exactly that reason. */
   var TD_TABS = [
     /* key, what the tab says, which of shared.js's TEAM_SECTIONS it draws */
     ['shooting',     'Shooting',     'Attacking Stats'],
     ['distribution', 'Distribution', 'Distribution Stats'],
     ['defensive',    'Defensive',    'Defensive Stats'],
-    ['other',        'Other',        'Discipline & GK']
+    ['goalkeeper',   'Goalkeeper',   'Goalkeeper Stats'],
+    ['setPieces',    'Set Pieces',   'Set Piece Stats'],
+    ['fouls',        'Fouls',        'Fouls & Discipline']
   ];
 
   function renderData(view) {
@@ -433,13 +440,16 @@
     var rep = (state.reports || {})[m.uuid];
     if (!rep || !Array.isArray(rep.rows) || !rep.rows.length) return null;
     var other = m.side === 'home' ? 'away' : 'home';
+    /* Named, because two fields below are read off it: the per-player tallies
+       themselves, and the cards they now carry. */
+    var players = window.computeStats(rep.rows, m.side);
     return {
       m: m,
       gf: (m.side === 'home' ? m.home.score : m.away.score) || 0,
       ga: (m.side === 'home' ? m.away.score : m.home.score) || 0,
       us: window.sumTeam(rep.rows, m.side),
       them: window.sumTeam(rep.rows, other),
-      players: window.computeStats(rep.rows, m.side),
+      players: players,
       names: window.squadNames(rep.lineups || {}, m.side),
       /* Who was on the pitch and for how long, and who was booked — the two
          things a player's own page needs that a team total cannot carry.
@@ -447,7 +457,7 @@
          both are pure functions of the report and neither writes to it.
          `mins` is null for a match nobody entered a line-up for. */
       mins: window.playedMinutes(rep.lineups || {}, rep.dur || {}, m.side, rep.rows),
-      cards: playerCards(rep.rows, m.side),
+      cards: playerCards(players),
       /* Which squad entries name a players row, so the 14 of one window and the
          9 of the next can be recognised as one man; and who kept goal, with what
          went in past him while he was on the pitch. */
@@ -675,10 +685,15 @@
     'Take-ons': 'Take-ons', 'Take-ons Won': 'Take-ons', 'Take-on Success': 'Take-ons',
     'Tackles': 'Tackles', 'Tackles Won': 'Tackles', 'Tackle Success': 'Tackles',
     'Aerial Duels': 'Duels', 'Aerial Duels Won': 'Duels',
-    'Ground Duels': 'Duels', 'Ground Duels Won': 'Duels',
+    'Physical Duels': 'Duels', 'Physical Duels Won': 'Duels',
+    'Loose Ball Duels': 'Duels', 'Loose Ball Duels Won': 'Duels',
     'Corners': 'Set Pieces', 'Free-kicks': 'Set Pieces', 'Penalty Kicks': 'Set Pieces',
     'Throw-ins': 'Set Pieces', 'Goal Kicks': 'Set Pieces',
-    'Fouls': 'Discipline', 'Offsides': 'Discipline'
+    'Set Piece Shots': 'From set pieces', 'Set Piece Goals': 'From set pieces',
+    'Saves': 'Shot stopping', 'Catches': 'Shot stopping', 'Parries': 'Shot stopping',
+    'Total Fouls': 'Fouls', 'Fouls': 'Fouls', 'Handball Fouls': 'Fouls',
+    'Foul Throws': 'Fouls',
+    'Yellow Cards': 'Cards', 'Red Cards': 'Cards'
   };
 
   function renderTeamData(body, cat) {
@@ -758,20 +773,19 @@
      #/data/player/n%3Aelva/defensive is a link somebody can send.
      --------------------------------------------------------- */
 
-  /* Cards are the one thing newStat() does not carry, so they are counted off
-     the rows through shared.js's classifyCards() — the same reading the match
-     timeline and the Overview's discipline() take, so a player's two yellows
-     and his club's card count cannot tell different stories. */
-  function playerCards(rows, team) {
+  /* Cards used to be walked off the rows here, because newStat() did not carry
+     them. It does now: computeStats() runs shared.js's classifyCards() itself, so
+     a second yellow counts as one booking AND the sending-off it is, worked out in
+     one place that the Stats tab, the match timeline and this page all read.
+
+     What is left is a reshape — the {no: {y, r}} the rest of this file indexes by
+     shirt, taken off a tally that has already been computed rather than counted a
+     second time. Players with no card are left out, as they always were. */
+  function playerCards(players) {
     var out = {};
-    window.classifyCards(rows).forEach(function (kind, row) {
-      if (row.team !== team) return;                  // the club's own side only
-      var no = String(row.playerFrom == null ? '' : row.playerFrom).trim();
-      if (!no) return;
-      var c = out[no] || (out[no] = { y: 0, r: 0 });
-      if (kind === 'yc') c.y++;
-      else if (kind === 'y2') { c.y++; c.r++; }       // the second yellow, and the red it is
-      else if (kind === 'rc') c.r++;
+    Object.keys(players || {}).forEach(function (no) {
+      var s = players[no];
+      if (s.yellowCards || s.redCards) out[no] = { y: s.yellowCards, r: s.redCards };
     });
     return out;
   }
@@ -1010,13 +1024,22 @@
     return (C && C[cat]) || [];
   }
 
-  /* A keeper reads the same four subjects as everyone else with one swapped:
-     his shots are a column of zeroes for ever, and what belongs in their place
-     is what happened at the other end. Derived from TD_TABS rather than written
-     out again, so the three he shares stay the three everybody else has. */
-  var GK_TABS = TD_TABS.map(function (t) {
-    return t[0] === 'shooting' ? ['goalkeeping', 'Goalkeeping'] : t;
-  });
+  /* A keeper reads the same subjects as everyone else, with one swapped and one
+     dropped. Swapped: his shots are a column of zeroes for ever, and what belongs
+     in their place is what happened at the other end — GK_COLS, which takes the
+     match around him as well as the man and so can show Save Rate and Clean Sheets.
+
+     Dropped: PLAYER_CATS.goalkeeper, because GK_COLS already contains every column
+     it has and four more. Leaving both in gave a keeper two tabs a letter apart —
+     "Goalkeeping" and "Goalkeeper" — showing nearly the same table.
+
+     Derived from TD_TABS rather than written out again, so the subjects he shares
+     stay the subjects everybody else has. */
+  var GK_TABS = TD_TABS
+    .map(function (t) {
+      return t[0] === 'shooting' ? ['goalkeeping', 'Goalkeeping'] : t;
+    })
+    .filter(function (t) { return t[0] !== 'goalkeeper'; });
   var tabsFor = function (who) { return who.gk ? GK_TABS : TD_TABS; };
 
   /* A campaign total in the same three readings the Stats tab gives one match:
@@ -1620,7 +1643,7 @@
      sake of a table it does not draw. Same URL as the line below, so whichever
      view is opened first is the one that pays for it. */
   function loadShared() {
-    return loadOnce(taggerRoot() + 'shared.js?v=24');
+    return loadOnce(taggerRoot() + 'shared.js?v=25');
   }
 
   /* Pulled in the first time someone opens a match's stats, not on every page
@@ -1628,11 +1651,11 @@
   function loadStatsView() {
     var r = taggerRoot();
     loadOnce(r + 'shared.css?v=14', 'css');
-    loadOnce(r + 'Stats/stats-view.css?v=9', 'css');
+    loadOnce(r + 'Stats/stats-view.css?v=10', 'css');
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
-      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=23'); })
-      .then(function () { return loadOnce(r + 'Stats/report.js?v=35'); })
+      .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=24'); })
+      .then(function () { return loadOnce(r + 'Stats/report.js?v=36'); })
       /* The analyst's toolkit. This site's file, not the tagging app's — Q1 was
          answered B, so the right-click menu, the drawing layer, clips and the
          exports exist in the channel and nowhere else. It registers itself with

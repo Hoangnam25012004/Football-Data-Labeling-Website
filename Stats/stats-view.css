@@ -57,7 +57,12 @@ table.stats .grp.g5{background:#331A1A;color:#F0CACA}
 /* the side picker and the category tabs are rows of their own under the header,
    not part of it — the top line is the three views and the exports. Both stay put
    while the view below them scrolls, so they are outside .stats-wrap. */
-.sub-row{flex:none;margin-bottom:10px}
+/* Six category tabs, not four, and two of them carry two words. shared.css sets
+   .stats-toggle to a plain flex row with no wrap, which is right for the three views
+   and the exports in the header — but here it pushed the last tab off the side of a
+   narrow window with no way to reach it. Wrapping is only ever asked for on these
+   two rows, so shared.css is left alone. */
+.sub-row{flex:none;margin-bottom:10px;flex-wrap:wrap;justify-content:center}
 .sub-team{justify-content:center}
 /* flat look: no grey panels behind the visualizations (charts sit straight on
    the page background; only tables/lists keep their own styling) */

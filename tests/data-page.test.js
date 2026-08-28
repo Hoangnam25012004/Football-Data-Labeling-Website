@@ -147,12 +147,33 @@ test('every figure comes from a submitted report, through shared.js', () => {
         'app.js defines no stat engine of its own');
 });
 
-test('the four categories are shared.js-s own team sections, by name', () => {
-  const titles=[...APPJS.matchAll(/\['(?:shooting|distribution|defensive|other)', *'[^']+', *'([^']+)'\]/g)]
-    .map(m=>m[1]);
-  eq(titles.length,4,'four tabs');
-  titles.forEach(t=>ok(SHARED.includes("['"+t+"',"),
-    'TEAM_SECTIONS still has a section called '+t));
+/* Both halves of every TD_TABS row, checked against shared.js. Neither lookup throws when
+   it misses — catCols() and sectionCols() both fall back to an empty column set — so a
+   key or a title that no longer exists in shared.js draws a blank table with nothing in
+   the console. This is the test that turns that silence into a failure.
+
+   Read out of the source rather than typed out again, so adding a tab does not need this
+   test edited; what it asserts is the JOIN, not the list. */
+test('every category tab names a real PLAYER_CATS key and a real TEAM_SECTIONS section', () => {
+  const block=/var TD_TABS = \[([\s\S]*?)\n  \];/.exec(APPJS)[1];
+  const rows=[...block.matchAll(/\['([A-Za-z]+)', *'[^']*', *'([^']+)'\]/g)]
+    .map(m=>({key:m[1],title:m[2]}));
+  eq(rows.length,6,'six tabs');
+  rows.forEach(r=>{
+    ok(new RegExp('^\\s{2}'+r.key+':\\s*\\[','m').test(SHARED),
+       'PLAYER_CATS still has a category called '+r.key);
+    ok(SHARED.includes("['"+r.title+"',"),
+       'TEAM_SECTIONS still has a section called '+r.title);
+  });
+});
+
+/* A keeper must not be offered two tabs a letter apart showing nearly the same table:
+   GK_COLS ("goalkeeping") already holds every column PLAYER_CATS.goalkeeper has, plus
+   Save Rate, Clean Sheets and On Target Faced, which need the match around him. */
+test('a keeper gets GK_COLS in place of shooting, and not the goalkeeper tab as well', () => {
+  ok(/t\[0\] !== 'goalkeeper'/.test(APPJS),'the duplicate tab is filtered out for him');
+  ok(/t\[0\] === 'shooting' \? \['goalkeeping', 'Goalkeeping'\]/.test(APPJS),
+     'and shooting is still what it replaces');
 });
 
 test('Possession is a fixed column, so Distribution does not print it twice', () => {

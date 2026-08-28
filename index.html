@@ -3923,7 +3923,13 @@ const EVENT_INC={
   'penalty kick':['penalties'],
   'throw-ins':['throwIns'],'throw-in':['throwIns'],
   'goal kick':['goalKicks'],
-  'foul':['fouls'],'foul throw':['fouls'],'handball foul':['fouls'],
+  /* Three events that have ALWAYS been three events, sharing one counter. Breaking them
+     out is not the ground-duel split in miniature: no name was renamed and no counter
+     changes meaning, so every row already on file says which kind it was. `fouls` stays
+     the total. Twin of the rows in shared.js. */
+  'foul':['fouls','foulsPlain'],
+  'foul throw':['fouls','foulThrows'],
+  'handball foul':['fouls','handballFouls'],
   'foul won':['foulsWon'],            // was missing here while shared.js had it
   'offside':['offsides'],
   'mistake':['mistakes'],
@@ -3975,8 +3981,15 @@ function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,s
   ownGoals:0,physicalDuels:0,physicalDuelsWon:0,looseBallDuels:0,looseBallDuelsWon:0,
   catches:0,parries:0,saveStanding:0,saveDiving:0,saveCollapse:0,saveOverhead:0,saveKneeling:0,
   defLineSupports:0,defLineSupportsWon:0,aerialControls:0,aerialControlsWon:0,goalsConceded:0,
+  // the three kinds of foul, and the two cards — which classifyCards() fills in from
+  // computeStats(), not EVENT_INC, so a second yellow books a yellow AND the red it is
+  foulsPlain:0,foulThrows:0,handballFouls:0,yellowCards:0,redCards:0,
+  // what a set piece produced, read off the entry it was tagged in (setPieceFold)
+  fkShotsOn:0,fkShotsOff:0,fkCrosses:0,fkCrossesComp:0,setPieceShots:0,setPieceGoals:0,
   // "was this match tagged in enough detail to answer" — never a measurement
-  duelDetail:0,saveDetail:0,gkTechDetail:0,gkCtrlDetail:0,concededDetail:0};}
+  duelDetail:0,saveDetail:0,gkTechDetail:0,gkCtrlDetail:0,concededDetail:0,
+  // spDetail is a flag about the MATCH, stamped on everyone tagged in it — see shared.js
+  spDetail:0};}
 const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
 /* Twin of shared.js's EV_ALIAS — this file carries its own copy of the stat engine,
    since it does not load shared.js. Keep the two in step: a rename shipped in
@@ -3989,15 +4002,80 @@ const pct=(n,d)=> (d? (Math.round(n/d*1000)/10).toFixed(1):'0.0')+'%';
 const EV_ALIAS={'take-on succes':'take-on success','gain possesion':'gain possession'};
 const evKey=e=>{const k=String(e==null?'':e).trim().toLowerCase();
   return EV_ALIAS[k]||k;};
+/* The five shot outcomes and the five set-piece starters. Both looked up through evKey:
+   the shipped dictionary spells the throw-in "throw-Ins", with a capital I. Twins of the
+   sets in shared.js. */
+const SHOT_KINDS=new Set(['goal','shot on target','shot off target','blocked shot','miss shot']);
+const SET_PIECE_EVENTS=new Set(['free-kick','corner-kick','penalty kick',
+  'throw-ins','throw-in','goal kick']);
+/* A second yellow is the sending-off it is, and the explicit red often tagged beside it
+   is the SAME dismissal, so it is dropped rather than counted again. This page had no
+   need to read cards until the team comparison started reporting them; the function is
+   shared.js's, copied across like the rest of the engine, and the two must agree or the
+   tagging tab and the Stats page will give one match two different card counts. */
+function classifyCards(rows){
+  const out=new Map(), yc={}, total={};
+  const key=r=>r.team+'#'+String(r.playerFrom==null?'':r.playerFrom).trim();
+  (rows||[]).forEach(r=>{if(evKey(r.event)==='yellow card')total[key(r)]=(total[key(r)]||0)+1;});
+  (rows||[]).filter(r=>r&&r.t!=null).slice().sort((a,b)=>a.t-b.t).forEach(r=>{
+    const e=evKey(r.event), k=key(r);
+    if(e==='yellow card'){yc[k]=(yc[k]||0)+1; out.set(r, yc[k]>=2?'y2':'yc');}
+    else if(e==='red card'){ if((total[k]||0)<2)out.set(r,'rc'); }   // else: same as the 2nd-yellow red
+  });
+  return out;
+}
+/* ---- what a set piece produced, read off the entry it was tagged in ----
+   Events typed in ONE entry share a grp. Credit goes to the player on the row being
+   measured — the shooter, not the taker — so each figure is a strict subset of a column
+   that already exists. Twin of setPieceFold in shared.js; see the note there. */
+function setPieceFold(mine,get){
+  const byGrp=new Map();
+  mine.forEach(r=>{if(r.grp!=null){
+    const g=byGrp.get(r.grp); if(g)g.push(r); else byGrp.set(r.grp,[r]);}});
+  let anyChain=false;
+  byGrp.forEach(list=>{
+    const kinds=list.map(r=>evKey(r.event));
+    if(!kinds.some(e=>SET_PIECE_EVENTS.has(e)))return;
+    anyChain=true;
+    const fromFK=kinds.indexOf('free-kick')>=0;
+    list.forEach(r=>{
+      const a=(r.playerFrom||'').toString().trim(); if(!a)return;
+      const e=evKey(r.event), p=get(a);
+      if(SHOT_KINDS.has(e)){p.setPieceShots++; if(e==='goal')p.setPieceGoals++;}
+      if(!fromFK)return;
+      if(e==='shot on target'||e==='goal')p.fkShotsOn++;      // a goal is on target
+      else if(e==='shot off target')p.fkShotsOff++;
+      else if(e==='cross success'){p.fkCrosses++;p.fkCrossesComp++;}
+      else if(e==='cross fail')p.fkCrosses++;
+    });
+  });
+  return anyChain;
+}
+/* Three passes, because two of the questions cannot be answered one row at a time:
+   what this row is, what the player's earlier yellows make it, and what the rows tagged
+   beside it in the same entry make it. Passes 2 and 3 touch none of pass 1's counters. */
 function computeStats(team){
   const P={}; const get=n=>{if(!P[n])P[n]=newStat();return P[n];};
-  state.rows.filter(r=>r.team===team).forEach(r=>{
+  const mine=state.rows.filter(r=>r.team===team);
+  mine.forEach(r=>{
     const a=(r.playerFrom||'').toString().trim(); if(!a)return;
     // event names are user-editable, so match the dictionary case-insensitively —
     // an event tagged "throw-Ins" must still count as a throw-in (same as shared.js)
     const inc=EVENT_INC[evKey(r.event)];
     if(inc){const p=get(a);inc.forEach(k=>p[k]++);}
   });
+  // the whole row set, not this side's: classifyCards keys on team + shirt internally
+  classifyCards(state.rows).forEach((kind,r)=>{
+    if(r.team!==team)return;
+    const a=(r.playerFrom||'').toString().trim(); if(!a)return;
+    const p=get(a);
+    if(kind==='yc')p.yellowCards++;
+    else if(kind==='y2'){p.yellowCards++;p.redCards++;}
+    else if(kind==='rc')p.redCards++;
+  });
+  const chained=setPieceFold(mine,get);
+  // the flag is about the match, so it goes on everyone in it — see newStat()
+  if(chained)Object.keys(P).forEach(k=>{P[k].spDetail++;});
   return P;
 }
 function statRow(no,s){return[no,s.goals,s.assists,s.totalShots,s.shotsOn,s.shotsOff,s.shotsBlocked,s.missShots,pct(s.shotsOn,s.totalShots),
@@ -4169,14 +4247,35 @@ const TEAM_SECTIONS=[
     ['Tackle Success',(s,o)=>pct(s.tacklesWon,s.tackles)],['Interceptions',(s,o)=>s.interceptions],
     ['Recoveries',(s,o)=>s.recoveries],['Clearances',(s,o)=>s.clearances],['Blocks',(s,o)=>s.blocks],
     ['Aerial Duels',(s,o)=>s.aerialDuels],['Aerial Duels Won',(s,o)=>s.aerialDuelsWon],
-    ['Ground Duels',(s,o)=>s.groundDuels],['Ground Duels Won',(s,o)=>s.groundDuelsWon],
+    // the floor duels by kind; the roll-up is still counted but no longer shown
+    ['Physical Duels',(s,o)=>s.duelDetail?s.physicalDuels:'—'],
+    ['Physical Duels Won',(s,o)=>s.duelDetail?s.physicalDuelsWon:'—'],
+    ['Loose Ball Duels',(s,o)=>s.duelDetail?s.looseBallDuels:'—'],
+    ['Loose Ball Duels Won',(s,o)=>s.duelDetail?s.looseBallDuelsWon:'—'],
     ['Take-on Concerns',(s,o)=>s.takeOnConcerns],   // shared.js has always had this row
     ['Mistakes',(s,o)=>s.mistakes]]],
-  ['Discipline & GK',[
-    ['Goals Conceded',(s,o)=>o.goals+s.ownGoals],['Saves',(s,o)=>s.saves],['Fouls',(s,o)=>s.fouls],
-    ['Offsides',(s,o)=>s.offsides],['Corners',(s,o)=>s.corners],
-    ['Free-kicks',(s,o)=>s.freeKicks],['Throw-ins',(s,o)=>s.throwIns],['Goal Kicks',(s,o)=>s.goalKicks],
-    ['Penalty Kicks',(s,o)=>s.penalties]]]
+  /* Three sections where "Discipline & GK" used to be one, APPENDED after index 2 —
+     Stats/report.js reaches for its comparison pages by POSITION, so the first three may
+     never move. Twin of the rows in shared.js. */
+  ['Goalkeeper Stats',[
+    ['Goals Conceded',(s,o)=>o.goals+s.ownGoals],
+    ['Saves',(s,o)=>s.saveDetail?s.catches+s.parries:'—'],   // catches + parries
+    ['Catches',(s,o)=>s.saveDetail?s.catches:'—'],
+    ['Parries',(s,o)=>s.saveDetail?s.parries:'—'],
+    ['Def. Line Support',(s,o)=>s.gkCtrlDetail?s.defLineSupportsWon+'/'+s.defLineSupports:'—'],
+    ['Aerial Control',(s,o)=>s.gkCtrlDetail?s.aerialControlsWon+'/'+s.aerialControls:'—']]],
+  ['Set Piece Stats',[
+    ['Corners',(s,o)=>s.corners],['Free-kicks',(s,o)=>s.freeKicks],
+    ['Penalty Kicks',(s,o)=>s.penalties],['Throw-ins',(s,o)=>s.throwIns],
+    ['Goal Kicks',(s,o)=>s.goalKicks],
+    ['Set Piece Shots',(s,o)=>s.spDetail?s.setPieceShots:'—'],
+    ['Set Piece Goals',(s,o)=>s.spDetail?s.setPieceGoals:'—']]],
+  ['Fouls & Discipline',[
+    ['Total Fouls',(s,o)=>s.fouls],['Fouls',(s,o)=>s.foulsPlain],
+    ['Handball Fouls',(s,o)=>s.handballFouls],['Foul Throws',(s,o)=>s.foulThrows],
+    ['Fouls Won',(s,o)=>s.foulsWon],
+    ['Yellow Cards',(s,o)=>s.yellowCards],['Red Cards',(s,o)=>s.redCards],
+    ['Offsides',(s,o)=>s.offsides]]]
 ];
 const numOf=v=>{const m=(''+v).match(/-?\d+(\.\d+)?/);return m?+m[0]:0;};
 function renderGeneral(){
