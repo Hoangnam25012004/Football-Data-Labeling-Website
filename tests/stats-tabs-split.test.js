@@ -65,14 +65,35 @@ test('the six tabs are the six buttons, in both copies of the chrome', () => {
   eq((STATS.match(/data-cat="/g)||[]).length,keys.length,'and no button for a tab that is not there');
 });
 
-test('every category has something for the Dashboard to draw', () => {
-  /* Dashboard and Stats share statCat. A category with no branch in dashboardHTML is a
-     button that renders a blank page — no error, nothing in the console. */
+test('the Dashboard can never render a blank page', () => {
+  /* Dashboard and Stats share statCat, so a category the chart chain does not handle is
+     a button that renders nothing — no error, nothing in the console, and no way to tell
+     it from a bug.
+
+     Goalkeeper and Set Pieces have no chart yet, on purpose: the map they were given
+     first is being replaced. What makes that safe is the chain ending in a bare `else`
+     rather than in two named cases — a category added later cannot fall through it
+     either. That terminal branch is what this checks; the notice's own wording is
+     checked below. */
   const fn=grabFunction('dashboardHTML',STATS,'Stats/stats-view.js');
-  Object.keys(S.PLAYER_CATS).forEach(k=>
-    ok(fn.includes("statCat==='"+k+"'")||k==='shooting',
-       k+' has a branch in dashboardHTML'));
-  ok(fn.includes("statCat==='shooting'"),'shooting included');
+  ok(/\}else\{/.test(fn),'the if/else chain ends in a bare else, not in a named case');
+  ok(/stats-empty/.test(fn),'and that else says so on screen');
+  // the four that do have one, named
+  ['shooting','distribution','defensive','fouls'].forEach(k=>
+    ok(fn.includes("statCat==='"+k+"'"),k+' still draws its own chart'));
+  // …and the two that deliberately do not
+  ['goalkeeper','setPieces'].forEach(k=>
+    notOk(fn.includes("statCat==='"+k+"'"),k+' has no chart branch yet, by design'));
+});
+
+test('nothing is left behind from the maps those two tabs used to draw', () => {
+  /* A picker whose setter is gone is a dead control; a setter still on window with no
+     markup naming it is a leak. Both halves went, and plainEventMapHTML is back to the
+     one caller it has — the Fouls tab. */
+  ['SP_CATS','GK_CATS','spHead','gkHead','setSpCat','setGkCat','spCat','gkCat']
+    .forEach(n=>notOk(new RegExp('\\b'+n+'\\b').test(STATS),n+' is gone'));
+  ok(/function plainEventMapHTML\(team,eventName\)\{/.test(STATS),
+     'and the map takes no head parameter nobody passes');
 });
 
 /* ================= 2. nothing that already worked moved ================= */

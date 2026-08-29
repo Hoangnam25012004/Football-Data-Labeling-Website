@@ -19,7 +19,7 @@ Trạng thái: **ĐÃ TRIỂN KHAI** (2026-08-29). Q1→bỏ hẳn, **kể cả 
 Q2→3 nhóm có dòng mới, nhãn `(tagged)` · Q3→**A**, ghi công **người dứt điểm** · Q4→không ·
 Q5→có. **Yêu cầu thêm:** `Saves` = `catches + parries`, không đọc event `save`.
 
-Test: `node tests/run.js` → **1400/1400 passed** (baseline 1358 + 42 test mới, 9 file test cũ sửa).
+Test: `node tests/run.js` → **1401/1401 passed** (baseline 1358 + 43 test mới, 9 file test cũ sửa).
 
 > **Có 5 câu hỏi phải trả lời trước khi code — §14.** Q1 (dữ liệu ground duel cũ đi đâu) và Q3
 > (cách suy ra cột set-piece) đổi cả kiến trúc, không chỉ đổi nhãn.
@@ -30,6 +30,26 @@ Test: `node tests/run.js` → **1400/1400 passed** (baseline 1358 + 42 test mớ
 
 Ba yêu cầu sau khi nhìn tab Goalkeeper và trang Overall trên dữ liệu thật. Cả ba **đảo lại**
 những quyết định của bản thiết kế, và đây là lý do mỗi cái là đúng khi nhìn màn hình:
+
+### 0-bis.0 Gỡ dashboard của Goalkeeper và Set Pieces
+
+Hai bản đồ `plainEventMapHTML` được dựng ở §8.4.1 làm chỗ giữ chỗ. Bạn xem trên dữ liệu thật —
+một sân trống toàn `0%` — và quyết định thiết kế lại. Nên chúng bị gỡ, cùng toàn bộ phần đi kèm:
+`SP_CATS`, `GK_CATS`, `spHead`, `gkHead`, `setSpCat`, `setGkCat`, hai biến trạng thái `spCat` /
+`gkCat`, và hai tên trên `window`. `plainEventMapHTML` trở lại **đúng chữ ký cũ** (bỏ tham số
+`head` không còn ai truyền); riêng bản vá `evKey` ở §10.1 **ở lại**, vì đó là sửa lỗi thật.
+
+> ⚠️ **Không được xoá thành nhánh rỗng.** Dashboard và Stats dùng chung `statCat`, nên một
+> category mà chuỗi `if/else` không xử lý sẽ **vẽ ra trang trắng** — không lỗi, không console,
+> không phân biệt được với bug. Đó chính là trạm số 4 ở §2.
+>
+> Nên chuỗi kết thúc bằng **`else` trần**, không phải hai `case` có tên: nó nói *"nhóm này chưa
+> có dashboard, bảng nằm ở tab Stats"*, và **category thêm sau cũng không lọt qua được**. Test
+> khoá đúng điều đó — sự tồn tại của `else` trần, không phải tên hai nhóm hiện tại.
+
+Kèm theo, test whitelist `window.*` được siết **hai chiều**: trước đây nó chỉ bắt tên *thừa* được
+publish; nay bắt cả tên **còn trong danh sách mà đã hết được publish** — nếu không, một cái tên
+chết sẽ được chính test đó bao che mãi mãi.
 
 ### 0-bis.1 `—` → `0` ở **mọi** cột
 

@@ -46,9 +46,6 @@ let root=null, opts={}, mounted=false;
 const ourLineups=()=>lineupsAreFor(loadMeta().matchId)?loadLineups():blankLineups();
 // no shotHalf any more: the shooting map shows both halves at once, normalised to attack up
 let rows=[], meta=blankMeta(), lineups=blankLineups(), statView='overall', statTeam='home', statCat='shooting', defHalf=0, defCat='tackles', othCat='fouls';
-/* Which located event the two new dashboards are showing. They hold an event NAME, not a
-   category key, because that is what plainEventMapHTML matches on. */
-let spCat='free-kick', gkCat='catch';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
 let distCat='passes', distHalf=0;   // the distribution map: which action, and which half
 
@@ -177,13 +174,24 @@ function dashboardHTML(team){
       :othCat==='foulsWon'?plainEventMapHTML(team,'foul won')
       :plainEventMapHTML(team,'offside');
     extra=`<div class="chart-row">${othMap}</div>`;
-  }else if(statCat==='setPieces'){
-    extra=`<div class="chart-row">${plainEventMapHTML(team,spCat,spHead())}</div>`;
-  }else if(statCat==='goalkeeper'){
-    extra=`<div class="chart-row">${plainEventMapHTML(team,gkCat,gkHead())}</div>`;
+  }else{
+    /* Goalkeeper and Set Pieces have no visualization yet — the located-event map they
+       were given first is being replaced by something designed for them.
+
+       A NOTICE rather than nothing. Dashboard and Stats share the category tabs, so a
+       branch that returns '' is a tab that renders a blank page: no error, nothing in
+       the console, and no way to tell it from a bug. This is also the else of the chain
+       rather than two named cases, so a category added later cannot silently fall
+       through it either — it says what it says for any tab with no chart of its own. */
+    extra=`<div class="stats-empty">No dashboard for ${esc(catLabel(statCat))} yet. `
+      +`Its table is on the <b>Stats</b> tab.</div>`;
   }
   return extra;
 }
+/* The tab's own wording, read off the button rather than written out again here. */
+const CAT_LABELS={shooting:'Shooting',distribution:'Distribution',defensive:'Defensive',
+  goalkeeper:'Goalkeeper',setPieces:'Set Pieces',fouls:'Fouls'};
+const catLabel=c=>CAT_LABELS[c]||c;
 /* attacking direction for a half — inferred from where this team's shots land
    ('right' if their shots average past midfield, else 'left'); if a half has no
    shots, use the opposite of the other half; sensible default otherwise. */
@@ -629,31 +637,6 @@ const othHead=()=>`<div class="chart-head"><div></div>`
   +Object.entries(OTH_CATS).map(([k,l])=>`<option value="${k}"${k===othCat?' selected':''}>${l}</option>`).join('')
   +`</select></div>`;
 function setOthCat(v){othCat=v;renderStats();}
-/* ---- the two dashboards the Other tab never had ----
-   Keyed by the event NAME, because that is what the map matches on. The label beside it
-   is what the dropdown reads. Both draw through plainEventMapHTML, which is the same
-   picture the Fouls tab's offside map is — one located event type, both halves normalised
-   to attack right, circle for the first half and square for the second. */
-const SP_CATS={'free-kick':'Free-kicks','corner-kick':'Corners','penalty kick':'Penalty Kicks',
-  'throw-ins':'Throw-Ins','goal kick':'Goal Kicks'};
-const GK_CATS={'catch':'Catches','parry':'Parries','save':'Saves (old name)',
-  'defensive line support success':'Def. Line Support — won',
-  'defensive line support fail':'Def. Line Support — lost',
-  'aerial control success':'Aerial Control — won',
-  'aerial control fail':'Aerial Control — lost',
-  'goal conceded':'Goals Conceded (tagged)'};
-/* The two <select>s are written out in full rather than through one helper taking the
-   handler's name: the test that catches a dead control reads the handler names back out
-   of THIS SOURCE, and a name assembled from a variable is a name it cannot see. The
-   duplication is the point — it is what keeps the guard able to do its job. */
-const selOpts=(cats,cur)=>Object.entries(cats)
-  .map(([k,l])=>`<option value="${esc(k)}"${k===cur?' selected':''}>${esc(l)}</option>`).join('');
-const spHead=()=>`<div class="chart-head"><div></div>`
-  +`<select class="def-sel" onchange="setSpCat(this.value)">${selOpts(SP_CATS,spCat)}</select></div>`;
-const gkHead=()=>`<div class="chart-head"><div></div>`
-  +`<select class="def-sel" onchange="setGkCat(this.value)">${selOpts(GK_CATS,gkCat)}</select></div>`;
-function setSpCat(v){spCat=v;renderStats();}
-function setGkCat(v){gkCat=v;renderStats();}
 function foulMapHTML(team){
   const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
   const teamColor=team==='home'?'var(--home)':'var(--away)', fill=teamColor;
@@ -703,12 +686,10 @@ function foulMapHTML(team){
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block;max-width:1000px;margin:0 auto">${defs}${over}${pitch}</svg>`
     +`<div class="shotmap-legend">${legend}</div></div>`;
 }
-/* ---- plain located-event map (offside, foul won, a set piece, a save…) — every located
-   event of that type, both halves normalised to attack RIGHT; circle = 1st half, square =
-   2nd half; ratio bands like the foul map, but no cards / dangerous-zone overlay.
-   `head` is the picker drawn above it, so the three tabs that share this map each bring
-   their own dropdown; it falls back to the Fouls tab's, which is what it always drew. */
-function plainEventMapHTML(team,eventName,head){
+/* ---- Fouls: plain located-event map (offside, foul won…) — every located event of
+   that type, both halves normalised to attack RIGHT; circle = 1st half, square = 2nd
+   half; ratio bands like the foul map, but no cards / dangerous-zone overlay. */
+function plainEventMapHTML(team,eventName){
   const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
   const teamColor=team==='home'?'var(--home)':'var(--away)', fill=teamColor;
   // no data -> keep the pitch and 0% bands, just draw no dots
@@ -743,7 +724,7 @@ function plainEventMapHTML(team,eventName,head){
     +`<g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(PW,PH,false)}</g>${dirArrowSVG('right')}${dots}</g>`;
   const legend=`<span class="sm-leg"><span class="leg-dot" style="background:${fill}"></span>1st half</span>`
     +`<span class="sm-leg"><span class="leg-dot" style="background:${fill};border-radius:3px"></span>2nd half</span>`;
-  return `<div class="chart-card oth-card">${head||othHead()}`
+  return `<div class="chart-card oth-card">${othHead()}`
     +`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;display:block;max-width:1000px;margin:0 auto">${over}${pitch}</svg>`
     +`<div class="shotmap-legend">${legend}</div></div>`;
 }
@@ -2468,7 +2449,7 @@ function destroy(){
    not made: this is the same data the view is drawing. */
 function data(){return {rows:rows,meta:meta,lineups:lineups,dur:dur};}
 
-/* ---- the twelve names that must stay global ----
+/* ---- the ten names that must stay global ----
    The three maps draw their own controls as markup:
    onclick="setHeatHalf(1)", onmouseenter="shotHover(...)". An inline handler
    is compiled against the GLOBAL scope, never against this closure, so wrapping
@@ -2480,7 +2461,6 @@ function data(){return {rows:rows,meta:meta,lineups:lineups,dur:dur};}
 window.setDefHalf=setDefHalf;   window.setDefCat=setDefCat;
 window.setDistHalf=setDistHalf; window.setDistCat=setDistCat;
 window.setHeatHalf=setHeatHalf; window.setOthCat=setOthCat;
-window.setSpCat=setSpCat;       window.setGkCat=setGkCat;
 window.defHover=defHover;       window.distHover=distHover;
 window.heatHover=heatHover;     window.shotHover=shotHover;
 
