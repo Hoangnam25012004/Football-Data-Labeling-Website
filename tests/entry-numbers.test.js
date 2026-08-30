@@ -183,6 +183,31 @@ test('T8b · a card BEFORE the sending-off is still taggable', () => {
   eq(a.state.rows.length,2,'the foul at 3500 predates the card at 3600');
 });
 
+test('T8c · the foul that earned the card, added afterwards at the same second', () => {
+  /* Tagged as one entry ("5f*yc*rc") this never arises: applyRedCard runs long after the
+     gate, so the period does not exist yet. Tag the card FIRST and come back for the foul
+     and it does — standing at that very second — and the gate answered with the sentence
+     both gates exist to prevent: "sent off at 60:00.00 and is not on the pitch at
+     60:00.00". He was on the pitch at 60:00.00; that is when he committed it.
+     Mirrors 'C7 · the incident that earned the card is not judged by the card'. */
+  const a=app(3600);
+  submit(a,'5rc',d(1,3600));
+  submit(a,'5f',d(1,3600));
+  eq(a.log.alerts.length,0,'not refused');
+  eq(a.state.rows.length,2,'the foul is written');
+  eq(a.state.lineups.history.length,1,'and the sending-off still stands — one period');
+  eq(xiOf(a,3700).length,10,'ten men from the card on, exactly as before');
+});
+
+test('T8d · …and a hundredth of a second later he is off', () => {
+  // the window reaches the card's own instant and no further, at this gate as at the other
+  const a=app(3600);
+  submit(a,'5rc',d(1,3600));
+  submit(a,'5f',d(1,3600.02));
+  eq(a.state.rows.length,1,'nothing written');
+  ok(/No\.5 was sent off at /.test(firstAlert(a)),firstAlert(a));
+});
+
 /* ================= 4. who is exempt from tier 2 ================= */
 
 test('T9 · a card may be shown to a man on the bench', () => {
