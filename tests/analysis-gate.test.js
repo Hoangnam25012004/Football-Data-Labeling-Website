@@ -253,6 +253,75 @@ test('C7 · a red card does NOT refuse itself', () => {
   ok(byId(v,'shirt-numbers').ok,'the card that caused it is not evidence against itself');
 });
 
+test('C7 · the incident that earned the card is not judged by the card', () => {
+  /* The reported case (Saint Lucia vs Barbados, No.13 at H2 60:58.72). "13f*yc*rc" is one
+     entry sharing one dot, so the foul and the second yellow carry the card's own t. The
+     gate read the sending-off as being in force AT that t and refused them both, saying
+     the sentence histWithoutRow exists to prevent — one row too early. */
+  const t=4025, left=HOME_XI.filter(n=>n!=='6');
+  const v=run(payload({lineups:lineups({history:[redSnap('home',left,HOME_BENCH,t,'6')]}),
+                       rows:[ev('home','6','foul',t,{grp:'g1',ord:0}),
+                             ev('home','6','yellow card',t,{grp:'g1',ord:1}),
+                             ev('home','6','red card',t,{grp:'g1',ord:2})]}));
+  ok(byId(v,'shirt-numbers').ok,'the whole incident stands, not only the card');
+});
+
+test('C7 · but a sending-off is in force from the very next moment', () => {
+  // a hundredth of a second past the card is already past it: SAME_MOMENT reaches the
+  // card's own instant and no further, so the play after a sending-off is not forgiven
+  const t=4025, left=HOME_XI.filter(n=>n!=='6');
+  const c=byId(run(payload({lineups:lineups({history:[redSnap('home',left,HOME_BENCH,t,'6')]}),
+                            rows:[ev('home','6','pass success',t+0.02,{playerTo:'9'})]})),
+               'shirt-numbers');
+  notOk(c.ok);
+  ok(/sent off at 62:05/.test(c.spots[0]),c.spots[0]);
+});
+
+test('C7 · the card-s own moment forgives that side only, and that moment only', () => {
+  const t=4025, left=HOME_XI.filter(n=>n!=='6');
+  const lu=lineups({history:[redSnap('home',left,HOME_BENCH,t,'6')]});
+  notOk(byId(run(payload({lineups:lu,rows:[ev('home','99','foul',t)]})),'shirt-numbers').ok,
+        'a number the side never had is still refused, at the card-s own t');
+  notOk(byId(run(payload({lineups:lu,rows:[ev('home','21','recovery',t)]})),'shirt-numbers').ok,
+        'and so is a substitute who has not come on');
+  ok(byId(run(payload({lineups:lu,rows:[ev('home','7','foul',t)]})),'shirt-numbers').ok,
+     'while a team-mate acting at that same t was never in question');
+  ok(byId(run(payload({lineups:lu,rows:[ev('away','7','foul',t)]})),'shirt-numbers').ok,
+     'nor was the other side');
+});
+
+test('C7 · two sendings-off in one instant each keep their own moment', () => {
+  /* Each period is built on the one before it, so the second already lacks the first man.
+     Dropping only the period naming the row's own number would leave him missing from the
+     other — which is why the filter drops every sending-off standing at that instant. */
+  const t=4025, l6=HOME_XI.filter(n=>n!=='6'), l67=l6.filter(n=>n!=='7');
+  const v=run(payload({lineups:lineups({history:[redSnap('home',l6,HOME_BENCH,t,'6'),
+                                                 redSnap('home',l67,HOME_BENCH,t,'7')]}),
+                       rows:[ev('home','6','foul',t),ev('home','7','foul',t)]}));
+  ok(byId(v,'shirt-numbers').ok);
+});
+
+test('C7 · a substitution at its own moment is NOT relaxed by this rule', () => {
+  /* Deliberately out of scope, and pinned so a later widening is a decision and not a
+     drift: the outgoing player is on the bench from the swap, and that is the reading the
+     formation panel, playedMinutes and squadInHalf all take. Widening it here alone would
+     put this gate out of step with all three. */
+  const t=3900, on=HOME_XI.filter(n=>n!=='7').concat('21');
+  const c=byId(run(payload({lineups:lineups({history:[subSnap('home',on,['14','7'],t)]}),
+                            rows:[ev('home','7','pass success',t,{playerTo:'9'})]})),
+               'shirt-numbers');
+  notOk(c.ok,'a substitution period is not a sending-off period');
+  ok(/on the bench at 60:00/.test(c.spots[0]),c.spots[0]);
+});
+
+test('C7 · the moment filter touches sending-off periods only, on the side it was given', () => {
+  const body=grabFunction('histWithoutRedAtMoment');
+  ok(/h\.off!=null/.test(body),'a substitution period carries no off, and is left alone');
+  ok(/h\.team===row\.team/.test(body),'one side only');
+  ok(/SAME_MOMENT/.test(body),'the window is the named one, not SNAP_WINDOW');
+  notOk(/SNAP_WINDOW/.test(body),'…which answers a different question');
+});
+
 test('C7 · but the sent-off man cannot act afterwards, and the card time is quoted', () => {
   const t=4025, left=HOME_XI.filter(n=>n!=='6');
   const c=byId(run(payload({lineups:lineups({history:[redSnap('home',left,HOME_BENCH,t,'6')]}),
@@ -397,7 +466,7 @@ test('a hint can never turn a passing match into a failing one', () => {
 
 test('the gate is pure — it reads no state, no DOM, no video', () => {
   ['checkAnalysis','duelTally','checkShotSpots','checkShirtNumbers','histWithoutRow',
-   'duelHints','analysisRefusal'].forEach(name=>{
+   'histWithoutRedAtMoment','duelHints','analysisRefusal'].forEach(name=>{
     const body=grabFunction(name);
     notOk(/\bstate\./.test(body),name+' reads no app state');
     notOk(/\$\(|document\.|video\./.test(body),name+' touches no DOM and no video');

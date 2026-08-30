@@ -77,7 +77,7 @@ const CONSTS=['numEq','FORMATION_GRID','PZ_COLORS','effCol','effRow',
   'scrollToRow','editPrevTeam',
   // the analysis gate: the rules a match passes before it can be published (AN_ORDER)
   'anKey','DUEL_MIRRORS','DUEL_TOTALS','SPOT_REQUIRED','AN_ORDER','AN_SPOT_MAX',
-  'SNAP_WINDOW','DUEL_PAIR_WINDOW','anStamp','anSide','anDur','sumOf','inMouth','anShort'];
+  'SNAP_WINDOW','SAME_MOMENT','DUEL_PAIR_WINDOW','anStamp','anSide','anDur','sumOf','inMouth','anShort'];
 const FUNCS=['fmt','parseTime','eventHalfIn','eventHalf','matchTimeIn','matchTime',
   'matchClockPartsIn','fmtMatchClockIn','zoneAt','eventForKey',
   'macroForKey','expandKey','expandMacros','freeCode','retypeForMe','parseChain','goalToPct','goalFromPct','goalBallSVG',
@@ -88,7 +88,7 @@ const FUNCS=['fmt','parseTime','eventHalfIn','eventHalf','matchTimeIn','matchTim
   // the shirt-number gate: entries are refused before anything is written
   'squadIn','squadAt','gateHistory','checkEntryNumbers','numberGateMessage','selectEntryNumber',
   // …and the gate at the other end: a whole match, judged as it is frozen
-  'duelTally','totalCheck','mirrorCheck','checkShotSpots','histWithoutRow',
+  'duelTally','totalCheck','mirrorCheck','checkShotSpots','histWithoutRow','histWithoutRedAtMoment',
   'checkShirtNumbers','spotLine','spotCheck','shirtCheck','duelHints',
   'checkAnalysis','analysisRefusal'];
 

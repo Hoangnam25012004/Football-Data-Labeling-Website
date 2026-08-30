@@ -2846,7 +2846,15 @@ function checkEntryNumbers(team,evs,dots,hist0){
     // a '*' group repeats the same player on the same touch ("1xx*aa") — judge it once
     const k=s.no+'@'+s.idx; if(seen.has(k))continue; seen.add(k);
     const t=(s.idx!=null&&dots[s.idx]&&dots[s.idx].t!=null)?dots[s.idx].t:anchor;
-    const sq=squadAt(team,t,hist0);
+    /* …and against the board WITHOUT the sending-off standing at this very moment,
+       which is the rule the analysis gate applies to the same instant (see
+       histWithoutRedAtMoment). The two gates have to agree here, or a tagger meets a
+       refusal for an entry the publish gate would have accepted, with nothing on
+       screen to say why. An entry can never reach this through its OWN card —
+       applyRedCard runs long after this gate — only through one tagged in an earlier
+       entry, with the foul that earned it added afterwards at the same second. */
+    const hist=histWithoutRedAtMoment(hist0||state.lineups.history||[],{team,t});
+    const sq=squadAt(team,t,hist);
     if(!sq.all.includes(s.no)){
       /* The side does not have this number. A sending-off is asked about FIRST, because
          it is the one way a number leaves the board altogether: applyRedCard drops the
@@ -2854,7 +2862,7 @@ function checkEntryNumbers(team,evs,dots,hist0){
          we get here he looks exactly like a number that never existed. He is not, and
          "was sent off at 67:40" is a far better answer than "is not in the formation".
          Cards are refused here too — a man already sent off cannot collect another. */
-      const red=(hist0||state.lineups.history||[])
+      const red=hist
         .filter(h=>h.team===team&&h.off!=null&&numEq(h.off,s.no)&&h.t<=t)
         .sort((a,b)=>a.t-b.t).pop();
       if(red)return {no:s.no,kind:'sent-off',redT:red.t,t,sq,idx:s.idx,ev:s.ev};
@@ -3096,6 +3104,36 @@ function histWithoutRow(hist,row){
     return !/^Substitution/.test(h.label||'');
   });
 }
+/* ---- the moment a card is shown belongs to the incident, not yet to the punishment ----
+   A sending-off is the consequence of something tagged at the SAME instant: the foul that
+   earned it, the second yellow that carried it. submitEntry writes those as separate rows
+   of one entry ("13f*yc*rc") sharing one dot, so every one of them carries the card's own
+   t -- and applyRedCard puts the snapshot at exactly that t, which effectiveLUIn reads as
+   in force FROM t. Each sibling row of the incident is then judged against a board the
+   incident itself emptied, and the check says the sentence histWithoutRow above exists to
+   prevent, one row too early: "No.13  foul  -- sent off at 60:58.72".
+
+   So the rule gains its missing half: a sending-off does not take effect until AFTER the
+   moment it is shown. For a row at t, the red-card periods standing at t itself are
+   dropped -- and dropping one can only ever put its own sent-off man back, because
+   applyRedCard builds each of them as the board before it minus exactly that man.
+
+   The window is a hundredth of a second and NOT SNAP_WINDOW, on purpose. effectiveLUIn
+   only ever consults periods at or before t, so a window reaching no further than t
+   itself cannot change the verdict of any row whose time differs from a card's: the whole
+   of the rest of the match is judged by exactly the board it was judged by before.
+   SNAP_WINDOW answers a different question -- how far a period may sit from the row that
+   CREATED it, which fmEditPeriodTime can widen -- and borrowing it here would forgive
+   three seconds of play after a sending-off.
+
+   `row` is read for its team and its t only, so either gate may hand it a whole row or
+   the {team,t} of one touch. h.off is what tells a sending-off period from a substitution
+   one: only applyRedCard writes it, and substitutions are deliberately left alone. */
+const SAME_MOMENT=0.01;                    // the precision the events table prints a time to
+function histWithoutRedAtMoment(hist,row){
+  return (hist||[]).filter(h=>!(h&&h.off!=null&&h.team===row.team
+    &&Math.abs(h.t-row.t)<=SAME_MOMENT));
+}
 /* -> the offending (row, number) pairs in time order; [] when C7 holds; null when there
    is no line-up to judge against at all. Both numbers on a row are checked: a pass
    played to somebody who is not on the pitch is the same error as one played by them. */
@@ -3104,7 +3142,7 @@ function checkShirtNumbers(lineups,rows){
   const hist0=lineups.history||[], bad=[];
   (rows||[]).forEach(r=>{
     if(!lineups[r.team])return;
-    const ev=anKey(r.event), hist=histWithoutRow(hist0,r);
+    const ev=anKey(r.event), hist=histWithoutRedAtMoment(histWithoutRow(hist0,r),r);
     const sq=squadIn(lineups,r.team,r.t,hist);
     // this side was never submitted, so nothing tagged for it can be vouched for —
     // the same verdict checkEntryNumbers gives, reached the same way
