@@ -10,9 +10,13 @@
    the channel tests use. Nothing here talks to a real database. */
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk}=require('./tiny-test');
+const {readSrc}=require('./harness');
 
 const ROOT=path.join(__dirname,'..');
-const page=p=>fs.readFileSync(path.join(ROOT,p),'utf8');
+/* through harness's one door, so a working copy git has rewritten with CRLF
+   still matches the patterns below — every one of them is written against the
+   LF the repository stores. See the note over readSrc in harness.js. */
+const page=readSrc;
 
 const LOGIN=page('client/login.html');
 const SUPA=page('client/assets/supa.js');

@@ -11,7 +11,7 @@
    them at (i+1)/(n+1) down the cell, so two centre backs read as a pair and four read as a
    column instead of a pile. */
 const fs=require('fs'), path=require('path'), vm=require('vm');
-const {loadShared,grabFunction,grabConst,SRC,SHARED}=require('./harness');
+const {loadShared,grabFunction,grabConst,readSrc,SRC,SHARED}=require('./harness');
 const {test,eq,deepEq,ok,notOk}=require('./tiny-test');
 
 const S=loadShared();
@@ -19,7 +19,7 @@ const DIRS=['lr','rl'];
 // centre of a DISPLAY cell — the same arithmetic gridHTML lays the squares out with
 const centre=(row,col)=>({x:(col+0.5)*100/6,y:S.PZ_ROW_TOP[row]+S.PZ_ROW_H[row]/2});
 const near=(a,b)=>Math.abs(a-b)<1e-9;
-const PL=fs.readFileSync(path.join(__dirname,'..','Player-Lists','index.html'),'utf8');
+const PL=readSrc('Player-Lists/index.html');
 
 /* ================= the staging square ================= */
 test('an unknown position parks beside the keeper, not out on the pitch', () => {
