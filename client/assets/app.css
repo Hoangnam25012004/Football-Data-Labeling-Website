@@ -542,7 +542,32 @@ table.stbl tfoot .c-opp{position:sticky; left:104px; z-index:2; text-align:left;
    pointer-events:none, which would leave these squares looking clickable and
    doing nothing. Two boards, two vocabularies, no way for either to reach the
    other. */
-.pl-pos{max-width:520px; margin-bottom:14px}
+/* ---------- one player: the board beside what he has played ----------
+   Position on the left, Season on the right. The left column is the narrower of
+   the two because it holds a drawing with a fixed aspect ratio (PITCH_DIMS) and
+   the right holds a table, which takes every pixel it is given. 820px is the
+   breakpoint .grid2 / .grid-13 / .sm-wrap already use — the same question does
+   not get a second answer here. */
+/* Stretched rather than start-aligned: the two are one row, and a short table
+   leaving a hole beside a tall pitch reads as something failing to load. */
+.pl-duo{
+  display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);
+  gap:14px; align-items:stretch; margin-bottom:14px;
+}
+.pl-duo-l{display:flex; flex-direction:column; gap:14px; min-width:0}
+@media (max-width:820px){ .pl-duo{grid-template-columns:minmax(0,1fr)} }
+
+/* Two tiles, so they halve the left column rather than being stretched into a
+   band by auto-fit. The gap on .pl-duo-l is the spacing below them. */
+.kpis.two{grid-template-columns:repeat(2,minmax(0,1fr)); margin-bottom:0}
+
+/* League and Season are words among columns of figures, so they read left like
+   the two text columns of every other table on this page (.c-date, .c-opp). */
+.pl-season .stbl-wrap{margin-bottom:11px}
+table.stbl .c-lg,table.stbl .c-sn{text-align:left}
+.pl-season .note{margin:0}
+
+.pl-pos{margin-bottom:0}
 /* aspect-ratio is set inline, off PITCH_DIMS — the channel's game decides it, and
    a futsal court is not a football pitch's shape. This is the fallback for a
    channel whose sport nothing could answer for. */
@@ -552,13 +577,13 @@ table.stbl tfoot .c-opp{position:sticky; left:104px; z-index:2; text-align:left;
 .pl-pitch > svg{border-radius:2px}
 .pl-pitch > svg > rect{fill:var(--carbon-2)}
 .pl-pitch > svg > g{stroke:var(--line-soft)}
+/* No cursor and no :hover — these squares report, they do not act. Both were
+   here while clicking one filtered the row of tiles below; that row is gone. */
 .pl-pz{
   position:absolute; display:flex; flex-direction:column; align-items:center;
   justify-content:center; gap:7px; padding:0; border:0; border-radius:2px;
-  background:color-mix(in srgb,var(--chalk) 7%, transparent); cursor:pointer;
-  transition:background .16s;
+  background:color-mix(in srgb,var(--chalk) 7%, transparent);
 }
-.pl-pz:hover{background:color-mix(in srgb,var(--chalk) 13%, transparent)}
 .pl-pz-dot{width:21px; height:21px; border-radius:50%; background:var(--chalk); flex:none}
 .pl-pz-lb{font-family:var(--f-mono); font-size:10px; letter-spacing:.1em; color:var(--chalk)}
 /* the square being read takes the amber of the badge beside his name */
@@ -573,14 +598,6 @@ table.stbl tfoot .c-opp{position:sticky; left:104px; z-index:2; text-align:left;
   .pl-pz-dot{width:15px; height:15px}
   .pl-pz-lb{font-size:8.5px; letter-spacing:.06em}
 }
-
-/* ---------- one player: the bar over his tiles ----------
-   Which reading the four tiles on the right are in. */
-.pl-ctl{display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin:0 0 14px}
-.pl-grp{display:flex; align-items:center; flex-wrap:wrap; gap:7px; min-width:0}
-.pl-grp.right{margin-left:auto}
-/* Per 90 with no minutes to divide by */
-.pl-ctl .chip[disabled]{opacity:.4; cursor:not-allowed}
 
 /* ---------- one match ---------- */
 /* The mounted Stats view brings its own stylesheet (Stats/stats-view.css) and

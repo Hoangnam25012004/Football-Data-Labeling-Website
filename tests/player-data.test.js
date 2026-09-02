@@ -45,12 +45,13 @@ const tabs=/function dataTabs\(open\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
    app.js, as ONE script so their bindings can see each other. `window` is the
    handful of shared.js names app.js reaches through it. */
 const LIFT=['playerIndex','aliasMap','sumStats','playerCards','gkFigures','gkCell','posFigures',
-            'minsTotal','minsOne','per90','aggregate','discipline','playerTally','totalOf','aggregates'];
-/* The role block, lifted whole: ROLES, ROLE_POS, the four lookups built off them,
-   MODES, and the four tile tables. It is one contiguous run in app.js from its own
-   banner comment to the last line of FALLBACK_KPIS, and taking it in one piece is
-   what keeps the lookups in step with the tables they are read beside. */
-const ROLEBLOCK=/\n  \/\* -+ roles -+[\s\S]*?c: 'yellow and red' \}\n  \];/.exec(APPJS)[0];
+            'minsTotal','minsOne','aggregate','discipline','playerTally','totalOf','aggregates'];
+/* The role block, lifted whole: ROLES, ROLE_POS and the three lookups built off
+   them. It is one contiguous run in app.js from its own banner comment to the end
+   of the loop that fills those lookups, and taking it in one piece is what keeps
+   them in step with each other. The four tile tables and MODES used to be part of
+   this run and were lifted with it; both went when the row of tiles did. */
+const ROLEBLOCK=/\n  \/\* -+ roles -+[\s\S]*?ROLE_OF\[p\] = r\[0\]; \}\);\n  \}\);/.exec(APPJS)[0];
 function sandbox(state){
   const ctx={console,location:{hash:''},
     document:{getElementById:()=>null,addEventListener(){},removeEventListener(){}},
@@ -67,8 +68,7 @@ function sandbox(state){
     /\n  var PL_GK = \[[\s\S]*?\n  \];/.exec(APPJS)[0],
     ROLEBLOCK,
     ';globalThis.A={'+LIFT.join(',')+',PL_OUT,PL_GK,PLAYER_CATS,GK_COLS,'
-      +'ROLES,ROLE_POS,ROLE_OF,ROLE_LABEL,ROLE_BADGE,MODES,'
-      +'ROLE_KPIS,GK_KPIS,FALLBACK_KPIS,'
+      +'ROLES,ROLE_POS,ROLE_OF,ROLE_LABEL,ROLE_BADGE,'
       +'squadIds,gkShirts,onPitchAt,newStat,pct,computeStats};'
   ].join('\n'),ctx,{filename:'client/assets/app.js-extract.js'});
   return ctx.A;
@@ -412,22 +412,22 @@ test('a keeper nothing is known about reads —, never 0', () => {
 
 test('the keeper columns are shared.js-s, and take the match as well as the man', () => {
   deepEq(A.GK_COLS.map(c=>c[0]),
-         ['Saves','Conceded','On Target Faced','Save Rate','Clean Sheets','Goal Kicks',
+         ['Saves','On Target Faced','Save Rate','Clean Sheets','Goal Kicks',
           'Catches','Parries','Standing','Diving','Collapse','Overhead','Kneeling',
-          'Def. Line Support','Aerial Control','Conceded (tagged)']);
+          'Def. Line Support','Aerial Control','Conceded']);
   ok(/const GK_COLS=\[/.test(SHARED),'the definition lives in shared.js, beside PLAYER_CATS');
   const s=stat({saves:4,goalKicks:9}), g={conceded:1,clean:0,known:1};
   const v=A.GK_COLS.map(c=>c[1](s,g));
-  deepEq(v.slice(0,6),[4,1,5,'80.0%',0,9],'faced = kept out + let in, and the rate follows from it');
+  deepEq(v.slice(0,5),[4,5,'80.0%',0,9],'faced = kept out + let in, and the rate follows from it');
   /* The ten added below them are the keeper's own detail. They print their tally, so a
      match tagged before those events existed reads 0 — the two fraction columns as 0/0. */
-  deepEq(v.slice(6),[0,0,0,0,0,0,0,'0/0','0/0',0],
+  deepEq(v.slice(5),[0,0,0,0,0,0,0,'0/0','0/0',0],
          'the detail columns are a plain tally');
-  /* `known` is a different question and still guards the four it always guarded: it asks
+  /* `known` is a different question and still guards the three it always guarded: it asks
      whether a line-up existed to say who was on the pitch, not whether an event was
-     tagged. With no board, those four say so and the rest still read. */
+     tagged. With no board, those three say so and the rest still read. */
   const unknown=A.GK_COLS.map(c=>c[1](s,{conceded:0,clean:0,known:0}));
-  deepEq(unknown.slice(0,6),[4,'—','—','—','—',9],'what only he did still reads; what the match knows does not');
+  deepEq(unknown.slice(0,5),[4,'—','—','—',9],'what only he did still reads; what the match knows does not');
 });
 
 test('PLAYER_CATS is the six tabs this page and the Stats tab share', () => {
@@ -542,18 +542,21 @@ test('the list columns read a player the way his section reads him', () => {
   deepEq(A.PL_GK.map(c=>c[1](k)),[1,"90'",9,1,'90.0%',0]);
 });
 
-test('a keeper-s six tiles are about the goal, and his cards are not lost', () => {
-  /* The four moved out of the function body and into a table when roles arrived —
-     one builder now draws a keeper's row, a role's row and the fallback row, so
-     none of the three is written out twice. What they SAY has not moved. */
-  deepEq(A.GK_KPIS.map(t=>t.l),['Saves','Conceded','Save Rate','Clean Sheets'],
-     'what he did instead of shooting');
-  ok(/who\.gk\s*\n?\s*\?/.test(profile),'chosen by role, not drawn twice');
-  deepEq(A.FALLBACK_KPIS.map(t=>t.l),['Goals','Assists','Key Passes','Cards'],
-     'and the strip for a player no line-up placed is exactly as it was');
-  ok(/who\.gk \|\| role \? ' · ' \+ who\.cards\.y \+ 'Y · ' \+ who\.cards\.r \+ 'R' : ''/.test(headCard),
-     'a keeper-s booking record moves to the meta line rather than disappearing — and so does a role-s');
-  ok(/pl-role">GK/.test(headCard),'and the badge says what he is — the one thing that does not change');
+test('two tiles now, and NOBODY-s cards are lost', () => {
+  /* The four tiles that changed with the job he did are gone; the Season table
+     beside the board answers for everybody instead. Appearances and Minutes are
+     what is left, and they are built straight rather than through any table. */
+  ok(/kpi\('Appearances', who\.apps/.test(profile)&&/kpi\('Minutes', minsTotal\(who\)/.test(profile),
+     'the two that are the same job for anybody');
+  notOk(/GK_KPIS|ROLE_KPIS|FALLBACK_KPIS/.test(APPJS),'and no table of tiles is left anywhere');
+  /* The regression this test exists for. The meta line used to stay quiet for a man
+     no line-up placed, because the tiles he got carried a Cards tile of their own.
+     That row is gone, so this line is the ONLY place a booking is printed and it
+     prints for all three kinds of player. */
+  ok(/' · ' \+ who\.cards\.y \+ 'Y · ' \+ who\.cards\.r \+ 'R'/.test(headCard),
+     'the booking record is on the meta line');
+  notOk(/who\.gk \|\| role \?/.test(headCard),'and nothing gates it on who he is any more');
+  ok(/pl-role">GK/.test(headCard),'the badge still says what he is — the one thing that does not change');
 });
 
 test('the match table is Team Data-s five fixed columns, with minutes for possession', () => {

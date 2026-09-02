@@ -206,7 +206,7 @@ test('T6b · the keeper-s own columns do the same, and read the match as well as
      columns above them, because that flag answers a different question — whether a
      line-up existed to say who was on the pitch at all (T6c). */
   ['Catches','Parries','Standing','Diving','Collapse','Overhead','Kneeling',
-   'Conceded (tagged)'].forEach(l=>eq(gk[l](before,g),0,l));
+   'Conceded'].forEach(l=>eq(gk[l](before,g),0,l));
   eq(gk['Def. Line Support'](before,g),'0/0');
   eq(gk['Aerial Control'](before,g),'0/0');
   const after=sum([...many('home','catch',2),...many('home','aerial control success',1),
@@ -214,17 +214,28 @@ test('T6b · the keeper-s own columns do the same, and read the match as well as
   eq(gk['Catches'](after,g),2);
   eq(gk['Parries'](after,g),0,'a real zero beside a real two');
   eq(gk['Aerial Control'](after,g),'1/2');
-  eq(gk['Conceded (tagged)'](after,g),3);
+  eq(gk['Conceded'](after,g),3);
 });
 
-test('T6c · Conceded (tagged) stands beside the derived Conceded, never instead of it', () => {
+test('T6c · the derived Conceded left the table, and the three columns on it did not', () => {
+  const cols=S.GK_COLS.map(c=>c[0]);
+  eq(cols.filter(l=>/Conceded/.test(l)).length,1,'exactly one column is called Conceded');
+  notOk(cols.indexOf('Conceded (tagged)')>=0,'and nothing carries the old suffix');
   const gk={}; S.GK_COLS.forEach(c=>gk[c[0]]=c[1]);
   const s=sum(many('home','goal conceded',1));
-  // the board says 2 went in; the tagger typed 1. Both are reported, and the derived
-  // figure — which cannot be forgotten — is untouched by the one that can.
-  eq(gk['Conceded'](s,{conceded:2,clean:0,known:1}),2);
-  eq(gk['Conceded (tagged)'](s,{conceded:2,clean:0,known:1}),1);
-  eq(gk['Conceded'](s,{conceded:0,clean:0,known:0}),'—','and it still says "—" with no board');
+  /* The board says 2 went in; the tagger typed 1. The column that survived is the
+     tagged one, and it reports what was tagged — never the board's figure. */
+  eq(gk['Conceded'](s,{conceded:2,clean:0,known:1}),1);
+  eq(gk['Conceded'](s,{conceded:0,clean:0,known:0}),1,
+     'it is the analyst-s number, so no board is needed to print it');
+  /* The derived figure did NOT go away with its column: these three are built on it
+     and still are. Which is why Saves + Conceded need not equal On Target Faced —
+     two questions, two answers, one of them printed. */
+  eq(gk['On Target Faced'](s,{conceded:2,clean:0,known:1}),2,'0 saves + 2 the board saw');
+  eq(gk['Save Rate'](s,{conceded:2,clean:0,known:1}),'0.0%');
+  eq(gk['Clean Sheets'](s,{conceded:0,clean:1,known:1}),1);
+  ['On Target Faced','Save Rate','Clean Sheets'].forEach(l=>
+    eq(gk[l](s,{conceded:0,clean:0,known:0}),'—',l+' still says "—" with no board'));
 });
 
 /* ================= T7-T11 · the gate ================= */

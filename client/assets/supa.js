@@ -482,7 +482,10 @@
         /* `match_date` is 0011's column — the one the tagging app writes. It
            travels beside 0013's `kickoff` rather than instead of it, so the
            seeded channel keeps the date it was given. */
-        .select('id,code,home_name,away_name,home_score,away_score,kickoff,match_date,competition,stage,venue,our_side,published,lineups,config,home_team_id,away_team_id')
+        /* `league` and `season` are 0022's columns. Naming them here is exactly
+           the trap the two comments above describe, so 0022 has to have been run
+           before this file is served — see the header of that migration. */
+        .select('id,code,home_name,away_name,home_score,away_score,kickoff,match_date,competition,stage,league,season,venue,our_side,published,lineups,config,home_team_id,away_team_id')
         .eq('club_id', clubId).eq('published', true)
         .order('kickoff', { ascending: true })
         .then(function (r) {
@@ -606,6 +609,12 @@
             venue: m.venue || (side === 'home' ? 'Home' : 'Away'),
             competition: m.competition || '',
             stage: m.stage || '',
+            /* 0022's two, empty until somebody fills them in. The Season table on
+               a player's page groups his matches by this pair; empty means "nobody
+               has said", and that page prints "—". Not folded into competition:
+               that column answers a different question and is already read. */
+            league: m.league || '',
+            season: m.season || '',
             timeline: [],
             us: statsFromView(st[side]),
             them: statsFromView(st[other]),

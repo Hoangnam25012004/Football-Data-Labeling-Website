@@ -340,17 +340,17 @@ test('the fail side is the remainder, so the three figures cannot disagree', () 
   notOk('defLineSupportsFail' in s,'no third counter that could drift from the other two');
 });
 
-test('the hand-tagged goals conceded is the plain name here, and suffixed in GK_COLS', () => {
+test('the hand-tagged goals conceded is one column in each table, plainly named', () => {
   const s=P(GK_ROWS)['1'];
   eq(col('goalkeeper','Goals Conceded')(s),1);
-  /* This table holds neither derived figure, so the plain name is free. GK_COLS does hold
-     one — the keeper's own Conceded, off who was on the pitch — so there the tagged one
-     keeps its suffix, or that table would print two columns called Conceded. */
+  /* Neither table holds the derived figure as a column of its own any more, so neither
+     needs a suffix to tell two Concededs apart. GK_COLS' one is the tagged number; the
+     derived one is still read there by On Target Faced, Save Rate and Clean Sheets. */
   const gk=S.GK_COLS.map(c=>c[0]);
-  ok(gk.indexOf('Conceded')>=0&&gk.indexOf('Conceded (tagged)')>=0,
-     'both live in GK_COLS, told apart by the suffix');
+  eq(gk.filter(l=>/Conceded/.test(l)).length,1,'exactly one Conceded column in GK_COLS');
+  ok(gk.indexOf('Conceded')>=0,'and it carries the plain name');
   eq(S.PLAYER_CATS.goalkeeper.filter(c=>/Conceded/.test(c[0])).length,1,
-     'and only one of them is on the tab');
+     'one on the tab as well, as there always was');
 });
 
 test('a keeper from before these events existed reads 0, not a dash', () => {
@@ -397,10 +397,15 @@ test('every column prints a tally: no table anywhere falls back to a dash', () =
     notOk(String(r[1](blank,blank))==='—',sec[0]+' / '+r[0]+' must not read a dash')));
   S.GK_COLS.forEach(c=>notOk(String(c[1](blank,g))==='—',
     'GK_COLS / '+c[0]+' must not read a dash when a board exists'));
-  // …and the four that legitimately still do, when no board can answer
+  /* …and the three that legitimately still do, when no board can answer. There were
+     four: the derived Conceded was one, and its column is gone. The figure behind it
+     is not — these three are built on it and still refuse to guess. The Conceded
+     column that remains is the hand-tagged one and needs no board, so it prints 0. */
   const none={conceded:0,clean:0,known:0};
-  ['Conceded','On Target Faced','Save Rate','Clean Sheets'].forEach(l=>
+  ['On Target Faced','Save Rate','Clean Sheets'].forEach(l=>
     eq(S.GK_COLS.find(c=>c[0]===l)[1](blank,none),'—',l+' still says so with no line-up'));
+  eq(S.GK_COLS.find(c=>c[0]==='Conceded')[1](blank,none),0,
+     'the tagged Conceded is a tally, so it reads a plain zero');
 });
 
 test('the dashboard and the PDF dropped it too, and gained the two kinds', () => {

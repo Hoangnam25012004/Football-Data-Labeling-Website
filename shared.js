@@ -556,7 +556,11 @@ const PLAYER_CATS={
    sheet nobody recorded. */
 const GK_COLS=[
   ['Saves',          (s,g)=>s.saves],
-  ['Conceded',       (s,g)=>g.known?g.conceded:'—'],
+  /* No derived Conceded column here since 2026-09-03. The figure it printed —
+     opposition goals scored while this keeper was on the pitch — has NOT gone
+     away: the three columns below still read it, and still say "—" when no
+     line-up could answer. Only the column was dropped, so that the hand-tagged
+     one at the foot of this table can carry the plain name. */
   ['On Target Faced',(s,g)=>g.known?s.saves+g.conceded:'—'],
   ['Save Rate',      (s,g)=>g.known?pct(s.saves,s.saves+g.conceded):'—'],
   ['Clean Sheets',   (s,g)=>g.known?g.clean:'—'],
@@ -580,10 +584,18 @@ const GK_COLS=[
   ['Kneeling',       (s,g)=>s.saveKneeling],
   ['Def. Line Support',(s,g)=>s.defLineSupportsWon+'/'+s.defLineSupports],
   ['Aerial Control', (s,g)=>s.aerialControlsWon+'/'+s.aerialControls],
-  /* Beside Conceded, never instead of it. Conceded is derived from the formation board
-     and cannot be forgotten; this one is typed by hand and can. When they disagree, the
-     derived figure is the one to believe. */
-  ['Conceded (tagged)',(s,g)=>s.goalsConceded]
+  /* The hand-tagged figure, off the `goal conceded` event. Since the derived column was
+     dropped above, this is the ONLY column here called Conceded, so the "(tagged)" suffix
+     no longer tells anything apart and the plain name is the right one.
+
+     It stays at the foot of the table rather than moving up into the gap. Beside
+     On Target Faced it would invite the eye to read Saves + Conceded = On Target Faced,
+     and that sum does not hold: On Target Faced is built on the DERIVED figure, which is
+     a different question with a different answer. Two numbers, one of them printed.
+
+     `g` is unused and stays in the signature: every column in this table takes the match
+     as well as the man, and that arity is what separates GK_COLS from PLAYER_CATS. */
+  ['Conceded',(s,g)=>s.goalsConceded]
 ];
 
 /* ---- shots + body part (Event List) ----
