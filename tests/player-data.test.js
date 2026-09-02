@@ -542,12 +542,12 @@ test('the list columns read a player the way his section reads him', () => {
   deepEq(A.PL_GK.map(c=>c[1](k)),[1,"90'",9,1,'90.0%',0]);
 });
 
-test('two tiles now, and NOBODY-s cards are lost', () => {
-  /* The four tiles that changed with the job he did are gone; the Season table
-     beside the board answers for everybody instead. Appearances and Minutes are
-     what is left, and they are built straight rather than through any table. */
-  ok(/kpi\('Appearances', who\.apps/.test(profile)&&/kpi\('Minutes', minsTotal\(who\)/.test(profile),
-     'the two that are the same job for anybody');
+test('no tiles at all now, and NOBODY-s cards are lost', () => {
+  /* Every tile is gone. The four that changed with the job he did answered a
+     question the Season table answers for everybody; Appearances and Minutes are
+     that table's own last two columns, so a tile repeating them printed the same
+     figure twice on one screen. */
+  eq((profile.match(/kpi\(/g)||[]).length,0,'not one kpi() call left in the profile');
   notOk(/GK_KPIS|ROLE_KPIS|FALLBACK_KPIS/.test(APPJS),'and no table of tiles is left anywhere');
   /* The regression this test exists for. The meta line used to stay quiet for a man
      no line-up placed, because the tiles he got carried a Cards tile of their own.

@@ -554,18 +554,17 @@ table.stbl tfoot .c-opp{position:sticky; left:104px; z-index:2; text-align:left;
   display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);
   gap:14px; align-items:stretch; margin-bottom:14px;
 }
-.pl-duo-l{display:flex; flex-direction:column; gap:14px; min-width:0}
 @media (max-width:820px){ .pl-duo{grid-template-columns:minmax(0,1fr)} }
-
-/* Two tiles, so they halve the left column rather than being stretched into a
-   band by auto-fit. The gap on .pl-duo-l is the spacing below them. */
-.kpis.two{grid-template-columns:repeat(2,minmax(0,1fr)); margin-bottom:0}
 
 /* League and Season are words among columns of figures, so they read left like
    the two text columns of every other table on this page (.c-date, .c-opp). */
-.pl-season .stbl-wrap{margin-bottom:11px}
 table.stbl .c-lg,table.stbl .c-sn{text-align:left}
-.pl-season .note{margin:0}
+/* The table is the last thing in the card, so its own bottom margin would sit
+   inside the card's padding and read as a gap nobody asked for. Outside the row
+   — a keeper has no board, so the card stands alone — it carries the row's. */
+.pl-season .stbl-wrap{margin-bottom:0}
+.pl-duo > .pl-season{margin-bottom:0}
+.pl-season{margin-bottom:14px}
 
 .pl-pos{margin-bottom:0}
 /* aspect-ratio is set inline, off PITCH_DIMS — the channel's game decides it, and

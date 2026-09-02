@@ -1197,22 +1197,21 @@
     body.appendChild(playerHead(who, people, cat, role));
 
     /* Where he stood on the left, what he has played on the right — one row, and
-       two on a phone. The two tiles go UNDER the board in that same left column:
-       they are the whole campaign added up, and the table beside them is that same
-       total broken out by league and season. Exactly the relation the match table's
-       tfoot below has with its own rows, so it is drawn the same way round. */
-    var duo = el('div', 'pl-duo');
-    var left = el('div', 'pl-duo-l');
+       two on a phone. Appearances and Minutes are the Season table's own last two
+       columns, so no tile repeats them underneath.
+
+       A keeper, and a man no line-up ever placed, get no board (positionBoard
+       returns null for both). The Season card then takes the width on its own
+       rather than sitting in a two-column row with an empty half beside it. */
     var board = positionBoard(who);
-    if (board) left.appendChild(board);
-    var kpis = el('div', 'kpis two');
-    kpis.innerHTML =
-      kpi('Appearances', who.apps, who.apps === 1 ? 'match played' : 'matches played') +
-      kpi('Minutes', minsTotal(who), 'on the pitch');
-    left.appendChild(kpis);
-    duo.appendChild(left);
-    duo.appendChild(seasonCard(who));
-    body.appendChild(duo);
+    if (board) {
+      var duo = el('div', 'pl-duo');
+      duo.appendChild(board);
+      duo.appendChild(seasonCard(who));
+      body.appendChild(duo);
+    } else {
+      body.appendChild(seasonCard(who));
+    }
 
     body.appendChild(catTabs(cat, '#/data/player/' + encodeURIComponent(who.key) + '/', tabs));
     body.appendChild(playerMatchTable(who, cat));
@@ -1283,9 +1282,6 @@
       '<th>Appearances</th><th>Minutes</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table>';
     card.appendChild(wrap);
-    card.appendChild(el('p', 'note',
-      'League and Season come from the match itself. A match nobody has assigned to a ' +
-      'competition or a season reads "—", and every match like that is gathered into one row.'));
     return card;
   }
 

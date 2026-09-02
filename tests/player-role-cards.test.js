@@ -115,15 +115,16 @@ test('the three groups are the ones that were asked for', () => {
 test('no table of tiles is left in app.js, nor anything that read one', () => {
   ['ROLE_KPIS','GK_KPIS','FALLBACK_KPIS','MODES','function per90','function playerCtl']
     .forEach(n=>notOk(APPJS.indexOf(n)>=0,n+' is still in app.js'));
-  notOk(/kpis six/.test(profile),'the profile no longer asks for the six-wide grid');
-  ok(/kpis two/.test(profile),'it asks for the two-wide one');
 });
 
-test('the two tiles that stayed are built straight, not through any table', () => {
-  ok(/kpi\('Appearances', who\.apps/.test(profile),'Appearances');
-  ok(/kpi\('Minutes', minsTotal\(who\)/.test(profile),'Minutes');
-  const kpiCalls=(profile.match(/kpi\(/g)||[]).length;
-  eq(kpiCalls,2,'and there are exactly two of them');
+test('the profile draws no tile at all', () => {
+  /* Appearances and Minutes are the Season table's own last two columns. A tile
+     repeating either of them under the board printed the same figure twice on one
+     screen, which is the rule this page keeps everywhere else. */
+  eq((profile.match(/kpi\(/g)||[]).length,0,'not one kpi() call is left in the profile');
+  notOk(/kpis/.test(profile),'and it asks for no tile grid, six-wide or two-wide');
+  ok(/\.kpis\.six\{/.test(APPCSS),'.kpis.six stays in the CSS — Team Data still draws it');
+  notOk(/\.kpis\.two\{/.test(APPCSS),'.kpis.two took its rule with it');
 });
 
 test('Shooting Accuracy is still one ratio, in the table it belongs to', () => {
@@ -314,9 +315,9 @@ test('nothing on this card prints a shirt number', () => {
 });
 
 test('the new markup brings its own styles and borrows the rest', () => {
-  ok(/\.pl-duo\{/.test(APPCSS)&&/\.pl-duo-l\{/.test(APPCSS),'the two-column row is defined');
-  ok(/\.kpis\.two\{/.test(APPCSS),'and the two-tile strip beside it');
-  ok(/\.kpis\.six\{/.test(APPCSS),'the six-wide one stays — Team Data still draws it');
+  ok(/\.pl-duo\{/.test(APPCSS),'the two-column row is defined');
+  ok(/\.pl-season\{/.test(APPCSS),'and the card that sits in its right half');
+  notOk(/\.pl-duo-l\{/.test(APPCSS),'the left column is the board itself now, not a wrapper');
   ok(/\.pl-pos\{/.test(APPCSS)&&/\.pl-pitch\{/.test(APPCSS)&&/\.pl-pz\{/.test(APPCSS),
      'the board is defined');
   ok(/\.pl-pz\.on\{/.test(APPCSS),'a lit square takes the amber of the badge');
@@ -403,12 +404,11 @@ function paintProfile(person){
 
   const body=mk('div');
   ctx.OUT(body,person,[person],'shooting');
-  /* one row holding the board and the tiles on the left, the Season card on the right */
-  const duo=body.kids.filter(n=>n.className==='pl-duo')[0];
-  const left=duo?duo.kids.filter(n=>n.className==='pl-duo-l')[0]:null;
-  const kpis=left?left.kids.filter(n=>n.className==='kpis two')[0]:null;
-  const season=duo?duo.kids.filter(n=>n.className==='card pl-season')[0]:null;
-  const board=left?left.kids.filter(n=>n.className==='card pl-pos')[0]||null:null;
+  /* One row: the board on the left, the Season card on the right. A player with
+     no board gets no row at all — the card is appended to the body on its own. */
+  const duo=body.kids.filter(n=>n.className==='pl-duo')[0]||null;
+  const season=(duo?duo.kids:body.kids).filter(n=>n.className==='card pl-season')[0]||null;
+  const board=duo?duo.kids.filter(n=>n.className==='card pl-pos')[0]||null:null;
   const pitch=board?board.kids.filter(n=>n.className==='pl-pitch')[0]:null;
   /* every square drawn on it, in the order the two loops walked the grid */
   /* the class list exactly, not a substring match: the direction arrow beside them
@@ -418,11 +418,9 @@ function paintProfile(person){
     tag:b.tag, on:b.className.split(' ').indexOf('on')>=0,
     role:b.getAttribute('data-role'), pressed:b.getAttribute('aria-pressed'),
     title:b.title, left:b.style.left, top:b.style.top, node:b})):[];
-  const cell=(node,cls)=>(node.innerHTML.match(new RegExp('class="'+cls+'">([^<]*)<','g'))||[])
-    .map(s=>s.replace(new RegExp('^class="'+cls+'">'),'').replace(/<$/,''));
-  return {body,duo,left,kpis,season,board,pitch,squares,ctx,
-    labels:kpis?cell(kpis,'k-l'):[], values:kpis?cell(kpis,'k-v'):[],
-    seasonRows:ctx.SEASONROWS};
+  return {body,duo,season,board,pitch,squares,ctx,seasonRows:ctx.SEASONROWS,
+    /* every .kpi tile anywhere in the profile — there should be none */
+    tiles:body.kids.filter(n=>/\bkpis\b/.test(n.className))};
 }
 /* a fully-formed player, the shape playerIndex hands the view */
 function person(o){
@@ -436,39 +434,29 @@ function person(o){
     timed:o.timed===undefined?true:o.timed});
 }
 
-test('a defender-s profile draws, and the two tiles are everybody-s', () => {
-  const r=paintProfile(person({role:'defender',roles:['defender'],
-    total:{tacklesWon:9,tackles:14,interceptions:14,clearances:21}}));
-  deepEq(r.labels,['Appearances','Minutes'],'no tile changes with the job he did any more');
-  deepEq(r.values,['4',"360'"]);
-  ok(r.season,'and the Season card is what stands where the other four were');
-});
-
-test('the row holds exactly two things, in the order the design asks for', () => {
+test('the row holds exactly two things: the board, then the Season card', () => {
   const r=paintProfile(person({role:'defender',roles:['defender'],posApps:{CB:4}}));
   ok(r.duo,'a .pl-duo row');
-  eq(r.duo.kids.length,2,'the left column and the Season card, nothing else');
-  eq(r.duo.kids[0].className,'pl-duo-l','the board and the tiles on the left');
-  eq(r.duo.kids[1].className,'card pl-season','the table on the right');
-  deepEq(r.left.kids.map(n=>n.className),['card pl-pos','kpis two'],
-     'and inside the left column the board comes first, the tiles under it');
+  deepEq(r.duo.kids.map(n=>n.className),['card pl-pos','card pl-season'],
+     'the board is the left column itself — there is no wrapper round it any more');
+  deepEq(r.tiles,[],'and no tile strip anywhere on the profile');
 });
 
-test('a keeper reads the same two tiles and the same table, with no board', () => {
-  const r=paintProfile(person({isGk:true,total:{saves:9},min:360}));
-  deepEq(r.labels,['Appearances','Minutes'],'the four about the goal are gone with the rest');
-  notOk(r.board,'no board — the GK square is not one of the fifteen');
-  ok(r.season,'but the Season card is his too: it does not change with the job');
-  eq(r.duo.kids.length,2,'and the row is still two columns wide');
-  deepEq(r.left.kids.map(n=>n.className),['kpis two'],'his left column holds the tiles alone');
+test('a player with no board gets the Season card at full width, not an empty half', () => {
+  [person({isGk:true,total:{saves:9},min:360}),                  // a keeper
+   person({total:{goals:3,assists:2}})].forEach(p=>{             // nobody ever placed him
+    const r=paintProfile(p);
+    notOk(r.board,'no board');
+    notOk(r.duo,'so no two-column row either');
+    ok(r.season,'but the Season card is still his — it does not change with the job');
+    ok(r.body.kids.indexOf(r.season)>=0,'and it sits straight on the body');
+  });
 });
 
 test('a man no board placed keeps his booking record', () => {
   const r=paintProfile(person({total:{goals:3,assists:2,keyPasses:6},cards:{y:2,r:1}}));
-  deepEq(r.labels,['Appearances','Minutes']);
-  notOk(r.board,'no square was ever lit for him');
-  /* the regression §2.4 of the design is about: the Cards tile he used to get is
-     gone, so the meta line has to be carrying it */
+  deepEq(r.tiles,[],'the Cards tile he used to get went with every other tile');
+  /* which is exactly why the meta line has to be carrying it */
   const meta=r.body.kids.filter(n=>n.className==='card pl-head')[0]
                   .kids.filter(n=>n.className==='pl-meta')[0];
   ok(/2Y · 1R/.test(meta.innerHTML),'and it is printed on the meta line instead');
@@ -552,6 +540,8 @@ test('a man with one position still gets his board', () => {
 test('a profile with no minutes draws, and says so where minutes are printed', () => {
   const r=paintProfile(person({role:'striker',roles:['striker'],posApps:{CF:1},
     timed:false,min:0}));
-  deepEq(r.labels,['Appearances','Minutes'],'the page draws rather than throwing');
-  eq(r.values[1],'—','and no line-up means no minutes, not zero of them');
+  ok(r.duo&&r.season,'the page draws rather than throwing');
+  /* the only place minutes are printed on this row now is the table's last column */
+  ok(/—/.test(r.season.innerHTML+r.season.kids.map(n=>n.innerHTML).join('')),
+     'and no line-up means no minutes, not zero of them');
 });

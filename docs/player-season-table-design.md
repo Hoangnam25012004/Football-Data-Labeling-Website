@@ -9,8 +9,22 @@ riêng biệt trên bảng Goalkeeping: **chỉ còn một cột `Conceded`**.
 Trạng thái: **ĐÃ TRIỂN KHAI** (2026-09-03). §13 được trả lời **Q1 = (b)**, Q2 = (a), Q3 = (a),
 Q4 = (a); tài liệu này mô tả code đang chạy, với §3.4 và §7 đã viết lại theo Q1 = (b).
 
-Test: `node tests/run.js` → **1419/1419 passed** (1409 trước đó, − 15 test bị xoá, − 11 sửa,
-+ 25 test mới ở `tests/player-season-table.test.js` và ở các file đã có).
+Test: `node tests/run.js` → **1418/1418 passed**.
+
+> ### Bản 2 (2026-09-03) — hai card và dòng chú thích bị gỡ
+>
+> | | Bản 1 | **Bản 2 — code đang chạy** |
+> |---|---|---|
+> | Card `Appearances` / `Minutes` dưới bảng sân | có | **gỡ hẳn.** Hồ sơ cầu thủ giờ **không còn một tile nào**. |
+> | Dòng `.note` dưới bảng Season | có | **gỡ hẳn** |
+> | Cột trái của `.pl-duo` | `div.pl-duo-l` bọc bảng sân + hai card | **chính thẻ `card pl-pos`** — không còn wrapper, `.pl-duo-l` bị xoá |
+> | Người không có bảng sân (thủ môn, người không đội hình nào xếp) | `.pl-duo` hai cột với nửa trái chỉ có hai card | **không dựng `.pl-duo`**; thẻ Season đứng riêng, **rộng toàn khung** |
+> | `.kpis.two` | có | xoá (`.kpis.six` **ở lại** — Team Data vẫn dùng) |
+>
+> **§2.3 của bản 1 không còn áp dụng.** Nó lập luận rằng `Appearances`/`Minutes` xuất hiện hai
+> lần là *chủ ý* — hai card là tổng, bảng Season là phần chia nhỏ. Bản 2 giải quyết trùng lặp
+> đó theo cách thẳng hơn: hai con số chỉ còn ở hai cột cuối của bảng Season. Mọi đoạn nói
+> "hai card" ở §0, §2.3, §3, §7, §8, §11 là mô tả bản 1; §16 liệt kê chính xác cái gì đổi.
 
 > **Q1 = (b) đổi hai thứ so với bản duyệt đầu.** Bảng sân thành **chỉ-để-đọc**: ô là `div` chứ
 > không phải `button`, không listener, không `data-role`, không `aria-pressed`, và `.pl-pz` bỏ
@@ -779,3 +793,81 @@ create index if not exists matches_league_season_idx on public.matches (club_id,
 
 Kiểm sau khi chạy: `select league, season from public.matches limit 1;` phải trả hai cột `null`
 chứ không phải lỗi. Sau đó điền dữ liệu vào hai cột là bảng Season tự tách hàng.
+
+---
+
+## 16. Bản 2 — gỡ hai card và dòng chú thích
+
+Yêu cầu: bỏ hai card `Appearances` / `Minutes` dưới bảng sân, và bỏ dòng `.note` dưới bảng
+Season. Kết quả là hồ sơ một cầu thủ **không còn một tile nào**.
+
+### 16.1 `client/assets/app.js`
+
+- `renderPlayerProfile()` — bỏ khối `var kpis = el('div', 'kpis two')` và cả `div.pl-duo-l`.
+  Bảng sân giờ là **chính cột trái** của lưới. Và vì lưới chỉ có nghĩa khi có hai thứ để xếp:
+
+  ```js
+  var board = positionBoard(who);
+  if (board) {
+    var duo = el('div', 'pl-duo');
+    duo.appendChild(board);
+    duo.appendChild(seasonCard(who));
+    body.appendChild(duo);
+  } else {
+    body.appendChild(seasonCard(who));
+  }
+  ```
+
+  Thủ môn và người không đội hình nào xếp chỗ đều nhận `null` từ `positionBoard()`. Trước đây
+  nửa trái của họ là hai card; giờ hai card không còn, nên dựng lưới hai cột sẽ để lại **một
+  nửa trống 0.85fr** — đọc như thứ gì đó hỏng. Vì thế họ không có lưới, và thẻ Season rộng
+  toàn khung. Đã xác minh: card rộng 1052px trên viewport 1280.
+
+- `seasonCard()` — bỏ `card.appendChild(el('p', 'note', …))`. Thẻ giờ đúng hai thứ:
+  `card-h` "Season" và `stbl-wrap`. Dấu `—` trong hai cột đầu tự nói điều dòng chú thích nói.
+
+`kpi()` **không** bị xoá: `renderTeamData()` và `renderOverview()` vẫn dựng tile bằng nó.
+
+### 16.2 `client/assets/app.css`
+
+| | |
+|---|---|
+| xoá | `.pl-duo-l{…}` — không còn wrapper cột trái |
+| xoá | `.kpis.two{…}` — không còn hàng hai tile |
+| xoá | `.pl-season .note{margin:0}` |
+| đổi | `.pl-season .stbl-wrap{margin-bottom:11px}` → `margin-bottom:0` — bảng là thứ cuối trong thẻ, lề dưới của nó nằm trong padding của thẻ và đọc như một khoảng hở thừa |
+| thêm | `.pl-season{margin-bottom:14px}` + `.pl-duo > .pl-season{margin-bottom:0}` — đứng riêng thì thẻ tự mang lề của hàng; nằm trong hàng thì `.pl-duo` đã mang rồi |
+
+`.kpis.six` và hai media query của nó **ở lại** — Team Data vẫn vẽ hàng sáu tile bằng đúng
+class đó, và `tests/data-page.test.js:362` canh điều này.
+
+### 16.3 Test
+
+`1419 → 1418` (một test bị gộp): `'a defender-s profile draws…'` và `'the row holds exactly
+two things…'` nhập làm một, vì cái đầu chỉ còn kiểm được bảng Season.
+
+| File | Đổi |
+|---|---|
+| `tests/player-role-cards.test.js` | harness `paintProfile` bỏ `left`/`kpis`/`labels`/`values`, thêm `tiles` (phải luôn rỗng) và đọc `season` từ `.pl-duo` **hoặc** thẳng từ `body`; 5 test viết lại |
+| `tests/player-data.test.js` | `'two tiles now…'` → `'no tiles at all now, and NOBODY-s cards are lost'` — đếm `kpi(` trong profile phải bằng **0** |
+| `tests/player-season-table.test.js` | `'…carries the note under it'` → `'the card is a title and a table, and nothing else'` |
+
+Ba test mới/đã đổi khoá lại đúng ba điều bản 2 khẳng định: **không tile nào**, **không note
+nào**, và **không lưới khi không có bảng sân**.
+
+### 16.4 Cache-bust
+
+`app.css` **19 → 20**, `app.js` **49 → 50**. Cả hai số cũ đã được push lên `main` ở bản 1, nên
+sửa nội dung mà giữ nguyên số sẽ để trình duyệt của người đã ghé phục vụ bản cũ. `supa.js`
+(v=14) và `shared.js` (v=27) **không đổi** ở bản 2.
+
+### 16.5 Đã xác minh trên trình duyệt
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Tile bất kỳ trên hồ sơ | `0` |
+| Dòng `.note` dưới bảng Season | `0` |
+| Tiền đạo | `.pl-duo` = `[card pl-pos, card pl-season]`, 441px / 597px, cùng hàng, cao bằng nhau 327px |
+| Thủ môn · người không được xếp chỗ | không `.pl-duo`; thẻ Season đứng riêng rộng 1052px |
+| 700px | xếp chồng một cột 578px, khoảng cách dưới hàng 14px, không cuộn ngang |
+| Dòng meta | vẫn `2Y · 0R` / `0Y · 1R` / `3Y · 1R` cho cả ba loại cầu thủ |

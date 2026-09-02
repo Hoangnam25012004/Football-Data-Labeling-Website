@@ -196,12 +196,13 @@ test('four columns, in the order the design asks for', () => {
          ['League','Season','Appearances','Minutes']);
 });
 
-test('the card is titled Season and carries the note under it', () => {
+test('the card is a title and a table, and nothing else', () => {
   const r=paintSeason(man([M('2025-06-11')]));
   ok(/card-h/.test(r.card.kids[0].className));
   eq(r.card.kids[0].innerHTML,'Season');
-  ok(/League and Season come from the match itself/.test(r.note.innerHTML),
-     'and it says where the two empty columns will come from');
+  deepEq(r.card.kids.map(n=>n.className),['card-h','stbl-wrap'],
+     'no explanatory note under it — the "—" in the two columns says it itself');
+  notOk(r.note,'and none is built');
 });
 
 test('the card reports and nothing else — no button, no listener', () => {
