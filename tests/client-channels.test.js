@@ -644,11 +644,14 @@ test('a match is one page — the analysis, and the way back', () => {
   ok(/PTStats\.mount/.test(stats),'and the analysis is what the page is');
 });
 
-test('every route into a match lands on that one page', () => {
+test('every route into a match lands on the analysis, bar the one that edits it', () => {
   const r=/function route\(\)[\s\S]*?\n  \}/.exec(APPJS)[0];
   ok(/parts\[0\] === 'match' && parts\[1\]/.test(r)&&/return renderMatchStats\(view, slug\)/.test(r),
-     'one destination, whatever the URL says');
-  ok(/\/stats is kept as a suffix/.test(r),'and a link made while there were two tabs still works');
+     'the analysis is where a match slug goes');
+  ok(/if \(parts\[2\] === 'edit'\) return renderMatchEdit\(view, slug\)/.test(r),
+     'except /edit, which is the one suffix that means something else');
+  ok(/from when there were two tabs/.test(r),
+     'and a link made while there were two tabs — /stats — still lands on the analysis');
 });
 
 /* ================= the rail ================= */

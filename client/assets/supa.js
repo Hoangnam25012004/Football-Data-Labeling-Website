@@ -120,6 +120,12 @@
       return new Error(what === 'create'
         ? 'The database would not let this account create a channel. Check that you are still signed in.'
         : 'Your account is not an admin of this channel.');
+    /* A column this file names but the database has not got. It fails the WHOLE
+       query, and the .catch() at the end of matches() turns that into a channel
+       with no matches in it — no error, no log. Saying which migration is
+       missing is the same service 42P01 gets two rules up. */
+    if (code === '42703' || /column .* does not exist/i.test(msg))
+      return new Error('This database is missing a column this page reads — run the migrations in supabase/migrations/ that have not been applied yet.');
     if (code === '23505') return new Error('That already exists in this channel.');
     /* 0018 puts a foreign key from clubs.code to teams.code, so a code that
        names no team is refused by the database rather than saved and
@@ -467,6 +473,47 @@
         });
     },
 
+    /* ---------- one match, the four things a channel may say about it ----------
+       Date, league, season and round. NOT the score, not published, not which
+       club it belongs to: 0023 grants UPDATE on five columns and no others, so
+       a fifth field smuggled into `fields` is refused by Postgres rather than
+       written quietly. Who may write is 0023's matches_update — an admin of the
+       channel the match is in — and asError turns its 42501 into the sentence
+       every other "not an admin" already gives.
+
+       A separate key rather than matches.update, because API.matches is a
+       function and cannot carry one. */
+    match: {
+      update: function (matchUuid, fields) {
+        var c = client();
+        if (!c) return Promise.reject(new Error('The Supabase client did not load.'));
+        if (!matchUuid) return Promise.reject(new Error('No match to save.'));
+        var row = {};
+        /* One place decides what a channel may write, and it is this list. It is
+           the same five columns 0023 grants, so the two cannot drift apart
+           without the test that reads both noticing. */
+        ['kickoff', 'match_date', 'league', 'season', 'round'].forEach(function (k) {
+          if (Object.prototype.hasOwnProperty.call(fields || {}, k)) {
+            var v = fields[k];
+            v = v == null ? null : String(v).trim();
+            /* Blank is a value here: it is how "nobody has said" is written back
+               after somebody clears the box. null rather than '' so the column
+               reads the same as one nothing was ever put in. */
+            row[k] = v === '' ? null : v;
+          }
+        });
+        if (!Object.keys(row).length) return Promise.resolve();
+        /* No .select() on the way back, for the reason channels.create() spells
+           out: it makes the statement UPDATE … RETURNING, and Postgres then
+           requires the row to satisfy the SELECT policy before handing it over.
+           Nothing needs the row — app.js re-reads the channel's matches. */
+        return c.from('matches').update(row).eq('id', matchUuid)
+          .then(function (r) {
+            if (r.error) throw asError(r.error);
+          });
+      }
+    },
+
     /* ---------- matches in a channel ----------
        `clubCode` is the channel's own team code (0018). Given one, which side
        of a fixture belongs to the client is answered by the match itself
@@ -482,10 +529,11 @@
         /* `match_date` is 0011's column — the one the tagging app writes. It
            travels beside 0013's `kickoff` rather than instead of it, so the
            seeded channel keeps the date it was given. */
-        /* `league` and `season` are 0022's columns. Naming them here is exactly
-           the trap the two comments above describe, so 0022 has to have been run
-           before this file is served — see the header of that migration. */
-        .select('id,code,home_name,away_name,home_score,away_score,kickoff,match_date,competition,stage,league,season,venue,our_side,published,lineups,config,home_team_id,away_team_id')
+        /* `league` and `season` are 0022's columns, `round` is 0023's. Naming
+           them here is exactly the trap the two comments above describe, so both
+           migrations have to have been run before this file is served — see the
+           header of each. */
+        .select('id,code,home_name,away_name,home_score,away_score,kickoff,match_date,competition,stage,league,season,round,venue,our_side,published,lineups,config,home_team_id,away_team_id')
         .eq('club_id', clubId).eq('published', true)
         .order('kickoff', { ascending: true })
         .then(function (r) {
@@ -615,6 +663,9 @@
                that column answers a different question and is already read. */
             league: m.league || '',
             season: m.season || '',
+            /* 0023's, and read the same way: empty means nobody has said which
+               round this was, and the screens print "—". */
+            round: m.round || '',
             timeline: [],
             us: statsFromView(st[side]),
             them: statsFromView(st[other]),

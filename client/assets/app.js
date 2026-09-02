@@ -153,8 +153,10 @@
     view.innerHTML = '';
     if (parts[0] === 'match' && parts[1]) {
       var slug = decodeURIComponent(parts[1]);
-      /* /stats is kept as a suffix so links made while there were two
-         tabs still land on the one page there is now. */
+      /* The one suffix that means something else. Anything else after the slug
+         — /stats, from when there were two tabs — still lands on the analysis,
+         which is the one page there is now. */
+      if (parts[2] === 'edit') return renderMatchEdit(view, slug);
       return renderMatchStats(view, slug);
     }
     if (parts[0] === 'channel') return renderChannel(view, parts.slice(1));
@@ -183,23 +185,38 @@
     /* The fixture is three columns, not one: who was at home, what it
        finished, who was away. Reading down a column then answers a question
        the old single cell could not — every home side, or every scoreline. */
+    /* Only an admin of this channel may change what a match says about itself.
+       This hides the control; the hedge that matters is 0023's matches_update,
+       which refuses the write whatever the browser thinks. */
+    var mayEdit = !!(state.user && state.channel && state.channel.role === 'admin');
+
     var list = el('div', 'mlist');
     /* Each heading sits over the edge its column reads from: Home ends where the
-       home name ends, Away starts where the away name starts. */
+       home name ends, Away starts where the away name starts. The trailing empty
+       span is the ⋯ column: without it the five headings sit over five columns
+       that are no longer the whole row. */
     list.appendChild(el('div', 'mlist-h',
       '<span>Date</span><span style="text-align:right">Home</span>' +
       '<span style="text-align:center">Final score</span>' +
       '<span>Away</span><span style="text-align:right">Result</span>'));
 
     state.matches.forEach(function (m) {
-      /* One page per match again, so the row is a plain button: there is no
-         second thing inside it to aim somewhere else. */
+      /* The row is still a plain button — keyboard-reachable for free, no
+         hand-rolled role and no hand-rolled key handling. The ⋯ is its SIBLING
+         inside .mrow-wrap rather than a second control inside it: a <button>
+         may not contain a <button>, and this page has been round that loop once
+         already (see the note this comment replaced). */
+      var wrap = el('div', 'mrow-wrap');
       var b = el('button', 'mrow');
       b.type = 'button';
       var ourHome = m.side === 'home';
+      /* venue, then whatever the channel has said about the fixture, then the id.
+         Each part is dropped when empty, so a channel that has filled none of
+         them in reads exactly as it did before any of this existed. */
+      var meta = [m.venue || (ourHome ? 'Home' : 'Away'), m.league, m.season, m.round]
+        .filter(Boolean).concat('Match ID ' + m.id);
       b.innerHTML =
-        '<span class="m-date">' + esc(m.dateLabel) + '<em>' + esc(m.venue || (ourHome ? 'Home' : 'Away')) +
-          ' · Match ID ' + esc(m.id) + '</em></span>' +
+        '<span class="m-date">' + esc(m.dateLabel) + '<em>' + esc(meta.join(' · ')) + '</em></span>' +
         '<span class="m-team m-home">' +
           '<span class="tn' + (ourHome ? ' us' : '') + '">' + esc(m.home.name) + '</span>' +
         '</span>' +
@@ -217,9 +234,67 @@
       b.addEventListener('click', function () {
         location.hash = '#/match/' + encodeURIComponent(m.slug || m.id);
       });
-      list.appendChild(b);
+      wrap.appendChild(b);
+      if (mayEdit) wrap.appendChild(matchMenu(m));
+      list.appendChild(wrap);
     });
     view.appendChild(list);
+
+    /* ONE listener for the whole list, not one per menu. settingsMenu() hangs a
+       document listener because it is the only menu on its page; there is a menu
+       per match here, and forty matches would be forty listeners on `document`,
+       each holding a detached row alive after the next channel is drawn. This
+       one goes away with #view, which route() empties. */
+    if (mayEdit) {
+      document.addEventListener('click', function away(e) {
+        if (!list.isConnected) { document.removeEventListener('click', away); return; }
+        var inside = e.target.closest ? e.target.closest('.mrow-wrap .menu-wrap') : null;
+        list.querySelectorAll('.menu-wrap.open').forEach(function (w) {
+          if (w === inside) return;
+          w.classList.remove('open');
+          var t = w.querySelector('.mrow-more');
+          if (t) t.setAttribute('aria-expanded', 'false');
+        });
+      });
+    }
+  }
+
+  /* The ⋯ beside one match row. Built out of the same menu-wrap / menu /
+     menu-opt the channel Settings menu and the player dropdown are, so it
+     inherits their styling and their behaviour without a class of its own.
+
+     It hangs no document listener: renderMatches() keeps one for the whole
+     list. */
+  function matchMenu(m) {
+    var wrap = el('span', 'menu-wrap');
+    var btn = el('button', 'mrow-more', '<span aria-hidden="true">⋯</span>');
+    btn.type = 'button';
+    btn.title = 'More';
+    btn.setAttribute('aria-label', 'More for ' + (m.home.name + ' v ' + m.away.name));
+    btn.setAttribute('aria-haspopup', 'true');
+    btn.setAttribute('aria-expanded', 'false');
+
+    var menu = el('div', 'menu');
+    menu.setAttribute('role', 'menu');
+    var edit = el('button', 'menu-opt', 'Edit<em>Date, league, season, round</em>');
+    edit.type = 'button';
+    edit.addEventListener('click', function () {
+      location.hash = '#/match/' + encodeURIComponent(m.slug || m.id) + '/edit';
+    });
+    menu.appendChild(edit);
+
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    /* No stopPropagation, and that is deliberate. The ⋯ is a SIBLING of the row
+       button rather than a child, so a click on it never passes through the row
+       and cannot open the match. Stopping the event would only keep it from
+       reaching the list's own listener — which is the thing that closes whichever
+       other menu was left open. */
+    btn.addEventListener('click', function () {
+      var open = wrap.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    return wrap;
   }
 
   /* Signed out, or signed in and not in a channel yet. There is nothing to
@@ -294,6 +369,152 @@
       holder.innerHTML = '';
       holder.appendChild(emptyState('The analysis could not be opened',
         (e && e.message) || String(e)));
+    });
+  }
+
+  /* ---------------------------------------------------------
+     View: one match, the four things a channel may say about it
+
+     A route rather than a dialog, the way editing a channel is one. It can be
+     linked to, Back leaves it, and #view is emptied on the way out so nothing
+     of it is left hanging about.
+     --------------------------------------------------------- */
+  /* Every (league, season) pair already used in this channel, newest first.
+     Two jobs: the datalists below, so re-using a spelling is easier than typing
+     a new one, and the line under the Team stats card on the Overview. */
+  function seasonsOf(matches) {
+    var seen = {}, out = [];
+    (matches || []).forEach(function (m) {
+      var lg = m.league || '', sn = m.season || '';
+      if (!lg && !sn) return;
+      var k = lg + '\u0000' + sn;
+      if (seen[k]) return;
+      seen[k] = 1;
+      out.push({ league: lg, season: sn });
+    });
+    return out;
+  }
+  function valuesOf(matches, field) {
+    var seen = {}, out = [];
+    (matches || []).forEach(function (m) {
+      var v = m[field] || '';
+      if (!v || seen[v]) return;
+      seen[v] = 1;
+      out.push(v);
+    });
+    return out.sort();
+  }
+
+  function renderMatchEdit(view, slug) {
+    var m = state.matches.filter(function (x) { return String(x.slug || x.id) === slug; })[0];
+    if (!m) { location.hash = '#/home'; return; }
+    var backTo = function () { location.hash = '#/home'; };
+
+    var back = el('button', 'back', '&larr; All matches');
+    back.addEventListener('click', backTo);
+    view.appendChild(back);
+    view.appendChild(head('Edit match',
+      m.home.name + ' v ' + m.away.name + ' · Match ID ' + m.id));
+
+    /* The same shape renderChannelEdit takes: say who may do this rather than
+       drawing a form whose Save is going to be refused. 0023's matches_update
+       is the guarantee; this is the courtesy. */
+    if (!state.channel || state.channel.role !== 'admin') {
+      view.appendChild(emptyState('Not an admin of this channel',
+        'Only an admin can change what a match says about itself. Ask whoever runs this channel.'));
+      return;
+    }
+
+    matchForm(view, {
+      values: m,
+      cancel: backTo,
+      save: function (fields) {
+        return window.HNA.match.update(m.uuid, fields).then(function () {
+          /* Read the channel back rather than patching state.matches with what
+             was just sent: the database has triggers, defaults and column-level
+             grants, and what it kept is the only thing worth drawing. It also
+             drops state.reports, so the Data view adds the campaign up again
+             instead of redrawing a cached one. */
+          return loadMatches(state.channel).then(function () {
+            location.hash = '#/home';
+            route();                              // same hash: nothing would redraw on its own
+          });
+        });
+      }
+    });
+  }
+
+  /* Four fields, and only four. Nothing here can touch a score, a result or
+     whether the match is published — 0023 grants UPDATE on five columns and no
+     others, so a fifth would be refused by Postgres rather than written quietly. */
+  function matchForm(view, opts) {
+    var v = opts.values || {};
+    var leagues = valuesOf(state.matches, 'league');
+    var seasons = valuesOf(state.matches, 'season');
+    var rounds = valuesOf(state.matches, 'round');
+    var options = function (list) {
+      return list.map(function (s) { return '<option value="' + esc(s) + '"></option>'; }).join('');
+    };
+    var card = el('div', 'card form-card');
+    card.innerHTML =
+      '<form id="matchForm">' +
+        '<div class="field"><label for="meDate">Date</label>' +
+          '<input id="meDate" type="date" value="' + esc(v.date || '') + '">' +
+          '<p class="field-note">The day the match was played. Clearing it leaves the ' +
+            'fixture undated, which is what it reads as now.</p></div>' +
+        '<div class="f2">' +
+          '<div class="field"><label for="meLeague">League <span class="opt">optional</span></label>' +
+            '<input id="meLeague" list="meLeagueList" autocomplete="off" value="' + esc(v.league || '') + '">' +
+            '<datalist id="meLeagueList">' + options(leagues) + '</datalist></div>' +
+          '<div class="field"><label for="meSeason">Season <span class="opt">optional</span></label>' +
+            '<input id="meSeason" list="meSeasonList" autocomplete="off" value="' + esc(v.season || '') + '">' +
+            '<datalist id="meSeasonList">' + options(seasons) + '</datalist></div>' +
+        '</div>' +
+        '<div class="field"><label for="meRound">Round <span class="opt">optional</span></label>' +
+          '<input id="meRound" list="meRoundList" autocomplete="off" placeholder="Round 3" value="' +
+            esc(v.round || '') + '">' +
+          '<datalist id="meRoundList">' + options(rounds) + '</datalist>' +
+          '<p class="field-note">Whatever this competition calls it — Round 3, Matchday 12, ' +
+            'Quarter-final.</p></div>' +
+        '<div class="form-end">' +
+          '<button class="btn btn-primary" type="submit" id="meGo">Save changes</button>' +
+          '<button class="btn btn-quiet" type="button" id="meCancel">Cancel</button>' +
+          '<span class="form-msg" id="meMsg"></span>' +
+        '</div>' +
+      '</form>';
+    view.appendChild(card);
+    /* The three lists are what this channel has already used. Nothing is
+       normalised on save: "Bepro League" and "Bepro league" would be two rows on
+       a player's Season table, and the fix for that is making the spelling you
+       already used the easy one to pick — not quietly rewriting what was typed,
+       which a competition that really does differ by case cannot recover from. */
+    view.appendChild(el('p', 'note',
+      'League, Season and Round come from the match rather than from the channel — a club ' +
+      'plays in several over a season. Anything left blank reads "—" wherever it is shown, ' +
+      'and the boxes suggest what this channel has already used.'));
+
+    card.querySelector('#meCancel').addEventListener('click', opts.cancel);
+    card.querySelector('#matchForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var go = card.querySelector('#meGo'), msg = card.querySelector('#meMsg');
+      go.disabled = true;
+      msg.className = 'form-msg';
+      msg.textContent = 'Saving…';
+      var day = card.querySelector('#meDate').value || '';
+      opts.save({
+        /* Both date columns. shape() reads `kickoff || match_date` while the
+           tagging app reads match_date, so writing one of them would leave the
+           two sites showing different days for the same match. */
+        kickoff: day,
+        match_date: day,
+        league: card.querySelector('#meLeague').value,
+        season: card.querySelector('#meSeason').value,
+        round: card.querySelector('#meRound').value
+      }).catch(function (err) {
+        go.disabled = false;
+        msg.className = 'form-msg err';
+        msg.textContent = err.message || String(err);
+      });
     });
   }
 
@@ -503,9 +724,20 @@
     var cards = discipline(all);
     /* Two rows of four on the one grid. The second row used to be three wide,
        so nothing in it lined up with anything in the row above it. */
+    /* What campaign these totals ARE. Overview adds every match in the channel
+       up, so with two competitions in it "Average goals scored" is a mean across
+       both — and until now nothing on the page said so. One pair is named; more
+       than one is counted, because listing four of them in a card heading is a
+       list, not a heading. Nothing said, nothing drawn. */
+    var pairs = seasonsOf(state.matches);
+    var span = pairs.length === 1
+      ? [pairs[0].league, pairs[0].season].filter(Boolean).join(' · ')
+      : (pairs.length > 1 ? pairs.length + ' competitions' : '');
+
     var stat = el('div', 'card stat-card');
     stat.innerHTML =
       '<p class="card-h">Team stats <span class="right">' + esc(state.channel ? state.channel.name : '') + '</span></p>' +
+      (span ? '<p class="card-sub">' + esc(span) + '</p>' : '') +
       '<div class="tstats">' +
         tstat('Total', played.length) + tstat('Win', w) + tstat('Draw', d) + tstat('Loss', l) +
       '</div>' +
@@ -591,6 +823,10 @@
         '<span class="rsc">' + num(m.away.score) + '</span>' +
         '<span class="rn rn-a' + (m.side === 'away' ? ' us' : '') + '">' + esc(m.away.name) + '</span>' +
         '<span class="rend">' +
+          /* Which round, over the date. Only the round: the row is already six
+             tracks wide, and league and season do not change from one of these
+             five to the next — they are on the card above instead. */
+          (m.round ? '<span class="rrd">' + esc(m.round) + '</span>' : '') +
           '<span class="rd">' + esc(window.HNA.shortDate(m.date)) + '</span>' +
           '<span class="m-open" aria-hidden="true">' +
             '<svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor"><path d="M1 0 9 5 1 10Z"/></svg>' +
@@ -713,8 +949,17 @@
     var rows = aggs.slice().reverse();          // most recent match first
 
     /* --- two header rows: the groups, then the leaves --- */
+    /* Six fixed columns. Round is the one of the three new fields that changes
+       from match to match, so it is the one worth a column; league and season
+       would print the same word down the whole table, and they are on the
+       Overview's card and in the player's Season table instead.
+
+       It sits after the fixture rather than after the date, because .c-date and
+       .c-opp are a frozen pair and a sticky run has to be contiguous — see the
+       note on .c-rnd in app.css. */
     var top = '<th class="c-date" rowspan="2">Date</th>' +
               '<th class="c-opp" rowspan="2">Opposing team</th>' +
+              '<th class="c-rnd" rowspan="2">Round</th>' +
               '<th class="c-res" rowspan="2">Result</th>' +
               '<th class="c-sc" rowspan="2">Score</th>' +
               '<th rowspan="2">Possession</th>';
@@ -741,6 +986,7 @@
         '<td class="c-date">' + esc(window.HNA.shortDate(m.date)) + '</td>' +
         '<td class="c-opp"><span class="cop"><b>' + esc(m.opponent) + '</b>' +
           '<em>' + (m.side === 'home' ? 'H' : 'A') + '</em></span></td>' +
+        '<td class="c-rnd">' + esc(m.round || '—') + '</td>' +
         '<td class="c-res">' + (m.result ? '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' : '—') + '</td>' +
         '<td class="c-sc">' + num(a.gf) + ' : ' + num(a.ga) + '</td>' +
         '<td>' + pct(a.us.passes, a.us.passes + a.them.passes) + '</td>' +
@@ -1453,7 +1699,7 @@
     var NOGK = { conceded: 0, clean: 0, known: 0 };
     var cell = function (c, s, g) { return c[1](s, gkView ? (g || NOGK) : undefined); };
 
-    var head = '<th class="c-date">Date</th><th class="c-opp">vs</th>' +
+    var head = '<th class="c-date">Date</th><th class="c-opp">vs</th><th class="c-rnd">Round</th>' +
       '<th class="c-res">Result</th><th class="c-sc">Score</th><th>Minutes Played</th>' +
       cols.map(function (c) { return '<th>' + esc(c[0]) + '</th>'; }).join('');
 
@@ -1463,6 +1709,7 @@
         '<td class="c-date">' + esc(window.HNA.shortDate(m.date)) + '</td>' +
         '<td class="c-opp"><span class="cop"><b>' + esc(m.opponent) + '</b>' +
           '<em>' + (m.side === 'home' ? 'H' : 'A') + '</em></span></td>' +
+        '<td class="c-rnd">' + esc(m.round || '—') + '</td>' +
         '<td class="c-res">' + (m.result ? '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' : '—') + '</td>' +
         '<td class="c-sc">' + num(r.gf) + ' : ' + num(r.ga) + '</td>' +
         minsOne(r.mins) +
@@ -1473,8 +1720,12 @@
     /* The totals are the column functions run on the summed stat, not the
        summed cells: a percentage of the campaign is one ratio of its totals. */
     var foot = '<tr><td class="c-date">Total</td>' +
+      /* empty, not "—": a campaign has no round, so there is nothing unknown
+         here to mark. Missing the cell altogether would shift every figure in
+         the foot one column left of the column it totals. */
       '<td class="c-opp"><span class="cop"><b>' + who.apps +
         (who.apps === 1 ? ' match' : ' matches') + '</b></span></td>' +
+      '<td class="c-rnd"></td>' +
       '<td class="c-res"></td><td class="c-sc"></td>' +
       '<td>' + esc(minsTotal(who)) + '</td>' +
       cols.map(function (c) { return '<td>' + esc(String(cell(c, who.total, who.gkTotal))) + '</td>'; }).join('') +

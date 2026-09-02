@@ -202,10 +202,18 @@ body.app.rail-in{--rail:56px}
 .mlist-h,.mrow{
   --m-cols:minmax(150px,1.1fr) minmax(140px,1.3fr) 96px minmax(140px,1.3fr) minmax(150px,1.1fr);
 }
+/* The row and its ⋯ are SIBLINGS in this wrapper, not nested: .mrow is a
+   <button>, and a button may not contain a button. The wrapper is what lets the
+   five tracks above stay exactly five — a sixth for the ⋯ would break the
+   mirror the scoreline sits on the middle of. */
+.mrow-wrap{display:grid; grid-template-columns:minmax(0,1fr) 34px; align-items:center}
 .mlist-h{
   display:grid; grid-template-columns:var(--m-cols);
   gap:14px; padding:0 4px 10px; border-bottom:1px solid var(--line);
   font-family:var(--f-mono); font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--ash-dim);
+  /* the heading reads over the row, and the row now ends 34px short of the
+     list's edge — without this the five headings drift off their columns */
+  margin-right:34px;
 }
 .mrow{
   display:grid; grid-template-columns:var(--m-cols);
@@ -214,7 +222,18 @@ body.app.rail-in{--rail:56px}
   background:transparent; border-left:0; border-right:0; border-top:0; color:inherit; font:inherit;
 }
 .mrow:hover{background:color-mix(in srgb,var(--chalk) 4%, transparent)}
-.mrow:last-child{border-bottom:0}
+.mrow-wrap:last-child .mrow{border-bottom:0}
+/* The ⋯ beside a row. It borrows .menu / .menu-opt from the channel Settings
+   menu; only the trigger is its own, because that one is a glyph in a row
+   rather than a labelled button on a heading. */
+.mrow-more{
+  width:28px; height:28px; margin-left:6px; display:grid; place-items:center;
+  border:1px solid transparent; border-radius:3px; background:transparent;
+  color:var(--ash-dim); font:inherit; font-size:15px; line-height:1; cursor:pointer;
+  transition:color .16s, border-color .16s, background .16s;
+}
+.mrow-more:hover{color:var(--chalk); border-color:var(--line); background:var(--carbon-2)}
+.menu-wrap.open .mrow-more{color:var(--chalk); border-color:var(--line); background:var(--carbon-2)}
 .m-date{font-size:13px; color:var(--chalk); line-height:1.45}
 .m-date em{display:block; font-style:normal; font-family:var(--f-mono); font-size:10.5px; color:var(--ash-dim); letter-spacing:.06em}
 .m-team{display:flex; align-items:center; gap:9px; min-width:0; font-size:13.5px}
@@ -242,6 +261,11 @@ body.app.rail-in{--rail:56px}
    fixture folds under them, still reading home · score · away. */
 @media (max-width:820px){
   .mlist-h{display:none}
+  /* the heading is gone, so its offset for the ⋯ goes with it; the ⋯ itself
+     stays beside the row, top-aligned against the date line it belongs to */
+  .mlist-h{margin-right:0}
+  .mrow-wrap{align-items:start}
+  .mrow-more{margin-top:12px}
   .mrow{
     grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
     grid-template-areas:"date date end" "home score away";
@@ -313,6 +337,14 @@ body.app.rail-in{--rail:56px}
 .dcol{display:flex; flex-direction:column; gap:14px; min-width:0}
 
 .stat-card{margin-bottom:14px}
+/* Which campaign these totals ARE. The card adds every match in the channel up,
+   so with two competitions in it every average is a mean across both — this is
+   the line that says so. Sits under the heading, above the figures; nothing is
+   drawn when the channel has said nothing. */
+.card-sub{
+  margin:-8px 0 14px; font-family:var(--f-mono); font-size:10.5px;
+  letter-spacing:.08em; color:var(--ash-dim);
+}
 /* Both rows are the same four columns, so Average goals scored sits under Total
    and every value below reads down a column. The second row asked for three and
    nothing in it lined up with anything above it. */
@@ -353,6 +385,12 @@ body.app.rail-in{--rail:56px}
 .rrow:hover{background:color-mix(in srgb,var(--chalk) 4%, transparent)}
 .rrow .rres{display:flex; align-items:center}
 .rrow .rend{display:flex; align-items:center; justify-content:flex-end; gap:8px; min-width:0}
+/* Which round, beside the date. Dimmer than the date, and dropped altogether
+   when nothing has been said — a "—" on five rows is five marks saying nothing. */
+.rrow .rrd{
+  font-family:var(--f-mono); font-size:9.5px; letter-spacing:.08em; color:var(--ash-dim);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
+}
 /* min-width:0 is what lets a long club name ellipsis rather than push the
    scoreline off the middle of the row */
 .rrow .rn{font-size:13px; color:var(--ash); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
@@ -446,6 +484,16 @@ table.stbl tbody tr[data-go]{cursor:pointer}
 
 table.stbl .c-date{
   position:sticky; left:0; z-index:2; text-align:left; width:104px; min-width:104px;
+  font-family:var(--f-mono); font-size:11px; letter-spacing:.02em; color:var(--ash-dim);
+}
+/* Round is the first column PAST the frozen pair, and not part of it. It cannot
+   be: a sticky run has to be contiguous, so its left offset would have to be a
+   fixed number — and a table column grows to fit what is in it. 82px was allowed
+   for, "Matchday 12" made the column 97, and .c-opp pinned at 186 parked itself
+   15px on top of the text. Scrolling with the figures costs it nothing: it is
+   still the first thing after the fixture. */
+table.stbl .c-rnd{
+  text-align:left; white-space:nowrap;
   font-family:var(--f-mono); font-size:11px; letter-spacing:.02em; color:var(--ash-dim);
 }
 table.stbl .c-opp{position:sticky; left:104px; z-index:2; text-align:left; min-width:178px}
