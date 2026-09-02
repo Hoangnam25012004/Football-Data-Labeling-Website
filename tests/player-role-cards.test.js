@@ -270,10 +270,21 @@ test('the board is a picture: no button, no listener, no role in the URL', () =>
   notOk(/'button'/.test(boardFn),'nothing in here is a button at all');
 });
 
-test('a keeper gets no board, and a man no board placed gets none either', () => {
-  ok(/if \(who\.gk \|\| !who\.roles\.length\) return null;/.test(boardFn),
-     'the two who are left out, in one line');
+test('a keeper gets a board now; only a man no line-up placed goes without', () => {
+  ok(/if \(!Object\.keys\(who\.posApps\)\.length\) return null;/.test(boardFn),
+     'the question is asked of the squares he took, not of the roles he has');
+  notOk(/who\.gk \|\| !who\.roles\.length/.test(boardFn),
+     'a keeper is no longer refused — GK belongs to no role, which is not the same as no square');
   notOk(/chip/.test(boardFn),'and there are no chips — there never were, since the squares replaced them');
+});
+
+test('the GK square is lit off what he is, since no role claims it', () => {
+  ok(/var r = ROLE_OF\[ps\] \|\| '';/.test(boardFn),"'' for the GK square");
+  ok(/\(r \? r === role : who\.gk\)/.test(boardFn),
+     'a role square answers to the role being read; the GK square answers to the keeper');
+  ok(/r \? ROLE_LABEL\[r\] : 'Goalkeeper'/.test(boardFn),'and it names itself in the tooltip');
+  ok(/var role = who\.gk \? '' : who\.role;/.test(boardFn),
+     'a keeper has no role, so no OUTFIELD square can be lit for him');
 });
 
 test('his role is the one his first square gives him, and nothing can override it', () => {
@@ -331,6 +342,30 @@ test('a square that cannot be pressed does not look pressable', () => {
   notOk(/\.pl-pz:hover\{/.test(APPCSS),'and no hover state to promise a click');
 });
 
+test('the pitch is drawn to be seen, and a lit square is told apart by weight', () => {
+  const css=APPCSS.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s*\n\s*/g,'');
+  ok(/\.pl-pitch > svg > g\{stroke:var\(--line\)\}/.test(css),
+     'the markings at --line, not the --line-soft that made them invisible');
+  /* amber is the badge's, and it says which of the three he is — a scope a square
+     cannot carry. The squares are told apart by weight instead. */
+  notOk(/\.pl-pz\.on\{[^}]*--amber/.test(css),'a lit square is not amber');
+  notOk(/\.pl-pz\.on \.pl-pz-dot\{[^}]*--amber/.test(css),'nor is its dot');
+  ok(/\.pl-pz\.on \.pl-pz-dot\{background:var\(--chalk\)\}/.test(css),'it is white');
+  ok(/\.pl-role\{[\s\S]*?--amber/.test(APPCSS),'and the badge keeps the amber');
+});
+
+test('these two cards name themselves without moving every other card', () => {
+  const css=APPCSS.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s*\n\s*/g,'');
+  const rule=/\.pl-pos > \.card-h,\.pl-season > \.card-h\{([^}]*)\}/.exec(css);
+  ok(rule,'a rule scoped to the two of them');
+  ok(/text-transform:none/.test(rule[1]),'sentence case rather than the mono capitals');
+  ok(/font-family:var\(--f-display\)/.test(rule[1]),'at display weight');
+  /* the site-wide .card-h is what every other card uses, and it has not moved */
+  ok(/\.card-h\{[^}]*text-transform:uppercase/.test(readSrc('client/assets/site.css')
+       .replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s*\n\s*/g,'')),
+     'site.css still uppercases .card-h for everybody else');
+});
+
 test('the board does not answer to the tagger-s .pz, nor it to this one', () => {
   /* shared.css styles .pz for the formation board, is loaded the first time
      anyone opens a match, and stays in the document afterwards. Its .pz carries
@@ -342,7 +377,7 @@ test('the board does not answer to the tagger-s .pz, nor it to this one', () => 
   const rules=APPCSS.replace(/\/\*[\s\S]*?\*\//g,'');
   notOk(/(^|[^-\w])\.pz[-.{ ]/.test(rules),'so no selector here is called .pz');
   notOk(/pl-pz/.test(SHAREDCSS),'and nothing there is called pl-pz');
-  ok(/class="pl-pz-dot"/.test(boardFn)&&/'pl-pz' \+ \(r === role/.test(boardFn),
+  ok(/class="pl-pz-dot"/.test(boardFn)&&/'pl-pz' \+ \(\(r \? r === role : who\.gk\)/.test(boardFn),
      'the board writes only its own vocabulary');
 });
 
@@ -442,12 +477,39 @@ test('the row holds exactly two things: the board, then the Season card', () => 
   deepEq(r.tiles,[],'and no tile strip anywhere on the profile');
 });
 
-test('a player with no board gets the Season card at full width, not an empty half', () => {
-  [person({isGk:true,total:{saves:9},min:360}),                  // a keeper
-   person({total:{goals:3,assists:2}})].forEach(p=>{             // nobody ever placed him
+test('a keeper gets the board, with the GK square lit and nothing else on it', () => {
+  const r=paintProfile(person({isGk:true,total:{saves:9},min:360,posApps:{GK:4}}));
+  ok(r.board,'a Position card, which he used to be refused');
+  deepEq(r.squares.map(s=>s.pos),['GK'],'one square, and it is his');
+  eq(r.squares[0].on,true,'lit — no role claims GK, so it is lit off what he is');
+  eq(r.squares[0].title,'Goalkeeper · 4 matches at GK');
+  deepEq(r.duo.kids.map(n=>n.className),['card pl-pos','card pl-season'],
+     'and he gets the two-column row like everybody else');
+});
+
+test('the GK square sits in the goal, at the end the board reads from', () => {
+  const r=paintProfile(person({isGk:true,posApps:{GK:4}}));
+  const gk=r.squares[0];
+  eq(gk.left,'0%','the board reads left to right, so his goal is the left edge');
+  eq(gk.top,'25%','and the middle band, which is the one GK shares with CF');
+});
+
+test('a keeper who once filled in outfield sees both squares, his own lit', () => {
+  const r=paintProfile(person({isGk:true,posApps:{GK:3,CB:1}}));
+  deepEq(r.squares.map(s=>s.pos).sort(),['CB','GK']);
+  eq(r.squares.filter(s=>s.pos==='GK')[0].on,true);
+  eq(r.squares.filter(s=>s.pos==='CB')[0].on,false,
+     'his role is "" so no outfield square can light, however often he took it');
+});
+
+test('a man no line-up ever placed gets the Season card at full width', () => {
+  /* The only one left without a board. A keeper reaches it too when no report
+     ever carried a formation — the same empty posApps, the same answer. */
+  [person({total:{goals:3,assists:2}}),
+   person({isGk:true,total:{saves:9}})].forEach(p=>{
     const r=paintProfile(p);
-    notOk(r.board,'no board');
-    notOk(r.duo,'so no two-column row either');
+    notOk(r.board,'no square was ever recorded for him, so no board');
+    notOk(r.duo,'and no two-column row either');
     ok(r.season,'but the Season card is still his — it does not change with the job');
     ok(r.body.kids.indexOf(r.season)>=0,'and it sits straight on the body');
   });

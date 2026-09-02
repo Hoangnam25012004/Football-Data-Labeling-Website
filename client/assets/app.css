@@ -549,12 +549,25 @@ table.stbl tfoot .c-opp{position:sticky; left:104px; z-index:2; text-align:left;
    breakpoint .grid2 / .grid-13 / .sm-wrap already use — the same question does
    not get a second answer here. */
 /* Stretched rather than start-aligned: the two are one row, and a short table
-   leaving a hole beside a tall pitch reads as something failing to load. */
+   leaving a hole beside a tall pitch reads as something failing to load.
+
+   Roughly a quarter to three: the board is a diagram that says all it has to say
+   small, and the table is the half that will grow columns. */
 .pl-duo{
-  display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);
+  display:grid; grid-template-columns:minmax(0,.55fr) minmax(0,1.45fr);
   gap:14px; align-items:stretch; margin-bottom:14px;
 }
 @media (max-width:820px){ .pl-duo{grid-template-columns:minmax(0,1fr)} }
+
+/* These two name themselves in sentence case at a size worth reading, not in the
+   mono capitals every other card on the site uses. Scoped to the two of them on
+   purpose: .card-h is shared by every card in the app, and this is not a change
+   to that. */
+.pl-pos > .card-h,.pl-season > .card-h{
+  font-family:var(--f-display); font-stretch:87.5%; font-weight:700;
+  font-size:19px; letter-spacing:-.01em; text-transform:none; color:var(--chalk);
+  margin-bottom:11px;
+}
 
 /* League and Season are words among columns of figures, so they read left like
    the two text columns of every other table on this page (.c-date, .c-opp). */
@@ -575,7 +588,10 @@ table.stbl .c-lg,table.stbl .c-sn{text-align:left}
    out of pitchSVG as presentation attributes, which any rule here outranks. */
 .pl-pitch > svg{border-radius:2px}
 .pl-pitch > svg > rect{fill:var(--carbon-2)}
-.pl-pitch > svg > g{stroke:var(--line-soft)}
+/* --line-soft left the markings all but invisible: the touchlines, the halfway
+   line and the two boxes are what make this read as a pitch rather than as a
+   grid of tinted rectangles, so they are drawn at --line's weight. */
+.pl-pitch > svg > g{stroke:var(--line)}
 /* No cursor and no :hover — these squares report, they do not act. Both were
    here while clicking one filtered the row of tiles below; that row is gone. */
 .pl-pz{
@@ -583,20 +599,37 @@ table.stbl .c-lg,table.stbl .c-sn{text-align:left}
   justify-content:center; gap:7px; padding:0; border:0; border-radius:2px;
   background:color-mix(in srgb,var(--chalk) 7%, transparent);
 }
-.pl-pz-dot{width:21px; height:21px; border-radius:50%; background:var(--chalk); flex:none}
-.pl-pz-lb{font-family:var(--f-mono); font-size:10px; letter-spacing:.1em; color:var(--chalk)}
-/* the square being read takes the amber of the badge beside his name */
-.pl-pz.on{background:color-mix(in srgb,var(--amber) 17%, transparent)}
-.pl-pz.on .pl-pz-dot{background:var(--amber)}
-.pl-pz.on .pl-pz-lb{color:var(--amber)}
+.pl-pz-dot{
+  width:13px; height:13px; border-radius:50%; flex:none;
+  background:color-mix(in srgb,var(--chalk) 45%, transparent);
+}
+.pl-pz-lb{font-family:var(--f-mono); font-size:8.5px; letter-spacing:.1em; color:var(--ash)}
+/* A mark on a diagram is a fraction of the diagram, not a number of pixels: the
+   board is a quarter of the row now, and a dot sized for the old half filled its
+   cell. A square is a sixth of the pitch wide, and these come out about a third
+   of that, which is what the reference draws. The px above are the fallback for
+   a browser without container queries, and are this at the narrow end. */
+.pl-pos{container-type:inline-size}
+@container (min-width:1px){
+  .pl-pz{gap:clamp(3px,1.4cqw,7px)}
+  .pl-pz-dot{width:clamp(11px,5.2cqw,24px); height:clamp(11px,5.2cqw,24px)}
+  .pl-pz-lb{font-size:clamp(7.5px,2.4cqw,11px)}
+}
+/* His own square, and every other square of the same role. Told apart by weight
+   rather than by hue: a grey dot for somewhere he has stood, a white one for the
+   job he is read as doing. Amber is still the badge beside his name — it says
+   which of the three he is, which a square cannot, and two amber things meaning
+   two different scopes was the harder of the two to read. */
+.pl-pz.on{background:color-mix(in srgb,var(--chalk) 13%, transparent)}
+.pl-pz.on .pl-pz-dot{background:var(--chalk)}
+.pl-pz.on .pl-pz-lb{color:var(--chalk)}
 .pl-pz-arrow{
   position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
   color:var(--ash-dim); font-size:19px; line-height:1; pointer-events:none;
 }
-@media (max-width:560px){
-  .pl-pz-dot{width:15px; height:15px}
-  .pl-pz-lb{font-size:8.5px; letter-spacing:.06em}
-}
+/* The board is full width on a phone, so the container query above already sizes
+   these; only the tracking is still worth tightening at that width. */
+@media (max-width:560px){ .pl-pz-lb{letter-spacing:.06em} }
 
 /* ---------- one match ---------- */
 /* The mounted Stats view brings its own stylesheet (Stats/stats-view.css) and

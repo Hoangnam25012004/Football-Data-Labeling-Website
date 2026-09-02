@@ -1311,8 +1311,15 @@
      placed — an empty pitch would be a question, and the answer is in the empty
      state he already gets. */
   function positionBoard(who) {
-    if (who.gk || !who.roles.length) return null;
-    var role = who.role;
+    /* Any square at all, GK included. A keeper used to be left out because the
+       board picked which row of tiles was shown and none of the three roles was
+       his; it reports now, and where he stood is worth reporting for him as much
+       as for anybody. `roles` cannot answer this — GK belongs to no role — so the
+       question is asked of posApps, which is every square he has actually taken.
+       A man no line-up ever placed still has none, and still gets nothing: an
+       empty pitch is a question, and the answer is in his empty state. */
+    if (!Object.keys(who.posApps).length) return null;
+    var role = who.gk ? '' : who.role;
     var card = el('div', 'card pl-pos');
     card.appendChild(el('p', 'card-h', 'Position'));
 
@@ -1331,9 +1338,12 @@
     for (var row = 0; row < 3; row++) {
       for (var col = 0; col < 6; col++) {
         var ps = FORMATION_GRID[effRow(row, 'lr')][effCol(col, 'lr')];
-        var r = ps && ROLE_OF[ps];
-        if (!r || !who.posApps[ps]) continue;      // the GK square, and every square he never took
-        var b = el('div', 'pl-pz' + (r === role ? ' on' : ''),
+        if (!ps || !who.posApps[ps]) continue;     // the two blank cells, and every square he never took
+        /* GK belongs to no role — ROLE_OF has nothing for it — so it is lit off
+           what he IS rather than off a role being read. A keeper who once filled
+           in at centre back sees both squares, with his own the one lit. */
+        var r = ROLE_OF[ps] || '';
+        var b = el('div', 'pl-pz' + ((r ? r === role : who.gk) ? ' on' : ''),
           '<span class="pl-pz-dot"></span><span class="pl-pz-lb">' + esc(ps) + '</span>');
         b.style.left = (col * 100 / 6) + '%';
         b.style.top = PZ_ROW_TOP[row] + '%';
@@ -1341,8 +1351,8 @@
         b.style.height = PZ_ROW_H[row] + '%';
         /* which job the square belongs to, then how often he took it. The mapping
            still comes first: it is what explains why the other squares of the same
-           role are lit alongside this one. */
-        b.title = ROLE_LABEL[r] + ' · ' + who.posApps[ps] +
+           role are lit alongside this one. GK is its own job and names itself. */
+        b.title = (r ? ROLE_LABEL[r] : 'Goalkeeper') + ' · ' + who.posApps[ps] +
                   (who.posApps[ps] === 1 ? ' match' : ' matches') + ' at ' + ps;
         pitch.appendChild(b);
       }

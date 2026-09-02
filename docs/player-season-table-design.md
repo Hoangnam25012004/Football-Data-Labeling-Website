@@ -871,3 +871,105 @@ sửa nội dung mà giữ nguyên số sẽ để trình duyệt của người
 | Thủ môn · người không được xếp chỗ | không `.pl-duo`; thẻ Season đứng riêng rộng 1052px |
 | 700px | xếp chồng một cột 578px, khoảng cách dưới hàng 14px, không cuộn ngang |
 | Dòng meta | vẫn `2Y · 0R` / `0Y · 1R` / `3Y · 1R` cho cả ba loại cầu thủ |
+
+---
+
+## 17. Bản 3 — bảng sân cho thủ môn, và bố cục theo ảnh tham chiếu
+
+Hai yêu cầu: **áp bảng Position cho vị trí GK**, và chỉnh cặp Position / Season **giống ảnh
+tham chiếu** (BePro). Bốn điểm của ảnh tham chiếu đều được chọn áp dụng.
+
+### 17.1 Thủ môn có bảng sân
+
+`positionBoard()` trước đây từ chối thủ môn ngay dòng đầu:
+
+```js
+if (who.gk || !who.roles.length) return null;      // cũ
+if (!Object.keys(who.posApps).length) return null; // mới
+```
+
+Lý do cũ đã hết hiệu lực: bảng sân từng là **bộ lọc** chọn hàng card theo vai, và GK không
+thuộc vai nào trong ba vai. Từ bản 1 nó chỉ còn **báo cáo**, nên "anh ta đứng ở đâu" đáng nói
+với thủ môn không kém ai. `who.roles` **không trả lời được** câu này — GK không nằm trong
+`ROLE_POS` nào — nên câu hỏi chuyển sang `posApps`, tức mọi ô anh ta thực sự đã đứng.
+
+Trong vòng lặp, ô GK sáng theo **anh ta LÀ gì** chứ không theo vai đang đọc:
+
+```js
+var r = ROLE_OF[ps] || '';                        // '' cho ô GK
+var b = el('div', 'pl-pz' + ((r ? r === role : who.gk) ? ' on' : ''), …);
+b.title = (r ? ROLE_LABEL[r] : 'Goalkeeper') + ' · ' + …;
+```
+
+`var role = who.gk ? '' : who.role` giữ nguyên, nên **không ô ngoài sân nào** sáng cho thủ môn:
+một thủ môn từng đá CB một trận thấy cả hai ô, GK sáng, CB tối. Badge `GK` cạnh tên không đổi.
+
+Người duy nhất còn không có bảng sân là **người chưa bản đội hình nào xếp chỗ** (`posApps`
+rỗng) — kể cả thủ môn, nếu chưa báo cáo nào mang đội hình. Họ vẫn nhận thẻ Season rộng toàn
+khung như bản 2.
+
+### 17.2 Bốn điểm của ảnh tham chiếu
+
+| | Trước | Sau |
+|---|---|---|
+| **Tỉ lệ hai cột** | `.85fr / 1.15fr` ≈ 42/58 | `.55fr / 1.45fr` ≈ **27/72**, đúng tỉ lệ ảnh |
+| **Đường kẻ sân** | `stroke:var(--line-soft)` — gần như tàng hình | `stroke:var(--line)` — viền, vạch giữa, vòng tròn, hai vòng cấm đều đọc được |
+| **Màu ô** | ô sáng màu hổ phách | trung tính: chấm xám cho ô đã đứng, **chấm trắng** cho ô đang đọc. Hổ phách **ở lại** trên badge cạnh tên — nó nói anh ta thuộc vai nào, một phạm vi mà một ô không mang được, và hai thứ hổ phách mang hai nghĩa là cái khó đọc hơn |
+| **Tiêu đề** | mono in hoa (`.card-h`) | chữ thường, `--f-display` 19px — **chỉ** trong `.pl-pos` và `.pl-season`. `.card-h` của site.css không đổi, nên mọi thẻ ở tab khác giữ nguyên |
+
+### 17.3 Chấm và nhãn co theo bảng, không theo pixel
+
+Cột hẹp lại còn ~27% thì chấm 21px chiếm nửa ô — sai tỉ lệ so với ảnh, ở đó chấm ≈ **⅓ chiều
+rộng một ô**. Nên chúng đo theo chính bảng sân:
+
+```css
+.pl-pos{container-type:inline-size}
+@container (min-width:1px){
+  .pl-pz{gap:clamp(3px,1.4cqw,7px)}
+  .pl-pz-dot{width:clamp(11px,5.2cqw,24px); height:clamp(11px,5.2cqw,24px)}
+  .pl-pz-lb{font-size:clamp(7.5px,2.4cqw,11px)}
+}
+```
+
+Giá trị px phía trên khối là **fallback** cho trình duyệt không có container query — bằng đúng
+đầu hẹp của thang. Media query `560px` cũ chỉnh cỡ chấm nay không cần nữa (container query đã
+lo), chỉ còn siết `letter-spacing`.
+
+Đo thật: chấm chiếm **31%** một ô ở mọi bề rộng — 13px khi bảng rộng 251px, 20px khi rộng
+391px. Đúng tỉ lệ ảnh tham chiếu.
+
+`container-type:inline-size` đặt trên `.pl-pos`, không phải `.pl-pitch`. Nó kéo theo
+`contain: layout`, mà `layout` biến phần tử thành containing block cho con `position:absolute`
+— nhưng `.pl-pz` neo vào `.pl-pitch` (`position:relative`) đứng giữa, nên không ô nào đổi chỗ.
+Đã kiểm trên trình duyệt: `left`/`top` của cả ba ô đúng như trước.
+
+### 17.4 Test
+
+`1418 → 1424` (+6). Sửa: `'a keeper gets no board…'` → `'a keeper gets a board now…'`,
+`'the board writes only its own vocabulary'`, và tỉ lệ cột trong `player-season-table`.
+
+Thêm 6 test:
+
+1. ô GK sáng off `who.gk`, tooltip `Goalkeeper · N matches at GK`
+2. ô GK nằm ở `left:0%` / `top:25%` — khung thành ở đầu bảng đọc từ đó, dải giữa
+3. thủ môn từng đá CB: hai ô, GK sáng, CB tối
+4. chỉ người `posApps` rỗng mới không có bảng (thử cả thủ môn lẫn cầu thủ ngoài sân)
+5. đường kẻ ở `--line`, ô sáng **không** hổ phách, badge **vẫn** hổ phách
+6. tiêu đề hai thẻ này chữ thường, và `.card-h` trong `site.css` vẫn `text-transform:uppercase`
+
+### 17.5 Cache-bust
+
+`app.css` **20 → 21**, `app.js` **50 → 51**. `supa.js` (v=14), `shared.js` (v=27) không đổi.
+
+### 17.6 Đã xác minh trên trình duyệt
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Tỉ lệ hai cột | **27% / 72%** |
+| Thủ môn | có bảng sân, đúng một ô `GK`, sáng, tooltip `Goalkeeper · 4 matches at GK` |
+| Tiền đạo | `LM` tối, `LW` + `RW` sáng — mọi ô cùng vai sáng cùng nhau |
+| Chấm | xám `chalk/45%` khi tối, trắng `--chalk` khi sáng; badge vẫn `rgb(232,179,58)` |
+| Đường kẻ sân | `rgb(42,35,37)` = `--line` |
+| Tiêu đề | `Position` / `Season`, `text-transform:none`, Bahnschrift 19px |
+| Chấm co theo bảng | 31% một ô ở cả 251px và 391px |
+| 700px | xếp chồng một cột, không cuộn ngang, ô vẫn đúng vị trí |

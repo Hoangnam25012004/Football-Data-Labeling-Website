@@ -250,8 +250,8 @@ test('the two columns are read off the match, and are allowed to be empty', () =
 
 test('the row it sits in collapses to one column on a phone', () => {
   const css=APPCSS.replace(/\s*\n\s*/g,'');
-  ok(/\.pl-duo\{[^}]*grid-template-columns:minmax\(0,\.85fr\) minmax\(0,1\.15fr\)/.test(css),
-     'the board is the narrower half — it is a drawing with a fixed shape');
+  ok(/\.pl-duo\{[^}]*grid-template-columns:minmax\(0,\.55fr\) minmax\(0,1\.45fr\)/.test(css),
+     'roughly a quarter to three — the board says all it has to say small');
   ok(/@media \(max-width:820px\)\{ ?\.pl-duo\{grid-template-columns:minmax\(0,1fr\)\}/.test(css),
      'and 820px is the breakpoint the rest of the page already uses');
 });
