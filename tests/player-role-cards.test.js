@@ -1,28 +1,25 @@
-/* Player role cards: the six tiles on a player's profile, cut by the job he did.
+/* Player roles and the position board: where a man has stood, drawn back.
 
-   Three things are being pinned down here.
+   Two things are being pinned down here.
 
    The first is where a role comes from. Not a guess off the numbers — the square
    the analyst put his dot in on the formation board, which every report already
    carries as `pos` on each XI entry. posFigures() reads that board the way
    gkShirts() reads it for the keeper, and the fifteen outfield squares map onto
    Defender / Midfielder / Striker with nothing left over and nothing counted twice.
-
-   The second is that the filter and the fact are one control. The board over his
-   tiles is that same grid drawn back: a square lit for everywhere he has stood,
-   nothing at all where he has not, and a click on one picking the card set for the
-   job that square belongs to. Every square of a role lights together, because the
-   four tiles below are the role's rather than the square's. The card a profile
-   opens on is the job of the FIRST square he played — where he was introduced,
+   His role is the job of the FIRST square he played — where he was introduced,
    which does not move as the campaign adds matches.
 
-   The third is the two readings. Total and Per 90 are one division apart, taken
-   over the minutes the tile beside them is already showing, and the two tiles that
-   no length of season changes — a percentage, and a clean sheet counted in matches
-   — say so by not moving.
+   The second is that the board REPORTS and no longer acts. It was a filter once:
+   a click on a square chose the row of four tiles for the job that square belonged
+   to. Those tiles went on 2026-09-03 (see docs/player-season-table-design.md), and
+   with them the click, the role segment in the URL and the Total / Per 90 bar. What
+   is left is a picture — a square lit for everywhere he has stood, nothing at all
+   where he has not, every square of his role lit together, and the badge beside his
+   name saying the same role. Nothing here is a button and nothing listens.
 
-   Arithmetic is EXECUTED: posFigures, playerIndex and per90 are lifted out of
-   app.js by name and run in a vm against hand-written line-ups, the way
+   Arithmetic is EXECUTED: posFigures and playerIndex are lifted out of app.js by
+   name and run in a vm against hand-written line-ups, the way
    tests/player-data.test.js runs playerIndex. Rendering is read as source, as
    every other client test does. */
 const vm=require('vm');
@@ -34,18 +31,18 @@ const APPCSS=readSrc('client/assets/app.css');
 
 const profile=/function renderPlayerProfile\([^)]*\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const headCard=/function playerHead\([^)]*\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
-const ctlFn=/function playerCtl\([^)]*\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const boardFn=/function positionBoard\([^)]*\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const catTabs=/function catTabs\([^)]*\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const matchTable=/function playerMatchTable\([^)]*\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 
 /* ---------- app.js's own helpers, running for real ---------- */
 const LIFT=['playerIndex','aliasMap','sumStats','playerCards','gkFigures','gkCell','posFigures',
-            'minsTotal','per90'];
-/* the role block whole: the two tables, the four lookups built off them, MODES,
-   and the four tile sets. One contiguous run in app.js, taken in one piece so the
-   lookups cannot drift from the tables they sit beside. */
-const ROLEBLOCK=/\n  \/\* -+ roles -+[\s\S]*?c: 'yellow and red' \}\n  \];/.exec(APPJS)[0];
+            'minsTotal'];
+/* the role block whole: the two tables and the three lookups built off them. One
+   contiguous run in app.js, taken in one piece so the lookups cannot drift from
+   the tables they sit beside. MODES and the four tile sets used to be part of this
+   run; both went with the row of tiles. */
+const ROLEBLOCK=/\n  \/\* -+ roles -+[\s\S]*?ROLE_OF\[p\] = r\[0\]; \}\);\n  \}\);/.exec(APPJS)[0];
 function sandbox(){
   const ctx={console,location:{hash:''},
     document:{getElementById:()=>null,addEventListener(){},removeEventListener(){}},
@@ -57,7 +54,7 @@ function sandbox(){
     LIFT.map(n=>grabFunction(n,APPJS,'client/assets/app.js')).join('\n'),
     ROLEBLOCK,
     ';globalThis.A={'+LIFT.join(',')+',ROLES,ROLE_POS,ROLE_OF,ROLE_LABEL,ROLE_BADGE,'
-      +'MODES,ROLE_KPIS,GK_KPIS,FALLBACK_KPIS,PLAYER_CATS,FORMATION_GRID,newStat,pct};'
+      +'PLAYER_CATS,FORMATION_GRID,newStat,pct};'
   ].join('\n'),ctx,{filename:'client/assets/app.js-extract.js'});
   return ctx.A;
 }
@@ -101,8 +98,8 @@ test('every outfield square of the formation board has exactly one role', () => 
 });
 
 test('the goalkeeper is not one of the three', () => {
-  notOk(A.ROLE_OF.GK,'GK maps to no role, so no chip can ever offer it');
-  notOk(A.ROLE_KPIS.goalkeeper,'and there is no fourth entry pretending otherwise');
+  notOk(A.ROLE_OF.GK,'GK maps to no role, so no square on the board can ever claim him');
+  notOk(A.ROLES.some(r=>r[0]==='goalkeeper'),'and there is no fourth entry pretending otherwise');
 });
 
 test('the three groups are the ones that were asked for', () => {
@@ -113,59 +110,29 @@ test('the three groups are the ones that were asked for', () => {
   deepEq(A.ROLES.map(r=>r[2]),['DEF','MID','ST'],'and each has a badge');
 });
 
-/* ================= the tile tables ================= */
+/* ================= the tile tables are gone ================= */
 
-test('ROLE_KPIS holds the three roles and nothing else', () => {
-  deepEq(Object.keys(A.ROLE_KPIS),['defender','midfielder','striker']);
-  ok(Array.isArray(A.FALLBACK_KPIS),'the net for a man no board placed is a constant of its own');
-  notOk(A.ROLE_KPIS.general,'not a fourth role hiding inside the table');
+test('no table of tiles is left in app.js, nor anything that read one', () => {
+  ['ROLE_KPIS','GK_KPIS','FALLBACK_KPIS','MODES','function per90','function playerCtl']
+    .forEach(n=>notOk(APPJS.indexOf(n)>=0,n+' is still in app.js'));
+  notOk(/kpis six/.test(profile),'the profile no longer asks for the six-wide grid');
+  ok(/kpis two/.test(profile),'it asks for the two-wide one');
 });
 
-test('every set is four tiles, so the row is always six', () => {
-  [A.ROLE_KPIS.defender,A.ROLE_KPIS.midfielder,A.ROLE_KPIS.striker,
-   A.GK_KPIS,A.FALLBACK_KPIS].forEach(set=>eq(set.length,4,'four beside Appearances and Minutes'));
-  ok(/kpis six/.test(profile),'and the grid is still the six-wide one');
+test('the two tiles that stayed are built straight, not through any table', () => {
+  ok(/kpi\('Appearances', who\.apps/.test(profile),'Appearances');
+  ok(/kpi\('Minutes', minsTotal\(who\)/.test(profile),'Minutes');
+  const kpiCalls=(profile.match(/kpi\(/g)||[]).length;
+  eq(kpiCalls,2,'and there are exactly two of them');
 });
 
-test('every tile reads a field that exists, in both readings', () => {
-  const zero=who(), some=who({total:{tacklesWon:9,tackles:14,groundDuels:30,groundDuelsWon:18,
-    aerialDuels:23,aerialDuelsWon:13,passes:412,passesComp:355,shotsOn:8,totalShots:18}});
-  [].concat(A.ROLE_KPIS.defender,A.ROLE_KPIS.midfielder,A.ROLE_KPIS.striker,
-            A.GK_KPIS,A.FALLBACK_KPIS).forEach(t=>{
-    [zero,some].forEach(p=>{
-      const v=t.v(p);
-      ok(v!==undefined&&v===v,t.l+' read something that is not there');
-      const c0=typeof t.c==='function'?t.c(p,false):t.c;
-      const c1=typeof t.c==='function'?t.c(p,true):t.c;
-      ok(typeof c0==='string'&&typeof c1==='string',t.l+' has no caption in one of the readings');
-    });
-  });
-});
-
-test('a tile that counts things carries the reading in its label; a fixed one does not', () => {
-  /* the row builder appends ' (total)' / ' (per 90)' — a tile may not smuggle
-     either into its own label, or the two would be printed twice */
-  [].concat(A.ROLE_KPIS.defender,A.ROLE_KPIS.midfielder,A.ROLE_KPIS.striker,
-            A.GK_KPIS,A.FALLBACK_KPIS).forEach(t=>{
-    notOk(/total|per 90|%/i.test(t.l),t.l+' says the reading in its own label');
-  });
-  ok(/t\.fixed \? '' : rate \? ' \(per 90\)' : ' \(total\)'/.test(profile),
-     'the label suffix is decided in one place, off one flag');
-  /* the four that must not follow the button, and only those four */
-  const fixed=[].concat(A.GK_KPIS,A.FALLBACK_KPIS,A.ROLE_KPIS.defender,
-                        A.ROLE_KPIS.midfielder,A.ROLE_KPIS.striker)
-    .filter(t=>t.fixed).map(t=>t.l).sort();
-  deepEq(fixed,['Cards','Clean Sheets','Save Rate'],
-     'a percentage, a count of matches, and a booking record — nothing else holds still');
-});
-
-test('Shots On Target is the same sum shared.js already publishes', () => {
+test('Shooting Accuracy is still one ratio, in the table it belongs to', () => {
+  /* This used to check the striker tile's caption against the column below it —
+     one ratio, not two. The tile is gone; the column is the only place the figure
+     is printed now, and it still comes out of shared.js. */
   const s=stat({shotsOn:8,totalShots:18});
   const col=A.PLAYER_CATS.shooting.filter(c=>c[0]==='Shooting Accuracy')[0];
-  const tile=A.ROLE_KPIS.striker.filter(t=>t.l==='Shots On Target')[0];
-  ok(/44\.4%/.test(tile.c(who({total:{shotsOn:8,totalShots:18}}),false)),
-     'the share under the tile');
-  eq(col[1](s),'44.4%','and the column in the table right below it — one ratio, not two');
+  eq(col[1](s),'44.4%');
 });
 
 /* ================= posFigures ================= */
@@ -288,101 +255,52 @@ test('a keeper is still a keeper, and roles changed none of his figures', () => 
   })])[0];
   ok(p.gk,'the GK square settles it for the campaign, exactly as before');
   deepEq(p.gkTotal,{conceded:1,clean:0,known:1},'and what went past him is untouched');
-  deepEq(p.roles,[],'a keeper is offered no role to filter by');
-});
-
-/* ================= the two readings ================= */
-
-test('per 90 is the figure over the minutes beside it', () => {
-  eq(A.per90(who({min:360}),21),'5.3','21 across four full matches');
-  eq(A.per90(who({min:90}),1),'1.0','one decimal always, so a column reads down');
-  eq(A.per90(who({min:360}),0),'0.0','nothing done is a rate of nothing, not a dash');
-});
-
-test('a rate nobody can work out is a dash, never a zero and never an infinity', () => {
-  eq(A.per90(who({timed:false,min:0}),9),'—','no line-up ever named him');
-  eq(A.per90(who({min:0}),9),'—','and no minutes is not a rate of zero');
-  eq(A.per90(who({min:360}),'—'),'—','the keeper-s Conceded already reads this when no board can answer');
-  eq(A.per90(who({min:360}),null),'—');
-});
-
-test('an approximate total can only make an approximate rate', () => {
-  eq(A.per90(who({min:360,exact:false}),21),'~5.3','the same mark minsTotal puts on the tile beside it');
-  eq(A.per90(who({min:360,exact:true}),21),'5.3');
-});
-
-test('a share does not move with the reading; the count it is a share of does', () => {
-  const p=who({total:{tacklesWon:9,tackles:14},min:360});
-  const t=A.ROLE_KPIS.defender.filter(x=>x.l==='Tackles Won')[0];
-  eq(t.v(p),9,'the figure is a count in both readings, one division apart');
-  eq(t.c(p,false),'64.3% of 14');
-  eq(t.c(p,true),'64.3% of 3.5','the share holds, the total it is out of goes to a rate');
-});
-
-test('Appearances and Minutes are the divisor, so they hold still', () => {
-  ok(/kpi\('Appearances', who\.apps/.test(profile)&&/kpi\('Minutes', minsTotal\(who\)/.test(profile),
-     'built once, outside the map, so no reading can reach them');
-  notOk(/per90\(who, who\.apps\)/.test(profile),'nobody divides his appearances by his minutes');
+  deepEq(p.roles,[],'a keeper is claimed by none of the three');
 });
 
 /* ================= what is drawn ================= */
 
-test('one table draws all three rows, and the keeper is asked about first', () => {
-  ok(/var set = who\.gk \? GK_KPIS : \(ROLE_KPIS\[role\] \|\| FALLBACK_KPIS\);/.test(profile),
-     'a keeper, then a role, then the net — in that order, in one line');
-  ok(/who\.gk\s*\n?\s*\?/.test(profile),'chosen by role, not drawn twice');
-  notOk(/kpi\('Goals', who\.total\.goals/.test(profile),
-     'and no row of tiles is still written out by hand');
+test('the board is a picture: no button, no listener, no role in the URL', () => {
+  notOk(/addEventListener/.test(boardFn),'the card hangs nothing');
+  notOk(/location\.hash/.test(boardFn),'and no square can navigate');
+  notOk(/data-role|aria-pressed/.test(boardFn),
+     'nor carry the attributes a click used to be dispatched on');
+  ok(/el\('div', 'pl-pz'/.test(boardFn),'a square is a div, not a button');
+  notOk(/'button'/.test(boardFn),'nothing in here is a button at all');
 });
 
-test('the reading resets when a player is opened', () => {
-  ok(/var mode = 'total';/.test(profile),'Total is where every visit starts');
-  notOk(/localStorage/.test(profile+ctlFn),'nothing is remembered between two visits');
-  const hashSets=(profile+ctlFn).match(/location\.hash = [^\n]*/g)||[];
-  ok(hashSets.length>0,'the role chip does put its role in the URL');
-  notOk(hashSets.some(h=>/mode|p90|total/.test(h)),
-     'but the reading never goes there — a click on it must not redraw the whole view');
-});
-
-test('a keeper gets the two readings and no board', () => {
-  notOk(/who\.gk/.test(ctlFn),'nothing in the reading bar turns on whether he keeps goal');
+test('a keeper gets no board, and a man no board placed gets none either', () => {
   ok(/if \(who\.gk \|\| !who\.roles\.length\) return null;/.test(boardFn),
-     'the board is the one thing he is left out of, and a man no board placed with him');
-  notOk(/chip/.test(boardFn),'the filter is the squares themselves — there are no chips left');
+     'the two who are left out, in one line');
+  notOk(/chip/.test(boardFn),'and there are no chips — there never were, since the squares replaced them');
 });
 
-test('Per 90 is refused when there are no minutes to divide by', () => {
-  ok(/var canRate = !!\(who\.timed && who\.min\);/.test(ctlFn),'both flags, as per90 reads them');
-  ok(/b\.disabled = true;/.test(ctlFn)&&/b\.title = 'No match in this channel has a line-up/.test(ctlFn),
-     'disabled, and it says why rather than offering a row of dashes');
-  ok(/\} else \{\n\s*b\.addEventListener/.test(ctlFn),'and a disabled button gets no listener at all');
+test('his role is the one his first square gives him, and nothing can override it', () => {
+  ok(/var role = who\.gk \? '' : who\.role;/.test(profile),
+     'read straight off the man; a keeper has none');
+  notOk(/wantedRole|roles\.indexOf/.test(profile),'nothing asks the URL what role to read');
+  ok(/function renderPlayerProfile\(body, who, people, wanted\)/.test(profile),
+     'and the parameter it was asked with is gone');
+  ok(/renderPlayerProfile\(body, who, people, rest\[2\]\)/.test(APPJS),
+     'so the route passes three segments, not four');
 });
 
-test('a square is a link somebody can send, category and all', () => {
-  ok(/var base = '#\/data\/player\/' \+ encodeURIComponent\(who\.key\) \+ '\/' \+ cat \+ '\/';/.test(boardFn),
-     'the category he was reading in is carried into the role he clicks to');
-  ok(/location\.hash = base \+ b\.getAttribute\('data-role'\);/.test(boardFn),
-     'a square carries the JOB it feeds, so the URL stays a role');
-  ok(/renderPlayerProfile\(body, who, people, rest\[2\], rest\[3\]\)/.test(APPJS),
-     'and the fourth segment is read back out of the hash');
-  ok(/e\.target\.closest \? e\.target\.closest\('button\[data-role\]'\) : null/.test(boardFn),
-     'one listener on the pitch, not one per square — as the match tables do it');
-});
-
-test('switching category keeps the role, and Team Data is untouched by the change', () => {
-  ok(/function catTabs\(cat, base, tabs, tail\)/.test(catTabs),'a fourth argument, with a default');
-  ok(/\(base \|\| '#\/data\/team\/'\) \+ t\[0\] \+ \(tail \|\| ''\)/.test(catTabs),
-     'nothing appended when nothing is passed');
+test('switching category no longer appends anything, and Team Data is untouched', () => {
+  ok(/function catTabs\(cat, base, tabs\)/.test(catTabs),'three arguments now, not four');
+  ok(/\(base \|\| '#\/data\/team\/'\) \+ t\[0\];/.test(catTabs),
+     'the href is the base and the category, full stop');
+  notOk(/tail/.test(catTabs),'no fourth segment is built anywhere');
   ok(/body\.appendChild\(catTabs\(cat\)\);/.test(APPJS),
      'Team Data still calls it with one argument and builds the href it always did');
-  ok(/role \? '\/' \+ role : ''/.test(profile),'and a player without a role appends nothing');
 });
 
-test('the badge says which role is being read', () => {
+test('the badge says his role, and the booking record prints for everybody', () => {
   ok(/pl-role">GK/.test(headCard),'a keeper is asked about first, and his badge is unchanged');
   ok(/esc\(ROLE_BADGE\[role\]\)/.test(headCard),'the other three come off one table');
-  ok(/who\.gk \|\| role \? ' · ' \+ who\.cards\.y/.test(headCard),
-     'and the booking record moves to the meta line whenever the tiles have no room for it');
+  ok(/' · ' \+ who\.cards\.y \+ 'Y · ' \+ who\.cards\.r \+ 'R'/.test(headCard),
+     'the meta line carries the booking record');
+  notOk(/who\.gk \|\| role \? ' · ' \+ who\.cards\.y/.test(headCard),
+     'and no longer only for a keeper and a man with a role — the tiles that carried it for the third are gone');
 });
 
 test('the role filter does not reach the table under it', () => {
@@ -390,18 +308,26 @@ test('the role filter does not reach the table under it', () => {
   notOk(/role|mode|per90/.test(matchTable),'a match row is what happened that match, whole');
 });
 
-test('nothing on this bar prints a shirt number', () => {
-  notOk(/who\.no|p\.no|pl-shirt/.test(ctlFn),
+test('nothing on this card prints a shirt number', () => {
+  notOk(/who\.no|p\.no|pl-shirt/.test(boardFn),
      'a number belongs to a match rather than to a man — the rule the rest of this page keeps');
 });
 
 test('the new markup brings its own styles and borrows the rest', () => {
-  ok(/\.pl-ctl\{/.test(APPCSS)&&/\.pl-grp\{/.test(APPCSS),'the reading bar is defined');
-  ok(/\.pl-grp\.right\{margin-left:auto\}/.test(APPCSS),'and sits at the far end');
+  ok(/\.pl-duo\{/.test(APPCSS)&&/\.pl-duo-l\{/.test(APPCSS),'the two-column row is defined');
+  ok(/\.kpis\.two\{/.test(APPCSS),'and the two-tile strip beside it');
+  ok(/\.kpis\.six\{/.test(APPCSS),'the six-wide one stays — Team Data still draws it');
   ok(/\.pl-pos\{/.test(APPCSS)&&/\.pl-pitch\{/.test(APPCSS)&&/\.pl-pz\{/.test(APPCSS),
      'the board is defined');
   ok(/\.pl-pz\.on\{/.test(APPCSS),'a lit square takes the amber of the badge');
+  notOk(/\.pl-ctl\{|\.pl-grp\{/.test(APPCSS),'and the reading bar took its rules with it');
   notOk(/^\.chip\{/m.test(APPCSS),'.chip itself is left where site.css defines it');
+});
+
+test('a square that cannot be pressed does not look pressable', () => {
+  const board=/\.pl-pz\{[^}]*\}/.exec(APPCSS)[0];
+  notOk(/cursor:pointer/.test(board),'no hand cursor over something inert');
+  notOk(/\.pl-pz:hover\{/.test(APPCSS),'and no hover state to promise a click');
 });
 
 test('the board does not answer to the tagger-s .pz, nor it to this one', () => {
@@ -419,19 +345,20 @@ test('the board does not answer to the tagger-s .pz, nor it to this one', () => 
      'the board writes only its own vocabulary');
 });
 
-test('the bar hangs no listener on the document', () => {
+test('the profile hangs no listener on the document', () => {
   /* playerHead's player menu has to, and takes it off again on the way out.
-     Nothing here does, so nothing here can hold a detached node alive. */
-  notOk(/document\.addEventListener/.test(ctlFn));
-  ok(/b\.addEventListener\('click'/.test(ctlFn),'every listener is on a button it just built');
+     Nothing else here does, so nothing else can hold a detached node alive. */
+  notOk(/document\.addEventListener/.test(profile+boardFn));
 });
 
 /* ================= the profile, actually drawn =================
    Everything above reads the render as source, which cannot catch a name that is
    not in scope or a field read off undefined. So the whole of renderPlayerProfile
-   is run here against a DOM small enough to reason about, and the six tiles are
-   read back out of it. This is the test that fails if the page would throw. */
-function paintProfile(person, wantedRole){
+   is run here against a DOM small enough to reason about, and the two tiles and
+   the board are read back out of it. This is the test that fails if the page
+   would throw. The Season card in the other half of that row has its own file,
+   tests/player-season-table.test.js, which paints the card alone. */
+function paintProfile(person){
   const made=[];
   const mk=tag=>{
     const n={tag,className:'',innerHTML:'',title:'',type:'',disabled:false,kids:[],
@@ -440,11 +367,10 @@ function paintProfile(person, wantedRole){
       addEventListener(ev,fn){(n.on=n.on||{})[ev]=fn;},
       setAttribute(k,v){n.attrs[k]=String(v);},removeAttribute(k){delete n.attrs[k];},
       getAttribute:k=>(k in n.attrs?n.attrs[k]:null),
-      closest:sel=>(sel==='button[data-role]'&&n.tag==='button'&&'data-role' in n.attrs)?n:null,
+      closest:()=>null,
       classList:{toggle(c,on){n.className=on?(n.className+' '+c):n.className.replace(' '+c,'');},
                  add(){},remove(){},contains:()=>false},
-      querySelectorAll:sel=>made.filter(x=>x.sel===sel||
-        (sel==='.pl-grp.right .chip'&&x.tag==='button'&&/\bchip\b/.test(x.className)&&x.inRight))};
+      querySelectorAll:sel=>made.filter(x=>x.sel===sel)};
     made.push(n); return n;
   };
   const ctx={console,JSON,Math,Date,String,Number,Object,Array,Boolean,RegExp,isFinite,
@@ -456,9 +382,9 @@ function paintProfile(person, wantedRole){
     state:{}};
   ctx.globalThis=ctx;
   vm.createContext(ctx);
-  const NAMES=['esc','num','kpi','catCols','minsTotal','minsOne','per90','gkCell',
-               'catTabs','playerHead','playerCtl','positionBoard','playerMatchTable',
-               'renderPlayerProfile'];
+  const NAMES=['esc','num','kpi','catCols','minsTotal','minsOne','gkCell',
+               'catTabs','playerHead','seasonRows','seasonCard','positionBoard',
+               'playerMatchTable','renderPlayerProfile'];
   /* app.js is an IIFE and shared.js is global, so the lifted half goes inside a
      function scope here too — otherwise app.js's own esc() collides with the one
      shared.js declares, which is a collision the real page does not have. */
@@ -471,93 +397,81 @@ function paintProfile(person, wantedRole){
     /\n  var tabsFor = [^\n]*/.exec(APPJS)[0],
     ROLEBLOCK,
     NAMES.map(n=>grabFunction(n,APPJS,'client/assets/app.js')).join('\n'),
-    ';globalThis.OUT=renderPlayerProfile;',
+    ';globalThis.OUT=renderPlayerProfile;globalThis.SEASONROWS=seasonRows;',
     '})();'
   ].join('\n'),ctx,{filename:'client/assets/app.js-render.js'});
 
   const body=mk('div');
-  ctx.OUT(body,person,[person],'shooting',wantedRole);
-  /* the tiles are one innerHTML string; the bar is the node before them */
-  const kpis=body.kids.filter(n=>n.className==='kpis six')[0];
-  const bar=body.kids.filter(n=>n.className==='pl-ctl')[0];
-  const board=body.kids.filter(n=>n.className==='card pl-pos')[0]||null;
+  ctx.OUT(body,person,[person],'shooting');
+  /* one row holding the board and the tiles on the left, the Season card on the right */
+  const duo=body.kids.filter(n=>n.className==='pl-duo')[0];
+  const left=duo?duo.kids.filter(n=>n.className==='pl-duo-l')[0]:null;
+  const kpis=left?left.kids.filter(n=>n.className==='kpis two')[0]:null;
+  const season=duo?duo.kids.filter(n=>n.className==='card pl-season')[0]:null;
+  const board=left?left.kids.filter(n=>n.className==='card pl-pos')[0]||null:null;
   const pitch=board?board.kids.filter(n=>n.className==='pl-pitch')[0]:null;
   /* every square drawn on it, in the order the two loops walked the grid */
-  const squares=pitch?pitch.kids.filter(n=>n.tag==='button').map(b=>({
+  /* the class list exactly, not a substring match: the direction arrow beside them
+     is .pl-pz-arrow, and /\bpl-pz\b/ would take it for a square */
+  const squares=pitch?pitch.kids.filter(n=>n.className.split(' ').indexOf('pl-pz')>=0).map(b=>({
     pos:(/class="pl-pz-lb">([^<]*)</.exec(b.innerHTML)||[])[1],
-    role:b.getAttribute('data-role'), on:b.className.split(' ').indexOf('on')>=0,
-    pressed:b.getAttribute('aria-pressed'),
+    tag:b.tag, on:b.className.split(' ').indexOf('on')>=0,
+    role:b.getAttribute('data-role'), pressed:b.getAttribute('aria-pressed'),
     title:b.title, left:b.style.left, top:b.style.top, node:b})):[];
-  const labels=(kpis.innerHTML.match(/class="k-l">([^<]*)</g)||[])
-    .map(s=>s.replace(/^class="k-l">/,'').replace(/<$/,''));
-  const values=(kpis.innerHTML.match(/class="k-v">([^<]*)</g)||[])
-    .map(s=>s.replace(/^class="k-v">/,'').replace(/<$/,''));
-  return {body,kpis,bar,board,pitch,squares,labels,values,ctx,
-    /* a click on one square, driven through the pitch's own delegated listener */
-    clickSquare:pos=>{
-      const sq=squares.filter(x=>x.pos===pos)[0];
-      pitch.on.click({target:sq.node});
-      return ctx.location.hash;
-    },
-    repaint:m=>{
-    /* the button's own click handler, run the way a click would run it */
-      const btns=bar.kids.filter(n=>n.className==='pl-grp right')[0].kids;
-      const b=btns.filter(n=>/Per 90|Total/.test(n.innerHTML))[MODES_IDX[m]];
-      b.on.click();
-      return (kpis.innerHTML.match(/class="k-l">([^<]*)</g)||[])
-        .map(s=>s.replace(/^class="k-l">/,'').replace(/<$/,''));
-    }};
+  const cell=(node,cls)=>(node.innerHTML.match(new RegExp('class="'+cls+'">([^<]*)<','g'))||[])
+    .map(s=>s.replace(new RegExp('^class="'+cls+'">'),'').replace(/<$/,''));
+  return {body,duo,left,kpis,season,board,pitch,squares,ctx,
+    labels:kpis?cell(kpis,'k-l'):[], values:kpis?cell(kpis,'k-v'):[],
+    seasonRows:ctx.SEASONROWS};
 }
-const MODES_IDX={total:0,p90:1};
 /* a fully-formed player, the shape playerIndex hands the view */
 function person(o){
   o=o||{};
-  const m={m:{slug:'m1',id:'m1',date:'2025-06-11',opponent:'Barbados',side:'home',result:'W'},
+  const m={m:Object.assign({slug:'m1',id:'m1',date:'2025-06-11',opponent:'Barbados',
+                            side:'home',result:'W'},o.m||{}),
            gf:2,ga:1,stat:stat(o.total),mins:played(90),cards:{y:0,r:0},gk:null,pos:null};
-  return Object.assign(who(o),{key:'n:elva',name:'Elva',matches:[m],gk:!!o.isGk,
+  return Object.assign(who(o),{key:'n:elva',name:'Elva',matches:o.matches||[m],gk:!!o.isGk,
     roles:o.roles||[],role:o.role||'',posApps:o.posApps||{},pos0:o.pos0||'',
     total:stat(o.total),min:o.min===undefined?360:o.min,
     timed:o.timed===undefined?true:o.timed});
 }
 
-test('a defender-s profile draws, and the four tiles are his', () => {
-  const r=paintProfile(person({role:'defender',roles:['defender'],roleApps:{defender:4},
-    total:{tacklesWon:9,tackles:14,interceptions:14,clearances:21,
-           groundDuels:30,groundDuelsWon:18,aerialDuels:23,aerialDuelsWon:13}}));
-  deepEq(r.labels,['Appearances','Minutes','Tackles Won (total)','Interceptions (total)',
-                   'Clearances (total)','Duels Won (total)']);
-  deepEq(r.values,['4',"360'",'9','14','21','31']);
+test('a defender-s profile draws, and the two tiles are everybody-s', () => {
+  const r=paintProfile(person({role:'defender',roles:['defender'],
+    total:{tacklesWon:9,tackles:14,interceptions:14,clearances:21}}));
+  deepEq(r.labels,['Appearances','Minutes'],'no tile changes with the job he did any more');
+  deepEq(r.values,['4',"360'"]);
+  ok(r.season,'and the Season card is what stands where the other four were');
 });
 
-test('Per 90 divides the counts and leaves the two on the left alone', () => {
-  const r=paintProfile(person({role:'defender',roles:['defender'],roleApps:{defender:4},
-    total:{tacklesWon:9,tackles:14,interceptions:14,clearances:21,
-           groundDuels:30,groundDuelsWon:18,aerialDuels:23,aerialDuelsWon:13}}));
-  const after=r.repaint('p90');
-  deepEq(after,['Appearances','Minutes','Tackles Won (per 90)','Interceptions (per 90)',
-                'Clearances (per 90)','Duels Won (per 90)'],'the label follows the button');
-  const values=(r.kpis.innerHTML.match(/class="k-v">([^<]*)</g)||[])
-    .map(s=>s.replace(/^class="k-v">/,'').replace(/<$/,''));
-  deepEq(values,['4',"360'",'2.3','3.5','5.3','7.8'],'21 clearances over four matches is 5.3');
+test('the row holds exactly two things, in the order the design asks for', () => {
+  const r=paintProfile(person({role:'defender',roles:['defender'],posApps:{CB:4}}));
+  ok(r.duo,'a .pl-duo row');
+  eq(r.duo.kids.length,2,'the left column and the Season card, nothing else');
+  eq(r.duo.kids[0].className,'pl-duo-l','the board and the tiles on the left');
+  eq(r.duo.kids[1].className,'card pl-season','the table on the right');
+  deepEq(r.left.kids.map(n=>n.className),['card pl-pos','kpis two'],
+     'and inside the left column the board comes first, the tiles under it');
 });
 
-test('a keeper draws his own four, and gets the two readings', () => {
+test('a keeper reads the same two tiles and the same table, with no board', () => {
   const r=paintProfile(person({isGk:true,total:{saves:9},min:360}));
-  deepEq(r.labels,['Appearances','Minutes','Saves (total)','Conceded (total)',
-                   'Save Rate','Clean Sheets'],
-     'a percentage and a count of matches carry no reading, because none applies');
-  deepEq(r.repaint('p90').slice(2),['Saves (per 90)','Conceded (per 90)','Save Rate','Clean Sheets'],
-     'and the two that hold still, hold still');
-  ok(r.bar,'he has the bar');
-  notOk(r.bar.kids.some(k=>k.className==='pl-grp'),'but no role group in it');
+  deepEq(r.labels,['Appearances','Minutes'],'the four about the goal are gone with the rest');
+  notOk(r.board,'no board — the GK square is not one of the fifteen');
+  ok(r.season,'but the Season card is his too: it does not change with the job');
+  eq(r.duo.kids.length,2,'and the row is still two columns wide');
+  deepEq(r.left.kids.map(n=>n.className),['kpis two'],'his left column holds the tiles alone');
 });
 
-test('a man no board placed draws the page he had before roles existed', () => {
-  const r=paintProfile(person({total:{goals:3,assists:2,keyPasses:6}}));
-  deepEq(r.labels,['Appearances','Minutes','Goals (total)','Assists (total)',
-                   'Key Passes (total)','Cards'],
-     'the four he has always seen, and his booking record still among them');
-  deepEq(r.values,['4',"360'",'3','2','6','0Y · 0R']);
+test('a man no board placed keeps his booking record', () => {
+  const r=paintProfile(person({total:{goals:3,assists:2,keyPasses:6},cards:{y:2,r:1}}));
+  deepEq(r.labels,['Appearances','Minutes']);
+  notOk(r.board,'no square was ever lit for him');
+  /* the regression §2.4 of the design is about: the Cards tile he used to get is
+     gone, so the meta line has to be carrying it */
+  const meta=r.body.kids.filter(n=>n.className==='card pl-head')[0]
+                  .kids.filter(n=>n.className==='pl-meta')[0];
+  ok(/2Y · 1R/.test(meta.innerHTML),'and it is printed on the meta line instead');
 });
 
 /* the man in the picture: two on the left flank, one on the right */
@@ -569,8 +483,10 @@ test('the board draws a square for every position he played, and nothing else', 
   ok(r.board,'a Position card');
   deepEq(r.squares.map(s=>s.pos).sort(),['LM','LW','RW'],
      'three squares out of eighteen — the rest of the pitch is left empty');
-  deepEq(r.squares.filter(s=>s.pos==='LM')[0].role,'midfielder');
-  deepEq(r.squares.filter(s=>s.pos==='LW')[0].role,'striker');
+  /* which job a square belongs to is no longer an attribute on it — nothing reads
+     one back any more. The title says it, and that is where it is checked. */
+  ok(/^Midfielder · /.test(r.squares.filter(s=>s.pos==='LM')[0].title));
+  ok(/^Striker · /.test(r.squares.filter(s=>s.pos==='LW')[0].title));
 });
 
 test('the squares land where the tagger would have drawn them', () => {
@@ -587,12 +503,11 @@ test('the squares land where the tagger would have drawn them', () => {
   eq(at('RW').left,(4*100/6)+'%','and his mirror is in the same column');
 });
 
-test('every square of the role being read lights up, not just the one clicked', () => {
-  const r=paintProfile(person(WINGER),'striker');
+test('every square of his role lights up, not just the first one he stood in', () => {
+  const r=paintProfile(person(WINGER));
   deepEq(r.squares.filter(s=>s.on).map(s=>s.pos).sort(),['LW','RW'],
-     'the four tiles below are the ROLE-s, so both of its squares say so');
-  eq(r.squares.filter(s=>s.pos==='LM')[0].on,false);
-  deepEq(r.labels.slice(2,3),['Goals (total)'],'and the tiles are the striker-s');
+     'a winger-s role is no more about the left wing than the right, so both say so');
+  eq(r.squares.filter(s=>s.pos==='LM')[0].on,false,'and the job he did not open on stays dark');
 });
 
 test('a square says which job it feeds and how often he took it', () => {
@@ -611,41 +526,32 @@ test('the board is drawn on the channel-s own game', () => {
      'the tagger-s own id does not travel with it');
 });
 
-test('a square tells a screen reader whether it is the one being read', () => {
-  const r=paintProfile(person(WINGER),'striker');
-  eq(r.squares.filter(s=>s.pos==='LW')[0].pressed,'true');
-  eq(r.squares.filter(s=>s.pos==='LM')[0].pressed,'false');
-  ok(r.squares.every(s=>s.node.type==='button'),
-     'and none of them submits anything, sitting where a form could be');
+test('a drawn square is inert: not a button, and nothing to press', () => {
+  const r=paintProfile(person(WINGER));
+  ok(r.squares.every(s=>s.tag==='div'),'a div, so no keyboard focus and no press');
+  ok(r.squares.every(s=>s.pressed===null),'no aria-pressed, because nothing is pressed');
+  ok(r.squares.every(s=>s.role===null),'no data-role, because no click reads one back');
+  ok(r.squares.every(s=>!s.node.on),'and not one of them carries a listener');
+  notOk(r.pitch.on,'nor does the pitch they sit on');
 });
 
-test('clicking a square asks for that job, keeping the category', () => {
-  const r=paintProfile(person(WINGER),'striker');
-  eq(r.clickSquare('LM'),'#/data/player/n%3Aelva/shooting/midfielder',
-     'the square carries the role, and the category he was reading in comes along');
-  eq(r.clickSquare('RW'),'#/data/player/n%3Aelva/shooting/striker');
+test('the badge and the lit squares say the job of his FIRST square', () => {
+  const r=paintProfile(person(WINGER));       // began at LW
+  deepEq(r.squares.filter(s=>s.on).map(s=>s.pos).sort(),['LW','RW'],'the striker-s two');
+  const head=r.body.kids.filter(n=>n.className==='card pl-head')[0];
+  ok(/pl-role">ST</.test(head.kids[0].innerHTML),'and the badge beside his name agrees');
 });
 
-test('the card opens on the job of his first square', () => {
-  const r=paintProfile(person(WINGER));       // no role in the URL
-  deepEq(r.labels.slice(2,3),['Goals (total)'],'he began at LW, so the striker card opens');
-  deepEq(r.squares.filter(s=>s.on).map(s=>s.pos).sort(),['LW','RW']);
-});
-
-test('a man with one position still gets his board, and nothing to press changes it', () => {
+test('a man with one position still gets his board', () => {
   const r=paintProfile(person({role:'defender',roles:['defender'],posApps:{CB:4},pos0:'CB'}));
-  ok(r.board,'where he plays is worth saying even when there is no choice to make');
+  ok(r.board,'where he plays is worth saying even when there is nothing to choose');
   deepEq(r.squares.map(s=>s.pos),['CB']);
   eq(r.squares[0].on,true);
-  eq(r.clickSquare('CB'),'#/data/player/n%3Aelva/shooting/defender','a click that changes nothing');
 });
 
-test('a profile with no minutes refuses Per 90 rather than drawing dashes', () => {
-  const r=paintProfile(person({role:'striker',roles:['striker'],roleApps:{striker:1},
+test('a profile with no minutes draws, and says so where minutes are printed', () => {
+  const r=paintProfile(person({role:'striker',roles:['striker'],posApps:{CF:1},
     timed:false,min:0}));
-  const right=r.bar.kids.filter(n=>n.className==='pl-grp right')[0];
-  const p90=right.kids[1];
-  ok(p90.disabled,'the button is off');
-  ok(/no minutes to divide by/.test(p90.title),'and says why');
-  notOk(p90.on&&p90.on.click,'a button nobody may press is given nothing to do');
+  deepEq(r.labels,['Appearances','Minutes'],'the page draws rather than throwing');
+  eq(r.values[1],'—','and no line-up means no minutes, not zero of them');
 });
