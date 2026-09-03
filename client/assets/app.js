@@ -85,6 +85,34 @@
   /* ---------------------------------------------------------
      Shell: channel switcher, account, nav
      --------------------------------------------------------- */
+
+  /* The round chip beside the account name. An account signed in with Google brings a
+     picture; one made with a password has none, and that is still most people — so the
+     initial is not a fallback bolted on, it is the other half of the design.
+
+     img.src is set as a PROPERTY and never through innerHTML: the URL arrives from a
+     provider, and a provider's string has no business being parsed as markup. A picture
+     Google's CDN will not serve falls back to the initial rather than leaving a broken
+     image glyph in the header. */
+  function showAvatar(user) {
+    var av = $('#avatar');
+    var meta = user.user_metadata || {};
+    var photo = meta.avatar_url || meta.picture || '';
+    var initial = (user.email || 'A').charAt(0).toUpperCase();
+    if (!photo) { av.classList.remove('has-photo'); av.textContent = initial; return; }
+    av.textContent = '';
+    av.classList.add('has-photo');
+    var img = document.createElement('img');
+    img.alt = '';
+    img.referrerPolicy = 'no-referrer';        // Google's CDN 403s some referrers
+    img.addEventListener('error', function () {
+      av.classList.remove('has-photo');
+      av.textContent = initial;
+    });
+    img.src = photo;
+    av.appendChild(img);
+  }
+
   function renderShell() {
     var ch = state.channel;
     $('#chanName').textContent = ch ? ch.name : (state.user ? 'No channel' : 'Not signed in');
@@ -106,11 +134,12 @@
     var who = $('#who');
     if (state.user) {
       who.innerHTML = 'Signed in as<b>' + esc(state.user.email || 'account') + '</b>';
-      $('#avatar').textContent = (state.user.email || 'A').charAt(0).toUpperCase();
+      showAvatar(state.user);
       $('#signOut').hidden = false;
       $('#signIn').hidden = true;
     } else {
       who.innerHTML = 'Not signed in<b>sign in to open your channel</b>';
+      $('#avatar').classList.remove('has-photo');
       $('#avatar').textContent = '?';
       $('#signOut').hidden = true;
       $('#signIn').hidden = false;

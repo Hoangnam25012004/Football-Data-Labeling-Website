@@ -721,9 +721,23 @@
 
   /* Supabase confirmation links point at the site root. The tagging app now
      lives under /tagger, so hand any auth tokens that land here over to it
-     instead of dropping them on a page that cannot use them. */
+     instead of dropping them on a page that cannot use them.
+
+     WHICH door to hand them to is the part Google added. A club signing in with
+     Google keeps its session under a different storage key, so the tagging app's
+     sign-in screen could not finish that job even though it would happily try.
+     Nothing in the hash says where the trip started — an OAuth callback carries no
+     `type=` — so the page that sent the browser to Google leaves a breadcrumb
+     first, and this reads it once and clears it. No breadcrumb means an emailed
+     confirmation link, which is the case this branch was written for, and the
+     destination is unchanged for it. */
   if (/[#&](access_token|error_code|type)=/.test(location.hash)) {
-    location.replace('tagger/auth' + location.search + location.hash);
+    var home = 'tagger/auth';
+    try {
+      home = localStorage.getItem('hna.oauth.home') || home;
+      localStorage.removeItem('hna.oauth.home');
+    } catch (e) { /* storage refused — the tagging app is the older default */ }
+    location.replace(home + location.search + location.hash);
     return;
   }
 

@@ -172,6 +172,92 @@ test('Supabase-s wording is turned into something a coach can act on', () => {
     .forEach(k=>ok(ex.includes(k),'it handles '+k));
 });
 
+/* ================= Continue with Google =================
+   One button doing the work of both tabs, because an OAuth provider has no separate
+   sign-up. The rules it is held to are the ones auth.html paid for: it stays outside
+   both forms, and working() is never told it exists. */
+test('supa.js can start a Google sign-in, and joins no channel doing it', () => {
+  const fn=/signInWithGoogle: function \(\)[\s\S]*?\n      \},/.exec(SUPA)[0];
+  ok(/provider: 'google'/.test(fn),'the provider is named');
+  ok(/ROOT \+ 'login\.html'/.test(fn),'home is this site’s own sign-in page, not the tagger’s');
+  ok(/skipBrowserRedirect: true/.test(fn),'the page navigates, not the library');
+  ok(/prompt: 'select_account'/.test(fn),'the account chooser');
+  notOk(/club_members|clubs|insert/.test(fn),'it writes to no channel table');
+});
+
+test('the Google button is outside both forms here too', () => {
+  const signIn=/<form id="loginForm"[\s\S]*?<\/form>/.exec(LOGIN)[0];
+  const signUp=/<form id="signupForm"[\s\S]*?<\/form>/.exec(LOGIN)[0];
+  [signIn,signUp].forEach(f=>notOk(/googleBtn/.test(f),'not inside a form'));
+  ok(/<button type="button" class="btn btn-google" id="googleBtn">/.test(LOGIN),
+     'type=button, so it cannot submit one by accident');
+  const working=/function working\(on, label\)[\s\S]*?\n  \}/.exec(SCRIPT)[0];
+  notOk(/googleBtn/.test(working),'working() is untouched — auth.html learned this the hard way');
+  ok(/function gWorking\(on\)/.test(SCRIPT),'the button has a switch of its own');
+});
+
+test('a project with Google switched off does not strand a club on a JSON page', () => {
+  ok(/function alive\(url\)/.test(SCRIPT),'the destination is asked about before we go');
+  ok(/PREFLIGHT_MS/.test(SCRIPT)&&/Promise\.race/.test(SCRIPT),'and the asking is capped');
+  const ex=/function explain\(err\)[\s\S]*?\n  \}/.exec(SCRIPT)[0];
+  ['unsupported provider','access_denied','bad_oauth_state','already linked']
+    .forEach(k=>ok(ex.includes(k),'it handles '+k));
+});
+
+test('a club is told what Google does, and does not do, about their channel', () => {
+  ok(/Google creates your account the first time/.test(LOGIN),'no separate sign-up to look for');
+  ok(/invitation to your\s+club/.test(LOGIN),'and it still waits for an invitation');
+});
+
+test('the two sign-in pages offer the same provider', () => {
+  ok(/Continue with Google/.test(LOGIN)&&/Continue with Google/.test(AUTH_HTML),
+     'one label, two pages');
+});
+
+/* ================= tokens that came home to the wrong door =================
+   Supabase honours redirectTo only if it is in the project's Redirect URLs; otherwise
+   it falls back to the Site URL, which is the landing page — and that page loads no
+   Supabase client at all, so without this the sign-in would succeed and look like
+   nothing happened. The tagging app has auth.js for this; the client site has these. */
+const LANDING=page('client/index.html');
+
+test('both sign-in pages leave a breadcrumb before they go to Google', () => {
+  ok(/hna\.oauth\.home/.test(SCRIPT)&&/'login\.html'/.test(SCRIPT),'the club site says so');
+  ok(/hna\.oauth\.home/.test(AUTH_HTML)&&/'tagger\/auth'/.test(AUTH_HTML),'and the tagger');
+  // the hash says nothing about which door it came from: an OAuth callback has no type=
+  ok(/setItem\('hna\.oauth\.home'/.test(SCRIPT),'written before the browser leaves');
+});
+
+test('the landing page hands the tokens to whichever page started the trip', () => {
+  ok(/getItem\('hna\.oauth\.home'\)/.test(LANDING),'it reads the breadcrumb');
+  ok(/removeItem\('hna\.oauth\.home'\)/.test(LANDING),'once — a stale one would misroute the next');
+  ok(/var home = 'tagger\/auth'/.test(LANDING),
+     'and with no breadcrumb it is an emailed confirmation link, which went there before');
+  ok(/location\.replace\(home \+ location\.search \+ location\.hash\)/.test(LANDING),
+     'the whole callback is handed over, not a summary of it');
+});
+
+/* ================= the picture Google hands over ================= */
+const APPJS=page('client/assets/app.js');
+
+test('an account signed in with Google shows its picture, one made with a password its initial', () => {
+  const fn=/function showAvatar\(user\)[\s\S]*?\n  \}/.exec(APPJS)[0];
+  ok(/meta\.avatar_url \|\| meta\.picture/.test(fn),'both keys Google can use');
+  ok(/if \(!photo\)[\s\S]{0,120}av\.textContent = initial/.test(fn),
+     'no picture is the other half of the design, not a failure');
+  // the URL arrives from a provider; parsing it as markup is how a provider writes script
+  ok(/img\.src = photo/.test(fn),'set as a property');
+  notOk(/innerHTML/.test(fn),'never through innerHTML');
+  ok(/addEventListener\('error'/.test(fn),'and one Google will not serve falls back to the initial');
+});
+
+test('signing out takes the picture with it', () => {
+  const shell=/function renderShell\(\)[\s\S]*?\n  \}/.exec(APPJS)[0];
+  ok(/showAvatar\(state\.user\)/.test(shell),'signed in: the chip is rendered from the account');
+  ok(/classList\.remove\('has-photo'\)[\s\S]{0,80}textContent = '\?'/.test(shell),
+     'signed out: back to the question mark, with no photo class left behind');
+});
+
 /* ================= styling ================= */
 test('the switch is styled with the site-s own tokens', () => {
   const css=APPCSS.replace(/\s*\n\s*/g,'');
@@ -179,4 +265,12 @@ test('the switch is styled with the site-s own tokens', () => {
   ok(/\.auth-tabs button\.on\{[^}]*background:var\(--red\)[^}]*color:#fff/.test(css),
      'the live one is the accent, filled, as every other primary control is');
   ok(/\.field-note\{/.test(css),'and the password rules have a style of their own');
+});
+
+test('the Google button and the avatar are styled with the site-s own sheet', () => {
+  const css=APPCSS.replace(/\s*\n\s*/g,'');
+  ok(/\.auth-or\{[^}]*display:flex/.test(css),'the divider is a rule, not a one-off');
+  ok(/\.btn-google\{[^}]*background:#fff/.test(css),
+     'Google’s own light button, kept as they specify it rather than restyled in the red');
+  ok(/\.avatar img\{[^}]*border-radius:50%/.test(css),'the picture fills the round chip');
 });

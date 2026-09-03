@@ -52,6 +52,19 @@
   .primary:hover{filter:brightness(1.08)}
   .primary[disabled]{opacity:.6;cursor:progress}
 
+  /* Continue with Google, under both forms and outside either of them */
+  .or{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:11px}
+  .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+  /* Google's own light button, kept as they specify it rather than restyled in the
+     brand red — a provider button that does not look like the provider's is one more
+     thing for a visitor to hesitate over on the screen where they hand over an account */
+  .google{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+          background:#fff;color:#1f1f1f;border:0;border-radius:999px;padding:11px 0;
+          font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  .google:hover{filter:brightness(.94)}
+  .google[disabled]{opacity:.6;cursor:progress}
+  .google svg{width:17px;height:17px;flex:none}
+
   /* the password rules, spelled out under the field instead of only on rejection */
   .rules{margin:-2px 0 0;padding-left:14px;color:var(--mut);font-size:11px;line-height:1.5}
 
@@ -112,6 +125,21 @@
     </label>
     <button class="primary" id="suSubmit" type="submit">Create account</button>
   </form>
+
+  <!-- OUTSIDE both forms, and type="button". A password manager reads form.elements and
+       never looks at the screen: an extra control inside the sign-in form is one more
+       thing for it to misread, and a button with no type inside a form submits it. -->
+  <div class="or"><span>or</span></div>
+
+  <button type="button" class="google" id="googleBtn">
+    <svg viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+    </svg>
+    Continue with Google
+  </button>
 
   <p class="msg" id="msg"></p>
   <p class="foot" id="foot">Sign in, or create an account, to open the site.</p>
@@ -224,6 +252,15 @@
       return 'This address is not in the Supabase redirect allow-list.\nAdd it in Authentication → URL Configuration (see README).';
     if (/failed to fetch|networkerror|load failed/i.test(msg)) return 'Cannot reach Supabase — check your connection and try again.';
     if (/rate limit|too many/i.test(msg)) return 'Too many attempts. Wait a minute and try again.';
+    // ---- what Google can send back ----
+    if (/unsupported provider|provider is not enabled/i.test(msg))
+      return 'Google sign-in is not enabled on this Supabase project yet.\nEnable it in Authentication → Providers → Google (see README).';
+    if (/access_denied|user denied|cancelled|canceled/i.test(msg))
+      return 'Google sign-in was cancelled. Nothing has changed.';
+    if (/bad_oauth_state|invalid state|flow ?state|state not found/i.test(msg))
+      return 'That sign-in took too long, or was finished in a different tab.\nPress Continue with Google again.';
+    if (/identity is already linked|already linked to another user/i.test(msg))
+      return 'That Google account is already attached to a different account here.\nSign in with your email and password instead.';
     return msg;
   }
 
@@ -296,6 +333,83 @@
       say(explain(err), 'bad');
     }
   });
+
+  /* ---------- Continue with Google ----------
+     One button for both tabs, because with an OAuth provider there is no separate
+     sign-up: the first time an address arrives it becomes an account, and every time
+     after that it signs in. Nothing here asks for a password, so nothing here has one
+     to save — the trip home lands in boot(), which calls land() with no arguments and
+     therefore skips both remember() and the settle.
+
+     The busy switch below is the button's own, and working() is never told about it.
+     That is not tidiness: working() used to disable this very button on EVERY submit,
+     so once the button was removed the leftover $('googleBtn') killed Sign in and
+     Create account outright (909cf87). Two switches that do not know about each other
+     cannot do that to each other. The forms already refuse to run while `busy`, and
+     that is what turns a click here away in the middle of a password sign-in. */
+  function gWorking(on) {
+    busy = on;
+    $('googleBtn').disabled = on;
+  }
+
+  /* signInWithOAuth only builds a URL and sends the browser to it, so a project that has
+     not turned Google on yet answers AFTER we have gone — leaving the visitor staring at
+     a raw {"code":400,"msg":"Unsupported provider…"} page with no way back. Ask first:
+     that 400 comes back with CORS headers and is readable, while an enabled provider
+     answers with a redirect to accounts.google.com that CORS makes this fetch throw on.
+     So only a readable "not enabled" stops us — anything else (including being offline)
+     goes ahead exactly as before.
+
+     The race is the part the old version did not have. This check is insurance, not the
+     feature, and on a slow connection it must not become the reason nothing happens. */
+  const PREFLIGHT_MS = 1200;
+  async function providerEnabled(url) {
+    const ask = (async () => {
+      try {
+        const r = await fetch(url, { headers: { accept: 'application/json' } });
+        const body = await r.text();
+        if (!r.ok && /provider is not enabled|unsupported provider/i.test(body)) return false;
+      } catch (e) { /* CORS or offline — neither of them says the provider is off */ }
+      return true;
+    })();
+    return Promise.race([ask, new Promise(r => setTimeout(() => r(true), PREFLIGHT_MS))]);
+  }
+
+  $('googleBtn').onclick = async function () {
+    if (busy) return;
+    const c = client();
+    if (!c) return say('Supabase could not be loaded — check your connection and reload the page.', 'bad');
+
+    gWorking(true);
+    say('Opening Google…', 'info');
+    try {
+      /* Come back to THIS page, ?next= and all, so the session is stored where the gate
+         reads it and the redirect leftovers never reach the app's own #match= hash.
+         origin + pathname + search is the address as it is actually served — never a
+         guess, so it cannot drift from what Supabase's Redirect URLs allow. */
+      const back = location.origin + location.pathname + location.search;
+      const { data, error } = await c.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: back,
+          skipBrowserRedirect: true,
+          /* Every popular app lets you pick which Google account. Without this a browser
+             signed into exactly one is sent straight through it with nothing to confirm. */
+          queryParams: { prompt: 'select_account' }
+        }
+      });
+      if (error) throw error;
+      if (!await providerEnabled(data.url)) throw { message: 'Unsupported provider: provider is not enabled' };
+      /* A breadcrumb for the case where `back` is not in the project's Redirect URLs:
+         Supabase then drops the tokens on the Site URL — the client site's landing
+         page — which reads this to know the trip started here and hands them back. */
+      try { localStorage.setItem('hna.oauth.home', 'tagger/auth'); } catch (e) {}
+      location.assign(data.url);
+    } catch (err) {
+      gWorking(false);
+      say(explain(err), 'bad');
+    }
+  };
 
   /* The gate on the app pages reads the session out of localStorage, so only forward once
      it is actually readable there — otherwise the two would bounce the user back and forth. */

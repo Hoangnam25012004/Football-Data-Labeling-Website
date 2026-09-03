@@ -159,7 +159,15 @@ Every page of the site is behind an account. Opening any of them without one lan
 offers **Sign in** (email + password) and **Sign up** (full name, email, password, confirm
 password). After signing in you land on the main tagging tab, where **▾ Other** — the first
 button on the header bar — drops down the account you are signed in as and **⎋ Sign out**.
-Sign-in is by email and password only; there is no third-party provider.
+
+There is also **Continue with Google**, under both forms. One button does the work of both
+tabs, because with an OAuth provider there is no separate sign-up: the first time an address
+arrives it becomes an account, and every time after that it signs in. The same button is on
+the client site's [`login.html`](client/login.html). An account that came in that way brings
+its name and its picture with it — the picture shows in **▾ Other** here and beside the
+account name on the client site; an account made with a password has none and keeps its
+initial. Both routes stay open, permanently: an account made with a password is signed into
+with that password.
 
 A new password must be **at least 6 characters, with one capital letter and one special
 character** — stated under the field, and checked before Supabase is asked. Signing in is
@@ -240,6 +248,50 @@ Email + password works as soon as the project exists. The rest is dashboard-only
 
 Anonymous sign-in stays enabled — [`cloud-sync.js`](cloud-sync.js) falls back to it only
 when there is no account session, and an anonymous session never opens the gate.
+
+### Continue with Google — the dashboard half
+The button ships whether or not the provider is on: both pages ask the authorize endpoint
+whether Google is enabled *before* sending the browser anywhere, so a project with it off
+says so in a sentence instead of stranding someone on a raw `{"code":400,…}` page. Turning
+it on is dashboard-only, and none of it is in the repo — the client secret lives in Supabase
+and nowhere else.
+
+1. **Google Cloud Console → APIs & Services → OAuth consent screen.** External. App name,
+   support email. *Authorized domains:* `hoangnams.com` **and** `supabase.co`. Scopes: only
+   `userinfo.email`, `userinfo.profile`, `openid` — with those three Google does not require
+   verification, and every extra scope is what pulls an app into that queue. Publish it
+   (**In production**), or only listed test users can get in.
+2. **Credentials → Create credentials → OAuth client ID → Web application.**
+   - *Authorized JavaScript origins:* `https://hoangnams.com`, `https://www.hoangnams.com`
+   - *Authorized redirect URIs:* exactly one, and it is Supabase's, not this site's —
+     `https://xtzmtdcohoixoxqusyyz.supabase.co/auth/v1/callback`
+3. **Supabase → Authentication → Providers → Google.** Enable, paste the Client ID and
+   secret. Leave *Skip nonce check* off; it is for Google One Tap, which this site does not
+   use.
+4. **Authentication → URL Configuration** — the field that actually bites, exactly as it
+   does for confirmation emails. Both sign-in pages send a `redirectTo` of their own page,
+   and **Supabase honours it only if it matches Redirect URLs**; otherwise it falls back to
+   the Site URL, silently. Add:
+   ```
+   https://hoangnams.com/**
+   https://www.hoangnams.com/**
+   https://hoangnam25012004.github.io/Football-Data-Labeling-Website/**
+   http://localhost:8765/**
+   ```
+   If it does fall back, nothing is lost: the tokens land on the client site's landing page,
+   which reads the breadcrumb (`hna.oauth.home`) the departing page left in `localStorage`
+   and hands them to whichever sign-in page started the trip — `login.html` or `tagger/auth`.
+   That is a net, not a substitute for getting the field right.
+
+**Before turning it on for the tagging app, check that Google links to an existing account
+rather than making a second one.** Supabase links identities that share a verified email, so
+normally it does. If it did not, an analyst who has been signing in with a password would
+arrive as a *new* `user_id` — and `user_prefs` (their hotkeys **and macros**) and
+`pitchtagger.recent.v1` are keyed by it, as is `club_members` on the client site. Nothing
+tagged is at risk (events, lineups, matches and teams are `to authenticated`, not per-user),
+but a squad's worth of macros is. With a throwaway Gmail: create an account with a password,
+confirm it, sign out, Continue with Google with the same address, and check the `user.id` is
+the one it was. `docs/google-sign-in-design.md` §8 has the full procedure.
 
 ## Deployment (CI/CD)
 Every push to the `main` branch triggers the workflow in
