@@ -808,3 +808,63 @@ quyền vừa cấp.
 | Scoreline | lệch **7.5px** so với giữa hàng (§16.3) |
 | Form | 5 ô, `meVenue` có giá trị đọc từ trận |
 | 700px | gập ba dòng `date/end`, `home score away`, `det` — không cuộn ngang |
+
+
+---
+
+## 17. Bản 3 — cột Details đủ rộng, và tấm gương bị bỏ
+
+Cột Details quá hẹp: `FIFA World Cup qualification – CONCACAF Second Round` bị cắt thành
+`…CONCA…`, trong khi cột Date rộng 540px và gần như trống.
+
+Test: `node tests/run.js` → **1456/1456 passed**.
+
+### 17.1 Vì sao Details hẹp: chính tấm gương ở §16.3
+
+Bất biến `date == details + result` nghĩa là **mỗi pixel cho Details phải mua bằng đúng một
+pixel cho Date** — mà Date chỉ chứa một ngày tháng. Giữ tấm gương thì hoặc Details hẹp, hoặc
+Date phình ra thành một khoảng trắng 640px để cân nó.
+
+Nên tấm gương **cấp hàng** bị bỏ. Cặp còn phải giữ là cặp làm một trận đấu đọc ra một trận đấu:
+
+```
+home == away        1.15fr, min 110px
+score               96px, cố định, nằm giữa hai đội
+```
+
+Scoreline vì thế nằm giữa **hai tên đội**, không còn nằm giữa **hàng**. Đó là một sự đổi ý so
+với quyết định cũ, và lý do đổi là hàng bây giờ có một cột chứa cả một câu — thứ chưa tồn tại
+khi tấm gương được dựng lên.
+
+### 17.2 Tỉ lệ mới, và con số quyết định nó
+
+```
+date 1.1fr · home 1.15fr · score 96px · away 1.15fr · details 2.2fr · result .5fr
+```
+
+Con số quyết định: `FIFA World Cup qualification – CONCACAF Second Round` đo được **304px**.
+`2.2fr` giữ cột Details trên mức đó từ cửa sổ 1280px trở lên. Đo thật:
+
+| Bề rộng | Details | Tên giải bị cắt? |
+|---|---|---|
+| 1000px | 211px | có — nhưng `title` mang đủ chữ |
+| 1100px | 260px | có |
+| **1280px** | **335px** | **không** |
+| 1500px | 414px | không, và cả dòng gọn trong **một** dòng (hàng 88px → 64px) |
+| 1860px | 540px | không |
+
+Dưới 820px hàng gập xuống và Details lấy trọn bề ngang, nên dải hẹp duy nhất còn cắt chữ là
+820–1280px.
+
+### 17.3 `title` trên ô Details
+
+Một giải đấu có thể tên bất kỳ, nên dù cột rộng bao nhiêu thì một ngày nào đó sẽ có cái dài
+hơn. Ô mang `title` là **toàn bộ** những gì nó hiển thị (`league · season · round · venue`),
+nên cái bị ellipsis cắt vẫn đọc được khi rê chuột. Ellipsis được giữ chứ không cho xuống dòng
+tự do: một cái tên vô lý sẽ làm nổ cột thay vì bị cắt gọn.
+
+### 17.4 Sàn `minmax` vẫn phải lọt qua ngưỡng gập
+
+Tổng sàu sàn + 5 gap 14px + 34px của `⋯` phải ≤ 820px, nếu không hàng tràn ngang ở đúng dải
+ngay trên ngưỡng gập. Hiện là `150+110+96+110+150+66 = 682` → `682+70+34 = 786`. Test trong
+`tests/client-channels.test.js` giờ tự cộng lại con số đó thay vì tin vào comment.

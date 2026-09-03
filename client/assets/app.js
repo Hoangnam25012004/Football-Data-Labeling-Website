@@ -268,12 +268,18 @@
      saying the same nothing, and the heading above already says what the column
      is for. Filling it in is the ⋯ menu's Edit. */
   function detailsCell(m) {
-    var top = [m.league, m.season, m.round].filter(Boolean)
+    var parts = [m.league, m.season, m.round].filter(Boolean);
+    var top = parts
       .map(function (s) { return '<b>' + esc(s) + '</b>'; })
       .join('<i class="m-det-sep" aria-hidden="true"></i>');
     var venue = m.venue ? '<em>' + esc(m.venue) + '</em>' : '';
-    return '<span class="m-det">' + (top ? '<span class="m-det-top">' + top + '</span>' : '') +
-           venue + '</span>';
+    /* A competition can be called anything — "FIFA World Cup qualification –
+       CONCACAF Second Round" is a real one — so however wide this column is,
+       something will one day be wider. The cell carries the whole of what it
+       shows, so a name the ellipsis cut is still readable. */
+    var full = parts.concat(m.venue ? [m.venue] : []).join(' · ');
+    return '<span class="m-det"' + (full ? ' title="' + esc(full) + '"' : '') + '>' +
+           (top ? '<span class="m-det-top">' + top + '</span>' : '') + venue + '</span>';
   }
 
   /* The ⋯ beside one match row. Built out of the same menu-wrap / menu /

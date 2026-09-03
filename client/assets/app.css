@@ -194,29 +194,31 @@ body.app.rail-in{--rail:56px}
 /* Date, home, score, away, details, result — six columns, so a scoreline sits
    under the words that name it and each side can be read straight down.
 
-   The six still read as a mirror about the score, which is what puts the
-   scoreline on the MIDDLE of the row rather than 143px right of it — where a
-   fixed 92px result column once left it, with the void after the date half as
-   wide again as the one before the result.
+   THE SCORE IS CENTRED BETWEEN THE TEAM NAMES, NOT ON THE ROW, and that is a
+   change of mind. While the row was five columns the fixture WAS the content,
+   and mirroring the whole row about the score was what stopped it sitting 143px
+   off centre. A Details column changed the arithmetic: the mirror needs
+   date == details + result, so every pixel given to Details has to be bought
+   with the same pixel of Date — and Date holds a date. Honouring it left
+   Details at 343px, ellipsising "FIFA World Cup qualification – CONCACAF…",
+   next to 540px of empty Date.
 
-   The mirror is arithmetic, not a coincidence, and it has to hold at both ends
-   of every minmax or it breaks the moment a floor binds:
+   So the pair that still has to hold is the one that makes a fixture read as a
+   fixture:
 
-     home == away                            1.3fr,  min 120px
-     date == details + result                2.2fr = 1.4 + 0.8
-                                          min 170px =  110 +  60
+     home == away                            1.15fr, min 110px
+     score                                   96px, fixed, between them
 
-   Change one of those six numbers and the other side has to move with it.
-
-   The TRACKS balance; the gaps do not. Six tracks means five 14px gaps, two of
-   them left of the score and three right of it, so the scoreline lands 7px left
-   of the true middle. Measured, not guessed. Closing that last 7px would mean
-   expressing "one gap" in fr, which cannot be written — and the bug this mirror
-   was built to fix was 143px, not 7. Leave it. */
+   Everything else is sized by what it holds. Details is the widest flexible
+   track because it is the only one carrying a sentence: "FIFA World Cup
+   qualification – CONCACAF Second Round" measures 304px, and 2.2fr keeps the
+   column above that from a 1100px window upward. Past it the name still
+   ellipsises rather than blowing the column out, and the cell carries a title
+   with the whole of what it shows. */
 /* The track list is one line on purpose: the tests normalise this file by
    deleting newline + indent, and a wrapped list would weld two tracks into one. */
 .mlist-h,.mrow{
-  --m-cols:minmax(170px,2.2fr) minmax(120px,1.3fr) 96px minmax(120px,1.3fr) minmax(110px,1.4fr) minmax(60px,.8fr);
+  --m-cols:minmax(150px,1.1fr) minmax(110px,1.15fr) 96px minmax(110px,1.15fr) minmax(150px,2.2fr) minmax(66px,.5fr);
 }
 /* The row and its ⋯ are SIBLINGS in this wrapper, not nested: .mrow is a
    <button>, and a button may not contain a button. The wrapper is also what
