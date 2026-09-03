@@ -599,20 +599,31 @@ test('no monogram anywhere on the site — a club is its name', () => {
   ok(/crest_text/.test(SUPA),'the column is still written, so existing rows stay consistent');
 });
 
-/* The five tracks read as a mirror about the score. A fixed 92px result column
+/* The six tracks read as a mirror about the score. A fixed 92px result column
    against a 1.1fr date column was not one, and it put the scoreline 143px right
    of the middle of the row: the void after the date came out half as wide again
-   as the void before the result, which is the lopsidedness you could see. */
+   as the void before the result, which is the lopsidedness you could see.
+
+   A Details column joined them, so the mirror is no longer track-for-track —
+   it is arithmetic. What has to hold is that the two sides of the score add up
+   to the same thing, at BOTH ends of every minmax, or a bound floor tips it. */
 test('the Matches row is a mirror about the score, so the scoreline is centred', () => {
   const css=APPCSS.replace(/\s*\n\s*/g,'');
   const cols=/--m-cols:([^;}]+)/.exec(css);
-  ok(cols,'the five tracks are named once, for the heading and the rows alike');
+  ok(cols,'the six tracks are named once, for the heading and the rows alike');
   // minmax(a,b) has a comma in it, so the tracks are split on the top level only
   const tracks=cols[1].trim().split(/\s+(?![^(]*\))/);
-  eq(tracks.length,5,'date, home, score, away, result');
-  eq(tracks[0],tracks[4],'date and result are the same track');
+  eq(tracks.length,6,'date, home, score, away, details, result');
   eq(tracks[1],tracks[3],'home and away are the same track');
-  ok(/^\d+px$/.test(tracks[2]),'and the score is a fixed width in the middle of them');
+  ok(/^\d+px$/.test(tracks[2]),'and the score is a fixed width between them');
+  /* left of the score is date + home; right of it is away + details + result.
+     With home == away that reduces to date == details + result, which is what
+     puts the scoreline on the middle of the row. */
+  const mm=t=>{const m=/^minmax\((\d+(?:\.\d+)?)px,(\d*\.?\d+)fr\)$/.exec(t);
+               ok(m,'every flexible track is minmax(px,fr): '+t); return {px:+m[1],fr:+m[2]};};
+  const date=mm(tracks[0]), det=mm(tracks[4]), res=mm(tracks[5]);
+  eq(date.fr,+(det.fr+res.fr).toFixed(4),'date == details + result, in fr');
+  eq(date.px,det.px+res.px,'and at the floor too, or a narrow row tips the score off centre');
   // both the heading and the rows have to read from it, or they drift apart
   ok(/\.mlist-h,\.mrow\{--m-cols:/.test(css),'the heading and the row take the same tracks');
   ok((css.match(/grid-template-columns:var\(--m-cols\)/g)||[]).length===2,

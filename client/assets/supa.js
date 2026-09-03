@@ -490,9 +490,10 @@
         if (!matchUuid) return Promise.reject(new Error('No match to save.'));
         var row = {};
         /* One place decides what a channel may write, and it is this list. It is
-           the same five columns 0023 grants, so the two cannot drift apart
-           without the test that reads both noticing. */
-        ['kickoff', 'match_date', 'league', 'season', 'round'].forEach(function (k) {
+           the same six columns the database grants — five from 0023 and `venue`
+           from 0024 — so the two cannot drift apart without the test that reads
+           both noticing. */
+        ['kickoff', 'match_date', 'league', 'season', 'round', 'venue'].forEach(function (k) {
           if (Object.prototype.hasOwnProperty.call(fields || {}, k)) {
             var v = fields[k];
             v = v == null ? null : String(v).trim();
@@ -654,7 +655,13 @@
             side: side,
             result: result,
             opponent: side === 'home' ? m.away_name : m.home_name,
-            venue: m.venue || (side === 'home' ? 'Home' : 'Away'),
+            /* The venue as it was typed, and nothing standing in for it. It used
+               to fall back to "Home"/"Away", which was fine while the only reader
+               printed one or the other — but the fixture list now shows the venue
+               in its own Details cell, and a cell reading "Away" where a ground
+               should be is a fact invented here. Which side of the fixture is the
+               club's is `side`, two lines down, and that is where a reader asks. */
+            venue: m.venue || '',
             competition: m.competition || '',
             stage: m.stage || '',
             /* 0022's two, empty until somebody fills them in. The Season table on

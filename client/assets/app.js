@@ -198,7 +198,7 @@
     list.appendChild(el('div', 'mlist-h',
       '<span>Date</span><span style="text-align:right">Home</span>' +
       '<span style="text-align:center">Final score</span>' +
-      '<span>Away</span><span style="text-align:right">Result</span>'));
+      '<span>Away</span><span>Details</span><span style="text-align:right">Result</span>'));
 
     state.matches.forEach(function (m) {
       /* The row is still a plain button — keyboard-reachable for free, no
@@ -210,13 +210,13 @@
       var b = el('button', 'mrow');
       b.type = 'button';
       var ourHome = m.side === 'home';
-      /* venue, then whatever the channel has said about the fixture, then the id.
-         Each part is dropped when empty, so a channel that has filled none of
-         them in reads exactly as it did before any of this existed. */
-      var meta = [m.venue || (ourHome ? 'Home' : 'Away'), m.league, m.season, m.round]
-        .filter(Boolean).concat('Match ID ' + m.id);
+      /* The date cell is the date, which side of the fixture was ours, and the id
+         — what it said before there was anything else to say. League, season,
+         round and the ground are a description of the FIXTURE and read in their
+         own column beside it, rather than as a fifth and sixth clause here. */
       b.innerHTML =
-        '<span class="m-date">' + esc(m.dateLabel) + '<em>' + esc(meta.join(' · ')) + '</em></span>' +
+        '<span class="m-date">' + esc(m.dateLabel) +
+          '<em>' + (ourHome ? 'Home' : 'Away') + ' · Match ID ' + esc(m.id) + '</em></span>' +
         '<span class="m-team m-home">' +
           '<span class="tn' + (ourHome ? ' us' : '') + '">' + esc(m.home.name) + '</span>' +
         '</span>' +
@@ -225,6 +225,7 @@
         '<span class="m-team m-away">' +
           '<span class="tn' + (ourHome ? '' : ' us') + '">' + esc(m.away.name) + '</span>' +
         '</span>' +
+        detailsCell(m) +
         '<span class="m-end">' +
           (m.result ? '<span class="res ' + m.result.toLowerCase() + '">' + m.result + '</span>' : '') +
           '<span class="m-open" aria-hidden="true">' +
@@ -257,6 +258,22 @@
         });
       });
     }
+  }
+
+  /* What a channel has said about a fixture, in the column beside it: the
+     competition on the top line and the ground under it.
+
+     Every part is dropped when empty, and a match nobody has described yet gets
+     an empty cell rather than a row of dashes — three "—" would be three marks
+     saying the same nothing, and the heading above already says what the column
+     is for. Filling it in is the ⋯ menu's Edit. */
+  function detailsCell(m) {
+    var top = [m.league, m.season, m.round].filter(Boolean)
+      .map(function (s) { return '<b>' + esc(s) + '</b>'; })
+      .join('<i class="m-det-sep" aria-hidden="true"></i>');
+    var venue = m.venue ? '<em>' + esc(m.venue) + '</em>' : '';
+    return '<span class="m-det">' + (top ? '<span class="m-det-top">' + top + '</span>' : '') +
+           venue + '</span>';
   }
 
   /* The ⋯ beside one match row. Built out of the same menu-wrap / menu /
@@ -452,6 +469,7 @@
     var leagues = valuesOf(state.matches, 'league');
     var seasons = valuesOf(state.matches, 'season');
     var rounds = valuesOf(state.matches, 'round');
+    var venues = valuesOf(state.matches, 'venue');
     var options = function (list) {
       return list.map(function (s) { return '<option value="' + esc(s) + '"></option>'; }).join('');
     };
@@ -470,12 +488,20 @@
             '<input id="meSeason" list="meSeasonList" autocomplete="off" value="' + esc(v.season || '') + '">' +
             '<datalist id="meSeasonList">' + options(seasons) + '</datalist></div>' +
         '</div>' +
-        '<div class="field"><label for="meRound">Round <span class="opt">optional</span></label>' +
-          '<input id="meRound" list="meRoundList" autocomplete="off" placeholder="Round 3" value="' +
-            esc(v.round || '') + '">' +
-          '<datalist id="meRoundList">' + options(rounds) + '</datalist>' +
-          '<p class="field-note">Whatever this competition calls it — Round 3, Matchday 12, ' +
-            'Quarter-final.</p></div>' +
+        '<div class="f2">' +
+          '<div class="field"><label for="meRound">Round <span class="opt">optional</span></label>' +
+            '<input id="meRound" list="meRoundList" autocomplete="off" placeholder="Round 3" value="' +
+              esc(v.round || '') + '">' +
+            '<datalist id="meRoundList">' + options(rounds) + '</datalist>' +
+            '<p class="field-note">Whatever this competition calls it — Round 3, ' +
+              'Matchday 12, Quarter-final.</p></div>' +
+          '<div class="field"><label for="meVenue">Venue <span class="opt">optional</span></label>' +
+            '<input id="meVenue" list="meVenueList" autocomplete="off" value="' +
+              esc(v.venue || '') + '">' +
+            '<datalist id="meVenueList">' + options(venues) + '</datalist>' +
+            '<p class="field-note">The ground it was played on. Whether the fixture was ' +
+              'home or away is read off the teams, not off this.</p></div>' +
+        '</div>' +
         '<div class="form-end">' +
           '<button class="btn btn-primary" type="submit" id="meGo">Save changes</button>' +
           '<button class="btn btn-quiet" type="button" id="meCancel">Cancel</button>' +
@@ -509,7 +535,8 @@
         match_date: day,
         league: card.querySelector('#meLeague').value,
         season: card.querySelector('#meSeason').value,
-        round: card.querySelector('#meRound').value
+        round: card.querySelector('#meRound').value,
+        venue: card.querySelector('#meVenue').value
       }).catch(function (err) {
         go.disabled = false;
         msg.className = 'form-msg err';

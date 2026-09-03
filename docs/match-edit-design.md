@@ -723,3 +723,88 @@ permission denied for table matches
 
 Cách sửa khi gặp: thêm cột nó cần vào danh sách `grant` ở cuối `0023` rồi chạy lại **hai câu
 cuối**. `matches_update` ở phần 2 vẫn là hàng rào thật và không đổi.
+
+---
+
+## 16. Bản 2 — cột Details, và Venue
+
+Yêu cầu: thêm cột **Details** ngay sau cột Away — `league | season | round` ở dòng trên,
+**venue** ở dòng dưới, như ảnh tham chiếu. Cột **Date** trở lại chỉ là ngày. Form Edit thêm ô
+**Venue**.
+
+Test: `node tests/run.js` → **1456/1456 passed**.
+
+### 16.1 Cái gì đi đâu
+
+| | Bản 1 | **Bản 2 — code đang chạy** |
+|---|---|---|
+| Ô Date | `Away · Bepro League · 23/24 · Round 3 · Match ID 44685` | `Away · Match ID 44685` — **đúng như trước khi có tính năng này** |
+| Cột Details | không có | mới, sau Away: `Bepro League ǀ 23/24 ǀ Round 3` / `Bepro Artificial Pitch 1` |
+| Lưới hàng | 5 track | **6 track** |
+| Form Edit | 4 ô | **5 ô** — Round và Venue chung một hàng `.f2` |
+| Cột được ghi | 5 | **6** (`venue`) |
+| Migration | 0023 | + **0024** |
+
+Ô Details **rỗng hoàn toàn** khi chưa ai mô tả trận — không phải ba dấu `—`. Ba dấu là ba lần
+nói cùng một điều là "không biết", và tiêu đề cột đã nói cột ấy để làm gì.
+
+### 16.2 `venue` không còn được thay thế bằng "Home"/"Away"
+
+`shape()` trước đây trả `venue: m.venue || (side === 'home' ? 'Home' : 'Away')`. Điều đó ổn khi
+người đọc duy nhất in ra một trong hai chữ ấy — nhưng ô Details giờ in **sân**, và một ô ghi
+"Away" ở chỗ đáng lẽ là tên sân là một sự thật do client bịa ra.
+
+Nay là `venue: m.venue || ''`, và ô Date tự lấy `ourHome ? 'Home' : 'Away'` từ `side`.
+Đã kiểm: `renderMatches` là **người đọc duy nhất** của `m.venue`, và không test nào đọc giá
+trị đã shape (`tests/team-code.test.js` chỉ có `venue:null` trong fixture, không assert).
+
+### 16.3 Lưới 6 track vẫn là một tấm gương — nhưng là số học
+
+Comment cũ trong `app.css` bảo vệ một tính chất thật: scoreline phải nằm **giữa hàng**, và một
+cột Result cố định 92px từng đẩy nó lệch **143px**. Thêm cột thứ sáu thì "track 0 == track 4"
+không còn đúng được nữa, nên bất biến đổi thành phép cộng:
+
+```
+home == away                       1.3fr,  min 120px
+date == details + result           2.2fr = 1.4 + 0.8
+                                min 170px =  110 +  60
+```
+
+Phải đúng ở **cả hai đầu** mỗi `minmax`, nếu không một sàn bị chạm là gương lệch. Test trong
+`tests/client-channels.test.js` giờ kiểm đúng phép cộng đó thay vì so hai chuỗi.
+
+**Còn dư 7px, và để nguyên.** Track thì cân, **khoảng cách thì không**: 6 track là 5 gap 14px,
+hai gap bên trái tỉ số và ba bên phải — nên scoreline nằm lệch trái 7px. Đo được, không đoán.
+Đóng nốt 7px ấy phải viết được "một gap" bằng `fr`, mà `fr` không cộng với `px`. Lỗi ban đầu
+là 143px, không phải 7.
+
+### 16.4 `--m-cols` phải nằm trên một dòng
+
+Các test chuẩn hoá `app.css` bằng `replace(/\s*\n\s*/g,'')`. Viết danh sách track xuống hai
+dòng thì newline + thụt đầu dòng bị xoá, và `minmax(120px,1.3fr)` dính liền
+`minmax(110px,1.4fr)` thành **một** track — test đếm được 5 thay vì 6. Comment giải thích cũng
+phải nằm **ngoài** khối `{}`, vì cùng phép chuẩn hoá ấy sẽ chèn nó vào giữa `{` và `--m-cols:`.
+
+### 16.5 `0024` là file riêng, và phải chạy SAU `0023`
+
+`grant` cộng dồn, nên mở thêm `venue` chỉ là một câu. Không sửa thẳng vào `0023` vì `0023` có
+`create policy`, và chạy lại nó lần thứ hai sẽ lỗi "policy already exists" — mà tại thời điểm
+viết, không chắc `0023` đã chạy hay chưa.
+
+**Thứ tự bắt buộc: 0023 rồi 0024.** `0023` có `revoke update on public.matches from
+authenticated` trước khi cấp lại năm cột; chạy `0024` trước thì câu revoke ấy thu hồi luôn
+quyền vừa cấp.
+
+### 16.6 Đã xác minh trên trình duyệt
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Tiêu đề | `Date · Home · Final score · Away · Details · Result` |
+| Tiêu đề và hàng | cùng một chuỗi track, không lệch |
+| Ô Date | `Sunday, 2 August 2026` / `Away · Match ID 44685` — không còn league/season/round |
+| Ô Details | 3 phần + 2 vạch ngăn, venue ở dòng dưới |
+| Trận chưa mô tả | ô Details **rỗng**, không có dấu `—` |
+| Chiều cao hàng | 78px → **64px** (dòng meta dài đã không còn phải xuống dòng) |
+| Scoreline | lệch **7.5px** so với giữa hàng (§16.3) |
+| Form | 5 ô, `meVenue` có giá trị đọc từ trận |
+| 700px | gập ba dòng `date/end`, `home score away`, `det` — không cuộn ngang |

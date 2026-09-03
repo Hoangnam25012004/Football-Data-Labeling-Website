@@ -37,6 +37,7 @@ const recent=/function recentResultsCard\(played\) \{[\s\S]*?\n  \}/.exec(APPJS)
 const teamData=/function renderTeamData\(body, cat\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const playerTable=/function playerMatchTable\(who, cat\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const seasonsFn=/function seasonsOf\(matches\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
+const detFn=/function detailsCell\(m\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 /* SQL with the comments taken out — this file's own prose says "home_score" a
    dozen times, and a test that cannot tell a comment from a grant is no test */
 const SQL=MIG.replace(/--[^\n]*/g,'');
@@ -54,17 +55,14 @@ test('the row is still a plain button, and the ⋯ is beside it rather than in i
   ok(/list\.appendChild\(wrap\);/.test(matches),'and the wrapper is what the list holds');
 });
 
-test('the five tracks the scoreline is centred on are untouched', () => {
+test('the ⋯ is still outside the row grid, whatever that grid is', () => {
   const css=APPCSS.replace(/\s*\n\s*/g,'');
   ok(/\.mlist-h,\.mrow\{--m-cols:/.test(css),'--m-cols is still declared on both');
-  const cols=/--m-cols:([^;}]+)/.exec(css);
-  const tracks=cols[1].trim().split(/\s+(?![^(]*\))/);
-  eq(tracks.length,5,'still date, home, score, away, result');
-  eq(tracks[0],tracks[4],'still a mirror');
-  eq(tracks[1],tracks[3]);
-  /* the ⋯ column is OUTSIDE that grid, on the wrapper */
+  /* the arithmetic of the six tracks is checked in client-channels.test.js, where
+     the mirror it protects was decided. All this one asks is that the ⋯ never
+     became one of them. */
   ok(/\.mrow-wrap\{display:grid; ?grid-template-columns:minmax\(0,1fr\) 34px/.test(css),
-     'the ⋯ is a track of the wrapper, not a sixth track of the row');
+     'the ⋯ is a track of the WRAPPER, not another track of the row');
   ok(/\.mlist-h\{[^}]*margin-right:34px/.test(css),
      'and the heading is pulled in by the same amount, or it drifts off its columns');
 });
@@ -124,19 +122,20 @@ test('a viewer who types the URL gets told, not a form', () => {
      'and it returns before the form is built');
 });
 
-test('four fields, and only four', () => {
+test('five fields, and only five', () => {
   const ids=(formFn.match(/id="me[A-Za-z]+"/g)||[])
     .map(s=>s.replace(/^id="/,'').replace(/"$/,''))
-    .filter(s=>!/^me(Go|Cancel|Msg|LeagueList|SeasonList|RoundList)$/.test(s));
-  deepEq(ids.sort(),['meDate','meLeague','meRound','meSeason']);
+    .filter(s=>!/List$/.test(s))
+    .filter(s=>!/^me(Go|Cancel|Msg)$/.test(s));
+  deepEq(ids.sort(),['meDate','meLeague','meRound','meSeason','meVenue']);
   ok(/type="date"/.test(formFn),'the date is a date box, so it hands back YYYY-MM-DD');
 });
 
-test('the payload is the five columns 0023 grants, and no sixth', () => {
+test('the payload is the six columns the database grants, and no seventh', () => {
   const call=/opts\.save\(\{[\s\S]*?\}\)/.exec(formFn)[0];
-  ['kickoff','match_date','league','season','round'].forEach(k=>
+  ['kickoff','match_date','league','season','round','venue'].forEach(k=>
     ok(new RegExp(k+':').test(call),k+' is sent'));
-  ['home_score','away_score','published','club_id','our_side','venue','competition','stage']
+  ['home_score','away_score','published','club_id','our_side','competition','stage']
     .forEach(k=>notOk(new RegExp('\\b'+k+':').test(call),k+' must never be in this payload'));
 });
 
@@ -167,10 +166,10 @@ test('the datalists are what this channel has already used', () => {
 
 /* ================= the write ================= */
 
-test('supa.js sends exactly the five columns, whatever it is handed', () => {
+test('supa.js sends exactly the six columns, whatever it is handed', () => {
   const up=/match: \{[\s\S]*?\n    \},/.exec(SUPA)[0];
-  ok(/\['kickoff', 'match_date', 'league', 'season', 'round'\]\.forEach/.test(up),
-     'one list decides, and it is the list 0023 grants');
+  ok(/\['kickoff', 'match_date', 'league', 'season', 'round', 'venue'\]\.forEach/.test(up),
+     'one list decides, and it is the list the database grants');
   ok(/hasOwnProperty\.call\(fields \|\| \{\}, k\)/.test(up),'a field not passed is not written');
   ok(/row\[k\] = v === '' \? null : v;/.test(up),'cleared reads as never-said, not as empty string');
   ok(/String\(v\)\.trim\(\)/.test(up),'and stray spaces are not a different league');
@@ -185,12 +184,34 @@ test('a column the database has not got says which migration is missing', () => 
 
 /* ================= what the four fields look like ================= */
 
-test('the row meta line drops what is empty and reads as it always did', () => {
-  ok(/\[m\.venue \|\| \(ourHome \? 'Home' : 'Away'\), m\.league, m\.season, m\.round\]/.test(matches),
-     'venue, then what the channel has said, then the id');
-  ok(/\.filter\(Boolean\)\.concat\('Match ID ' \+ m\.id\)/.test(matches),
-     'empty parts are dropped, so a channel that has filled none in reads as before');
-  ok(/meta\.join\(' · '\)/.test(matches));
+test('the date cell is the date, and says nothing about the competition', () => {
+  const dateCell=/'<span class="m-date">'[\s\S]*?'<\/span>' \+/.exec(matches)[0];
+  ok(/esc\(m\.dateLabel\)/.test(dateCell));
+  ok(/\(ourHome \? 'Home' : 'Away'\) \+ ' · Match ID ' \+ esc\(m\.id\)/.test(dateCell),
+     'which side was ours, and the id — what it said before there was more to say');
+  ['m.league','m.season','m.round','m.venue'].forEach(f=>
+    notOk(dateCell.indexOf(f)>=0,f+' belongs to the Details cell, not under the date'));
+});
+
+test('Details is one cell after Away, competition over ground', () => {
+  ok(/'<span>Away<\/span><span>Details<\/span>'/.test(matches)
+     ||/<span>Away<\/span><span>Details<\/span>/.test(matches),
+     'the heading sits between Away and Result');
+  ok(/detailsCell\(m\) \+/.test(matches),'and the cell is built after the away name');
+  ok(/\[m\.league, m\.season, m\.round\]\.filter\(Boolean\)/.test(detFn),
+     'league, season, round on the top line, each dropped when empty');
+  ok(/m\.venue \? '<em>' \+ esc\(m\.venue\) \+ '<\/em>' : ''/.test(detFn),
+     'the ground under them, dropped when there is none');
+  /* three dashes would be three marks saying the same nothing, and the heading
+     above already says what the column is for */
+  notOk(/'—'/.test(detFn),'an undescribed match gets an empty cell, not a row of dashes');
+});
+
+test('the venue is the venue, with nothing standing in for it', () => {
+  ok(/venue: m\.venue \|\| '',/.test(SUPA),
+     'shape() carries it raw — it used to fall back to Home/Away, which the Details cell would print as a ground');
+  ok(/\.m-det\{/.test(APPCSS)&&/\.m-det-top\{/.test(APPCSS)&&/\.m-det-sep\{/.test(APPCSS),
+     'and the cell has its rules');
 });
 
 test('the Overview says which campaign its totals are', () => {
@@ -283,15 +304,37 @@ test('only an admin of the channel the match is IN may update it', () => {
      'and they say the same thing');
 });
 
-test('a channel may write five columns and no others', () => {
+test('a channel may write six columns and no others', () => {
   ok(/revoke update on public\.matches from authenticated;/.test(SQL),'the blanket grant goes first');
   const grant=/grant\s+update \(([^)]*)\)/.exec(SQL);
   ok(grant,'and a column grant replaces it');
-  const cols=grant[1].split(',').map(s=>s.trim()).sort();
-  deepEq(cols,['kickoff','league','match_date','round','season'],
-     'exactly the five the form sends');
+  const cols=grant[1].split(',').map(s=>s.trim());
+  /* 0024 adds venue to this, because grant is cumulative — 0023 cannot be edited
+     to include it: it has `create policy`, which errors on a second run. */
+  const MIG24=readSrc('supabase/migrations/0024_match_venue_editable.sql');
+  const SQL24=MIG24.replace(/--[^\n]*/g,'');
+  ok(/grant update \(venue\) on public\.matches to authenticated;/.test(SQL24),
+     '0024 opens the sixth');
+  notOk(/create policy|alter table|revoke/i.test(SQL24),
+     'and does nothing else — no policy to clash on a re-run, no column, no revoke');
+  const all=cols.concat(['venue']).sort();
+  deepEq(all,['kickoff','league','match_date','round','season','venue'],
+     'exactly the six the form sends');
   ['home_score','away_score','published','club_id','our_side','code','home_team_id']
-    .forEach(k=>notOk(cols.indexOf(k)>=0,k+' must not be writable from a channel'));
+    .forEach(k=>notOk(all.indexOf(k)>=0,k+' must not be writable from a channel'));
+  /* the one place in the client that decides, checked against the two migrations
+     that decide in the database — they cannot drift without this failing */
+  const list=/\['kickoff', 'match_date', 'league', 'season', 'round', 'venue'\]/.exec(SUPA);
+  ok(list,'supa.js sends the same six');
+});
+
+test('0024 has to run after 0023, and says so', () => {
+  const MIG24=readSrc('supabase/migrations/0024_match_venue_editable.sql');
+  /* 0023 revokes UPDATE on the whole table and then grants five columns back.
+     Run 0024 first and that revoke takes the venue grant away with everything
+     else — the order is not a preference. */
+  ok(/PHẢI CHẠY 0023 TRƯỚC|must run 0023 first/i.test(MIG24),'the order is stated');
+  ok(/revoke/i.test(MIG24),'and why: 0023 revokes, so a grant made before it is lost');
 });
 
 test('deleting a match is not something a channel can do', () => {

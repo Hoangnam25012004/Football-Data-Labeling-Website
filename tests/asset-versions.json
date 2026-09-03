@@ -16,12 +16,12 @@
     "sha256": "8b01800a0a5476be"
   },
   "client/assets/app.css": {
-    "v": 22,
-    "sha256": "597ef7a783421942"
+    "v": 23,
+    "sha256": "68ea5221159a07ce"
   },
   "client/assets/app.js": {
-    "v": 52,
-    "sha256": "c7fec8c0d6234512"
+    "v": 53,
+    "sha256": "b7aaca49c8dabf5e"
   },
   "client/assets/film-tools.css": {
     "v": 4,
@@ -48,8 +48,8 @@
     "sha256": "85046042bdfd81f9"
   },
   "client/assets/supa.js": {
-    "v": 15,
-    "sha256": "4d4b372b8b72c947"
+    "v": 16,
+    "sha256": "52669dab72f562f6"
   },
   "cloud-sync.js": {
     "v": 51,

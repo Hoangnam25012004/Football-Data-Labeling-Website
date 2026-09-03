@@ -191,20 +191,36 @@ body.app.rail-in{--rail:56px}
 
 /* ---------- match list ---------- */
 .mlist{display:flex; flex-direction:column}
-/* Date, home, score, away, result — five columns, so a scoreline sits under
-   the words that name it and each side can be read straight down.
+/* Date, home, score, away, details, result — six columns, so a scoreline sits
+   under the words that name it and each side can be read straight down.
 
-   The five read as a mirror about the score: date and result are the same
-   track, home and away are the same track. That is what puts the scoreline on
-   the middle of the row rather than 143px right of it, which is where a fixed
-   92px result column left it — and with the fixture off centre, the void after
-   the date came out half as wide again as the one before the result. */
+   The six still read as a mirror about the score, which is what puts the
+   scoreline on the MIDDLE of the row rather than 143px right of it — where a
+   fixed 92px result column once left it, with the void after the date half as
+   wide again as the one before the result.
+
+   The mirror is arithmetic, not a coincidence, and it has to hold at both ends
+   of every minmax or it breaks the moment a floor binds:
+
+     home == away                            1.3fr,  min 120px
+     date == details + result                2.2fr = 1.4 + 0.8
+                                          min 170px =  110 +  60
+
+   Change one of those six numbers and the other side has to move with it.
+
+   The TRACKS balance; the gaps do not. Six tracks means five 14px gaps, two of
+   them left of the score and three right of it, so the scoreline lands 7px left
+   of the true middle. Measured, not guessed. Closing that last 7px would mean
+   expressing "one gap" in fr, which cannot be written — and the bug this mirror
+   was built to fix was 143px, not 7. Leave it. */
+/* The track list is one line on purpose: the tests normalise this file by
+   deleting newline + indent, and a wrapped list would weld two tracks into one. */
 .mlist-h,.mrow{
-  --m-cols:minmax(150px,1.1fr) minmax(140px,1.3fr) 96px minmax(140px,1.3fr) minmax(150px,1.1fr);
+  --m-cols:minmax(170px,2.2fr) minmax(120px,1.3fr) 96px minmax(120px,1.3fr) minmax(110px,1.4fr) minmax(60px,.8fr);
 }
 /* The row and its ⋯ are SIBLINGS in this wrapper, not nested: .mrow is a
-   <button>, and a button may not contain a button. The wrapper is what lets the
-   five tracks above stay exactly five — a sixth for the ⋯ would break the
+   <button>, and a button may not contain a button. The wrapper is also what
+   keeps the six tracks above to six — a seventh for the ⋯ would break the
    mirror the scoreline sits on the middle of. */
 .mrow-wrap{display:grid; grid-template-columns:minmax(0,1fr) 34px; align-items:center}
 .mlist-h{
@@ -251,6 +267,23 @@ body.app.rail-in{--rail:56px}
   background:var(--carbon-2); border:1px solid var(--line); border-radius:2px; padding:3px 10px;
   color:var(--chalk); letter-spacing:.06em; white-space:nowrap;
 }
+/* What the channel has said about the fixture: the competition on the top line,
+   the ground under it. Both are dropped when empty, so an undescribed match gets
+   an empty cell rather than a column of dashes. */
+.m-det{display:flex; flex-direction:column; gap:4px; min-width:0; line-height:1.4}
+.m-det-top{display:flex; align-items:center; flex-wrap:wrap; gap:7px; min-width:0}
+.m-det-top b{
+  font-weight:400; font-size:12px; color:var(--ash);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+}
+/* a hairline between the parts, the way the reference separates them — a
+   character would need a space either side and would wrap on its own */
+.m-det-sep{width:1px; height:11px; flex:none; background:var(--line); display:block}
+.m-det em{
+  display:block; font-style:normal; font-family:var(--f-mono); font-size:10.5px;
+  letter-spacing:.06em; color:var(--ash-dim);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
 .m-end{display:flex; align-items:center; justify-content:flex-end; gap:10px}
 .m-open{
   width:24px; height:24px; border-radius:50%; border:1px solid var(--line); background:transparent;
@@ -268,11 +301,15 @@ body.app.rail-in{--rail:56px}
   .mrow-more{margin-top:12px}
   .mrow{
     grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
-    grid-template-areas:"date date end" "home score away";
+    grid-template-areas:"date date end" "home score away" "det det det";
     row-gap:10px; column-gap:10px;
   }
   .m-date{grid-area:date}
   .m-end{grid-area:end}
+  /* under the fixture, and reading across rather than down: there is a whole
+     row's width for it here and no column to keep it inside */
+  .m-det{grid-area:det; flex-direction:row; align-items:center; flex-wrap:wrap; gap:7px}
+  .m-det em{font-size:10px}
   /* the score is the middle column of three, so the two names lean into it
      here exactly as they do on the wide row */
   .m-home{grid-area:home}
