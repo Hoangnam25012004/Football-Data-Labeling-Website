@@ -241,6 +241,12 @@
     color:var(--ink);border-radius:6px;padding:8px 10px;font-size:12px;font-weight:600;
     font-family:inherit;cursor:pointer}
   .other-item:hover{background:#16302466;color:var(--accent)}
+  /* The picture Google hands over, when the account came in that way. Laid over the
+     rule above rather than folded into it: the ellipsis moves to the span holding the
+     name, and an account with no picture is the same single line it always was. */
+  .other-who{display:flex;align-items:center;gap:8px}
+  .other-who img{width:20px;height:20px;border-radius:50%;flex:none;border:1px solid var(--line)}
+  .other-who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 
   /* Event modal */
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;z-index:200;padding:60px 16px}
@@ -4502,7 +4508,23 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
   // no account = no menu; the gate normally makes this impossible, but a page opened
   // straight off the filesystem has no session and should not show a dead button
   if(!u){$('otherBtn').parentNode.style.display='none';return;}
-  $('otherWho').textContent=window.PTAuth.displayName(u);
+  /* The name, and the picture beside it when the account came in through Google. The
+     src is set as a PROPERTY, never through innerHTML: the URL arrives from a provider
+     and has no business being parsed as markup. A picture that will not load takes
+     itself out and leaves the name, which is what an account made with a password
+     shows anyway. */
+  const meta=u.user_metadata||{}, photo=meta.avatar_url||meta.picture||'';
+  const nameEl=document.createElement('span');
+  nameEl.textContent=window.PTAuth.displayName(u);
+  $('otherWho').textContent='';
+  if(photo){
+    const img=document.createElement('img');
+    img.alt=''; img.referrerPolicy='no-referrer';   // Google's CDN 403s some referrers
+    img.addEventListener('error',()=>img.remove());
+    img.src=photo;
+    $('otherWho').appendChild(img);
+  }
+  $('otherWho').appendChild(nameEl);
   $('otherWho').title=u.email||'';
 
   const menu=$('otherMenu'), btn=$('otherBtn');

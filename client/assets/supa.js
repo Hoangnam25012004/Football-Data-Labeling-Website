@@ -222,6 +222,35 @@
           options: { data: { full_name: name || '' }, emailRedirectTo: ROOT + 'login.html' }
         }).then(function (r) { if (r.error) throw r.error; return r.data || {}; });
       },
+      /* Google, and one door for both tabs: with an OAuth provider there is no separate
+         "sign up" — the first time an address arrives it becomes an account, and every
+         time after that it signs in. It joins no channel either way; which club someone
+         belongs to stays an admin's decision, exactly as for an account made with a
+         password (see channels.invite / claim).
+
+         Returns the URL to send the browser to rather than going itself. Navigating is
+         the page's job, and login.html checks that URL is alive before it leaves — a
+         project with Google switched off answers only after we have gone.
+
+         redirectTo is read off ROOT, not off location, for the same reason
+         emailRedirectTo is: app.html loads this file too. It MUST be in the project's
+         Redirect URLs — falling back to the Site URL lands on index.html, which loads
+         no Supabase client at all and would drop the tokens without a word. */
+      signInWithGoogle: function () {
+        var c = client();
+        if (!c) return Promise.reject(new Error('Sign-in is unavailable: the Supabase client did not load.'));
+        return c.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: ROOT + 'login.html',
+            skipBrowserRedirect: true,
+            queryParams: { prompt: 'select_account' }
+          }
+        }).then(function (r) {
+          if (r.error) throw r.error;
+          return (r.data && r.data.url) || '';
+        });
+      },
       signOut: function () {
         var c = client();
         return c ? c.auth.signOut().catch(function () {}) : Promise.resolve();

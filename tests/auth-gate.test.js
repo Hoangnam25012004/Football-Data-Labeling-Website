@@ -211,13 +211,62 @@ test('no handler reaches for a field that no longer exists', () => {
     .forEach(id=>notOk(new RegExp("\\$\\('"+id+"'\\)").test(html),"nothing still calls $('"+id+"')"));
 });
 
-test('Google sign-in is gone, and takes every reference with it', () => {
+/* ================= Continue with Google =================
+   It was here once, and removing it is what taught this file the lesson below: working()
+   disabled the Google button on EVERY submit, so the moment the button went the leftover
+   $('googleBtn') killed Sign in and Create account outright (909cf87). The old test kept
+   that from coming back by forbidding the whole feature. These keep it from coming back
+   while the feature is here — which is the harder and more useful promise. */
+test('Google is back, and it cannot take the two forms down with it', () => {
   const html=page('auth.html');
-  notOk(/signInWithOAuth|provider/i.test(html),'no OAuth call left behind');
-  // the one that bites: working() touched $('googleBtn') on EVERY submit, so a leftover
-  // reference to a button that no longer exists would kill Sign in and Create account
-  notOk(/googleBtn/.test(html),'nothing still reaches for the button');
-  notOk(/\.google\b|accounts\.google/.test(html),'and its styling and logo are gone too');
+  ok(/signInWithOAuth/.test(html)&&/provider: 'google'/.test(html),'the OAuth call is there');
+  ok(/id="googleBtn"/.test(html),'and a button to start it');
+  const working=/function working\(on, label\)[\s\S]*?\n  \}/.exec(html)[0];
+  notOk(/googleBtn/.test(working),'working() knows nothing about it — THE bug, pinned');
+  ok(/function gWorking\(on\)/.test(html),'the Google button has a switch of its own');
+  // and the two switches are the only ones: nothing else may reach for that button
+  eq((html.match(/\$\('googleBtn'\)/g)||[]).length,3,'gWorking, the click handler, and no more');
+});
+
+test('the Google button is outside both forms, and adds no field to either', () => {
+  const html=page('auth.html');
+  const form=id=>new RegExp('<form id="'+id+'"[\\s\\S]*?</form>').exec(html)[0];
+  notOk(/googleBtn/.test(form('signInForm')),'not in the sign-in form');
+  notOk(/googleBtn/.test(form('signUpForm')),'nor in the sign-up form');
+  eq((form('signInForm').match(/<input/g)||[]).length,2,'sign-in still has exactly two inputs');
+  eq((form('signUpForm').match(/<input/g)||[]).length,4,'and sign-up exactly four');
+  ok(/<button type="button" class="google" id="googleBtn">/.test(html),
+     'type=button, so it could never submit one of them by accident');
+});
+
+test('the trip to Google comes back to this page, ?next= and all', () => {
+  const h=/\$\('googleBtn'\)\.onclick[\s\S]*?\n  \};/.exec(page('auth.html'))[0];
+  ok(/location\.origin \+ location\.pathname \+ location\.search/.test(h),
+     'the address as it is actually served — never a guess, so Redirect URLs can match it');
+  ok(/redirectTo: back/.test(h),'and that is what is sent');
+  ok(/prompt: 'select_account'/.test(h),'the account chooser every popular app shows');
+  ok(/hna\.oauth\.home/.test(h),'a breadcrumb, in case the tokens come home to the landing page');
+});
+
+test('a project with Google switched off is a sentence, not a raw JSON page', () => {
+  const html=page('auth.html');
+  ok(/async function providerEnabled/.test(html),'the pre-flight asks before we go');
+  ok(/PREFLIGHT_MS/.test(html)&&/Promise\.race/.test(html),
+     'and it is capped, so a slow network is never the reason nothing happens');
+});
+
+test('coming back from Google is not made to wait for a password prompt', () => {
+  const html=page('auth.html');
+  ok(/return land\(\);/.test(html),'boot still lands with no arguments');
+  const h=/\$\('googleBtn'\)\.onclick[\s\S]*?\n  \};/.exec(html)[0];
+  notOk(/remember\(|credentials\.store|SETTLE_MS/.test(h),
+        'there is no password to save, so nothing waits for the offer to save one');
+});
+
+test('everything Google can send back is said in plain words', () => {
+  const ex=/function explain\(err\)[\s\S]*?\n  \}/.exec(page('auth.html'))[0];
+  ['unsupported provider','access_denied','bad_oauth_state','already linked']
+    .forEach(k=>ok(ex.includes(k),'it handles '+k));
 });
 
 /* ================= what a new password has to be ================= */
@@ -384,6 +433,21 @@ test('nothing is left loose on the bar', () => {
   // Sign out may only appear inside the menu now, never as a sibling of the other buttons
   notOk(/class="ev-btn" id="signOutBtn"/.test(bar),'and the old header button with it');
   ok(/class="other-item" id="signOutBtn"/.test(bar),'it is a menu row instead');
+});
+
+test('an account that came in through Google brings its picture into the menu', () => {
+  const src=page('index.html');
+  const menu=/---- ▾ Other[\s\S]*?\n\}\)\(\);/.exec(src)[0];
+  ok(/meta\.avatar_url\|\|meta\.picture/.test(menu),'both keys Google can use for it');
+  // the URL comes from a provider; parsing it as markup is how a provider gets to write
+  // script into this page. A property assignment cannot.
+  ok(/img\.src=photo/.test(menu),'set as a property');
+  notOk(/otherWho'\)\.innerHTML/.test(menu),'never through innerHTML');
+  ok(/img\.addEventListener\('error'/.test(menu),
+     'and a picture that will not load leaves the name rather than a broken glyph');
+  // an account made with a password has none, and that is still most of them
+  ok(/if\(photo\)\{/.test(menu),'no picture is the other half of the design, not a failure');
+  ok(/\.other-who img\{/.test(src)&&/\.other-who span\{/.test(src),'both have a style');
 });
 
 test('the menu opens, closes, and gets out of the way', () => {
