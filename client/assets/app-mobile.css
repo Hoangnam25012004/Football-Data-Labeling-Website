@@ -1,0 +1,158 @@
+/* ============================================================
+   app-mobile.css — the client app on a phone.
+
+   Loaded ONLY by client/app.html, and only ever as the last sheet in
+   its <head>. Three fences, one on top of the other:
+
+     nạp     nothing else links this file;
+     media   every rule is inside the one @media below;
+     scope   every selector starts body.app, which no page of the
+             tagging app carries.
+
+   The body.app prefix is not decoration. app.js pulls shared.css and
+   Stats/stats-view.css in at runtime with document.head.appendChild
+   (app.js:1854), so they land AFTER this file: a rule of equal
+   specificity here would lose the tie. body.app .x is (0,2,0) against
+   their (0,1,0), which wins whatever the order is.
+
+   Delete the <link> in app.html and the app is byte-for-byte what it
+   was before this file existed.
+
+   Designed and measured in docs/mobile-ui-design.md.
+   ============================================================ */
+@media (max-width:720px){
+
+/* ---------- 1. the top bar ---------- */
+body.app .app-top{gap:10px; padding:8px var(--gut)}
+body.app .chan-wrap{min-width:0; flex:1 1 auto}
+body.app .chan{min-width:0; width:100%; min-height:44px; padding:5px 8px 5px 6px}
+body.app .chan > span:first-child{
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block;
+}
+body.app .app-user{flex:none; gap:8px; margin-left:0}
+/* A channel with a long name used to push Sign out off a 320px screen, where
+   body{overflow-x:hidden} then made it unreachable rather than merely cramped.
+   The name ellipsises now, and the button never wraps to a second line. */
+body.app .app-top .btn{white-space:nowrap; padding:11px 12px; min-height:44px}
+
+/* ---------- 2. the rail becomes a bottom bar ----------
+   The 860px block in app.css turns the rail into a row across the top and
+   scrolls it sideways. On a phone that row hides its last entry — 95px of it
+   at 390px, so About Hoang Nam was off the screen altogether — and costs the
+   page 61px of height it never gets back.
+
+   Four equal cells at the foot of the screen show all four entries and hand
+   that height back. Every rule here OVERRIDES the 860px block, never edits it:
+   between 721 and 860px the top row is exactly what it was. */
+body.app .side{
+  position:fixed; left:0; right:0; bottom:0; top:auto; z-index:45;
+  display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:0; padding:0 0 env(safe-area-inset-bottom,0px);
+  overflow:visible; min-height:0;
+  border-top:1px solid var(--line); border-bottom:0; border-right:0;
+  background:var(--carbon);
+}
+body.app .side-foot{margin:0; padding:0; border:0; display:flex; min-width:0}
+body.app .side a{
+  flex-direction:column; align-items:center; justify-content:center; gap:4px;
+  padding:8px 4px; min-height:56px; width:100%; border-radius:0;
+  border-left:0; border-bottom:0; border-top:2px solid transparent;
+  font-size:10.5px; line-height:1.25; text-align:center; white-space:nowrap;
+}
+/* the lit edge points at the content, so at the foot of the screen it is the
+   top one and not the bottom one */
+body.app .side a.on{border-bottom:0; border-top-color:var(--red)}
+body.app .side a span{max-width:100%; overflow:hidden; text-overflow:ellipsis}
+body.app .side a i, body.app .side a i svg{width:20px; height:20px}
+/* the bar floats over the page, so the page has to end above it */
+body.app .view{padding-bottom:calc(74px + env(safe-area-inset-bottom,0px))}
+/* The ⋯ on the last match row opens downward, into the band the bar occupies.
+   The bar is z-index 45; this puts the menu over it rather than under it.
+   .mlist must NOT be a container here or this would be confined to a stacking
+   context of its own — see the guard on container-type in app.css. */
+body.app .menu{z-index:70}
+
+/* ---------- 3. the match list ---------- */
+body.app .mrow-wrap{grid-template-columns:minmax(0,1fr) 44px}
+body.app .mrow-more{width:44px; height:44px; margin:4px 0 0}
+body.app .mrow{padding:12px 2px; row-gap:8px}
+/* Competition | season | round stay on ONE line, the long name ellipsising,
+   rather than the name wrapping and pushing the other two onto a line of their
+   own. Nothing is dropped: the cell still carries the whole of it in title. */
+body.app .m-det{flex-wrap:wrap; gap:3px 8px}
+body.app .m-det-top{flex-wrap:nowrap; min-width:0; flex:1 1 260px; gap:6px}
+/* Only the competition gives way. Every part shrinks by default, which spent the
+   line evenly and produced "FIFA World Cup qualification – CONCACAF… | 2… | Rou…"
+   — three truncations where one was wanted. The season and the round are short
+   and are the two worth reading whole. */
+body.app .m-det-top b{flex:none; font-size:11.5px}
+body.app .m-det-top b:first-child{flex:0 1 auto; min-width:0}
+body.app .m-det em{min-width:0}
+
+/* ---------- 4. tabs and chips ---------- */
+/* Three tabs, three equal cells. Squeezed into a flex row, Player Data went to
+   two lines at 320px. */
+body.app .dtabs{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0}
+body.app .dtab{min-height:44px; padding:10px 6px; font-size:13px}
+/* .dsubs reads left, so a scroller here cannot strand its first chip out of
+   reach the way a centred one would — see .sub-row below. */
+body.app .dsubs{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding-bottom:2px}
+body.app .dsubs::-webkit-scrollbar{display:none}
+body.app .chip{flex:none; min-height:40px; display:inline-flex; align-items:center}
+
+/* ---------- 5. the wide table keeps ONE frozen column ----------
+   app.css lets both go under 720px, on the grounds that there is not enough
+   width to freeze two columns in. True — but with neither frozen, 523px of
+   sideways scroll leaves no way to tell which match a row belongs to. So one
+   is put back: the column that NAMES the row, at left:0, with the date left to
+   scroll away with the figures. The `position:static` rule app.css sets is what
+   this overrides; it is not edited, and the tests that pin its text still pass. */
+body.app table.stbl .c-opp{position:sticky; left:0; min-width:124px}
+body.app table.stbl tfoot .c-opp{position:sticky; left:0}
+body.app table.stbl .c-pl{position:sticky; left:0; min-width:132px}
+body.app table.stbl .c-opp::after, body.app table.stbl .c-pl::after{display:block}
+/* the frozen cell is narrower here, so the name inside it has to give way */
+body.app .stbl .cop{gap:6px}
+body.app .stbl .cop b{min-width:0}
+
+/* ---------- 6. the mounted analysis ---------- */
+body.app .pt-stats-bar{gap:8px}
+/* Four buttons at 311px in a 280px box is where the 320px page got its sideways
+   scroll: .stats-toggle is a flex row and does not wrap. */
+body.app .pt-views{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); width:100%; gap:6px}
+body.app .pt-views button{min-height:44px; padding:5px 4px; font-size:11.5px}
+body.app .pt-exports{margin-left:0; width:100%; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px}
+body.app .pt-exports button{min-height:40px}
+/* .sub-row is justify-content:center. It WRAPS rather than scrolls, because a
+   centred overflow scroller puts its first items at a negative offset that no
+   amount of scrolling reaches. Only the height of the buttons changes. */
+body.app .sub-row{row-gap:6px}
+body.app .sub-row button{min-height:40px}
+
+/* Every floor the tagging app's two sheets set for a desktop column, released.
+   .view is 350px wide at 390px; these were written for 420, 480 and 360, and
+   what did not fit was clipped by body{overflow-x:hidden} rather than scrolled
+   to. Each one is a min-width or a fixed width, and each is only released here. */
+body.app .gen-layout{padding:10px; gap:12px}
+body.app .gen-row{grid-template-columns:36px minmax(0,1fr) 92px minmax(0,1fr) 36px; gap:6px; font-size:11px}
+body.app .gen-wrap{padding:2px}
+body.app .gen-center{min-width:0; width:100%; flex:1 1 100%}
+body.app .gen-form{width:100%; flex:1 1 100%}
+body.app .oth-card{min-width:0; flex:1 1 100%}
+body.app .donut-card{flex:1 1 100%; min-width:0}
+/* the legend drops under the ring rather than standing beside it and making the
+   card 480px wide */
+body.app .donut-legend{min-width:0; flex-basis:100%}
+body.app .donut-wrap{gap:14px}
+body.app .scatter-card, body.app .map-card{min-width:0; flex:1 1 100%}
+body.app .sr-card, body.app .dl-map, body.app .dl-side,
+body.app .dm-map, body.app .dm-side{min-width:0; max-width:none; flex:1 1 100%}
+body.app .hm-flex > div:first-child{min-width:0; flex:1 1 100%}
+body.app .hm-list{width:100%; flex:1 1 100%}
+
+/* ---------- 7. text boxes iOS would zoom into ----------
+   Under 16px, Safari zooms the page on focus and does not zoom back out. */
+body.app .field input, body.app .form-card select,
+body.app .inv-form input[type=email], body.app .inv-form select, body.app .rsel{font-size:16px}
+
+}

@@ -50,6 +50,7 @@ jobs:
           mkdir -p _site/assets
           cp client/assets/site.css _site/assets/site.css
           cp client/assets/app.css  _site/assets/app.css
+          cp client/assets/app-mobile.css _site/assets/app-mobile.css
           cp client/assets/supa.js  _site/assets/supa.js
           cp client/assets/app.js   _site/assets/app.js
           cp client/assets/film-tools.js  _site/assets/film-tools.js

@@ -15,9 +15,13 @@
     "v": 1,
     "sha256": "8b01800a0a5476be"
   },
+  "client/assets/app-mobile.css": {
+    "v": 1,
+    "sha256": "3a42916b46bf1352"
+  },
   "client/assets/app.css": {
-    "v": 24,
-    "sha256": "45adb3e76cd01335"
+    "v": 25,
+    "sha256": "1dd7492208453a78"
   },
   "client/assets/app.js": {
     "v": 54,

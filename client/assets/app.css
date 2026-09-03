@@ -319,6 +319,52 @@ body.app.rail-in{--rail:56px}
   .m-away{grid-area:away}
 }
 
+/* ---------- the same fold, asked for by the COLUMN rather than the window ----
+   The query above asks the viewport, and the viewport is not what the row gets.
+   From 861px the rail is back, and it takes 196px off the top of whatever the
+   window is; the gutters take a tenth more. The row's own minimum is 756px —
+   six floors (682) plus five 14px gaps — and the ⋯ beside it wants 34 more.
+
+   So between 861px and about 1100px the row asks for 790px of a column that is
+   handing it 596. Measured, on the fixture list as it ships: at a 880px window
+   the PAGE scrolls sideways by 116px, at 900 by 97, at 1000 by 2. Above that the
+   scrollbar goes but the row is still overflowing its own box into the gutter —
+   the Result heading and badge simply render in the page's padding — until the
+   column reaches 790 at roughly a 1100px window.
+
+   A media query cannot express this, because the answer depends on the rail as
+   well as the window: pulled in, the rail is 56px and the row fits from about
+   960. A container query asks the one question that actually decides it — how
+   wide is the list — and gets the rail, the gutters and the window in one number.
+
+   The rules are the block above, restated. CSS has no way to share a rule set
+   between a media query and a container query, and the block above is what the
+   suite pins the folded layout to (client-channels.test.js:645). On a phone both
+   fire; they say the same thing, so it does not matter which wins.
+
+   container-type is set only from 721px, and that guard is load-bearing: it
+   makes .mlist a containment context, and a containment context is a stacking
+   context. Below 721px app-mobile.css puts a fixed bar at the foot of the screen
+   at z-index 45, and a ⋯ menu sealed inside .mlist could never paint over it. */
+@media (min-width:721px){ .mlist{container-type:inline-size} }
+@container (max-width:793px){
+  .mlist-h{display:none; margin-right:0}
+  .mrow-wrap{align-items:start}
+  .mrow-more{margin-top:12px}
+  .mrow{
+    grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+    grid-template-areas:"date date end" "home score away" "det det det";
+    row-gap:10px; column-gap:10px;
+  }
+  .m-date{grid-area:date}
+  .m-end{grid-area:end}
+  .m-det{grid-area:det; flex-direction:row; align-items:center; flex-wrap:wrap; gap:7px}
+  .m-det em{font-size:10px}
+  .m-home{grid-area:home}
+  .m-sc{grid-area:score}
+  .m-away{grid-area:away}
+}
+
 /* ---------- roster / contributor cards ---------- */
 .people{display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
 .person{
