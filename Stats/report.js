@@ -125,7 +125,34 @@ function ensureCss(){
 .rp-footm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rp-footp{flex:none;color:${C.navy};letter-spacing:0.6px}
 .rp-footp em{font-style:normal;font-weight:600;color:${C.mut}}
-/* ---- section head: an accent bar, the title, and the rule under both ---- */
+/* ---- page header: the site's mark, what this document is, what this page is ----
+   A full-bleed band pulled up into the page's top padding, for the same reason the
+   running foot sits in the bottom one: every row budget in this file (CMP_FILL, the
+   contents budget, the shot list's FIRST/CONT, the timeline chunks) is measured
+   against the flow box, and a header taking height out of it would move all of them
+   at once. Out of that box it costs nothing — measured, it GIVES 31px back: the flow
+   used to start at y=96 under .rp-sec and starts at y=65 under this. Every existing
+   page therefore has more room than before, never less. */
+.rp-head{display:flex;align-items:center;gap:11px;background:${C.panel};
+  border-bottom:2px solid ${C.line};margin:-46px -50px 16px;padding:11px 50px 10px;
+  box-sizing:border-box}
+/* the site red, written out: report pages must not inherit the app's CSS variables */
+.rp-logo{flex:none;width:28px;height:28px;border-radius:5px;background:#e03131;
+  display:flex;align-items:center;justify-content:center}
+.rp-logo svg{display:block}
+.rp-htxt{flex:1;min-width:0;display:block}
+.rp-hkick{display:block;font-size:8px;font-weight:700;letter-spacing:1.3px;
+  text-transform:uppercase;color:${C.mut};line-height:1.15}
+.rp-htitle{display:block;font-size:16px;font-weight:800;color:${C.navy};
+  letter-spacing:-0.3px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-hteam{flex:none;display:flex;align-items:center;gap:8px;font-size:12px;
+  font-weight:800;max-width:250px}
+.rp-hteam em{font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-hchip{flex:none;width:9px;height:24px;border-radius:3px}
+/* ---- section head: an accent bar, the title, and the rule under both ----
+   No call site left since the page header above took the job. Kept because the
+   suite lifts secTitle out and runs it, and because a stylesheet is the cheapest
+   place in this file to leave a rule that costs nothing. */
 .rp-sec{display:flex;align-items:center;gap:11px;border-bottom:3px solid ${C.navy};
   padding-bottom:9px;margin-bottom:15px}
 .rp-secbar{flex:none;width:5px;height:23px;border-radius:3px;
@@ -142,6 +169,19 @@ function ensureCss(){
 .rp-mastt u{display:block;height:3px;border-radius:2px;margin-top:7px;text-decoration:none}
 .rp-masts{flex:none;font-size:40px;font-weight:800;color:${C.ink};letter-spacing:-1px;line-height:1}
 .rp-mastd{color:${C.grey};font-weight:400;padding:0 2px}
+/* the fixture under the masthead — pulled up so the two read as one block, and
+   absent altogether on a report whose payload never carried any of the five */
+.rp-fix{display:flex;flex-wrap:wrap;align-items:stretch;gap:9px;margin:-12px 0 22px}
+.rp-fixi{flex:1 1 126px;min-width:0;border:1px solid ${C.line};border-radius:9px;
+  background:${C.panel};padding:8px 12px;box-sizing:border-box}
+.rp-fixi span{display:block;font-size:7.5px;font-weight:700;letter-spacing:1.1px;
+  text-transform:uppercase;color:${C.mut};line-height:1.3}
+/* the value WRAPS rather than ellipsing. "FIFA World Cup qualification – CONCACAF Second
+   Round" is a real competition name and a fifth of 694px is not enough for it on one line;
+   cutting it off here would be the same complaint the player tables were fixed for. Page 1
+   has the room — this block sits above a timeline, not above a full-height table. */
+.rp-fixi b{display:block;font-size:10.5px;font-weight:800;color:${C.navy};line-height:1.35;
+  margin-top:2px;overflow-wrap:anywhere}
 /* ---- contents ---------------------------------------------------------- */
 .rp-toch{font-size:26px;font-weight:800;color:${C.navy};letter-spacing:-0.3px;
   border-bottom:3px solid ${C.navy};padding-bottom:10px;margin:4px 0 20px}
@@ -182,12 +222,24 @@ function ensureCss(){
 .rp-fill.rp-fh{left:auto;right:0}
 /* ---- tables ------------------------------------------------------------ */
 table.rpt{width:100%;border-collapse:collapse;font-size:10.5px}
-.rpt th{background:${C.navy};color:#fff;font-weight:700;font-size:8.5px;letter-spacing:0.4px;
-  line-height:1.25;text-transform:uppercase;padding:7px 4px;text-align:center}
+/* A header is a label, not a paragraph — white-space:nowrap.
+   table.rpt is auto-layout at width:100%, so when the columns want more than the 694px
+   flow box the browser takes the shortfall out of whichever labels have the most text
+   per column, and those wrap. On the widest table — Defensive, 16 columns — the sums
+   were: the labels need 674px on one line each, but td.rp-pl asked 96px for the name
+   column where its label wanted 40.7px, so 729.5px was wanted and 35.5px was missing.
+   It came out of exactly two labels: "Tackle %" (50.8px wanted, 43.7px given) and
+   "T-on Con" (53.5px wanted, 35.9px given). Both wrapped, and a wrapped label centred
+   in a two-line head reads as a title that has been cut off.
+   nowrap makes the whole label the column's minimum; the 2px trimmed off each cell and
+   the 16px off the name column is where the room comes from. Measured after: <thead>
+   35.3px -> 24.6px, table still exactly 694px, zero horizontal overflow. */
+.rpt th{background:${C.navy};color:#fff;font-weight:700;font-size:8.5px;letter-spacing:0.15px;
+  line-height:1.25;text-transform:uppercase;padding:7px 3px;text-align:center;white-space:nowrap}
 .rpt th:first-child{border-radius:5px 0 0 0}
 .rpt th:last-child{border-radius:0 5px 0 0}
-.rpt td{padding:4.5px 5px;text-align:center;border-bottom:1px solid ${C.hair};color:#2b384a}
-.rpt td.rp-pl{text-align:left;font-weight:600;color:${C.ink};max-width:96px;overflow:hidden;
+.rpt td{padding:4.5px 3px;text-align:center;border-bottom:1px solid ${C.hair};color:#2b384a}
+.rpt td.rp-pl{text-align:left;font-weight:600;color:${C.ink};max-width:80px;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .rpt tbody tr:nth-child(even) td{background:${C.panel}}
 .rp-rk .rpt td{padding:6px 5px}
@@ -262,6 +314,26 @@ table.rpm{border-collapse:collapse;font-size:10px;width:100%;margin:0 auto}
 .rp-sgleg{justify-content:flex-start;gap:5px;font-size:8px;margin-top:8px}
 .rp-sgleg span{padding:2.5px 7px}
 .rp-sgleg i{width:7px;height:7px;margin-right:4px}
+/* ---- the keeper's line, at the top of his two pages --------------------
+   Not a .rpt: that one is a navy-headed grid of tallies, and this is one sentence about
+   one man. A light rule and a wide letter-spaced head, like the reference report. */
+.rp-gkrow{width:100%;border-collapse:collapse;font-size:11px;margin:0 0 15px}
+.rp-gkrow th{font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:${C.mut};padding:0 6px 7px;border-bottom:1px solid ${C.line};text-align:center;white-space:nowrap}
+.rp-gkrow th.rp-gkl,.rp-gkrow td.rp-gkl{text-align:left}
+.rp-gkrow td{padding:9px 6px;border-bottom:1px solid ${C.hair};text-align:center;
+  font-weight:700;color:#2b384a}
+.rp-gkrow td b{font-size:13px;font-weight:800;color:${C.navy}}
+/* ---- the Details block on the Goalkeeper page -------------------------- */
+.rp-gkbody2{display:flex;align-items:flex-start;gap:13px}
+.rp-gkring{flex:none;text-align:center;padding-top:6px}
+.rp-gkring div{font-size:8px;font-weight:700;letter-spacing:0.9px;text-transform:uppercase;
+  color:${C.mut};margin-top:4px}
+.rp-dtl{width:100%;border-collapse:collapse;font-size:10.5px}
+.rp-dtl td{padding:6px 8px;border-bottom:1px solid ${C.hair};color:#2b384a}
+.rp-dtl td:last-child{text-align:right;font-weight:800;color:${C.navy}}
+.rp-dtl td.rp-dtlb{padding:0;width:3px;border-bottom:none}
+.rp-dtl tr.rp-dtlt td{font-weight:800;color:${C.navy};border-bottom:1px solid ${C.line}}
 /* ---- goalkeeper, discipline, donut ------------------------------------- */
 .rp-duo{display:flex;gap:14px;margin-bottom:2px}
 .rp-gkcard{flex:1;border:1px solid ${C.line};border-radius:10px;padding:13px 15px;background:${C.panel}}
@@ -293,8 +365,32 @@ table.rpm{border-collapse:collapse;font-size:10px;width:100%;margin:0 auto}
 /* The title is written into the page in one piece, never split around a tag:
    the section a page belongs to is read back out of this markup (the contents
    page indexes on it, and the suite checks a page named the category it drew),
-   so "Defensive — Tackles" has to survive as that exact run of characters. */
-const secTitle=t=>`<div class="rp-sec"><span class="rp-secbar"></span><span class="rp-sect">${t}</span></div>`;
+   so "Defensive — Tackles" has to survive as that exact run of characters.
+
+   The site's mark and the words "Match Report" ride along with it, so EVERY page
+   carries them without every builder having to remember to. The mark is the same
+   four-dot N drawn in client/app.html and client/index.html, inlined rather than
+   loaded: html2canvas turns these pages into the PDF from the DOM, and an <img>
+   is one more request that can be slow, blocked or taint the canvas.
+
+   It is written out here rather than lifted into a const of its own on purpose —
+   tests/report-visuals.test.js lifts secTitle out by name and runs it against a
+   sandbox holding a fixed list of helpers, and a name this expression reaches for
+   that the list has not got is a ReferenceError at the first call site.
+
+   `team` is optional. A page about ONE side names it on the right; a page about
+   both passes nothing and every existing call site is unchanged. TI/TC are only
+   evaluated on that branch, for the same sandbox reason. */
+const secTitle=(t,team)=>`<div class="rp-head"><span class="rp-logo">`
+  +`<svg width="16" height="16" viewBox="0 0 48 48" fill="#fff">`
+  +`<path d="M13 39V11l22 28V11" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>`
+  +`<circle cx="13" cy="39" r="5.4"/><circle cx="13" cy="11" r="5.4"/>`
+  +`<circle cx="35" cy="39" r="5.4"/><circle cx="35" cy="11" r="5.4"/></svg></span>`
+  +`<span class="rp-htxt"><span class="rp-hkick">Match Report</span>`
+  +`<span class="rp-htitle">${t}</span></span>`
+  +(team?`<span class="rp-hteam" style="color:${TI(team)}"><em>${esc(TN(team))}</em>`
+        +`<i class="rp-hchip" style="background:${TC(team)}"></i></span>`:'')
+  +`</div>`;
 const legend=()=>`<div class="rp-leg"><span><i style="background:${C.home}"></i>${esc(TN('home'))}</span>`
   +`<span><i style="background:${C.away}"></i>${esc(TN('away'))}</span></div>`;
 const pill=(no,team)=>`<span class="rp-pill" style="background:${TC(team)};color:${C.on(TC(team))}">${esc(no)}</span>`;
@@ -419,6 +515,32 @@ function headerBlock(){
     +`<div class="rp-masts">${teamGoals('home')} <span class="rp-mastd">–</span> ${teamGoals('away')}</div>`
     +`<div class="rp-mastt" style="text-align:left;color:${C.awayInk}">${esc(meta.away)}`
     +`<u style="background:${C.away};width:54px"></u></div></div>`;
+}
+/* ---- the fixture, as the channel has it on file ----
+   A date is built from its parts rather than through toLocaleDateString(): the
+   analyst's browser and the club's would otherwise put two different strings into
+   two copies of the same report, and neither would be wrong. */
+const RP_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fixtureDate(v){
+  const s=String(v==null?'':v).trim(); if(!s)return '';
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if(!m)return s;                       // whatever it is, print it rather than nothing
+  const mo=+m[2];
+  return (mo>=1&&mo<=12)?`${+m[3]} ${RP_MONTHS[mo-1]} ${m[1]}`:s;
+}
+/* Date · League · Season · Round · Venue. Every part is dropped when empty and the
+   whole block when all five are, which is what a report published before these
+   travelled in the payload prints: exactly what it printed before, nothing. They are
+   not in the tagging app's local meta store either, so an analyst working a match
+   that was never opened on the cloud sees no block — and that is honest, because
+   that session genuinely does not know which league it was. */
+function fixtureBlock(){
+  const f=[['Date',fixtureDate(meta.date)],['League',meta.league],['Season',meta.season],
+           ['Round',meta.round],['Venue',meta.venue]]
+    .map(p=>[p[0],String(p[1]==null?'':p[1]).trim()]).filter(p=>p[1]);
+  if(!f.length)return '';
+  return `<div class="rp-fix">`+f.map(p=>
+    `<div class="rp-fixi"><span>${p[0]}</span><b>${esc(p[1])}</b></div>`).join('')+`</div>`;
 }
 /* "#9 Bacuna" — the shirt number always, plus the registered name when Player lists has
    one for it. playerLabel() would fall back to "Player 9", which only repeats the number,
@@ -549,9 +671,13 @@ function timelinePages(){
   const items=timelineItems(), chunks=[];
   if(items)timelineChunks(items).forEach(c=>chunks.push(c));
   else chunks.push(null);
+  /* The header band is pulled up INTO the page's top padding (see .rp-head), so it
+     has to be the first thing on the page — put after the masthead it would be
+     dragged over the top of it. Page 1 therefore reads band, masthead, fixture,
+     timeline; every other page reads band, timeline. */
   return chunks.map((ch,ci)=>
-    (ci===0?headerBlock():'')
-    +secTitle('Match Timeline')
+    secTitle('Match Timeline')
+    +(ci===0?headerBlock()+fixtureBlock():'')
     +legend()
     +(ch?`<div class="rp-tlwrap"><div class="rp-tlspine"></div>${ch.join('')}</div>`
         :`<div class="rp-note" style="text-align:center;padding:26px 0;font-size:11px">No goals or cards tagged yet.</div>`));
@@ -749,6 +875,102 @@ function defensivePlayerPages(){
       frac(s.physicalDuelsWon,s.physicalDuels),
       frac(s.looseBallDuelsWon,s.looseBallDuels),
       dotv(s.fouls),dotv(s.foulsWon),dotv(s.takeOnConcerns),dotv(s.mistakes)]);
+}
+
+/* ---- the three sections whose tables are one page PER SIDE ----
+   Column LABELS for A4, and nothing else. The numbers still come from PLAYER_CATS in
+   shared.js, so this table cannot make one of them disagree with the Stats tab or with
+   the client site's Data page; a column added there and forgotten here still prints,
+   under its own name. It is only wide.
+
+   How wide is not a guess. Measured at the 694px flow box, in the header's own font:
+   PLAYER_CATS.goalkeeper wants 1411px of label on 18 columns and PLAYER_CATS.setPieces
+   wants 1128px on 14, against 694px of page — four and three lines of wrapped header.
+   Through this map they want 657px and 661px, on one line each. */
+const RPT_ABBR={
+  'Save Standing':'Stand',            'Save Collapse':'Collapse',
+  'Save Diving':'Diving',             'Save Kneeling':'Kneel',
+  'Save Overhead':'Overhd',           'Goals Conceded':'Conceded',
+  'Freekicks':'FK',                   'Freekicks: Shots Off Target':'FK Sh Off',
+  'Freekicks: Shots On Target':'FK Sh On',
+  'Freekicks: Crosses':'FK Cross',    'Freekicks: Crosses Succeeded':'FK Cr Succ',
+  'Penalty Kicks':'Pens',             'Throw-Ins':'Throw-in',
+  'Goal Kicks':'Goal Kick',
+  'Set Piece Shot':'SP Shots',        'Set Piece Goal':'SP Goals',
+  'Handball Foul':'Handball',         'Yellow Cards':'Yellow',
+  'Red Cards':'Red'
+};
+/* 13 columns for A4 — the ONE set here that does not read PLAYER_CATS straight through.
+   PLAYER_CATS.goalkeeper carries three Success / Fail / % triples, and the Fail side is
+   the remainder of the total, never a counter of its own (shared.js:510 says so). Printing
+   all three is printing one number twice, on the widest table in the report. Each function
+   below reads exactly the counters PLAYER_CATS.goalkeeper reads — no new counter, no new
+   arithmetic — so the pairs still agree with the Stats tab, column by column.
+
+   Saves is the NARROW reading (catches+parries), matching PLAYER_CATS. The keeper row at
+   the top of the Goalkeeper — Saves page uses the broad one (s.saves, which also carries
+   the retired `save` event) and says so on the page. Two questions, two answers, both
+   already shipping. */
+const RPT_GK_COLS=[
+  ['Saves',   s=>s.catches+s.parries],
+  ['Catch',   s=>s.catches],          ['Parry',    s=>s.parries],
+  ['Stand',   s=>s.saveStanding],     ['Collapse', s=>s.saveCollapse],
+  ['Diving',  s=>s.saveDiving],       ['Kneel',    s=>s.saveKneeling],
+  ['Overhd',  s=>s.saveOverhead],
+  ['DLS',     s=>frac(s.defLineSupportsWon,s.defLineSupports)],
+  ['DLS %',   s=>pc0(s.defLineSupportsWon,s.defLineSupports)],
+  ['Aer Ctrl',s=>frac(s.aerialControlsWon,s.aerialControls)],
+  ['AC %',    s=>pc0(s.aerialControlsWon,s.aerialControls)],
+  ['Conceded',s=>s.goalsConceded]
+];
+/* One page per side, always — which is what these three sections were asked for, and
+   what playerStatPages() above deliberately does not do (it packs both sides onto one
+   page when they fit, and the three older sections still want that).
+
+   26 rows is the page: header band 65px + a one-line thead 25px + 26 x 27px = 792 of the
+   1031px flow box, with the rest left for the sub-heading and slack. A squad longer than
+   that runs on to a second page under the same title. */
+const RPT_TEAM_ROWS=26;
+/* `only` narrows the squad to the shirts a table is about. The keeper table is the one
+   that needs it, and the Stats tab already does exactly this (catPlayers, stats-view.js:131):
+   on an outfield player every goalkeeping column is a zero that says nothing, and twenty-two
+   of those is a page of noise. Left out, a table lists the whole matchday squad, which is
+   what the other two want. */
+function teamPlayerPages(title,cols,only){
+  const headers=cols.map(c=>RPT_ABBR[c[0]]||c[0]);
+  const out=[];
+  ['home','away'].forEach(team=>{
+    const P=withSquad(computeStats(rows,team),lineups,team);
+    const keep=only?only(team):null;
+    const list=sortedPlayers(P).filter(no=>!keep||keep.has(String(no==null?'':no).trim()));
+    const names=squadNames(lineups,team);
+    const mins=playedMinutes(lineups,dur,team,rows);
+    const minOf=no=>{const m=mins&&mins[String(no==null?'':no).trim()];return m?dotv(m.min):dotv(0);};
+    const sub=`<div class="rp-sub" style="color:${TI(team)}">${esc(TN(team))}</div>`;
+    if(!list.length){
+      // a narrowed table that came back empty is a different sentence from a side with no
+      // events at all: nobody kept goal on paper, and nobody was tagged doing it either
+      out.push(secTitle(title,team)+sub
+        +`<div class="rp-note" style="font-size:11px">`
+        +(keep?`No goalkeeper is named in ${esc(TN(team))}'s line-up, and none of its shirts was `
+              +`tagged with a goalkeeping event.`
+             :`No events for ${esc(TN(team))} yet.`)
+        +`</div>`);
+      return;
+    }
+    const tr=no=>`<tr><td>${pill(no,team)}</td><td class="rp-pl">${esc(playerLabel(names,no))}</td>`
+      +`<td>${minOf(no)}</td>`
+      // a number gets the middle dot a zero is drawn as here; a rate or a frac is a
+      // string already and is printed as it comes
+      +cols.map(c=>{const v=c[1](P[no]);return `<td>${typeof v==='number'?dotv(v):v}</td>`;}).join('')
+      +`</tr>`;
+    for(let i=0;i<list.length;i+=RPT_TEAM_ROWS)
+      out.push(secTitle(title,team)+sub
+        +`<table class="rpt"><thead><tr><th>No</th><th>Player</th><th>Min</th>`
+        +headers.map(h=>`<th>${h}</th>`).join('')+`</tr></thead><tbody>`
+        +list.slice(i,i+RPT_TEAM_ROWS).map(tr).join('')+`</tbody></table>`);
+  });
+  return out;
 }
 
 /* ================= distribution ================= */
@@ -1160,23 +1382,29 @@ function radarPage(){
     +`<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;margin:0 auto">${g}</svg>`;
 }
 
-/* foul maps — halves normalised, card halos, hatched own defensive third */
+/* foul maps — halves normalised, card halos, hatched own defensive third.
+   The three names ARE the total: `fouls` in shared.js counts all three (EVENT_INC), and
+   the Fouls comparison prints them as Total = Fouls + Handball + Foul Throw. Looked up
+   through evKey like actionMapsPage does, not against the raw name: the event dictionary
+   is user-editable, so a "Foul" typed with a capital would otherwise silently count zero
+   and the map would quietly stop being the total it says it is. */
 const RP_FOULS=new Set(['foul','foul throw','handball foul']);
+const RP_CARDS=new Set(['yellow card','red card']);
 function foulMapsPage(){
   let any=false;
   const card=team=>{
     // home shown attacking RIGHT, away mirrored to attack LEFT
     const N=normXY(team), d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT, flip=team==='away';
-    const evs=rows.filter(r=>r.team===team&&RP_FOULS.has(r.event)&&r.pXY);
+    const evs=rows.filter(r=>r.team===team&&RP_FOULS.has(evKey(r.event))&&r.pXY);
     // a side with no located fouls keeps the empty pitch and 0% bands
     let inner;
     if(evs.length)any=true;
     {
-      const cards=rows.filter(r=>r.team===team&&(r.event==='yellow card'||r.event==='red card')&&r.t!=null);
+      const cards=rows.filter(r=>r.team===team&&RP_CARDS.has(evKey(r.event))&&r.t!=null);
       const cardFor=f=>{let best=null,bd=90;
         cards.forEach(c=>{
           if(String(c.playerFrom||'').trim()!==String(f.playerFrom||'').trim())return;
-          const dd=Math.abs(c.t-f.t); if(dd<=bd){bd=dd;best=c.event;}
+          const dd=Math.abs(c.t-f.t); if(dd<=bd){bd=dd;best=evKey(c.event);}
         });
         return best;};
       const fl=evs.map(r=>{const p=N(r).a;
@@ -1207,7 +1435,7 @@ function foulMapsPage(){
     }
     return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))} · Foul Map</div>${inner}</div>`;
   };
-  const body=secTitle('Discipline — Foul Maps')+card('home')+card('away')
+  const body=secTitle('Fouls — Foul Maps')+card('home')+card('away')
     +`<div class="rp-mleg"><span><i style="background:#98a0aa"></i>Circle = 1st half</span><span><i style="background:#98a0aa;border-radius:2px"></i>Square = 2nd half</span>`
     +`<span><i style="background:rgba(247,80,107,0.3);border:1px solid rgba(247,80,107,0.55);border-radius:2px"></i>Dangerous zone (own third)</span>`
     +`<span><i class="rp-ring" style="background:#98a0aa;border-color:#f5c518"></i>Led to yellow</span>`
@@ -1219,13 +1447,14 @@ function foulMapsPage(){
    attacks RIGHT, away mirrored LEFT), marker shape = half, with a top-5 ranking under
    each map. `title` names the section; `eventName` is the event filtered on. */
 function eventMapsPage(eventName,title){
-  const evs=team=>rows.filter(r=>r.team===team&&r.event===eventName&&r.pXY);
+  const want=evKey(eventName);
+  const evs=team=>rows.filter(r=>r.team===team&&evKey(r.event)===want&&r.pXY);
   const hA=evs('home'), aA=evs('away');
   if(!hA.length&&!aA.length)return null;
   const top5=team=>{
     const counts={};
     rows.forEach(r=>{
-      if(r.team!==team||r.event!==eventName)return;
+      if(r.team!==team||evKey(r.event)!==want)return;
       const no=String(r.playerFrom||'').trim(); if(!no)return;
       counts[no]=(counts[no]||0)+1;
     });
@@ -1271,17 +1500,100 @@ function eventMapsPage(eventName,title){
     +`<div class="rp-mleg" style="margin:0 0 10px">${legend}</div>`
     +`<div style="display:flex;gap:18px;align-items:flex-start">${card('home',hA)}${card('away',aA)}</div>`;
 }
-const offsideMapsPage=()=>eventMapsPage('offside','Discipline — Offsides');
-const foulWonMapsPage=()=>eventMapsPage('foul won','Discipline — Fouls Won');
+const offsideMapsPage=()=>eventMapsPage('offside','Fouls — Offsides');
+const foulWonMapsPage=()=>eventMapsPage('foul won','Fouls — Fouls Won');
 
-/* ================= goalkeeper + discipline ================= */
-function gkNo(team){
-  const lu=lineups[team]; if(!lu||!lu.xi||!lu.xi.length)return null;
-  const gk=lu.xi.find(p=>p.pos==='GK'); if(gk)return gk.no;
-  const dir=lu.dir||'lr';
-  return lu.xi.reduce((b,p)=>{const x=dir==='rl'?100-p.x:p.x; return (!b||x<b.x)?{no:p.no,x}:b;},null).no;
+/* ---- Fouls: the comparison, and the cards coming home ----
+   TEAM_SECTIONS[5] is 'Fouls & Discipline' (shared.js:943): Total Fouls, the three kinds
+   that make it up, Fouls Won, Yellow, Red, Offsides.
+
+   Yellow and Red matter here beyond being two more rows. The page they used to be on —
+   'Goalkeeper & Discipline' — was the ONLY place in the whole PDF that printed a card,
+   and it is gone. These two rows are where they land, counted by the same classifyCards()
+   the old box counted them with (through computeStats -> cardFold), so the number did not
+   change; only the page it is on. The per-player split is on Fouls — Player Stats, which
+   the report never had at all. */
+const foulComparisonPage=()=>{
+  const r=sectionRows(5);
+  return secTitle('Fouls — Team Comparison')+legend()
+    +`<div class="rp-cmphead">Fouls &amp; Discipline</div>`+cmpRows(r,cmpFit(r.length));
+};
+const foulPlayerPages=()=>teamPlayerPages('Fouls — Player Stats',PLAYER_CATS.fouls);
+
+/* ================= set-piece chains (read-only) =================
+   Every chain of this team that a set piece of `kind` OPENS, with the rows it led to.
+
+   Deliberately NOT setPieceFold() (shared.js:370). That one credits the player who
+   FINISHED, asks only "is a set piece somewhere in this chain", cannot tell a corner from
+   a goal kick, and counts no passes at all. It also feeds the Stats table AND the client
+   site's whole-season Data page, so changing it changes a season of numbers on a screen
+   this file has no business touching.
+
+   `ord` is what makes "opens" answerable: the position of a row within the entry it was
+   typed in (index.html:2710). It has been on every row since chains existed and nothing
+   has ever read it. A set piece typed AFTER the shot it supposedly created did not cause
+   it, and this is the only field that can say so.
+
+   A set piece typed on its own has grp === null and therefore no chain — a group id is
+   only minted for an entry of two events or more. Those count in `taken` and never in
+   `chains`. The gap between the two is itself the answer to "how much of this was
+   tagged", so both numbers are printed and neither is derived from the other. */
+function spChains(team,kind){
+  const want=evKey(kind), mine=rows.filter(r=>r.team===team);
+  const taken=mine.filter(r=>evKey(r.event)===want).length;
+  const byGrp=new Map();
+  mine.forEach(r=>{if(r.grp!=null){
+    const g=byGrp.get(r.grp); if(g)g.push(r); else byGrp.set(r.grp,[r]);}});
+  const chains=[];
+  byGrp.forEach(list=>{
+    const ordOf=r=>+r.ord||0;
+    const sps=list.filter(r=>SET_PIECE_EVENTS.has(evKey(r.event))).sort((a,b)=>ordOf(a)-ordOf(b));
+    if(!sps.length||evKey(sps[0].event)!==want)return;   // a different set piece opened it
+    const sp=sps[0], o=ordOf(sp);
+    chains.push({sp,out:list.filter(r=>r!==sp&&ordOf(r)>o).sort((a,b)=>ordOf(a)-ordOf(b))});
+  });
+  return {taken,chains};
 }
-/* save-rate ring for a keeper card (grey track + coloured arc, % in the middle) */
+/* What one row of a chain says happened. Anything else in the entry — a body part, a
+   card, a duel — is not an outcome and answers null. `goal` sits with `shot on target`
+   because EVENT_INC already counts it as one (shared.js:192); that is the repo's
+   convention, not a decision taken here. */
+const SP_OUT={'pass success':{kind:'pass',ok:true},   'pass fail':{kind:'pass',ok:false},
+  'cross success':{kind:'cross',ok:true},             'cross fail':{kind:'cross',ok:false},
+  'shot on target':{kind:'shot',ok:true},             'goal':{kind:'shot',ok:true},
+  'shot off target':{kind:'shot',ok:false}};
+/* Where each set piece of this kind went, in normalised pitch percentages.
+
+   ⚠️ The arrow is drawn from the row that says what HAPPENED, never from the set-piece
+   row. No set-piece event is one of TRANSFER_EVENTS (index.html:2463), and rXY only lands
+   on the last transfer of an entry — so a set-piece row keeps an rXY only when it happens
+   to be the final key of the entry and nothing was passed. Drawn from there, this map
+   would be a picture of the tagger's typing habits rather than of the match.
+
+   A row with no destination is a dot, never an invented line. A chain that produced
+   nothing tagged falls back to the set piece's own rXY, which is exactly the one case
+   where that field means what it looks like it means. */
+function spSegments(team,kind){
+  const N=normXY(team), out=[];
+  spChains(team,kind).chains.forEach(c=>{
+    const sn=N(c.sp);
+    let any=false;
+    c.out.forEach(r=>{
+      const o=SP_OUT[evKey(r.event)]; if(!o)return;
+      const rn=N(r), a=rn.a||sn.a; if(!a)return;
+      any=true;
+      out.push({a:a, b:rn.b||null, kind:o.kind, ok:o.ok, to:String(r.playerTo||'').trim()});
+    });
+    if(!any&&sn.a)out.push({a:sn.a, b:sn.b||null, kind:'played', ok:null, to:''});
+  });
+  return out;
+}
+// green succeeded / red failed, exactly as the cross map reads; grey = nobody said
+const spCol=s=>s.ok==null?C.grey:(s.ok?'#39d98a':'#f7506b');
+
+/* ================= goalkeeper ================= */
+/* save-rate ring (grey track + coloured arc, % in the middle). Unchanged from the page
+   this section replaces — it was the one part of it worth keeping. */
 function gkArcSVG(rate,col){
   const cx=33,cy=33,r=25,w=7, a0=-Math.PI/2;
   let ring=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e6eaf0" stroke-width="${w}"/>`;
@@ -1292,49 +1604,350 @@ function gkArcSVG(rate,col){
     +`<text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="15" font-weight="800" fill="${C.navy}">`
     +`${rate==null?'–':rate+'%'}</text></svg>`;
 }
-const GK_FIT={track:18,fs:16,row:54,lbl:11};
-function gkPage(){
-  const h=sumTeam(rows,'home'), a=sumTeam(rows,'away');
-  const gcH=teamGoals('away'), gcA=teamGoals('home');
-  // shots on target faced = the ones kept out plus the ones that went in
-  const facedH=h.saves+gcH, facedA=a.saves+gcA;
-  const rateH=facedH?Math.round(h.saves/facedH*100):null;
-  const rateA=facedA?Math.round(a.saves/facedA*100):null;
-  // one card per keeper — the numbers appear ONCE here, not repeated as bars above
-  const card=(team,s,gc,faced,rate)=>{
-    const no=gkNo(team), names=squadNames(lineups,team);
-    const stat=(v,l)=>`<div class="rp-gkstat"><b>${v}</b><span>${l}</span></div>`;
-    return `<div class="rp-gkcard"><div class="rp-gkteam" style="color:${TI(team)}">${esc(TN(team))}</div>`
-      +`<div class="rp-gkwho">`
-      +(no!=null?`<span class="rp-pill" style="background:${TC(team)}">${esc(no)}</span>`
-                +`<span class="rp-gkname">${esc(playerLabel(names,no))}</span>`
-                :`<span class="rp-gkname">No keeper in the lineup</span>`)
-      +`</div><div class="rp-gkbody">`
-      +`<div class="rp-gkarc">${gkArcSVG(rate,TC(team))}<div>Save rate</div></div>`
-      +`<div class="rp-gkfig">${stat(s.saves,'Saves')}${stat(gc,'Conceded')}${stat(faced,'On target<br>faced')}</div>`
-      +`</div></div>`;
-  };
-  // cards belong on a page called Discipline — they were missing entirely before
-  const cardTot=team=>{const c=cardCounts(team); let yc=0,rc=0;
-    Object.keys(c).forEach(k=>{yc+=c[k].yc;rc+=c[k].rc;}); return {yc,rc};};
-  const cardBox=team=>{const t=cardTot(team);
-    return `<div class="rp-dcbox"><span class="rp-dcteam" style="color:${TI(team)}">${esc(TN(team))}</span>`
-      +`<span class="rp-dcv"><span class="rp-cardi" style="background:#f5c518"></span>${t.yc} <em>Yellow</em></span>`
-      +`<span class="rp-dcv"><span class="rp-cardi" style="background:${C.red}"></span>${t.rc} <em>Red</em></span></div>`;};
-  const discRows=[['Fouls',h.fouls,a.fouls],['Fouls Won',h.foulsWon,a.foulsWon],['Offsides',h.offsides,a.offsides]];
-  // every set piece is listed, including a 0 vs 0 one — the block reads the same on
-  // every report, so a missing row can't be mistaken for a missing stat
-  const spRows=[['Corners',h.corners,a.corners],['Free-kicks',h.freeKicks,a.freeKicks],
-    ['Throw-ins',h.throwIns,a.throwIns],['Goal Kicks',h.goalKicks,a.goalKicks],
-    ['Penalty Kicks',h.penalties,a.penalties]];
-  return secTitle('Goalkeeper &amp; Discipline')+legend()
-    +`<div class="rp-cmphead">Goalkeeper</div>`
-    +`<div class="rp-duo">${card('home',h,gcH,facedH,rateH)}${card('away',a,gcA,facedA,rateA)}</div>`
-    +`<div class="rp-cmphead">Discipline</div>`
-    +`<div class="rp-duo">${cardBox('home')}${cardBox('away')}</div>`
-    +cmpRows(discRows,GK_FIT)
-    +`<div class="rp-cmphead">Set Pieces</div>`+cmpRows(spRows,GK_FIT);
+/* The on-target shots this team's keeper faced, in the goal's own frame.
+
+   ⚠️ THE ONLY function in this file that filters r.team !== team. Every map above opens
+   with `r.team===team`; this one has to read the OTHER side, because gXY is written on
+   three events only — shot on target, goal, own goal (index.html:1354) — and all three
+   belong to whoever struck the ball. A keeper's own events (catch, parry, goal conceded)
+   carry a pitch spot and nothing in the goal at all. This is not a bug. Do not "fix" it.
+
+   ⚠️ goalMarksV() above is not a substitute: it filters SHOT_KINDS, which does not carry
+   'own goal' (shared.js:605), so a ball put through your own net — which IS a goal past
+   this keeper and does carry gXY — would be silently dropped. */
+function gkFaced(team){
+  const opp=team==='home'?'away':'home';
+  return rows.filter(r=>{
+      if(!r.gXY||r.t==null)return false;
+      const e=evKey(r.event);
+      if(r.team===opp)return e==='shot on target'||e==='goal';
+      return r.team===team&&e==='own goal';
+    })
+    .sort((a,b)=>a.t-b.t)
+    .map((r,i)=>{
+      const e=evKey(r.event), own=e==='own goal', conceded=own||e==='goal';
+      return {idx:i+1,t:r.t,row:r,own,conceded,team:r.team,
+        x:r.gXY.x,y:r.gXY.y,color:conceded?C.red:C.green,square:own};
+    });
 }
+/* Every goal this team let in, spot or no spot: the opposition's goals plus its own
+   players' own goals — the same sum teamGoals() takes for the other side. Not read off
+   gkFaced(): that one needs a gXY, and a keeper's record should not depend on whether
+   somebody placed the ball in the goal mouth. */
+function gkConcededRows(team){
+  const opp=team==='home'?'away':'home';
+  return rows.filter(r=>{
+    if(r.t==null)return false;
+    const e=evKey(r.event);
+    return (r.team===opp&&e==='goal')||(r.team===team&&e==='own goal');
+  });
+}
+/* One keeper's line at the top of his two pages.
+
+   `saves` is s.saves — the BROAD reading, which counts catch, parry and the retired
+   `save` name (shared.js:262). It is the figure the report has always printed here. The
+   Goalkeeper — Player Stats table uses the narrow catches+parries that PLAYER_CATS
+   defines, and the page says so under the Details table rather than leaving a reader to
+   find the difference.
+
+   Conceded is split between two keepers by who was on the pitch when the ball went in
+   (onPitchAt, shared.js:863). With one keeper there is nothing to split and the team's
+   total is his, which also keeps a match with no formation board from reading 0. */
+function gkRow(team,no,keepers){
+  const key=String(no==null?'':no).trim();
+  const P=computeStats(rows,team), s=P[key]||newStat();
+  const mins=playedMinutes(lineups,dur,team,rows);
+  const m=mins&&mins[key];
+  const gcRows=gkConcededRows(team);
+  const conceded=(keepers&&keepers.length>1)
+    ? gcRows.filter(r=>onPitchAt(lineups,team,r.t).has(key)).length
+    : gcRows.length;
+  const faced=s.saves+conceded;
+  // a goal kick answers "did it find a team-mate" only when the entry said what happened
+  const gk=spChains(team,'goal kick');
+  let gkOk=0, gkAns=0;
+  gk.chains.forEach(c=>{
+    if(String(c.sp.playerFrom||'').trim()!==key)return;
+    const t=c.out.map(r=>SP_OUT[evKey(r.event)]).filter(o=>o&&(o.kind==='pass'||o.kind==='cross'))[0];
+    if(t){gkAns++; if(t.ok)gkOk++;}
+  });
+  return {no:key, name:playerLabel(squadNames(lineups,team),key),
+    min:m?m.min:null, saves:s.saves, conceded, faced,
+    rate:faced?Math.round(s.saves/faced*100):null,
+    gkOk, gkAns, gkRate:gkAns?Math.round(gkOk/gkAns*100):null};
+}
+/* The keeper line, one row per shirt gkShirts() finds — it walks lineups.history as well
+   as the starting XI, so a side that changed keeper gets two rows and never one blurred
+   average. A board with no GK filled in gives an empty set, and the table says that in a
+   sentence rather than printing a row of zeroes about nobody. */
+function gkRowsHTML(team){
+  const keepers=[...gkShirts(lineups,team)];
+  const pcs=v=>v==null?'<span style="color:#c9cfd9">–</span>':v.toFixed(1)+'%';
+  if(!keepers.length)
+    return `<div class="rp-note" style="font-size:11px;margin:0 0 14px">`
+      +`No keeper is marked GK in ${esc(TN(team))}'s line-up, so no keeper can be named here. `
+      +`The maps below still show every save and every goal this side's goal let in.</div>`;
+  const tr=no=>{const g=gkRow(team,no,keepers);
+    return `<tr><td class="rp-gkl">${pill(g.no,team)}</td>`
+      +`<td class="rp-gkl">${esc(g.name)}</td>`
+      +`<td>${g.min==null?'<span style="color:#c9cfd9">–</span>':esc(g.min)+"'"}</td>`
+      +`<td><b>${g.rate==null?'–':pcs(g.rate)}</b></td>`
+      +`<td><b>${g.gkRate==null?'–':pcs(g.gkRate)}</b></td></tr>`;};
+  return `<table class="rp-gkrow"><thead><tr><th class="rp-gkl">Num.</th><th class="rp-gkl">Name</th>`
+    +`<th>Minutes Played</th><th>Save Rate (%)</th><th>Goal Kick Success Rate</th></tr></thead>`
+    +`<tbody>${keepers.map(tr).join('')}</tbody></table>`;
+}
+/* The keeper's own located events, on a pitch stood on its end with HIS goal at the top.
+   Every other vertical map in this file attacks UP (see shotDotsV); this one is that same
+   view turned through 180°, because the question about a keeper is what happened in front
+   of his goal, not how far up the pitch he got. normXY has already put the team attacking
+   right, so x=0 is his own goal line and (100-y, x) stands it on end the right way round. */
+const GK_EV={'catch':{c:C.green,t:'Catch'},'parry':{c:'#2f81f7',t:'Parry'},
+  'save':{c:C.green,t:'Save'},'goal conceded':{c:C.red,t:'Goal conceded'},
+  'own goal':{c:C.red,t:'Own goal'}};
+function gkPitchDots(team){
+  const N=normXY(team), d=PITCH_DIMS.football, W=d.h, H=d.w;
+  const faced=gkFaced(team);
+  // a save is given the number of the shot nearest it in time, so the mark in the goal and
+  // the mark on the grass are the same event. ±8s, because both rows are typed at the same
+  // moment of the video; foulMapsPage pairs a foul to its card the same way, on ±90s.
+  const near=t=>{let best=null,bd=8;
+    faced.forEach(f=>{const dd=Math.abs(f.t-t); if(dd<=bd){bd=dd;best=f.idx;}});
+    return best;};
+  return rows.filter(r=>r.team===team&&GK_EV[evKey(r.event)]&&r.pXY)
+    .sort((a,b)=>(a.t||0)-(b.t||0))
+    .map(r=>{
+      const p=N(r).a, k=GK_EV[evKey(r.event)];
+      const vx=(100-p.y)/100*W, vy=p.x/100*H;
+      const n=r.t==null?null:near(r.t);
+      const shape=eventHalf(r)===1
+        ?`<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="17" fill="${k.c}" stroke="#fff" stroke-width="3"/>`
+        :`<rect x="${(vx-15).toFixed(1)}" y="${(vy-15).toFixed(1)}" width="30" height="30" rx="5" fill="${k.c}" stroke="#fff" stroke-width="3"/>`;
+      return `<g>${shape}`+(n==null?'':`<text x="${vx.toFixed(1)}" y="${(vy+6).toFixed(1)}" `
+        +`text-anchor="middle" font-size="17" font-weight="800" fill="${C.on(k.c)}">${n}</text>`)+`</g>`;
+    }).join('');
+}
+// "Defending ↓" marker: the twin of vUpArrowSVG, pointing at the goal this page is about
+function vDownArrowSVG(){
+  const d=PITCH_DIMS.football, W=d.h, H=d.w, cx=W/2;
+  return `<g opacity="0.5" stroke="#fff" fill="none" stroke-width="7">`
+    +`<line x1="${cx}" y1="${(H*0.28).toFixed(0)}" x2="${cx}" y2="${(H*0.45).toFixed(0)}"/>`
+    +`<polyline points="${cx-17},${(H*0.412).toFixed(0)} ${cx},${(H*0.45).toFixed(0)} ${cx+17},${(H*0.412).toFixed(0)}"/></g>`
+    +`<text x="${cx}" y="${(H*0.238).toFixed(0)}" text-anchor="middle" font-size="26" fill="#fff" opacity="0.6">Defending</text>`;
+}
+function gkSavesPage(team){
+  const s=sumTeam(rows,team), faced=gkFaced(team);
+  const conceded=gkConcededRows(team).length;
+  const rate=(s.saves+conceded)?Math.round(s.saves/(s.saves+conceded)*100):null;
+  const names=squadNames(lineups,team==='home'?'away':'home');
+  const ourNames=squadNames(lineups,team);
+  const marks=faced.map(f=>({x:f.x,y:f.y,label:f.idx,color:f.color,square:f.square}));
+  const left=`<div class="rp-sgleft"><div class="rp-mtitle" style="color:${TI(team)}">Event Map</div>`
+    +`<div class="rp-mleg rp-sgleg"><span><i style="background:${C.green}"></i>Catch</span>`
+    +`<span><i style="background:#2f81f7"></i>Parry</span>`
+    +`<span><i style="background:${C.red}"></i>Goal conceded</span>`
+    +`<span><i style="background:${C.red};border-radius:2px"></i>Own goal</span></div>`
+    +`<div class="rp-goalmouth">${goalMouthSVG(marks,{net:'#c7d0dc',frame:'#8f99a6',ink:'#152233',ring:'#fff'})}</div>`
+    +vPitchSVG(vDownArrowSVG()+gkPitchDots(team))
+    +`<div class="rp-mleg rp-sgleg"><span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
+    +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span></div>`
+    +`<div class="rp-note" style="font-size:8px;line-height:1.4">The goal shows where the ball `
+    +`crossed the line, which only the shooter's row records — so it is read from the other `
+    +`side's shots. A number on the grass is the shot it belongs to.</div></div>`;
+  const own=faced.filter(f=>f.own).length;
+  const dtl=[['Total',faced.length,null],['Catches',s.catches,C.green],['Parries',s.parries,'#2f81f7'],
+    ['Goals Conceded',conceded,C.red],['Own Goals',own,C.red]];
+  const dtlHTML=`<table class="rp-dtl"><tbody>`
+    +dtl.map((d,i)=>`<tr${i?'':' class="rp-dtlt"'}><td class="rp-dtlb"${d[2]?` style="background:${d[2]}"`:''}></td>`
+      +`<td>${d[0]}</td><td>${d[1]}</td></tr>`).join('')+`</tbody></table>`;
+  const tr=f=>{const r=f.row, no=String(r.playerFrom||'').trim();
+    return `<tr><td class="el-c"><span class="rp-elidx" style="background:${f.color};color:${C.on(f.color)}">${f.idx}</span></td>`
+      +`<td class="el-c">${esc(no)}</td>`
+      +`<td class="el-c">${esc(minLbl(matchTime(r.t),eventHalf(r)))}</td>`
+      +`<td>${esc(playerLabel(f.own?ourNames:names,no))}${f.own?' <em style="font-style:normal;color:'+C.mut+'">(own goal)</em>':''}</td>`
+      +`<td>${shotBodyPart(rows,r)?esc(shotBodyPart(rows,r)):'<span style="color:#c9cfd9">–</span>'}</td></tr>`;};
+  const table=slice=>`<table class="rpt rpt-el"><thead><tr><th class="el-c">#</th><th class="el-c">Num</th>`
+    +`<th class="el-c">Time</th><th>Opponent</th><th>Body Part</th></tr></thead>`
+    +`<tbody>${slice.map(tr).join('')}</tbody></table>`;
+  const FIRST=18, CONT=33;
+  const right=`<div class="rp-sgright"><div class="rp-mtitle">Details</div>`
+    +`<div class="rp-gkbody2"><div class="rp-gkring">${gkArcSVG(rate,TC(team))}<div>Save rate</div></div>`
+    +`<div style="flex:1;min-width:0">${dtlHTML}`
+    +`<div class="rp-note" style="font-size:8px;margin-top:6px">Saves counts catch, parry and the `
+    +`retired <b>save</b> event; the player table counts catch and parry only.</div></div></div>`
+    +`<div class="rp-mtitle" style="margin-top:13px">Event List</div>`
+    +(faced.length?table(faced.slice(0,FIRST))
+      :`<div class="rp-note">No shots on target faced.</div>`)
+    +`</div>`;
+  const title='Goalkeeper — Saves';
+  const pages=[secTitle(title,team)+gkRowsHTML(team)+`<div class="rp-sgwrap">${left}${right}</div>`];
+  for(let i=FIRST;i<faced.length;i+=CONT)
+    pages.push(secTitle(title,team)
+      +`<div class="rp-sgcont"><div class="rp-mtitle">Event List</div>${table(faced.slice(i,i+CONT))}</div>`);
+  return pages;
+}
+/* TEAM_SECTIONS[3] is 'Goalkeeper Stats' (shared.js:927). Reached by index like the three
+   above it, and appended rather than inserted for exactly that reason — see the note on
+   TEAM_SECTIONS. Nothing in shared.js changes; this only reads one more of them. */
+const gkComparisonPage=()=>{
+  const r=sectionRows(3);
+  return secTitle('Goalkeeper — Team Comparison')+legend()
+    +`<div class="rp-cmphead">Goalkeeper</div>`+cmpRows(r,cmpFit(r.length));
+};
+/* Keepers only, the same set the Stats tab's Goalkeeper table draws. A side whose board
+   names no GK gets the shirts that were actually tagged doing a keeper's job instead, so a
+   match with no line-up still says something rather than printing an empty table. */
+const gkPlayerPages=()=>teamPlayerPages('Goalkeeper — Player Stats',RPT_GK_COLS,team=>{
+  const s=gkShirts(lineups,team);
+  if(s.size)return s;
+  const out=new Set();
+  rows.forEach(r=>{if(r.team===team&&GK_EV[evKey(r.event)]&&evKey(r.event)!=='own goal'){
+    const no=String(r.playerFrom||'').trim(); if(no)out.add(no);}});
+  return out;
+});
+
+/* ================= set pieces ================= */
+/* Goal kicks: where they went, how far, and who received them. The keeper line from the
+   Saves page is repeated at the top, because a goal kick is the keeper's ball. */
+function goalKickPage(team){
+  const N=normXY(team), d=PITCH_DIMS.football, W=d.h, H=d.w;
+  const {taken,chains}=spChains(team,'goal kick');
+  const segs=spSegments(team,'goal kick');
+  // the same metres and the same three bands passTypeData() uses for every other pass in
+  // the report, so one kick can never be Long on one page and Medium on another
+  const XM=105, YM=68;
+  const band=s=>{
+    if(!s.b)return null;
+    const dx=(s.b.x-s.a.x)/100*XM, dy=(s.b.y-s.a.y)/100*YM, m=Math.hypot(dx,dy);
+    return m>30?0:(m>=15?1:2);
+  };
+  const rowsD=[[0,0],[0,0],[0,0]];
+  segs.forEach(s=>{if(s.ok==null)return; const b=band(s); if(b==null)return;
+    rowsD[b][1]++; if(s.ok)rowsD[b][0]++;});
+  const tot=rowsD.reduce((a,b)=>[a[0]+b[0],a[1]+b[1]],[0,0]);
+  const dRow=(lbl,rng,p)=>`<tr><td style="text-align:left"><b>${lbl}</b>`
+    +`<span style="color:${C.mut};font-weight:400"> ${rng}</span></td>`
+    +`<td>${pc0(p[0],p[1])}</td><td>${p[0]}</td><td>${p[1]}</td></tr>`;
+  const dist=`<table class="rpt"><thead><tr><th style="text-align:left">Distance</th>`
+    +`<th>Success Rate</th><th>Succeeded</th><th>Total</th></tr></thead><tbody>`
+    +dRow('Long','[ &gt; 30m ]',rowsD[0])+dRow('Medium','[ 15 - 30m ]',rowsD[1])
+    +dRow('Short','[ &lt; 15m ]',rowsD[2])
+    +`<tr><td style="text-align:left;font-weight:800;color:${C.navy}">Total</td>`
+    +`<td style="font-weight:800;color:${C.navy}">${pc0(tot[0],tot[1])}</td>`
+    +`<td style="font-weight:800;color:${C.navy}">${tot[0]}</td>`
+    +`<td style="font-weight:800;color:${C.navy}">${tot[1]}</td></tr></tbody></table>`;
+  // who the ball reached, off playerTo of the row that says it arrived
+  const rec={};
+  segs.forEach(s=>{if(s.ok&&s.to)rec[s.to]=(rec[s.to]||0)+1;});
+  const names=squadNames(lineups,team);
+  const list=Object.entries(rec).sort((a,b)=>b[1]-a[1]||(+a[0]||1e9)-(+b[0]||1e9)).slice(0,8);
+  const recHTML=`<table class="rpt" style="margin-top:8px"><thead><tr><th>Rank</th>`
+    +`<th style="text-align:left">Player</th><th>Count</th></tr></thead><tbody>`
+    +(list.length?list.map((p,i)=>{
+        const hi=i===0?`background:${C.band};color:${C.navy};font-weight:800;`:'';
+        return `<tr><td style="${hi}color:${i===0?C.navy:C.mut}">${i+1}</td>`
+          +`<td style="${hi}text-align:left">${esc(p[0])}.&nbsp;${esc(playerLabel(names,p[0]))}</td>`
+          +`<td style="${hi}">${p[1]}</td></tr>`;}).join('')
+      :[1,2,3,4,5].map(i=>`<tr><td style="color:${C.mut}">${i}</td>`
+        +`<td style="text-align:left;color:#c9cfd9">–</td><td style="color:#c9cfd9">–</td></tr>`).join(''))
+    +`</tbody></table>`;
+  // the map: the kick, and the arrow to wherever the entry said the ball went
+  const arrows=segs.map((s,i)=>{
+    const col=spCol(s), ax=(s.a.y)/100*W, ay=(100-s.a.x)/100*H;
+    let g=`<circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="12" fill="${col}" stroke="#fff" stroke-width="2.5"/>`;
+    if(s.b){const bx=(s.b.y)/100*W, by=(100-s.b.x)/100*H;
+      g+=`<line x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}" `
+        +`stroke="${col}" stroke-width="5" stroke-dasharray="11 9" opacity="0.9" marker-end="url(#rpGkA${team}${s.ok?'y':'n'})"/>`;}
+    return g;
+  }).join('');
+  const defs=`<defs>`
+    +[['y','#39d98a'],['n','#f7506b']].map(m=>`<marker id="rpGkA${team}${m[0]}" viewBox="0 0 10 10" refX="8" refY="5" `
+      +`markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${m[1]}"/></marker>`).join('')
+    +`</defs>`;
+  const map=`<div class="rp-vmap">`
+    +`<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block;border-radius:7px">${defs}`
+    +`${grassSVG(W,H,true)}<g transform="translate(0 ${H}) rotate(-90)">`
+    +`<g fill="none" stroke="rgba(255,255,255,0.88)" stroke-width="4">${pitchFootball(H,W,false)}</g></g>`
+    +vUpArrowSVG()+arrows+`</svg></div>`;
+  const left=`<div class="rp-sgleft"><div class="rp-mtitle" style="color:${TI(team)}">Event Map</div>`
+    +`<div class="rp-mleg rp-sgleg"><span><i style="background:#39d98a"></i>Succeeded</span>`
+    +`<span><i style="background:#f7506b"></i>Fail</span>`
+    +`<span><i style="background:${C.grey}"></i>No outcome tagged</span></div>${map}</div>`;
+  const right=`<div class="rp-sgright"><div class="rp-mtitle">Details</div>${dist}`
+    +`<div class="rp-note" style="font-size:8px;margin-top:6px">Total counts the goal kicks whose `
+    +`entry also said what happened to the ball — ${taken} taken, ${tot[1]} with a tagged outcome. `
+    +`The player table counts all ${taken}.</div>`
+    +`<div class="rp-mtitle" style="margin-top:13px">Player Receiving Passes</div>${recHTML}</div>`;
+  return secTitle('Set Pieces — Goal Kicks',team)+gkRowsHTML(team)
+    +`<div class="rp-sgwrap">${left}${right}</div>`;
+}
+/* Free-kicks and corners: one pitch per side, the same shape the cross map draws — home
+   attacking RIGHT, away mirrored LEFT, thirds of the pitch read across the top for where
+   it was taken and down the side for where it arrived.
+
+   Colour says succeeded or failed; SHAPE says which of the four things it was. Two
+   readings on one picture, and neither colour nor shape carrying two jobs. */
+const SP_KIND={'free-kick':'Free-kicks','corner-kick':'Corners'};
+function spArrowSVG(team,kind){
+  const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
+  const flip=team==='away';
+  const F=p=>p?{x:(flip?100-p.x:p.x)/100*PW, y:(flip?100-p.y:p.y)/100*PH}:null;
+  const segs=spSegments(team,kind).map(s=>({a:F(s.a),b:F(s.b),kind:s.kind,ok:s.ok}));
+  const oCnt=[0,0,0]; segs.forEach(s=>oCnt[Math.min(2,Math.floor(s.a.x/PW*3))]++);
+  const tgt=segs.filter(s=>s.b), tCnt=[0,0,0];
+  tgt.forEach(s=>tCnt[Math.min(2,Math.floor(s.b.y/PH*3))]++);
+  const pctL=(n,dd)=>dd?(Math.round(n/dd*1000)/10)+'%':'0%';
+  let over='';
+  for(let i=0;i<3;i++)over+=`<text x="${((i+0.5)*PW/3).toFixed(0)}" y="42" text-anchor="middle" font-size="30" font-weight="700" fill="${TC(team)}">${pctL(oCnt[i],segs.length)}</text>`;
+  [1,2].forEach(i=>over+=`<line x1="${i*PW/3}" y1="10" x2="${i*PW/3}" y2="${mT-16}" stroke="${C.line}" stroke-width="2"/>`);
+  for(let i=0;i<3;i++)over+=`<text x="${PW+mR2/2}" y="${(mT+(i+0.5)*PH/3+10).toFixed(0)}" text-anchor="middle" font-size="30" font-weight="700" fill="${TC(team)}">${pctL(tCnt[i],tgt.length)}</text>`;
+  [1,2].forEach(i=>over+=`<line x1="${PW+18}" y1="${mT+i*PH/3}" x2="${W-18}" y2="${mT+i*PH/3}" stroke="${C.line}" stroke-width="2"/>`);
+  const id=n=>'rpSp'+kind.replace(/[^a-z]/g,'')+team+n;
+  const defs=`<defs>`+[['y','#39d98a'],['n','#f7506b'],['x',C.grey]].map(m=>
+    `<marker id="${id(m[0])}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" `
+    +`orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${m[1]}"/></marker>`).join('')+`</defs>`;
+  const seg=segs.map(s=>{
+    const col=spCol(s), mk=id(s.ok==null?'x':(s.ok?'y':'n'));
+    if(s.kind==='shot'){
+      // a shot has no destination — it is drawn where it was struck, filled when on target
+      const x=s.a.x, y=s.a.y, p=`${x.toFixed(1)},${(y-15).toFixed(1)} ${(x-14).toFixed(1)},${(y+10).toFixed(1)} ${(x+14).toFixed(1)},${(y+10).toFixed(1)}`;
+      return s.ok?`<polygon points="${p}" fill="${col}" stroke="#fff" stroke-width="2"/>`
+                 :`<polygon points="${p}" fill="none" stroke="${col}" stroke-width="5"/>`;
+    }
+    let g=`<circle cx="${s.a.x.toFixed(1)}" cy="${s.a.y.toFixed(1)}" r="9" fill="${col}" stroke="#fff" stroke-width="1.5"/>`;
+    if(s.b)g+=`<line x1="${s.a.x.toFixed(1)}" y1="${s.a.y.toFixed(1)}" x2="${s.b.x.toFixed(1)}" y2="${s.b.y.toFixed(1)}" `
+      +`stroke="${col}" stroke-width="4"${s.kind==='cross'?' stroke-dasharray="9 8"':''} opacity="0.9" marker-end="url(#${mk})"/>`;
+    return g;
+  }).join('');
+  const pitch=`<g transform="translate(0 ${mT})">${grassSVG(PW,PH,false)}`
+    +`<g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3">${pitchFootball(PW,PH,false)}</g>`
+    +`${dirArrowSVG(flip?'left':'right')}${seg}</g>`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">${defs}${over}${pitch}</svg>`;
+}
+function spArrowPage(team,kind){
+  const label=SP_KIND[kind]||kind;
+  const {taken}=spChains(team,kind), segs=spSegments(team,kind);
+  return secTitle('Set Pieces — '+label,team)
+    +`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))} · ${label}`
+    +`<span class="rp-mdir">${taken} taken · ${segs.length} tagged outcome${segs.length===1?'':'s'}</span></div>`
+    +`<div style="width:660px;margin:0 auto">${spArrowSVG(team,kind)}</div></div>`
+    +`<div class="rp-mleg"><span><i style="background:#39d98a"></i>Succeeded</span>`
+    +`<span><i style="background:#f7506b"></i>Failed</span>`
+    +`<span><i style="background:${C.grey}"></i>No outcome tagged</span>`
+    +`<span><i style="background:#98a0aa"></i>Solid line = pass</span>`
+    +`<span><i style="background:#98a0aa;border-radius:1px"></i>Dashed line = cross</span>`
+    +`<span><i style="background:#98a0aa;border-radius:50% 50% 2px 2px"></i>Triangle = shot</span></div>`
+    +`<div class="rp-note" style="font-size:9px">An arrow is drawn from the row that says what `
+    +`happened, not from the ${esc(label.toLowerCase())} itself: no set-piece event carries a `
+    +`receiving spot of its own unless it was the last thing typed in its entry. A ${esc(label.toLowerCase().replace(/s$/,''))} `
+    +`whose entry said nothing more is a dot.</div>`;
+}
+const setPieceComparisonPage=()=>{
+  const r=sectionRows(4);
+  return secTitle('Set Pieces — Team Comparison')+legend()
+    +`<div class="rp-cmphead">Set Pieces</div>`+cmpRows(r,cmpFit(r.length));
+};
+const setPiecePlayerPages=()=>teamPlayerPages('Set Pieces — Player Stats',PLAYER_CATS.setPieces);
 
 /* ================= table of contents ================= */
 /* Every page joins the report under the section it belongs to and, where a section
@@ -1380,7 +1993,9 @@ function contentsPages(pages,lead){
     return `<div class="rp-tocrow rp-toc${e.lvl}"><span class="rp-tocttl">${esc(e.label)}</span>`
       +`<span class="rp-tocgap"></span><span class="rp-tocpg">${no}</span></div>`;
   };
-  return chunks.map(ch=>`<div class="rp-toch">Table of Contents</div>`+ch.map(row).join(''));
+  // the same page header every other page carries — .rp-toch's own heading would be
+  // a second title under the first, saying the same thing twice
+  return chunks.map(ch=>secTitle('Table of Contents')+ch.map(row).join(''));
 }
 
 /* ================= assembly + export ================= */
@@ -1416,10 +2031,28 @@ function buildPages(host){
     ...defCategoryPages().reduce((a,c)=>a.concat(P('Defensive',c.sub,c.html)),[]),
     ...P('Defensive','Profile Radar',radarPage()),
     ...P('Defensive','Player Stats',defensivePlayerPages()),
-    ...P('Discipline','Foul Maps',foulMapsPage()),
-    ...P('Discipline','Fouls Won',foulWonMapsPage()),
-    ...P('Discipline','Offsides',offsideMapsPage()),
-    ...P('Goalkeeper & Discipline',null,gkPage())
+    /* ---- Goalkeeper ----------------------------------------------------
+       Where 'Discipline' and 'Goalkeeper & Discipline' used to be. Nothing those two
+       printed has been dropped: the keeper's figures are on the comparison below, the
+       set pieces on their own comparison, and the cards — which that page was the ONLY
+       place in the report to print — are on Fouls — Team Comparison, counted the same
+       way, plus a per-player column the report never had. */
+    ...P('Goalkeeper','Team Comparison',gkComparisonPage()),
+    ...P('Goalkeeper',HOME,gkSavesPage('home')),
+    ...P('Goalkeeper',AWAY,gkSavesPage('away')),
+    ...P('Goalkeeper','Player Stats',gkPlayerPages()),
+    /* ---- Set Pieces ---------------------------------------------------- */
+    ...P('Set Pieces','Team Comparison',setPieceComparisonPage()),
+    ...P('Set Pieces','Goal Kicks',[goalKickPage('home'),goalKickPage('away')]),
+    ...P('Set Pieces','Free-kicks',[spArrowPage('home','free-kick'),spArrowPage('away','free-kick')]),
+    ...P('Set Pieces','Corners',[spArrowPage('home','corner-kick'),spArrowPage('away','corner-kick')]),
+    ...P('Set Pieces','Player Stats',setPiecePlayerPages()),
+    /* ---- Fouls --------------------------------------------------------- */
+    ...P('Fouls','Team Comparison',foulComparisonPage()),
+    ...P('Fouls','Foul Maps',foulMapsPage()),
+    ...P('Fouls','Fouls Won',foulWonMapsPage()),
+    ...P('Fouls','Offsides',offsideMapsPage()),
+    ...P('Fouls','Player Stats',foulPlayerPages())
   ];
   const list=opening.map(p=>p.html)
     .concat(contentsPages(opening.concat(body),opening.length))

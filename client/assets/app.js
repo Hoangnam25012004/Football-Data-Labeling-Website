@@ -403,6 +403,26 @@
          Both are the host asking; the analyst's own Stats page mounts without
          either and is unchanged. The href is written against THIS document, so
          it resolves beside app.html on the live site and in client/ locally. */
+      /* The fixture as this channel has it NOW, laid over the meta the payload
+         froze. The PDF report prints date, league, season, round and venue on its
+         cover, and none of the five is in the payload — deliberately: they live on
+         public.matches, this page has already read them, and buildReport() copies
+         nothing that is already on that row (tests/submit-analysis.test.js:41).
+
+         Read live rather than frozen, they are also right for a report published
+         before the ⋯ Edit dialog was used, and for one published before this cover
+         existed at all. A blank live field never wipes out a frozen one; a payload
+         that has none and a channel that says nothing leave the cover with no
+         fixture block, which is exactly what it printed before.
+
+         Written back onto `rep`, not into `rep.payload`: HNA.report() builds a
+         fresh object per call and nothing caches it, so this is a local overlay
+         and the snapshot object itself is untouched. */
+      var fx = { date: m.date, league: m.league, season: m.season,
+                 round: m.round, venue: m.venue };
+      var meta = Object.assign({}, rep.payload.meta);
+      Object.keys(fx).forEach(function (k) { if (fx[k]) meta[k] = fx[k]; });
+      rep.payload = Object.assign({}, rep.payload, { meta: meta });
       window.PTStats.mount(holder, rep.payload,
         { fullscreen: true, guide: 'guide.html' });
       /* the PDF button is part of the chrome that mount() just drew, so it did
@@ -1904,7 +1924,7 @@
     return loadOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
       .then(function () { return loadShared(); })
       .then(function () { return loadOnce(r + 'Stats/stats-view.js?v=26'); })
-      .then(function () { return loadOnce(r + 'Stats/report.js?v=37'); })
+      .then(function () { return loadOnce(r + 'Stats/report.js?v=38'); })
       /* The analyst's toolkit. This site's file, not the tagging app's — Q1 was
          answered B, so the right-click menu, the drawing layer, clips and the
          exports exist in the channel and nowhere else. It registers itself with
