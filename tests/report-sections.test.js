@@ -254,6 +254,16 @@ test('the keeper line names every shirt the board ever put in goal', () => {
   ok(text(p).includes('Name 0'),'the keeper is named, not just numbered');
 });
 
+test('…and it appears there ONLY — Goal Kicks is a page about goal kicks', () => {
+  const b=build();
+  b.of('Set Pieces — Goal Kicks').forEach(p=>{
+    notOk(/class="rp-gkrow"/.test(p),'the keeper line is still at the top of Goal Kicks');
+    notOk(/Save Rate/.test(p),'and so is Save Rate, which is not a fact about a goal kick');
+  });
+  // the one figure of it that IS about goal kicks is the Total row of the distance table
+  ok(/Total/.test(text(b.of('Set Pieces — Goal Kicks')[0])),'the Total row still answers it');
+});
+
 test('the player table is keepers only, the way the Stats tab draws it', () => {
   const b=build();
   const p=b.of('Goalkeeper — Player Stats')[0];
@@ -270,7 +280,7 @@ test('a set piece typed on its own draws nothing — it produced nothing that wa
      grey "no outcome tagged" dot, which for a corner marked the corner flag, i.e. the
      definition of the thing rather than a fact about the match. */
   const tri=[...p.matchAll(/<polygon /g)].length;
-  const dot=[...p.matchAll(/<circle cx="[\d.]+" cy="[\d.]+" r="9"/g)].length;
+  const dot=[...p.matchAll(/<circle cx="[\d.]+" cy="[\d.]+" r="13"/g)].length;
   eq(tri,1,'the chain-bearing corner is the one shot drawn');
   eq(dot,0,'and nothing is drawn for the corner that said no more');
   notOk(/No outcome tagged/.test(p),'the legend for it is gone too');
@@ -379,6 +389,58 @@ test('Defensive — Player Stats leaves the fouls to the Fouls section', () => {
   const f=b.of('Fouls — Player Stats')[0];
   ok(f.includes('<th>Total Fouls</th>')&&f.includes('<th>Fouls Won</th>'),
      'the Fouls table carries them');
+});
+
+test('Tackle % goes from the player table but stays on the comparison', () => {
+  const b=build();
+  const p=b.of('Defensive — Player Stats')[0];
+  notOk(p.includes('<th>Tackle %</th>'),'the column is gone');
+  ok(/<td>\d+\/\d+<\/td>/.test(p),'and "won/attempted" is still printed, which IS the rate');
+  // TEAM_SECTIONS[2] carries Tackle Success, and that row has no fraction beside it
+  ok(text(b.first('Defensive')).includes('Tackle Success'),
+     'the Defensive comparison keeps its own rate row');
+});
+
+/* ================= F4. the Fouls maps join the rest ================= */
+test('the foul, fouls-won and offside maps draw one shape too', () => {
+  const b=build();
+  ['Fouls — Foul Maps','Fouls — Fouls Won','Fouls — Offsides'].forEach(t=>{
+    const p=b.first(t);
+    ok(p,t+' was not built');
+    notOk(/Circle = 1st half|Square = 2nd half/.test(p),t+' still explains a shape by half');
+    notOk(/<rect [^>]*rx="[35]"[^>]*fill-opacity/.test(p),t+' still draws a square marker');
+  });
+});
+
+test('the card ring survives — it is the one thing that marker says twice, and it is a card', () => {
+  const b=build();
+  const p=b.first('Fouls — Foul Maps');
+  ok(/stroke="#f5c518" stroke-width="5"/.test(p),'a foul that led to a yellow keeps its ring');
+  ok(/Led to yellow/.test(p)&&/Dangerous zone/.test(p),'and the legend that explains it');
+});
+
+/* ================= F5. set-piece dots carry a shirt ================= */
+test('every dot on a set-piece map says which shirt played the ball', () => {
+  const b=build();
+  const pages=[].concat(b.of('Set Pieces — Goal Kicks'),b.of('Set Pieces — Free-kicks'),
+                        b.of('Set Pieces — Corners'));
+  let dots=0, texts=0;
+  pages.forEach(p=>{
+    dots+=[...p.matchAll(/<circle cx="[\d.]+" cy="[\d.]+" r="1[35]"/g)].length
+         +[...p.matchAll(/<polygon /g)].length;
+    // the numbers drawn inside them — the map's own <text>, not the tables around it
+    texts+=[...p.matchAll(/text-anchor="middle" font-size="1[45]" font-weight="800"/g)].length;
+  });
+  ok(dots>0,'there are markers to check — got '+dots);
+  eq(texts,dots,'every marker carries a number: '+texts+' numbers for '+dots+' markers');
+});
+
+test('the number is the shirt that played the ball, not always the taker', () => {
+  const b=build();
+  // the corner is taken by 11 and the shot that came off it is 9's, so 9 is on the marker
+  const p=b.of('Set Pieces — Corners')[0];
+  ok(/<polygon[\s\S]{0,200}?>9</.test(p),'the shooter-s shirt is in the triangle: '+
+     (/<polygon[\s\S]{0,220}/.exec(p)||[''])[0].slice(0,200));
 });
 
 /* ================= G. the fixture on the cover ================= */

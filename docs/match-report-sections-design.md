@@ -1506,3 +1506,61 @@ và Distribution — Take-ons & Step-ins), và `gkPitchDots` (Goalkeeper — Sav
 **Sau lần sửa này:** 1514/1514 test (thêm 4 test mới, và
 `tests/shooting-goal-map.test.js` đổi hai dòng vì hành vi nó khoá chính là hành vi vừa
 được yêu cầu đổi). Đo lại cả 57 trang: **0 tràn dọc, 0 tràn ngang, 0 nhãn cột bẻ dòng.**
+
+---
+
+## 20. Sửa lần ba — 2026-09-06
+
+Bốn điều chỉnh nữa sau khi đọc bản in. Ba cái đầu tiếp tục nguyên tắc của §19 — **bớt thứ
+đang nói hai lần** — cái thứ tư thì thêm, và là thêm đúng thứ bản đồ vốn thiếu.
+
+### 20.1 Bỏ cột `Tackle %` khỏi Defensive — Player Stats
+
+`3/5` **đã là** tỉ lệ, viết bằng hai ký tự, và một cột phần trăm bên cạnh là đọc lại đúng
+một sự thật. Hàng `Tackle Success` trên **Defensive — Team Comparison** giữ nguyên: ở đó
+không có phân số nào bên cạnh để làm nó thừa. Test khoá cả hai chiều.
+
+### 20.2 Ba map Fouls gộp về một hình tròn
+
+Chỗ §19.5 đã nêu là còn sót, nay được cho phép: `foulMapsPage` (`f.half===1`) và
+`eventMapsPage` (`eventHalf(r)===1`). Bỏ luôn hai chú giải.
+
+**Vòng thẻ ở lại.** Nó là thứ *duy nhất* marker của foul map còn nói hai lần — nhưng cái
+nó nói thêm là **một chiếc thẻ**, không phải một cái đồng hồ, và chú giải "Led to yellow /
+Led to red" vẫn ở đó giải thích nó.
+
+Sau lần này **không còn trang nào** trong báo cáo chia ký hiệu theo hiệp — đã kiểm bằng
+cách quét cả 57 trang.
+
+### 20.3 Bỏ bảng thủ môn khỏi Set Pieces — Goal Kicks
+
+Nó in đúng năm thứ đã in ở đầu **Goalkeeper — Saves**, và `Save Rate (%)` không phải một
+sự thật về quả phát bóng. Con số của nó *thật sự* nói về phát bóng —
+`Goal Kick Success Rate` — chính là hàng **Total** của bảng Distance ngay trên cùng trang
+đó. Trang Goalkeeper — Saves giữ nguyên bảng, vì đó mới là chỗ người đọc hỏi về thủ môn.
+
+### 20.4 Mọi dot trên map set piece mang số áo
+
+`spSegments()` nay trả thêm `from` — số áo của **row hệ quả**, không phải của row set
+piece. Trên quả phát bóng hai cái là một người; trên quả phạt góc tạt vào rồi đánh đầu thì
+**không**, và cái chấm đánh dấu chỗ bóng được chạm, nên số phải là người chạm.
+
+Ba thay đổi hình để chứa được con số:
+
+| | Trước | Sau |
+|---|---|---|
+| Chấm trên map Goal Kicks | `r=12`, không số | **`r=15`, số 15px** |
+| Chấm trên map Free-kick / Corner | `r=9`, không số | **`r=13`, số 14px** |
+| Tam giác (cú sút) | cao 25, rộng 28 | **cao 32, rộng 36**, số ở 60% chiều cao — chỗ tam giác rộng bằng hình tròn |
+
+Và **vẽ toàn bộ đường trước, marker sau**. Trước đây mỗi segment vẽ liền một mạch
+(đường + chấm), nên đường của quả này nằm đè lên số của quả bên cạnh — thấy rõ nhất ở
+Goal Kicks, nơi mọi quả xuất phát cách nhau vài mét.
+
+> ⚠️ Một cái bẫy mất một vòng test mới thấy: `spArrowSVG` chiếu lại toàn bộ segment qua
+> `F()` để đổi sang toạ độ pixel, và phép `.map()` đó **liệt kê từng trường một** — nên
+> `from` bị rơi im lặng và một nửa số marker không có số. Test đếm `số marker === số chữ`
+> là cái bắt được. Thêm trường vào `spSegments()` thì phải thêm cả ở đó.
+
+**Sau lần sửa này:** 1520/1520 test (thêm 6). Đo lại cả 57 trang: **0 tràn dọc, 0 tràn
+ngang, 0 nhãn cột bẻ dòng, 0 trang còn chia ký hiệu theo hiệp.**

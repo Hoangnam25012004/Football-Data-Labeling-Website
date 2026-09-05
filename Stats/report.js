@@ -886,8 +886,11 @@ function defensivePlayerPages(){
        on the floor is now tagged as, matching the Stats tab and the team comparison.
        A plain frac(), like Aerial beside it: a match tagged before the split reads 0/0,
        the same 0 the tables print for it. */
-    ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Physical','Loose','T-on Con','Mistakes'],
-    s=>[frac(s.tacklesWon,s.tackles),pc0(s.tacklesWon,s.tackles),dotv(s.interceptions),dotv(s.clearances),
+    /* No Tackle % column: "3/5" already IS the rate, at the width of two characters, and a
+       percentage beside it is the same fact read twice. The Defensive comparison keeps its
+       Tackle Success row — that one has no fraction beside it to make it redundant. */
+    ['Tackles','Intercept','Clear','Blocks','Recover','Aerial','Physical','Loose','T-on Con','Mistakes'],
+    s=>[frac(s.tacklesWon,s.tackles),dotv(s.interceptions),dotv(s.clearances),
       dotv(s.blocks),dotv(s.recoveries),frac(s.aerialDuelsWon,s.aerialDuels),
       frac(s.physicalDuelsWon,s.physicalDuels),
       frac(s.looseBallDuelsWon,s.looseBallDuels),
@@ -1437,9 +1440,9 @@ function foulMapsPage(){
         +`<rect width="26" height="26" fill="rgba(247,80,107,0.10)"/><rect width="13" height="26" fill="rgba(247,80,107,0.26)"/></pattern></defs>`;
       const dots=fl.map(f=>{
         const ring=f.card?`stroke="${f.card==='red card'?C.red:'#f5c518'}" stroke-width="5"`:'stroke="#fff" stroke-width="2"';
-        const shape=f.half===1
-          ?`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${TC(team)}" fill-opacity="0.92" ${ring}/>`
-          :`<rect x="${(f.x-11).toFixed(1)}" y="${(f.y-11).toFixed(1)}" width="22" height="22" rx="3" fill="${TC(team)}" fill-opacity="0.92" ${ring}/>`;
+        // one shape for both halves, like every other map in the report. The ring is the
+        // one thing this marker still says twice over, and that is a card, not a clock.
+        const shape=`<circle cx="${f.x.toFixed(1)}" cy="${f.y.toFixed(1)}" r="12" fill="${TC(team)}" fill-opacity="0.92" ${ring}/>`;
         return `<g>${shape}<text x="${f.x.toFixed(1)}" y="${(f.y+4.5).toFixed(1)}" text-anchor="middle" font-size="14" font-weight="800" fill="${C.on(TC(team))}">${f.no}</text></g>`;
       }).join('');
       const grass=grassSVG(PW,PH,false);
@@ -1451,7 +1454,7 @@ function foulMapsPage(){
     return `<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))} · Foul Map</div>${inner}</div>`;
   };
   const body=secTitle('Fouls — Foul Maps')+card('home')+card('away')
-    +`<div class="rp-mleg"><span><i style="background:#98a0aa"></i>Circle = 1st half</span><span><i style="background:#98a0aa;border-radius:2px"></i>Square = 2nd half</span>`
+    +`<div class="rp-mleg">`
     +`<span><i style="background:rgba(247,80,107,0.3);border:1px solid rgba(247,80,107,0.55);border-radius:2px"></i>Dangerous zone (own third)</span>`
     +`<span><i class="rp-ring" style="background:#98a0aa;border-color:#f5c518"></i>Led to yellow</span>`
     +`<span><i class="rp-ring" style="background:#98a0aa;border-color:${C.red}"></i>Led to red</span></div>`;
@@ -1500,19 +1503,17 @@ function eventMapsPage(eventName,title){
     const N=normXY(team), d=PITCH_DIMS.football, W=d.h, H=d.w;
     const dots=list.map(r=>{
       const p=N(r).a, x=p.y/100*W, y=(100-p.x)/100*H;
-      const shape=eventHalf(r)===1
-        ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16" fill="${TC(team)}" fill-opacity="0.94" stroke="#fff" stroke-width="2.5"/>`
-        :`<rect x="${(x-14.5).toFixed(1)}" y="${(y-14.5).toFixed(1)}" width="29" height="29" rx="5" fill="${TC(team)}" fill-opacity="0.94" stroke="#fff" stroke-width="2.5"/>`;
+      // one shape for both halves, like every other map in the report — the shirt number
+      // inside is what this marker is for, and the ranking under it is where the rest is
+      const shape=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16" fill="${TC(team)}" fill-opacity="0.94" stroke="#fff" stroke-width="2.5"/>`;
       return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+5.5).toFixed(1)}" text-anchor="middle" font-size="16" font-weight="800" fill="${C.on(TC(team))}">${esc(String(r.playerFrom||'').trim())}</text></g>`;
     }).join('');
     const map=`<div class="rp-vmap">${vPitchSVG(dots)}</div>`;
     return `<div style="flex:1;min-width:0"><div class="rp-mtitle" style="color:${TI(team)}">`
       +`${esc(TN(team))}<span class="rp-mdir">▲ attacking</span></div>${map}${top5(team)}</div>`;
   };
-  const legend=`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
-    +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span>`;
+  // no legend: one marker shape, and the number in it is the shirt that did it
   return secTitle(title)
-    +`<div class="rp-mleg" style="margin:0 0 10px">${legend}</div>`
     +`<div style="display:flex;gap:18px;align-items:flex-start">${card('home',hA)}${card('away',aA)}</div>`;
 }
 const offsideMapsPage=()=>eventMapsPage('offside','Fouls — Offsides');
@@ -1601,7 +1602,14 @@ function spSegments(team,kind){
     c.out.forEach(r=>{
       const o=SP_OUT[evKey(r.event)]; if(!o)return;
       const rn=N(r), a=rn.a||sn.a; if(!a)return;
-      out.push({a:a, b:rn.b||null, kind:o.kind, ok:o.ok, to:String(r.playerTo||'').trim()});
+      /* `from` is the shirt that played the ball, and it is written INTO the dot on every
+         set-piece map. Off the outcome row rather than off the set-piece row: they are the
+         same man on a goal kick, but on a corner swung in and headed on they are not, and
+         the dot marks where the ball was struck. Falls back to the taker when the outcome
+         row was typed without a number. */
+      out.push({a:a, b:rn.b||null, kind:o.kind, ok:o.ok,
+        to:String(r.playerTo||'').trim(),
+        from:String(r.playerFrom||c.sp.playerFrom||'').trim()});
     });
   });
   return out;
@@ -1868,13 +1876,22 @@ function goalKickPage(team){
         +`<td style="text-align:left;color:#c9cfd9">–</td><td style="color:#c9cfd9">–</td></tr>`).join(''))
     +`</tbody></table>`;
   // the map: the kick, and the arrow to wherever the entry said the ball went
-  const arrows=segs.map((s,i)=>{
+  /* The line is drawn under every dot, and every dot carries the shirt that played the
+     ball. Goal kicks all start within a couple of metres of each other, so the markers
+     overlap: drawing all the lines first keeps a line from being laid across the number of
+     the kick beside it. r=15 rather than 12 is the room two digits need at this scale. */
+  const arrows=segs.map(s=>{
+    if(!s.b)return '';
     const col=spCol(s), ax=(s.a.y)/100*W, ay=(100-s.a.x)/100*H;
-    let g=`<circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="12" fill="${col}" stroke="#fff" stroke-width="2.5"/>`;
-    if(s.b){const bx=(s.b.y)/100*W, by=(100-s.b.x)/100*H;
-      g+=`<line x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}" `
-        +`stroke="${col}" stroke-width="5" stroke-dasharray="11 9" opacity="0.9" marker-end="url(#rpGkA${team}${s.ok?'y':'n'})"/>`;}
-    return g;
+    const bx=(s.b.y)/100*W, by=(100-s.b.x)/100*H;
+    return `<line x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}" `
+      +`stroke="${col}" stroke-width="5" stroke-dasharray="11 9" opacity="0.9" marker-end="url(#rpGkA${team}${s.ok?'y':'n'})"/>`;
+  }).join('')
+  +segs.map(s=>{
+    const col=spCol(s), ax=(s.a.y)/100*W, ay=(100-s.a.x)/100*H;
+    return `<g><circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="15" fill="${col}" stroke="#fff" stroke-width="2.5"/>`
+      +(s.from?`<text x="${ax.toFixed(1)}" y="${(ay+5).toFixed(1)}" text-anchor="middle" font-size="15" `
+        +`font-weight="800" fill="${C.on(col)}">${esc(s.from)}</text>`:'')+`</g>`;
   }).join('');
   const defs=`<defs>`
     +[['y','#39d98a'],['n','#f7506b']].map(m=>`<marker id="rpGkA${team}${m[0]}" viewBox="0 0 10 10" refX="8" refY="5" `
@@ -1890,7 +1907,11 @@ function goalKickPage(team){
     +`<span><i style="background:#f7506b"></i>Fail</span></div>${map}</div>`;
   const right=`<div class="rp-sgright"><div class="rp-mtitle">Details</div>${dist}`
     +`<div class="rp-mtitle" style="margin-top:13px">Player Receiving Passes</div>${recHTML}</div>`;
-  return secTitle('Set Pieces — Goal Kicks',team)+gkRowsHTML(team)
+  /* No keeper line here. It says the same five things it says at the top of Goalkeeper —
+     Saves, and Save Rate is not a fact about a goal kick; the one figure of it that IS —
+     Goal Kick Success Rate — is the Total row of the Distance table on this very page.
+     Goalkeeper — Saves keeps the line, which is where a reader asks about the keeper. */
+  return secTitle('Set Pieces — Goal Kicks',team)
     +`<div class="rp-sgwrap">${left}${right}</div>`;
 }
 /* Free-kicks and corners: one pitch per side, the same shape the cross map draws — home
@@ -1904,7 +1925,8 @@ function spArrowSVG(team,kind){
   const d=PITCH_DIMS.football, PW=d.w, PH=d.h, mT=76, mR2=150, W=PW+mR2, H=PH+mT;
   const flip=team==='away';
   const F=p=>p?{x:(flip?100-p.x:p.x)/100*PW, y:(flip?100-p.y:p.y)/100*PH}:null;
-  const segs=spSegments(team,kind).map(s=>({a:F(s.a),b:F(s.b),kind:s.kind,ok:s.ok}));
+  // `from` travels with the point: it is the number drawn inside the marker
+  const segs=spSegments(team,kind).map(s=>({a:F(s.a),b:F(s.b),kind:s.kind,ok:s.ok,from:s.from}));
   const oCnt=[0,0,0]; segs.forEach(s=>oCnt[Math.min(2,Math.floor(s.a.x/PW*3))]++);
   const tgt=segs.filter(s=>s.b), tCnt=[0,0,0];
   tgt.forEach(s=>tCnt[Math.min(2,Math.floor(s.b.y/PH*3))]++);
@@ -1915,21 +1937,34 @@ function spArrowSVG(team,kind){
   for(let i=0;i<3;i++)over+=`<text x="${PW+mR2/2}" y="${(mT+(i+0.5)*PH/3+10).toFixed(0)}" text-anchor="middle" font-size="30" font-weight="700" fill="${TC(team)}">${pctL(tCnt[i],tgt.length)}</text>`;
   [1,2].forEach(i=>over+=`<line x1="${PW+18}" y1="${mT+i*PH/3}" x2="${W-18}" y2="${mT+i*PH/3}" stroke="${C.line}" stroke-width="2"/>`);
   const id=n=>'rpSp'+kind.replace(/[^a-z]/g,'')+team+n;
-  const defs=`<defs>`+[['y','#39d98a'],['n','#f7506b'],['x',C.grey]].map(m=>
+  // two arrowheads, because there are two outcomes: it came off, or it did not
+  const defs=`<defs>`+[['y','#39d98a'],['n','#f7506b']].map(m=>
     `<marker id="${id(m[0])}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" `
     +`orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${m[1]}"/></marker>`).join('')+`</defs>`;
+  /* Lines first, markers over them, so no arrow is laid across the shirt number of the
+     set piece beside it. Every marker carries that number — a triangle at 60% of its height
+     is as wide as the circle is, which is where two digits go. */
+  const num=(s,x,y,col)=>s.from
+    ?`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="14" `
+      +`font-weight="800" fill="${col}">${esc(s.from)}</text>`:'';
   const seg=segs.map(s=>{
-    const col=spCol(s), mk=id(s.ok==null?'x':(s.ok?'y':'n'));
+    if(s.kind==='shot'||!s.b)return '';
+    const col=spCol(s), mk=id(s.ok?'y':'n');
+    return `<line x1="${s.a.x.toFixed(1)}" y1="${s.a.y.toFixed(1)}" x2="${s.b.x.toFixed(1)}" y2="${s.b.y.toFixed(1)}" `
+      +`stroke="${col}" stroke-width="4"${s.kind==='cross'?' stroke-dasharray="9 8"':''} opacity="0.9" marker-end="url(#${mk})"/>`;
+  }).join('')
+  +segs.map(s=>{
+    const col=spCol(s);
     if(s.kind==='shot'){
       // a shot has no destination — it is drawn where it was struck, filled when on target
-      const x=s.a.x, y=s.a.y, p=`${x.toFixed(1)},${(y-15).toFixed(1)} ${(x-14).toFixed(1)},${(y+10).toFixed(1)} ${(x+14).toFixed(1)},${(y+10).toFixed(1)}`;
-      return s.ok?`<polygon points="${p}" fill="${col}" stroke="#fff" stroke-width="2"/>`
-                 :`<polygon points="${p}" fill="none" stroke="${col}" stroke-width="5"/>`;
+      const x=s.a.x, y=s.a.y;
+      const p=`${x.toFixed(1)},${(y-19).toFixed(1)} ${(x-18).toFixed(1)},${(y+13).toFixed(1)} ${(x+18).toFixed(1)},${(y+13).toFixed(1)}`;
+      return `<g>`+(s.ok?`<polygon points="${p}" fill="${col}" stroke="#fff" stroke-width="2"/>`
+                        :`<polygon points="${p}" fill="none" stroke="${col}" stroke-width="5"/>`)
+        +num(s,x,y+10,s.ok?C.on(col):col)+`</g>`;
     }
-    let g=`<circle cx="${s.a.x.toFixed(1)}" cy="${s.a.y.toFixed(1)}" r="9" fill="${col}" stroke="#fff" stroke-width="1.5"/>`;
-    if(s.b)g+=`<line x1="${s.a.x.toFixed(1)}" y1="${s.a.y.toFixed(1)}" x2="${s.b.x.toFixed(1)}" y2="${s.b.y.toFixed(1)}" `
-      +`stroke="${col}" stroke-width="4"${s.kind==='cross'?' stroke-dasharray="9 8"':''} opacity="0.9" marker-end="url(#${mk})"/>`;
-    return g;
+    return `<g><circle cx="${s.a.x.toFixed(1)}" cy="${s.a.y.toFixed(1)}" r="13" fill="${col}" stroke="#fff" stroke-width="1.5"/>`
+      +num(s,s.a.x,s.a.y+4.8,C.on(col))+`</g>`;
   }).join('');
   const pitch=`<g transform="translate(0 ${mT})">${grassSVG(PW,PH,false)}`
     +`<g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3">${pitchFootball(PW,PH,false)}</g>`
