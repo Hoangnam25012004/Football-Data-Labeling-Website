@@ -4,12 +4,12 @@
     "sha256": "ea82bff2e223beb9"
   },
   "Stats/stats-view.css": {
-    "v": 10,
-    "sha256": "21bb5f8b5388163e"
+    "v": 11,
+    "sha256": "3ef8829ec33899e6"
   },
   "Stats/stats-view.js": {
-    "v": 26,
-    "sha256": "6d2e84140ada3bb2"
+    "v": 27,
+    "sha256": "87356915c4c61d93"
   },
   "auth.js": {
     "v": 1,
@@ -24,8 +24,8 @@
     "sha256": "37fee08ede58b61d"
   },
   "client/assets/app.js": {
-    "v": 56,
-    "sha256": "5709c90daeb33574"
+    "v": 57,
+    "sha256": "d6393edb2dd066fe"
   },
   "client/assets/film-tools.css": {
     "v": 4,
