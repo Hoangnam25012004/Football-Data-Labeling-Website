@@ -545,35 +545,38 @@ function gkDetailsHTML(team){
   return `<div class="chart-card donut-card"><div class="donut-wrap">`
     +`<div class="donut-svg">${svg}</div><div class="donut-legend">${legend}</div></div></div>`;
 }
-/* Event Map — the goal mouth on the goal line at the top of an upright pitch, the keeper's
-   own located events on the grass below it. Both halves are normalised so this side always
-   ATTACKS right (dir==='left' flips), then x=0 — its own goal — is drawn at the top, the
-   report's "what happened in front of his goal" view rather than "how far up the pitch".
-   Each goal-mouth mark carries data-p = the shooter, so the ranking can isolate him. */
-const GK_EV_COLOR={'catch':'#39d98a','parry':'#2f81f7','save':'#39d98a',
-  'goal conceded':'#f7506b','own goal':'#f7506b'};
+/* Event Map — the goal mouth on the goal line at the top of an upright pitch, and on the
+   grass below it the SAME shots (gkFaced), plotted where the opposition player struck each
+   one from. Not the keeper's own events: the question the map answers is where this side
+   was beaten from and where it ended up. Both halves are normalised so this side always
+   ATTACKS right (dir==='left' flips), then x=0 — its own goal, the line every one of these
+   was aimed at — is drawn at the top. Each mark, in the mouth and on the grass, carries
+   data-p = the shooter, so the ranking beside it can isolate him across both. */
 function gkMapHTML(team){
   const d=PITCH_DIMS.football, W=d.h, H=d.w;          // vertical: 680 wide x 1050 tall
   const dir={1:attackDir(team,1),2:attackDir(team,2)};
-  const evs=rows.filter(r=>r.team===team&&GK_EV_COLOR[evKey(r.event)]&&r.pXY).map(r=>{
-    const flip=dir[eventHalf(r)]==='left';
-    const px=flip?100-r.pXY.x:r.pXY.x, py=flip?100-r.pXY.y:r.pXY.y;
-    return {vx:(100-py)/100*W, vy:px/100*H, c:GK_EV_COLOR[evKey(r.event)],
-      no:String(r.playerFrom||'').trim()};
-  });
-  const dots=evs.map(e=>{
-    const cx=e.vx.toFixed(1), cy=e.vy.toFixed(1);
-    return `<g><circle cx="${cx}" cy="${cy}" r="16" fill="${e.c}" fill-opacity="0.92" stroke="#000000" stroke-width="2"/>`
-      +`<text x="${cx}" y="${(+cy+6).toFixed(1)}" text-anchor="middle" font-size="16" font-weight="800" fill="#06281a">${esc(e.no)}</text></g>`;
-  }).join('');
   const faced=gkFaced(team);
+  const pdots=faced.filter(f=>f.row.pXY).map(f=>{
+    const flip=dir[eventHalf(f.row)]==='left';
+    const px=flip?100-f.row.pXY.x:f.row.pXY.x, py=flip?100-f.row.pXY.y:f.row.pXY.y;
+    return {vx:(100-py)/100*W, vy:px/100*H, color:f.color, square:f.square,
+      no:String(f.row.playerFrom||'').trim()};
+  });
+  const dots=pdots.map(e=>{
+    const cx=e.vx.toFixed(1), cy=e.vy.toFixed(1), p=esc(e.no);
+    const shape=e.square
+      ? `<rect x="${(+cx-16).toFixed(1)}" y="${(+cy-16).toFixed(1)}" width="32" height="32" rx="4" fill="${e.color}" fill-opacity="0.92" stroke="#000000" stroke-width="2"/>`
+      : `<circle cx="${cx}" cy="${cy}" r="16" fill="${e.color}" fill-opacity="0.92" stroke="#000000" stroke-width="2"/>`;
+    return `<g class="gk-mark" data-p="${p}">${shape}`
+      +`<text x="${cx}" y="${(+cy+6).toFixed(1)}" text-anchor="middle" font-size="16" font-weight="800" fill="#06281a">${p}</text></g>`;
+  }).join('');
   const gm=faced.map(f=>({x:f.x,y:f.y,label:String(f.row.playerFrom||'').trim(),color:f.color,
     square:f.square,cls:'gk-mark',p:String(f.row.playerFrom||'').trim()}));
   const GW=W*0.54, GH=GW/3, GX=(W-GW)/2, PAD=22, CM=49, GOAL_GAP=1*CM;
   const goal=goalMouthG({x:GX,y:-GH-GOAL_GAP,w:GW,h:GH},gm,
     {ink:'#06281a',ring:'#000000',net:'#3b4f5c',frame:'#e6edf3',r:15,noLine:true});
-  // crop to the defending half, but never so far it hides a dot deep in midfield
-  const deepest=evs.reduce((m,e)=>Math.max(m,e.vy),0);
+  // crop to the defending half, but never so far it hides a dot struck from deep
+  const deepest=pdots.reduce((m,e)=>Math.max(m,e.vy),0);
   const bottom=Math.min(H,Math.max(H*0.5,deepest+70));
   const arrow=`<g opacity="0.45" stroke="#fff" fill="none" stroke-width="6">`
     +`<line x1="${W/2}" y1="${(bottom*0.30).toFixed(0)}" x2="${W/2}" y2="${(bottom*0.18).toFixed(0)}"/>`

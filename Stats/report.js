@@ -1729,34 +1729,31 @@ function gkRowsHTML(team){
     +`<th>Minutes Played</th><th>Save Rate (%)</th><th>Goal Kick Success Rate</th></tr></thead>`
     +`<tbody>${keepers.map(tr).join('')}</tbody></table>`;
 }
-/* The keeper's own located events, on a pitch stood on its end with HIS goal at the top.
-   Every other vertical map in this file attacks UP (see shotDotsV); this one is that same
-   view turned through 180°, because the question about a keeper is what happened in front
-   of his goal, not how far up the pitch he got. normXY has already put the team attacking
-   right, so x=0 is his own goal line and (100-y, x) stands it on end the right way round. */
-const GK_EV={'catch':{c:C.green,t:'Catch'},'parry':{c:'#2f81f7',t:'Parry'},
-  'save':{c:C.green,t:'Save'},'goal conceded':{c:C.red,t:'Goal conceded'},
-  'own goal':{c:C.red,t:'Own goal'}};
+/* The keeper's own event names — no longer drawn on the map, but still the fallback
+   gkPlayerPages() uses to find which shirt kept goal when no formation board named one.
+   Unchanged from when this list also coloured the pitch dots. */
+const GK_EV={'catch':1,'parry':1,'save':1,'goal conceded':1,'own goal':1};
+/* The shots this keeper faced, on a pitch stood on its end with HIS goal at the top,
+   plotted where each was STRUCK FROM — the opposition player's ground, not the keeper's.
+   Same rows as the goal mouth above (gkFaced), so a dot on the grass and its mark in the
+   mouth carry the same number: struck from here, ended up there. Every other vertical map
+   in this file attacks UP; this one is that view turned through 180°, because the question
+   about a keeper is what happened in front of his goal. normXY has put the team attacking
+   right, so x=0 is his own goal line — the line every one of these was aimed at — and
+   (100-y, x) stands the pitch on end facing it. Colour = outcome (saved / conceded), the
+   own goal a square, exactly as in the mouth. */
 function gkPitchDots(team){
   const N=normXY(team), d=PITCH_DIMS.football, W=d.h, H=d.w;
-  const faced=gkFaced(team);
-  // a save is given the number of the shot nearest it in time, so the mark in the goal and
-  // the mark on the grass are the same event. ±8s, because both rows are typed at the same
-  // moment of the video; foulMapsPage pairs a foul to its card the same way, on ±90s.
-  const near=t=>{let best=null,bd=8;
-    faced.forEach(f=>{const dd=Math.abs(f.t-t); if(dd<=bd){bd=dd;best=f.idx;}});
-    return best;};
-  return rows.filter(r=>r.team===team&&GK_EV[evKey(r.event)]&&r.pXY)
-    .sort((a,b)=>(a.t||0)-(b.t||0))
-    .map(r=>{
-      const p=N(r).a, k=GK_EV[evKey(r.event)];
+  return gkFaced(team).filter(f=>f.row.pXY)
+    .map(f=>{
+      const p=N(f.row).a;
       const vx=(100-p.y)/100*W, vy=p.x/100*H;
-      const n=r.t==null?null:near(r.t);
-      // one shape for both halves, like the shooting and defensive maps — the colour says
-      // what it was and the number ties it to the Event List, where the minute is printed
-      const shape=`<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="17" fill="${k.c}" stroke="#fff" stroke-width="3"/>`;
-      return `<g>${shape}`+(n==null?'':`<text x="${vx.toFixed(1)}" y="${(vy+6).toFixed(1)}" `
-        +`text-anchor="middle" font-size="17" font-weight="800" fill="${C.on(k.c)}">${n}</text>`)+`</g>`;
+      // one shape for both halves, like the shooting and defensive maps
+      const shape=f.square
+        ? `<rect x="${(vx-17).toFixed(1)}" y="${(vy-17).toFixed(1)}" width="34" height="34" rx="4" fill="${f.color}" stroke="#fff" stroke-width="3"/>`
+        : `<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="17" fill="${f.color}" stroke="#fff" stroke-width="3"/>`;
+      return `<g>${shape}<text x="${vx.toFixed(1)}" y="${(vy+6).toFixed(1)}" `
+        +`text-anchor="middle" font-size="17" font-weight="800" fill="${C.on(f.color)}">${f.idx}</text></g>`;
     }).join('');
 }
 // "Defending ↓" marker: the twin of vUpArrowSVG, pointing at the goal this page is about
@@ -1774,10 +1771,11 @@ function gkSavesPage(team){
   const names=squadNames(lineups,team==='home'?'away':'home');
   const ourNames=squadNames(lineups,team);
   const marks=faced.map(f=>({x:f.x,y:f.y,label:f.idx,color:f.color,square:f.square}));
+  /* The map — mouth and grass alike — is the opposition's on-target shots now, not the
+     keeper's own events, so the key reads by OUTCOME: a saved shot, a goal, an own goal. */
   const left=`<div class="rp-sgleft"><div class="rp-mtitle" style="color:${TI(team)}">Event Map</div>`
-    +`<div class="rp-mleg rp-sgleg"><span><i style="background:${C.green}"></i>Catch</span>`
-    +`<span><i style="background:#2f81f7"></i>Parry</span>`
-    +`<span><i style="background:${C.red}"></i>Goal conceded</span>`
+    +`<div class="rp-mleg rp-sgleg"><span><i style="background:${C.green}"></i>Saved</span>`
+    +`<span><i style="background:${C.red}"></i>Goal</span>`
     +`<span><i style="background:${C.red};border-radius:2px"></i>Own goal</span></div>`
     +`<div class="rp-goalmouth">${goalMouthSVG(marks,{net:'#c7d0dc',frame:'#8f99a6',ink:'#152233',ring:'#fff'})}</div>`
     +vPitchSVG(vDownArrowSVG()+gkPitchDots(team))+`</div>`;
