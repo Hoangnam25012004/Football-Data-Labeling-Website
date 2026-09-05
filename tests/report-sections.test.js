@@ -165,6 +165,46 @@ test('a per-side page names its side in the header, and a shared one does not', 
   notOk(/rp-hteam/.test(b.first('Fouls — Team Comparison')),'a comparison page names neither');
 });
 
+test('EVERY page about one side names it in that slot, and none of them in the title', () => {
+  const b=build();
+  /* The rule this locks: a team name belongs in the header's own slot, never folded into
+     the page title. "Shots & Goals — Saint Lucia" made two pages of one section read as two
+     sections, and left the slot beside it empty. */
+  b.titles.forEach((t,i)=>{
+    ['Curacao','Saint Lucia'].forEach(n=>notOk(t.includes(n),
+      'page '+(i+1)+' still has a team in its title: '+t));
+  });
+  // and the pages that ARE about one side carry it
+  ['Lineups &amp; Formation','Attacking — Shots &amp; Goals','Goalkeeper — Saves',
+   'Set Pieces — Goal Kicks','Distribution — Pass Heatmap (From → To)'].forEach(t=>{
+    const ps=b.of(t);
+    ok(ps.length>=2,t+': expected a page per side, got '+ps.length);
+    ok(/class="rp-hteam"[\s\S]*?Curacao/.test(ps[0]),t+': the first page does not name the home side');
+    ok(/class="rp-hteam"[\s\S]*?Saint Lucia/.test(ps[1]),t+': the second does not name the away side');
+  });
+});
+
+test('Shots & Goals is a part of Attacking, not a section beside it', () => {
+  const b=build();
+  const secs=[];
+  // the contents indexes on (section, part), and consecutive pages sharing both are one line
+  b.titles.forEach(t=>{const s=t.split(' — ')[0].replace(/&amp;/g,'&');
+    if(s!==secs[secs.length-1])secs.push(s);});
+  notOk(secs.includes('Shots & Goals'),'it is still its own section: '+secs.join(' / '));
+  const at=n=>b.titles.findIndex(t=>t.replace(/&amp;/g,'&')===n);
+  const cmp=at('Attacking — Team Comparison'), sg=at('Attacking — Shots & Goals'),
+        ps=at('Attacking — Player Stats');
+  ok(cmp>=0&&sg>cmp&&ps>sg,
+     'Team Comparison -> Shots & Goals -> Player Stats, got '+[cmp,sg,ps].join(','));
+});
+
+test('the keeper table drops the two percentages the fractions already say', () => {
+  const p=build().of('Goalkeeper — Player Stats')[0];
+  ['DLS %','AC %'].forEach(h=>notOk(p.includes('<th>'+h+'</th>'),h+' is still a column'));
+  ['DLS','Aer Ctrl'].forEach(h=>ok(p.includes('<th>'+h+'</th>'),h+' should have stayed'));
+  ok(/<td>\d+\/\d+<\/td>/.test(p),'and the fraction, which IS the rate, is printed');
+});
+
 /* ================= B. the page header ================= */
 test('every page carries the mark, the words Match Report, and its own title', () => {
   const {pages,titles}=build();
@@ -346,14 +386,14 @@ test('the abbreviations are labels only — every number still comes from PLAYER
 test('shooting, distribution and defensive maps draw one shape, not two', () => {
   const b=build();
   const pages=b.pages.filter((p,i)=>
-    /^(Shots & Goals|Distribution|Defensive)/.test(b.titles[i].replace(/&amp;/g,'&')));
+    /^(Attacking|Distribution|Defensive)/.test(b.titles[i].replace(/&amp;/g,'&')));
   ok(pages.length>=8,'there are a good few of them — got '+pages.length);
   pages.forEach((p,i)=>{
     notOk(/Circle = 1st half|Square = 2nd half/.test(p),
       'the half legend is still on '+b.titles[b.pages.indexOf(p)]);
   });
   // the shot map: circles only, no square markers. The title carries &amp; as written.
-  const shots=b.of('Shots &amp; Goals — Curacao')[0];
+  const shots=b.of('Attacking — Shots &amp; Goals')[0];
   ok(shots,'the home Shots & Goals page was built');
   ok(/<circle [^>]*r="18"/.test(shots),'the shot markers are drawn');
   notOk(/<rect [^>]*width="32"/.test(shots),'and none of them is a square');

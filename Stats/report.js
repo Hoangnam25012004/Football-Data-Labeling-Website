@@ -705,14 +705,14 @@ function fmCard(p,team){
 }
 function formationPages(team){
   const ps=teamPeriods(team), pages=[];
-  /* One title, carried by every page of the section: the team names itself, so
-     "(Home)" said nothing the name did not, and a reader who has turned a page
-     knows they have. */
-  const title=`Lineups &amp; Formation — ${esc(TN(team))}`;
-  if(!ps.length)return [secTitle(title)
+  /* One title, carried by every page of the section. The side is named in the header's
+     own team slot rather than folded into the title — the shape every other per-side page
+     uses — and again as the sub-heading over the cards, where the reader is looking. */
+  const title='Lineups &amp; Formation';
+  if(!ps.length)return [secTitle(title,team)
     +`<div class="rp-note" style="font-size:11px">No starting lineup set for this team (see Player lists).</div>`];
   for(let i=0;i<ps.length;i+=4){
-    let b=secTitle(title);
+    let b=secTitle(title,team);
     b+=`<div class="rp-sub" style="color:${TI(team)}">${esc(TN(team))}</div>`;
     b+=`<div class="rp-fgrid">${ps.slice(i,i+4).map(p=>fmCard(p,team)).join('')}</div>`;
     pages.push(b);
@@ -800,7 +800,10 @@ function shotsAndGoalsPages(team){
     +`<td>${s.bodyPart?esc(s.bodyPart):'<span style="color:#c9cfd9">–</span>'}</td></tr>`;
   const table=slice=>`<table class="rpt rpt-el"><thead><tr><th class="el-c">#</th><th class="el-c">Time</th>`
     +`<th>Player</th><th>Body Part</th></tr></thead><tbody>${slice.map(tr).join('')}</tbody></table>`;
-  const title=`Shots &amp; Goals — ${esc(TN(team))}`;
+  /* The side is named in the header's own team slot, not folded into the title — the
+     shape every other per-side page in the report uses. A title that carried the team
+     made two pages of one section read as two sections. */
+  const title='Attacking — Shots &amp; Goals';
   // where the on-target ones crossed the line. Numbered and coloured exactly like the map
   // and the Event List, so #7 in the goal is #7 on the pitch is #7 in the table.
   const gm=goalMarksV(team);
@@ -823,9 +826,9 @@ function shotsAndGoalsPages(team){
      and four columns 694px wide read as a different table from the four 384px ones
      the reader has just come off. Centred — there is no map beside it to sit against. */
   const cont=slice=>`<div class="rp-sgcont"><div class="rp-mtitle">Event List</div>${table(slice)}</div>`;
-  const pages=[secTitle(title)+`<div class="rp-sgwrap">${left}${right}</div>`];
+  const pages=[secTitle(title,team)+`<div class="rp-sgwrap">${left}${right}</div>`];
   for(let i=FIRST;i<list.length;i+=CONT)
-    pages.push(secTitle(title)+cont(list.slice(i,i+CONT)));
+    pages.push(secTitle(title,team)+cont(list.slice(i,i+CONT)));
   return pages;
 }
 
@@ -853,7 +856,9 @@ function playerStatPages(title,headers,rowFor){
   const h=teamTable('home',headers,rowFor), a=teamTable('away',headers,rowFor);
   if(h.rows+a.rows<=30)
     return [secTitle(title)+h.html+'<div style="height:16px"></div>'+a.html];
-  return [secTitle(title)+h.html, secTitle(title)+a.html];
+  // split, so each page is about one side and its header says which — the same slot every
+  // other per-side page in the report names its team in. Both on one page names neither.
+  return [secTitle(title,'home')+h.html, secTitle(title,'away')+a.html];
 }
 function cardCounts(team){
   const out={};
@@ -937,10 +942,11 @@ const RPT_GK_COLS=[
   ['Stand',   s=>s.saveStanding],     ['Collapse', s=>s.saveCollapse],
   ['Diving',  s=>s.saveDiving],       ['Kneel',    s=>s.saveKneeling],
   ['Overhd',  s=>s.saveOverhead],
+  /* "2/3" and nothing beside it. The percentage columns that used to follow each of these
+     said the same thing the fraction says, at three characters instead of two — the same
+     trade Tackle % lost on the Defensive table. */
   ['DLS',     s=>frac(s.defLineSupportsWon,s.defLineSupports)],
-  ['DLS %',   s=>pc0(s.defLineSupportsWon,s.defLineSupports)],
   ['Aer Ctrl',s=>frac(s.aerialControlsWon,s.aerialControls)],
-  ['AC %',    s=>pc0(s.aerialControlsWon,s.aerialControls)],
   ['Conceded',s=>s.goalsConceded]
 ];
 /* One page per side, always — which is what these three sections were asked for, and
@@ -1130,7 +1136,7 @@ function scatterPage(){
 /* pass heatmap matrix (From → To) — one page per team */
 function matrixPage(team){
   const {players,mtx}=passMatrix(rows,team);
-  let b=secTitle('Distribution — Pass Heatmap (From → To)')
+  let b=secTitle('Distribution — Pass Heatmap (From → To)',team)
     +`<div class="rp-sub" style="color:${TI(team)}">${esc(TN(team))}</div>`;
   if(!players.length)return b+`<div class="rp-note" style="font-size:11px">No completed passes for this team yet.</div>`;
   let max=0; players.forEach(f=>players.forEach(t=>{if(f!==t)max=Math.max(max,(mtx[f]&&mtx[f][t])||0);}));
@@ -2052,9 +2058,13 @@ function buildPages(host){
   const body=[
     ...P('Lineups & Formation',HOME,formationPages('home')),
     ...P('Lineups & Formation',AWAY,formationPages('away')),
-    ...P('Shots & Goals',HOME,shotsAndGoalsPages('home')),
-    ...P('Shots & Goals',AWAY,shotsAndGoalsPages('away')),
+    /* Shots & Goals is a part of Attacking, not a section beside it: it answers the same
+       question the comparison and the player table answer, at a third scale. Three parts,
+       in the order a reader wants them — both sides at once, then each side's shots, then
+       the men who took them. */
     ...P('Attacking','Team Comparison',attackingComparisonPage()),
+    ...P('Attacking','Shots & Goals',shotsAndGoalsPages('home')),
+    ...P('Attacking','Shots & Goals',shotsAndGoalsPages('away')),
     ...P('Attacking','Player Stats',attackingPlayerPages()),
     ...P('Distribution','Team Comparison',distributionPage()),
     ...P('Distribution','Pass Networks',netMapsPage()),

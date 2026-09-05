@@ -1564,3 +1564,50 @@ Goal Kicks, nơi mọi quả xuất phát cách nhau vài mét.
 
 **Sau lần sửa này:** 1520/1520 test (thêm 6). Đo lại cả 57 trang: **0 tràn dọc, 0 tràn
 ngang, 0 nhãn cột bẻ dòng, 0 trang còn chia ký hiệu theo hiệp.**
+
+---
+
+## 21. Sửa lần bốn — 2026-09-06
+
+### 21.1 Shots & Goals thành một phần của Attacking
+
+Nó trả lời **cùng câu hỏi** mà comparison và bảng cầu thủ trả lời, chỉ ở một thang khác —
+nên nó là một phần của Attacking, không phải một mục đứng cạnh. Thứ tự trong `buildPages`:
+
+```
+Attacking · Team Comparison
+          · Shots & Goals      ← 2 trang, một mỗi đội, gộp thành MỘT dòng mục lục
+          · Player Stats
+```
+
+Mục `Shots & Goals` biến mất khỏi mục lục cấp một; báo cáo còn **bảy** mục thay vì tám.
+
+### 21.2 Bỏ `DLS %` và `AC %` khỏi Goalkeeper — Player Stats
+
+Cùng lý do `Tackle %` bị bỏ ở §20.1: `2/3` **đã là** tỉ lệ, và cột phần trăm bên cạnh là
+đọc lại đúng một sự thật, tốn ba ký tự thay vì hai. Bảng thủ môn còn 11 cột.
+
+### 21.3 Tên đội ra khỏi title, vào ô của nó — trên **mọi** trang
+
+Đây là chỗ báo cáo đang không nhất quán, và câu hỏi được đặt ra vì lời yêu cầu ("nằm bên
+trái") mâu thuẫn với chính tấm ảnh được đưa làm mẫu (tên đội ở bên phải). **Người dùng
+chọn: giữ bên phải, như ảnh.**
+
+Bốn chỗ phải sửa:
+
+| Trang | Trước | Sau |
+|---|---|---|
+| Attacking — Shots & Goals | title `Shots & Goals — Saint Lucia`, ô đội **trống** | title sạch, tên đội ở ô của nó |
+| Lineups & Formation | title `Lineups & Formation — Haiti`, ô đội **trống** | như trên |
+| Distribution — Pass Heatmap | title sạch nhưng ô đội **cũng trống** | tên đội vào ô |
+| Attacking / Distribution / Defensive — Player Stats *(khi tách hai trang)* | ô đội trống | mỗi trang gọi tên đội của nó |
+
+> Một title mang tên đội làm **hai trang của một mục đọc ra như hai mục**, và bỏ trống
+> đúng cái ô sinh ra để trả lời câu đó. Bảng player stats gộp cả hai đội trên **một** trang
+> thì không gọi tên ai — đúng, vì trang đó không nói về một đội nào cả.
+
+Đo được sau khi sửa: **26 trang** mang chip tên đội, **tất cả** nằm bên phải title và sát
+lề phải của dải header. **Không một title nào còn chứa tên đội** — test quét cả 57 trang.
+
+**Sau lần sửa này:** 1523/1523 test (thêm 3). Cả 57 trang: **0 tràn dọc, 0 tràn ngang,
+0 nhãn cột bẻ dòng.**
