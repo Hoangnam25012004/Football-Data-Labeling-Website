@@ -171,17 +171,15 @@ function ensureCss(){
 .rp-mastd{color:${C.grey};font-weight:400;padding:0 2px}
 /* the fixture under the masthead — pulled up so the two read as one block, and
    absent altogether on a report whose payload never carried any of the five */
-.rp-fix{display:flex;flex-wrap:wrap;align-items:stretch;gap:9px;margin:-12px 0 22px}
-.rp-fixi{flex:1 1 126px;min-width:0;border:1px solid ${C.line};border-radius:9px;
-  background:${C.panel};padding:8px 12px;box-sizing:border-box}
-.rp-fixi span{display:block;font-size:7.5px;font-weight:700;letter-spacing:1.1px;
-  text-transform:uppercase;color:${C.mut};line-height:1.3}
-/* the value WRAPS rather than ellipsing. "FIFA World Cup qualification – CONCACAF Second
-   Round" is a real competition name and a fifth of 694px is not enough for it on one line;
-   cutting it off here would be the same complaint the player tables were fixed for. Page 1
-   has the room — this block sits above a timeline, not above a full-height table. */
-.rp-fixi b{display:block;font-size:10.5px;font-weight:800;color:${C.navy};line-height:1.35;
-  margin-top:2px;overflow-wrap:anywhere}
+/* the fixture, centred under the masthead. Every line WRAPS rather than ellipsing —
+   "FIFA World Cup qualification – CONCACAF Second Round" is a real competition name, and
+   cutting it here would be the same fault the player tables were fixed for. */
+.rp-fix{text-align:center;margin:-4px 0 24px}
+.rp-fixl{font-size:13px;font-weight:800;color:${C.navy};line-height:1.35;
+  max-width:560px;margin:0 auto}
+.rp-fixr{font-size:11.5px;font-weight:700;color:#3d4a5c;line-height:1.4;margin-top:3px}
+.rp-fixm{font-size:10px;font-weight:400;color:${C.mut};line-height:1.5}
+.rp-fixr+.rp-fixm,.rp-fixl+.rp-fixm{margin-top:7px}
 /* ---- contents ---------------------------------------------------------- */
 .rp-toch{font-size:26px;font-weight:800;color:${C.navy};letter-spacing:-0.3px;
   border-bottom:3px solid ${C.navy};padding-bottom:10px;margin:4px 0 20px}
@@ -534,13 +532,25 @@ function fixtureDate(v){
    not in the tagging app's local meta store either, so an analyst working a match
    that was never opened on the cloud sees no block — and that is honest, because
    that session genuinely does not know which league it was. */
+/* Set as a centred stack, not as five labelled boxes. Five boxes gave every part the same
+   weight and the same width, so a competition name three lines long sat in a cell the size
+   of "2026/27", and each one needed its own caption to be read at all. Stacked, the reading
+   order does the captioning: what the match was, then which round of it, then when and
+   where. Any part that is missing simply is not a line. */
 function fixtureBlock(){
-  const f=[['Date',fixtureDate(meta.date)],['League',meta.league],['Season',meta.season],
-           ['Round',meta.round],['Venue',meta.venue]]
-    .map(p=>[p[0],String(p[1]==null?'':p[1]).trim()]).filter(p=>p[1]);
-  if(!f.length)return '';
-  return `<div class="rp-fix">`+f.map(p=>
-    `<div class="rp-fixi"><span>${p[0]}</span><b>${esc(p[1])}</b></div>`).join('')+`</div>`;
+  const v=x=>String(x==null?'':x).trim();
+  const league=v(meta.league), season=v(meta.season), round=v(meta.round),
+        date=fixtureDate(meta.date), venue=v(meta.venue);
+  if(!(league||season||round||date||venue))return '';
+  // the round is the line under the competition, the way the reference report sets it;
+  // the season joins it there rather than taking a line of its own
+  const mid=[round,season].filter(Boolean).join(' · ');
+  return `<div class="rp-fix">`
+    +(league?`<div class="rp-fixl">${esc(league)}</div>`:'')
+    +(mid?`<div class="rp-fixr">${esc(mid)}</div>`:'')
+    +(date?`<div class="rp-fixm">${esc(date)}</div>`:'')
+    +(venue?`<div class="rp-fixm">${esc(venue)}</div>`:'')
+    +`</div>`;
 }
 /* "#9 Bacuna" — the shirt number always, plus the registered name when Player lists has
    one for it. playerLabel() would fall back to "Player 9", which only repeats the number,
@@ -762,9 +772,11 @@ function shotDotsV(team){
       const p=N(r).a;
       // horizontal (attacking right) -> vertical (attacking up): left = y, top = 100 - x
       const vx=p.y/100*W, vy=(100-p.x)/100*H, col=SHOT_MAP_COLORS[r.event]||'#a9b3c0';
-      const shape=eventHalf(r)===1
-        ?`<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="18" fill="${col}" stroke="#fff" stroke-width="3"/>`
-        :`<rect x="${(vx-16).toFixed(1)}" y="${(vy-16).toFixed(1)}" width="32" height="32" rx="5" fill="${col}" stroke="#fff" stroke-width="3"/>`;
+      /* One shape for both halves. The circle/square split had the marker carrying two
+         readings at once — what happened, and when — and the colour already answers the
+         first. Which half a shot was in is on its row of the Event List beside the map,
+         where a minute can be read rather than inferred from a corner radius. */
+      const shape=`<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="18" fill="${col}" stroke="#fff" stroke-width="3"/>`;
       return `<g>${shape}<text x="${vx.toFixed(1)}" y="${(vy+6.5).toFixed(1)}" text-anchor="middle" `
         +`font-size="18" font-weight="800" fill="${C.on(col)}">${i+1}</text></g>`;
     }).join('');
@@ -775,8 +787,9 @@ function shotDotsV(team){
 function goalMarksV(team){
   return rows.filter(r=>r.team===team&&SHOT_KINDS.has(r.event)&&r.t!=null)
     .sort((a,b)=>a.t-b.t)
+    // no `square`: the goal mouth marks one shot one way, like the pitch map beside it
     .map((r,i)=>r.gXY?{x:r.gXY.x,y:r.gXY.y,label:i+1,
-      color:SHOT_MAP_COLORS[r.event]||'#a9b3c0',square:eventHalf(r)===2}:null)
+      color:SHOT_MAP_COLORS[r.event]||'#a9b3c0'}:null)
     .filter(Boolean);
 }
 function shotsAndGoalsPages(team){
@@ -796,9 +809,7 @@ function shotsAndGoalsPages(team){
     +vPitchSVG(vUpArrowSVG()+shotDotsV(team))
     +`<div class="rp-mleg rp-sgleg"><span><i style="background:${C.gold}"></i>Goal</span>`
     +`<span><i style="background:${C.green}"></i>On target</span>`
-    +`<span><i style="background:#a9b3c0"></i>Off / blocked / missed</span>`
-    +`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
-    +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span></div></div>`;
+    +`<span><i style="background:#a9b3c0"></i>Off / blocked / missed</span></div></div>`;
   // 26 rows exactly fill the column beside the map/summary (measured against the 1123px
   // page); 25 leaves a row of headroom for a long team name wrapping in the donut card.
   // A continuation page is title + table only, so it takes 33 of the ~28px rows.
@@ -854,27 +865,33 @@ function cardCounts(team){
   });
   return out;
 }
+/* Shooting only. Offsides, Freekicks and Corners used to sit on the end of this table and
+   have moved out rather than been dropped: Offsides is on Fouls — Player Stats, Freekicks
+   and Corners on Set Pieces — Player Stats, each beside the columns that explain them. A
+   figure printed in the one place it belongs is a figure two pages cannot disagree about. */
 const attackingPlayerPages=()=>playerStatPages('Attacking — Player Stats',
-  ['Goals','Assists','Shots','On Target','Off Target','Blocked','Missed','Shoot Acc','Offsides','Freekicks','Corners'],
+  ['Goals','Assists','Shots','On Target','Off Target','Blocked','Missed','Shoot Acc'],
   s=>[dotv(s.goals),dotv(s.assists),dotv(s.totalShots),dotv(s.shotsOn),dotv(s.shotsOff),dotv(s.shotsBlocked),
-      dotv(s.missShots),pc0(s.shotsOn,s.totalShots),dotv(s.offsides),dotv(s.freeKicks),dotv(s.corners)]);
+      dotv(s.missShots),pc0(s.shotsOn,s.totalShots)]);
 const distributionPlayerPages=()=>playerStatPages('Distribution — Player Stats',
   ['Passes','Pass Acc','Crosses','Cross Acc','Take-Ons','Step-ins'],
   s=>[frac(s.passesComp,s.passes),pc0(s.passesComp,s.passes),frac(s.crossesComp,s.crosses),
       pc0(s.crossesComp,s.crosses),frac(s.takeOnsWon,s.takeOns),dotv(s.stepIns)]);
-// cards are reported on the Goalkeeper & Discipline page, not here
+/* Cards, fouls given and fouls won all live on Fouls — Player Stats now, which splits the
+   fouls into the three kinds this table could only ever total. Nothing is lost by their
+   going: Total Fouls there IS the Fouls column that used to be here. */
 function defensivePlayerPages(){
   return playerStatPages('Defensive — Player Stats',
     /* "Physical" and "Loose" where one "Ground" column used to be — the two kinds a duel
        on the floor is now tagged as, matching the Stats tab and the team comparison.
        A plain frac(), like Aerial beside it: a match tagged before the split reads 0/0,
        the same 0 the tables print for it. */
-    ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Physical','Loose','Fouls','F.Won','T-on Con','Mistakes'],
+    ['Tackles','Tackle %','Intercept','Clear','Blocks','Recover','Aerial','Physical','Loose','T-on Con','Mistakes'],
     s=>[frac(s.tacklesWon,s.tackles),pc0(s.tacklesWon,s.tackles),dotv(s.interceptions),dotv(s.clearances),
       dotv(s.blocks),dotv(s.recoveries),frac(s.aerialDuelsWon,s.aerialDuels),
       frac(s.physicalDuelsWon,s.physicalDuels),
       frac(s.looseBallDuelsWon,s.looseBallDuels),
-      dotv(s.fouls),dotv(s.foulsWon),dotv(s.takeOnConcerns),dotv(s.mistakes)]);
+      dotv(s.takeOnConcerns),dotv(s.mistakes)]);
 }
 
 /* ---- the three sections whose tables are one page PER SIDE ----
@@ -1288,16 +1305,16 @@ function actionMapsPage(cat,title,ranks){
      defensive shape can be compared directly rather than through a mirror. It is the
      orientation the Shots & Goals maps already use, so the rule across the report is
      simply that a pitch drawn at half-width is drawn end-on.
-     Marker shape = half (circle 1st, square 2nd), colour = the event's part;
-     a side with no data keeps the empty pitch. */
+     One marker shape for both halves, colour = the event's part; a side with no data
+     keeps the empty pitch. */
   const card=(team,list)=>{
     const N=normXY(team), d=PITCH_DIMS.football, W=d.h, H=d.w;
     const dots=list.map(r=>{
       // normXY leaves both halves attacking RIGHT; end-on that is across = y, up = 100 - x
       const p=N(r).a, x=p.y/100*W, y=(100-p.x)/100*H, c=col[evKey(r.event)];
-      const shape=eventHalf(r)===1
-        ?`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16" fill="${c}" fill-opacity="0.94" stroke="#fff" stroke-width="2.5"/>`
-        :`<rect x="${(x-14.5).toFixed(1)}" y="${(y-14.5).toFixed(1)}" width="29" height="29" rx="5" fill="${c}" fill-opacity="0.94" stroke="#fff" stroke-width="2.5"/>`;
+      // one shape for both halves — see shotDotsV. Colour says which action it was; the
+      // shirt number inside says who, and those are the two questions this map is asked.
+      const shape=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16" fill="${c}" fill-opacity="0.94" stroke="#fff" stroke-width="2.5"/>`;
       return `<g>${shape}<text x="${x.toFixed(1)}" y="${(y+5.5).toFixed(1)}" text-anchor="middle" font-size="16" font-weight="800" fill="${C.on(c)}">${esc(String(r.playerFrom||'').trim())}</text></g>`;
     }).join('');
     const map=`<div class="rp-vmap${rk.length>1?' rp-vmap-sm':''}">${vPitchSVG(dots)}</div>`;
@@ -1305,9 +1322,7 @@ function actionMapsPage(cat,title,ranks){
       +`${esc(TN(team))}<span class="rp-mdir">▲ attacking</span></div>`
       +map+rk.map(one=>rankTable(team,one,rk.length===1)).join('')+'</div>';
   };
-  const legend=cat.parts.map(([,lbl,c])=>`<span><i style="background:${c}"></i>${lbl}</span>`).join('')
-    +`<span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
-    +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span>`;
+  const legend=cat.parts.map(([,lbl,c])=>`<span><i style="background:${c}"></i>${lbl}</span>`).join('');
   return secTitle(title)
     +`<div class="rp-mleg" style="margin:0 0 10px">${legend}</div>`
     +`<div style="display:flex;gap:18px;align-items:flex-start">${card('home',hA)}${card('away',aA)}</div>`;
@@ -1575,21 +1590,24 @@ const SP_OUT={'pass success':{kind:'pass',ok:true},   'pass fail':{kind:'pass',o
    where that field means what it looks like it means. */
 function spSegments(team,kind){
   const N=normXY(team), out=[];
+  /* A chain that produced nothing tagged draws NOTHING. It used to leave a grey dot for
+     "taken, outcome unknown", which put a third reading on a map that answers one question —
+     did it come off — and, for a corner or a goal kick, marked a spot that is the definition
+     of the set piece rather than a fact about the match. Nothing is lost by dropping it:
+     spChains().taken still counts every one of them, tagged or not, and the player tables
+     print that count. */
   spChains(team,kind).chains.forEach(c=>{
     const sn=N(c.sp);
-    let any=false;
     c.out.forEach(r=>{
       const o=SP_OUT[evKey(r.event)]; if(!o)return;
       const rn=N(r), a=rn.a||sn.a; if(!a)return;
-      any=true;
       out.push({a:a, b:rn.b||null, kind:o.kind, ok:o.ok, to:String(r.playerTo||'').trim()});
     });
-    if(!any&&sn.a)out.push({a:sn.a, b:sn.b||null, kind:'played', ok:null, to:''});
   });
   return out;
 }
-// green succeeded / red failed, exactly as the cross map reads; grey = nobody said
-const spCol=s=>s.ok==null?C.grey:(s.ok?'#39d98a':'#f7506b');
+// green succeeded / red failed, exactly as the cross map reads
+const spCol=s=>s.ok?'#39d98a':'#f7506b';
 
 /* ================= goalkeeper ================= */
 /* save-rate ring (grey track + coloured arc, % in the middle). Unchanged from the page
@@ -1720,9 +1738,9 @@ function gkPitchDots(team){
       const p=N(r).a, k=GK_EV[evKey(r.event)];
       const vx=(100-p.y)/100*W, vy=p.x/100*H;
       const n=r.t==null?null:near(r.t);
-      const shape=eventHalf(r)===1
-        ?`<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="17" fill="${k.c}" stroke="#fff" stroke-width="3"/>`
-        :`<rect x="${(vx-15).toFixed(1)}" y="${(vy-15).toFixed(1)}" width="30" height="30" rx="5" fill="${k.c}" stroke="#fff" stroke-width="3"/>`;
+      // one shape for both halves, like the shooting and defensive maps — the colour says
+      // what it was and the number ties it to the Event List, where the minute is printed
+      const shape=`<circle cx="${vx.toFixed(1)}" cy="${vy.toFixed(1)}" r="17" fill="${k.c}" stroke="#fff" stroke-width="3"/>`;
       return `<g>${shape}`+(n==null?'':`<text x="${vx.toFixed(1)}" y="${(vy+6).toFixed(1)}" `
         +`text-anchor="middle" font-size="17" font-weight="800" fill="${C.on(k.c)}">${n}</text>`)+`</g>`;
     }).join('');
@@ -1748,12 +1766,7 @@ function gkSavesPage(team){
     +`<span><i style="background:${C.red}"></i>Goal conceded</span>`
     +`<span><i style="background:${C.red};border-radius:2px"></i>Own goal</span></div>`
     +`<div class="rp-goalmouth">${goalMouthSVG(marks,{net:'#c7d0dc',frame:'#8f99a6',ink:'#152233',ring:'#fff'})}</div>`
-    +vPitchSVG(vDownArrowSVG()+gkPitchDots(team))
-    +`<div class="rp-mleg rp-sgleg"><span><i style="background:#fff;border:1.5px solid #98a0aa"></i>Circle = 1st half</span>`
-    +`<span><i style="background:#fff;border:1.5px solid #98a0aa;border-radius:2px"></i>Square = 2nd half</span></div>`
-    +`<div class="rp-note" style="font-size:8px;line-height:1.4">The goal shows where the ball `
-    +`crossed the line, which only the shooter's row records — so it is read from the other `
-    +`side's shots. A number on the grass is the shot it belongs to.</div></div>`;
+    +vPitchSVG(vDownArrowSVG()+gkPitchDots(team))+`</div>`;
   const own=faced.filter(f=>f.own).length;
   const dtl=[['Total',faced.length,null],['Catches',s.catches,C.green],['Parries',s.parries,'#2f81f7'],
     ['Goals Conceded',conceded,C.red],['Own Goals',own,C.red]];
@@ -1772,9 +1785,12 @@ function gkSavesPage(team){
   const FIRST=18, CONT=33;
   const right=`<div class="rp-sgright"><div class="rp-mtitle">Details</div>`
     +`<div class="rp-gkbody2"><div class="rp-gkring">${gkArcSVG(rate,TC(team))}<div>Save rate</div></div>`
-    +`<div style="flex:1;min-width:0">${dtlHTML}`
-    +`<div class="rp-note" style="font-size:8px;margin-top:6px">Saves counts catch, parry and the `
-    +`retired <b>save</b> event; the player table counts catch and parry only.</div></div></div>`
+    /* Saves here is the broad reading (s.saves, which also carries the retired `save`
+       event) while Goalkeeper — Player Stats prints the narrow catches+parries that
+       PLAYER_CATS defines. The footnote that used to say so on the page is gone — this is
+       a document a club reads, not a tagging manual — so the difference is recorded here
+       and in docs/match-report-sections-design.md §6.2 instead. */
+    +`<div style="flex:1;min-width:0">${dtlHTML}</div></div>`
     +`<div class="rp-mtitle" style="margin-top:13px">Event List</div>`
     +(faced.length?table(faced.slice(0,FIRST))
       :`<div class="rp-note">No shots on target faced.</div>`)
@@ -1871,12 +1887,8 @@ function goalKickPage(team){
     +vUpArrowSVG()+arrows+`</svg></div>`;
   const left=`<div class="rp-sgleft"><div class="rp-mtitle" style="color:${TI(team)}">Event Map</div>`
     +`<div class="rp-mleg rp-sgleg"><span><i style="background:#39d98a"></i>Succeeded</span>`
-    +`<span><i style="background:#f7506b"></i>Fail</span>`
-    +`<span><i style="background:${C.grey}"></i>No outcome tagged</span></div>${map}</div>`;
+    +`<span><i style="background:#f7506b"></i>Fail</span></div>${map}</div>`;
   const right=`<div class="rp-sgright"><div class="rp-mtitle">Details</div>${dist}`
-    +`<div class="rp-note" style="font-size:8px;margin-top:6px">Total counts the goal kicks whose `
-    +`entry also said what happened to the ball — ${taken} taken, ${tot[1]} with a tagged outcome. `
-    +`The player table counts all ${taken}.</div>`
     +`<div class="rp-mtitle" style="margin-top:13px">Player Receiving Passes</div>${recHTML}</div>`;
   return secTitle('Set Pieces — Goal Kicks',team)+gkRowsHTML(team)
     +`<div class="rp-sgwrap">${left}${right}</div>`;
@@ -1926,21 +1938,14 @@ function spArrowSVG(team,kind){
 }
 function spArrowPage(team,kind){
   const label=SP_KIND[kind]||kind;
-  const {taken}=spChains(team,kind), segs=spSegments(team,kind);
   return secTitle('Set Pieces — '+label,team)
-    +`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))} · ${label}`
-    +`<span class="rp-mdir">${taken} taken · ${segs.length} tagged outcome${segs.length===1?'':'s'}</span></div>`
+    +`<div class="rp-mapcard"><div class="rp-mtitle" style="color:${TI(team)}">${esc(TN(team))} · ${label}</div>`
     +`<div style="width:660px;margin:0 auto">${spArrowSVG(team,kind)}</div></div>`
     +`<div class="rp-mleg"><span><i style="background:#39d98a"></i>Succeeded</span>`
     +`<span><i style="background:#f7506b"></i>Failed</span>`
-    +`<span><i style="background:${C.grey}"></i>No outcome tagged</span>`
     +`<span><i style="background:#98a0aa"></i>Solid line = pass</span>`
     +`<span><i style="background:#98a0aa;border-radius:1px"></i>Dashed line = cross</span>`
-    +`<span><i style="background:#98a0aa;border-radius:50% 50% 2px 2px"></i>Triangle = shot</span></div>`
-    +`<div class="rp-note" style="font-size:9px">An arrow is drawn from the row that says what `
-    +`happened, not from the ${esc(label.toLowerCase())} itself: no set-piece event carries a `
-    +`receiving spot of its own unless it was the last thing typed in its entry. A ${esc(label.toLowerCase().replace(/s$/,''))} `
-    +`whose entry said nothing more is a dot.</div>`;
+    +`<span><i style="background:#98a0aa;border-radius:50% 50% 2px 2px"></i>Triangle = shot</span></div>`;
 }
 const setPieceComparisonPage=()=>{
   const r=sectionRows(4);

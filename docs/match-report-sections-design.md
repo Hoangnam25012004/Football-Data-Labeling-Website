@@ -1430,3 +1430,79 @@ mà `ensureCss()` sinh ra, rồi mở bằng trình duyệt và đo.
 > `document.getElementById('rpCss')` trả về node **trước khi** stylesheet được thêm,
 > `ensureCss()` `return` sớm, và **toàn bộ số đo vòng đầu là số của trang không CSS**.
 > Riêng id `rpCss` phải trả `null` cho tới khi style thật sự được append.
+
+---
+
+## 19. Sửa lần hai — 2026-09-05 (sau khi xem bản PDF thật)
+
+Năm điều chỉnh, sau khi người dùng đọc bản in ra. Không cái nào đổi con số nào; tất cả là
+**bớt đi**, và mỗi cái bớt đều là bớt một thứ đang nói hai chuyện cùng lúc.
+
+### 19.1 Fixture trên trang 1: năm cái thẻ → một khối căn giữa
+
+Năm thẻ có nhãn cho mọi phần **cùng một trọng lượng và cùng một chiều rộng**, nên một tên
+giải ba dòng ngồi trong ô to bằng ô chứa "2026/27", và mỗi phần phải có nhãn riêng mới đọc
+được. Xếp chồng căn giữa thì **thứ tự đọc chính là nhãn**:
+
+```
+FIFA World Cup qualification – CONCACAF Second Round   ← navy 13px, đậm
+Matchday 4 · 2026/27                                   ← 11.5px
+15 Aug 2026                                            ← xám 10px
+Stade Sylvio Cator, Port-au-Prince                     ← xám 10px
+```
+
+Phần nào rỗng thì **không thành một dòng**, không phải một ô trống. `.rp-fixi` biến mất
+khỏi CSS cùng với năm cái nhãn.
+
+### 19.2 Bỏ cột: Attacking mất 3, Defensive mất 2
+
+| Bảng | Bỏ | Cột đó **vẫn được in**, ở |
+|---|---|---|
+| Attacking — Player Stats | Offsides | `Fouls — Player Stats` |
+| | Freekicks, Corners | `Set Pieces — Player Stats` |
+| Defensive — Player Stats | Fouls, F.Won | `Fouls — Player Stats` (và Fouls tách ra ba loại, thứ cột cũ chỉ tổng được) |
+
+Không mất chỉ số nào — chỉ là mỗi con số nay in ở **một** chỗ, cạnh những cột giải thích
+nó, nên hai trang không thể nói khác nhau. Test khoá cả hai chiều: cột đã đi khỏi bảng cũ
+**và** có mặt ở bảng mới.
+
+### 19.3 Bỏ "No outcome tagged" — và bỏ luôn cái chấm xám
+
+Bỏ mỗi cái nhãn thì để lại một chấm xám không ai giải thích. Nên **chấm xám cũng đi**:
+`spSegments()` không còn nhánh dự phòng, `spCol` chỉ còn xanh/đỏ.
+
+Không mất gì. Với một quả phạt góc hay một quả phát bóng, chấm đó đánh dấu **định nghĩa
+của chính nó** (góc sân, vòng 5m50) chứ không phải một sự kiện của trận. Và số lượng vẫn
+chính xác tuyệt đối: `spChains().taken` đếm đủ, tagged hay không, và bảng player stats in
+đúng con số đó.
+
+### 19.4 Bỏ mọi chú thích giải thích cách tag
+
+Bốn khối `rp-note` đi hẳn: "Total counts the goal kicks whose entry…", "An arrow is drawn
+from the row that says what happened…", "The goal shows where the ball crossed the line…",
+"Saves counts catch, parry and the retired save event…". Cộng dòng
+`N taken · M tagged outcomes` trên tiêu đề map.
+
+**Đây là tài liệu một CLB đọc, không phải sổ tay tag.** Lý do kỹ thuật vẫn còn nguyên —
+trong comment của code và trong §2.4, §6.2, §7.2 của tài liệu này — chỗ người sửa code đọc,
+chứ không phải chỗ người đọc báo cáo đọc.
+
+### 19.5 Một hình cho cả hai hiệp
+
+Marker `circle = 1st half` / `square = 2nd half` mang **hai** thông tin cùng lúc — chuyện
+gì xảy ra, và lúc nào — trong khi **màu đã trả lời cái thứ nhất** và phút thì đã in trên
+dòng Event List ngay cạnh bản đồ. Gộp về một hình tròn, bỏ hai cái nhãn.
+
+Đã đổi ở: `shotDotsV` + `goalMarksV` (Shots & Goals), `actionMapsPage` (mọi map Defensive
+và Distribution — Take-ons & Step-ins), và `gkPitchDots` (Goalkeeper — Saves).
+
+> ⚠️ **Ba trang CÒN chia hình theo hiệp**, có chủ ý: `Fouls — Foul Maps`,
+> `Fouls — Fouls Won`, `Fouls — Offsides`. Người dùng nêu đích danh ba mục shooting /
+> distribution / defensive, và mục Fouls không nằm trong đó. Trang Foul Maps còn có vòng
+> thẻ vàng/đỏ quanh chấm, tức chú giải của nó vốn đã dày hơn. Muốn gộp nốt thì nói một
+> tiếng — `foulMapsPage` (`f.half===1`) và `eventMapsPage` (`eventHalf(r)===1`), mỗi chỗ
+> hai dòng.
+
+**Sau lần sửa này:** 1514/1514 test (thêm 4 test mới, và
+`tests/shooting-goal-map.test.js` đổi hai dòng vì hành vi nó khoá chính là hành vi vừa
+được yêu cầu đổi). Đo lại cả 57 trang: **0 tràn dọc, 0 tràn ngang, 0 nhãn cột bẻ dòng.**

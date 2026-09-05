@@ -262,21 +262,37 @@ test('the player table is keepers only, the way the Stats tab draws it', () => {
 });
 
 /* ================= E. set pieces ================= */
-test('a set piece typed on its own is taken, but has no outcome to report', () => {
+test('a set piece typed on its own draws nothing — it produced nothing that was tagged', () => {
   const b=build();
   const p=b.of('Set Pieces — Corners')[0];
-  // two corners in the fixture, one of them with no grp at all
-  ok(/2 taken/.test(text(p)),'both are counted as taken: '+text(p).slice(0,160));
-  ok(/1 tagged outcome/.test(text(p)),'only one of them said what happened');
+  /* Two corners in the fixture, one of them with no grp at all. The one with a chain is a
+     shot off target: one hollow triangle. The lone one leaves no mark — it used to leave a
+     grey "no outcome tagged" dot, which for a corner marked the corner flag, i.e. the
+     definition of the thing rather than a fact about the match. */
+  const tri=[...p.matchAll(/<polygon /g)].length;
+  const dot=[...p.matchAll(/<circle cx="[\d.]+" cy="[\d.]+" r="9"/g)].length;
+  eq(tri,1,'the chain-bearing corner is the one shot drawn');
+  eq(dot,0,'and nothing is drawn for the corner that said no more');
+  notOk(/No outcome tagged/.test(p),'the legend for it is gone too');
 });
 
 test('a chain a set piece did NOT open is not counted as one', () => {
   const b=build();
   // the free-kick chain is one cross; the corner chain is one shot. Neither may leak
   // into the other's page.
-  const fk=text(b.of('Set Pieces — Free-kicks')[0]);
-  ok(/1 taken/.test(fk),'one free-kick: '+fk.slice(0,140));
-  ok(/1 tagged outcome/.test(fk),'and it produced the one thing tagged with it');
+  const fk=b.of('Set Pieces — Free-kicks')[0];
+  eq([...fk.matchAll(/stroke-dasharray="9 8"/g)].length,1,'one cross, from the one free-kick');
+  eq([...fk.matchAll(/<polygon /g)].length,0,'and the corner-s shot did not leak in');
+});
+
+test('the set-piece pages carry no tagging arithmetic on their face', () => {
+  const b=build();
+  ['Set Pieces — Corners','Set Pieces — Free-kicks','Set Pieces — Goal Kicks'].forEach(t=>
+    b.of(t).forEach(p=>{
+      notOk(/taken/.test(text(p)),t+' still says "taken"');
+      notOk(/tagged outcome/.test(text(p)),t+' still says "tagged outcome"');
+      notOk(/An arrow is drawn/.test(text(p)),t+' still carries the arrow footnote');
+    }));
 });
 
 test('the goal-kick bands are the same three passTypeData uses', () => {
@@ -292,13 +308,7 @@ test('a goal kick that found nobody is a fail, and one that did is a receiver', 
   const p=b.of('Set Pieces — Goal Kicks')[0], t=text(p);
   ok(/Player Receiving Passes/.test(t),'the receiver table is drawn');
   ok(/6\. Name 5/.test(t),'the shirt the successful kick reached');
-  ok(/2 taken, 2 with a tagged outcome/.test(t),'both said what happened: '+t.slice(0,400));
-});
-
-test('Total on the distance table is said out loud, so it cannot be read as the raw count', () => {
-  const t=text(build().of('Set Pieces — Goal Kicks')[0]);
-  ok(/Total counts the goal kicks whose entry also said what happened/.test(t),
-     'the note explaining Total is missing');
+  ok(/Total 50% 1 2/.test(t),'one of the two kicks came off: '+t.slice(0,400));
 });
 
 /* ================= F. the tables fit ================= */
@@ -322,13 +332,69 @@ test('the abbreviations are labels only — every number still comes from PLAYER
   ok(/teamPlayerPages\('Fouls — Player Stats',PLAYER_CATS\.fouls\)/.test(REPORT));
 });
 
+/* ================= F2. one marker for both halves ================= */
+test('shooting, distribution and defensive maps draw one shape, not two', () => {
+  const b=build();
+  const pages=b.pages.filter((p,i)=>
+    /^(Shots & Goals|Distribution|Defensive)/.test(b.titles[i].replace(/&amp;/g,'&')));
+  ok(pages.length>=8,'there are a good few of them — got '+pages.length);
+  pages.forEach((p,i)=>{
+    notOk(/Circle = 1st half|Square = 2nd half/.test(p),
+      'the half legend is still on '+b.titles[b.pages.indexOf(p)]);
+  });
+  // the shot map: circles only, no square markers. The title carries &amp; as written.
+  const shots=b.of('Shots &amp; Goals — Curacao')[0];
+  ok(shots,'the home Shots & Goals page was built');
+  ok(/<circle [^>]*r="18"/.test(shots),'the shot markers are drawn');
+  notOk(/<rect [^>]*width="32"/.test(shots),'and none of them is a square');
+});
+
+test('the source no longer branches a marker on which half it was', () => {
+  ['shotDotsV','gkPitchDots'].forEach(n=>{
+    const i=REPORT.indexOf('function '+n+'(');
+    ok(i>0,n+' is still there');
+    const body=REPORT.slice(i,REPORT.indexOf('\nfunction ',i+1));
+    notOk(/eventHalf\(r\)===1\s*\n?\s*\?/.test(body),n+' still picks a shape by half');
+  });
+});
+
+/* ================= F3. the columns that moved out ================= */
+test('Attacking — Player Stats is shooting only', () => {
+  const b=build();
+  const p=b.of('Attacking — Player Stats')[0];
+  ['Goals','Assists','Shots','On Target','Shoot Acc'].forEach(h=>
+    ok(p.includes('<th>'+h+'</th>'),'missing column '+h));
+  ['Offsides','Freekicks','Corners'].forEach(h=>
+    notOk(p.includes('<th>'+h+'</th>'),h+' is still on the attacking table'));
+});
+
+test('Defensive — Player Stats leaves the fouls to the Fouls section', () => {
+  const b=build();
+  const p=b.of('Defensive — Player Stats')[0];
+  ['Tackles','Intercept','Aerial','Mistakes'].forEach(h=>
+    ok(p.includes('<th>'+h+'</th>'),'missing column '+h));
+  ['Fouls','F.Won'].forEach(h=>
+    notOk(p.includes('<th>'+h+'</th>'),h+' is still on the defensive table'));
+  // and they are still printed, on the page that now owns them
+  const f=b.of('Fouls — Player Stats')[0];
+  ok(f.includes('<th>Total Fouls</th>')&&f.includes('<th>Fouls Won</th>'),
+     'the Fouls table carries them');
+});
+
 /* ================= G. the fixture on the cover ================= */
 test('the cover prints what the channel knows about the fixture', () => {
   const b=build({meta:{date:'2026-08-15',league:'CONCACAF Nations League',
     season:'2026/27',round:'Matchday 4',venue:'Ergilio Hato'}});
   const t=text(b.pages[0]);
-  ['Date','15 Aug 2026','League','CONCACAF Nations League','Season','2026/27',
-   'Round','Matchday 4','Venue','Ergilio Hato'].forEach(s=>ok(t.includes(s),'cover is missing '+s));
+  ['CONCACAF Nations League','Matchday 4','2026/27','15 Aug 2026','Ergilio Hato']
+    .forEach(s=>ok(t.includes(s),'cover is missing '+s));
+  /* Set as a centred stack, not five captioned boxes: the reading order says which part is
+     which, so the captions are gone with the boxes. Checked on the markup rather than on
+     the text — "League" is a word inside a real competition name. */
+  const p=b.pages[0];
+  notOk(/class="rp-fixi"/.test(p),'the five boxes are still being drawn');
+  notOk(/>Date<|>League<|>Season<|>Round<|>Venue</.test(p),'a caption is still printed');
+  ok(/Matchday 4 · 2026\/27/.test(t),'the round and the season share a line');
 });
 
 test('a report that never carried them prints no block at all, not five empty boxes', () => {
@@ -336,11 +402,12 @@ test('a report that never carried them prints no block at all, not five empty bo
   notOk(/class="rp-fix"/.test(b.pages[0]),'an empty fixture block was drawn anyway');
 });
 
-test('a part nobody filled in is dropped, and the rest still prints', () => {
-  const b=build({meta:{venue:'Ergilio Hato'}});
-  const t=text(b.pages[0]);
-  ok(t.includes('Venue')&&t.includes('Ergilio Hato'),'the one that was filled in');
-  notOk(/Season|Round|League/.test(t.split('Match Timeline')[0]||''),'and only that one');
+test('a part nobody filled in is not a line, and the rest still prints', () => {
+  const b=build({meta:{venue:'Ergilio Hato',league:'CONCACAF Nations League'}});
+  const p=b.pages[0], t=text(p);
+  ok(t.includes('Ergilio Hato')&&t.includes('CONCACAF Nations League'),'the two that were filled in');
+  notOk(/rp-fixr/.test(p),'no round/season line, because neither was given');
+  eq([...p.matchAll(/class="rp-fixm"/g)].length,1,'and one grey line, not two');
 });
 
 test('the date is built from its parts, so two machines print the same string', () => {

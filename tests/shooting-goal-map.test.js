@@ -207,8 +207,12 @@ test('the report numbers a goal marker exactly as the pitch map numbers it', () 
   deepEq(m.map(x=>[x.x,x.y]),[[15,35],[80,60]]);
   eq(m[0].color,'#f4b942','a goal is gold');
   eq(m[1].color,'#38b76e','on target is green');
+  /* One shape for both halves since 2026-09-05. The marker used to be a circle in the
+     first half and a square in the second, which made it carry two readings at once —
+     what happened, and when — while the colour already answered the first. The minute is
+     printed on the shot's own row of the Event List beside the map. */
   notOk(m[0].square,'1st half is a circle');
-  ok(m[1].square,'2nd half is a square, same as the pitch map');
+  notOk(m[1].square,'…and so is the 2nd, same as the pitch map');
 });
 
 test('the report keeps the shot order it always used', () => {
