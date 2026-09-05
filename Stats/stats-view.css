@@ -147,6 +147,19 @@ table.stats .grp.g5{background:#331A1A;color:#F0CACA}
 .sr-rank tbody tr.dim td{opacity:0.45}
 .sr-no{color:var(--ink)}
 .sr-empty{color:var(--mut);text-align:center;padding:18px 12px}
+/* Goalkeeper dashboard — the Event List under the shooting grid. The ranking beside the
+   map reuses .sr-rank; only this full-width table needs its own rules. */
+.gkel-card{margin-top:2px}
+.gkel-wrap{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.gkel{width:100%;border-collapse:collapse;font-size:13px}
+.gkel th{position:sticky;top:0;z-index:1;background:var(--panel2);color:var(--mut);
+  font-weight:600;text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.gkel td{padding:8px 12px;border-bottom:1px solid var(--line)}
+.gkel .gkel-c{width:64px;text-align:center}
+.gkel td.gkel-c{color:var(--mut)}
+.gkel-idx{display:inline-block;min-width:18px;padding:1px 5px;border-radius:10px;
+  color:#06281a;font-weight:800;font-size:12px}
+.gkel-og,.gkel-dash{color:var(--mut)}
 /* Defensive map (Dashboard): the upright pitch beside its ranking. Capped by WIDTH
    rather than height — the pitch is portrait and carries a band row underneath, so a
    full-width map would run off the bottom before the ranking beside it ever ended. */

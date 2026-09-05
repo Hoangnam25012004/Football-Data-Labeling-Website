@@ -174,9 +174,16 @@ function dashboardHTML(team){
       :othCat==='foulsWon'?plainEventMapHTML(team,'foul won')
       :plainEventMapHTML(team,'offside');
     extra=`<div class="chart-row">${othMap}</div>`;
+  }else if(statCat==='goalkeeper'){
+    /* The PDF's "Goalkeeper — Saves" page, on the dashboard: Details donut, the goal-mouth
+       + defending-half Event Map, the opponent ranking (hover isolates a shooter), and the
+       Event List. Set Pieces still falls through to the notice below. */
+    extra=`<div class="chart-row sh-row"><div class="sh-grid">`
+      +`${gkDetailsHTML(team)}${gkMapHTML(team)}${gkOppRankHTML(team)}</div></div>`
+      +`<div class="chart-row">${gkEventListHTML(team)}</div>`;
   }else{
-    /* Goalkeeper and Set Pieces have no visualization yet — the located-event map they
-       were given first is being replaced by something designed for them.
+    /* Set Pieces has no visualization yet — the located-event map it was given first is
+       being replaced by something designed for it.
 
        A NOTICE rather than nothing. Dashboard and Stats share the category tabs, so a
        branch that returns '' is a tab that renders a blank page: no error, nothing in
@@ -473,6 +480,174 @@ function shotRankHTML(team){
     +`<thead><tr><th class="sr-r">Rank</th><th>Name</th><th class="sr-c">Count</th></tr></thead><tbody>`
     +(rankRows||`<tr><td colspan="3" class="sr-empty">No shot has been placed on the pitch yet.</td></tr>`)
     +`</tbody></table></div></div>`;
+}
+/* ---- Goalkeeper: the PDF's "Goalkeeper — Saves" page, brought onto the Dashboard ----
+   Same three answers the report gives: WHERE in the goal this side was beaten, WHAT the
+   keeper did in front of it, and the list of every on-target shot faced. Laid out on the
+   shooting grid — Details donut, then the goal-mouth + defending-half map, then the
+   opponent ranking that hovers to isolate a shooter (the way Shooting's does). There is
+   no symbol legend on this tab, by request.
+
+   gkFaced() is the ONE reader on this tab that filters r.team !== team: gXY is written on
+   three events only — shot on target, goal, own goal — and all three belong to whoever
+   struck the ball, so the shots THIS keeper faced are the opposition's, plus this side's
+   own goals. This mirrors gkFaced() in Stats/report.js and is not a bug. */
+function gkFaced(team){
+  const opp=team==='home'?'away':'home';
+  return rows.filter(r=>{
+      if(!r.gXY||r.t==null)return false;
+      const e=evKey(r.event);
+      if(r.team===opp)return e==='shot on target'||e==='goal';
+      return r.team===team&&e==='own goal';
+    })
+    .sort((a,b)=>a.t-b.t)
+    .map((r,i)=>{
+      const e=evKey(r.event), own=e==='own goal', conceded=own||e==='goal';
+      return {idx:i+1,t:r.t,row:r,own,conceded,
+        x:r.gXY.x,y:r.gXY.y,color:conceded?'#f7506b':'#39d98a',square:own};
+    });
+}
+/* Every goal this side let in, spot or no spot — the opposition's goals plus its own
+   players' own goals. Not read off gkFaced(): that one needs a gXY, and the Save Rate
+   should not depend on whether someone dropped the ball in the goal mouth. */
+function gkConcededRows(team){
+  const opp=team==='home'?'away':'home';
+  return rows.filter(r=>{
+    if(r.t==null)return false;
+    const e=evKey(r.event);
+    return (r.team===opp&&e==='goal')||(r.team===team&&e==='own goal');
+  });
+}
+/* Details — the Save Rate ring and the five-line breakdown, read the same way the PDF
+   reads them: Saves is the broad s.saves (it also carries the retired `save` name),
+   Conceded is off the goals actually let in, and Total is the on-target shots faced. */
+function gkDetailsHTML(team){
+  const s=sumTeam(rows,team), faced=gkFaced(team);
+  const conceded=gkConcededRows(team).length, own=faced.filter(f=>f.own).length;
+  const rate=(s.saves+conceded)?Math.round(s.saves/(s.saves+conceded)*100):null;
+  const col=team==='home'?'var(--home)':'var(--away)';
+  const cx=90,cy=90,rr=62,thick=26,a0=-Math.PI/2;
+  let ring=`<circle cx="${cx}" cy="${cy}" r="${rr}" fill="none" stroke="var(--line)" stroke-width="${thick}"/>`;
+  if(rate!=null&&rate>0)ring+=rate>=100
+    ? `<circle cx="${cx}" cy="${cy}" r="${rr}" fill="none" stroke="${col}" stroke-width="${thick}"/>`
+    : `<path d="${arcPath(cx,cy,rr,a0,a0+rate/100*2*Math.PI)}" fill="none" stroke="${col}" stroke-width="${thick}" stroke-linecap="round"/>`;
+  const svg=`<svg viewBox="0 0 180 180" width="170" height="170">${ring}`
+    +`<text x="${cx}" y="${cy-6}" text-anchor="middle" font-size="13" fill="var(--mut)">Save rate</text>`
+    +`<text x="${cx}" y="${cy+24}" text-anchor="middle" font-size="30" font-weight="800" fill="var(--ink)">${rate==null?'&ndash;':rate+'%'}</text></svg>`;
+  const row=(dot,lbl,val)=>`<div class="leg-row">`
+    +(dot?`<span class="leg-dot" style="background:${dot}"></span>`:'')
+    +`<span class="leg-lbl">${lbl}</span><span class="leg-val">${val}</span></div>`;
+  const legend=row('','Total',faced.length)
+    +row('#39d98a','Catches',s.catches)
+    +row('#2f81f7','Parries',s.parries)
+    +row('#f7506b','Goals Conceded',conceded)
+    +row('#f7506b','Own Goals',own);
+  return `<div class="chart-card donut-card"><div class="donut-wrap">`
+    +`<div class="donut-svg">${svg}</div><div class="donut-legend">${legend}</div></div></div>`;
+}
+/* Event Map — the goal mouth on the goal line at the top of an upright pitch, the keeper's
+   own located events on the grass below it. Both halves are normalised so this side always
+   ATTACKS right (dir==='left' flips), then x=0 — its own goal — is drawn at the top, the
+   report's "what happened in front of his goal" view rather than "how far up the pitch".
+   Each goal-mouth mark carries data-p = the shooter, so the ranking can isolate him. */
+const GK_EV_COLOR={'catch':'#39d98a','parry':'#2f81f7','save':'#39d98a',
+  'goal conceded':'#f7506b','own goal':'#f7506b'};
+function gkMapHTML(team){
+  const d=PITCH_DIMS.football, W=d.h, H=d.w;          // vertical: 680 wide x 1050 tall
+  const dir={1:attackDir(team,1),2:attackDir(team,2)};
+  const evs=rows.filter(r=>r.team===team&&GK_EV_COLOR[evKey(r.event)]&&r.pXY).map(r=>{
+    const flip=dir[eventHalf(r)]==='left';
+    const px=flip?100-r.pXY.x:r.pXY.x, py=flip?100-r.pXY.y:r.pXY.y;
+    return {vx:(100-py)/100*W, vy:px/100*H, c:GK_EV_COLOR[evKey(r.event)],
+      no:String(r.playerFrom||'').trim()};
+  });
+  const dots=evs.map(e=>{
+    const cx=e.vx.toFixed(1), cy=e.vy.toFixed(1);
+    return `<g><circle cx="${cx}" cy="${cy}" r="16" fill="${e.c}" fill-opacity="0.92" stroke="#000000" stroke-width="2"/>`
+      +`<text x="${cx}" y="${(+cy+6).toFixed(1)}" text-anchor="middle" font-size="16" font-weight="800" fill="#06281a">${esc(e.no)}</text></g>`;
+  }).join('');
+  const faced=gkFaced(team);
+  const gm=faced.map(f=>({x:f.x,y:f.y,label:String(f.row.playerFrom||'').trim(),color:f.color,
+    square:f.square,cls:'gk-mark',p:String(f.row.playerFrom||'').trim()}));
+  const GW=W*0.54, GH=GW/3, GX=(W-GW)/2, PAD=22, CM=49, GOAL_GAP=1*CM;
+  const goal=goalMouthG({x:GX,y:-GH-GOAL_GAP,w:GW,h:GH},gm,
+    {ink:'#06281a',ring:'#000000',net:'#3b4f5c',frame:'#e6edf3',r:15,noLine:true});
+  // crop to the defending half, but never so far it hides a dot deep in midfield
+  const deepest=evs.reduce((m,e)=>Math.max(m,e.vy),0);
+  const bottom=Math.min(H,Math.max(H*0.5,deepest+70));
+  const arrow=`<g opacity="0.45" stroke="#fff" fill="none" stroke-width="6">`
+    +`<line x1="${W/2}" y1="${(bottom*0.30).toFixed(0)}" x2="${W/2}" y2="${(bottom*0.18).toFixed(0)}"/>`
+    +`<polyline points="${W/2-15},${(bottom*0.21).toFixed(0)} ${W/2},${(bottom*0.18).toFixed(0)} ${W/2+15},${(bottom*0.21).toFixed(0)}"/></g>`
+    +`<text x="${W/2}" y="${(bottom*0.42).toFixed(0)}" text-anchor="middle" font-size="22" fill="#fff" opacity="0.55">Defending</text>`;
+  const top=-(GH+GOAL_GAP+PAD);
+  const pitch=`<svg viewBox="0 ${top.toFixed(1)} ${W} ${(bottom-top).toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">`
+    +`<rect x="0" y="0" width="${W}" height="${H}" fill="rgba(26,62,32,0.72)"/>`
+    +`<g transform="translate(0 ${H}) rotate(-90)"><g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(H,W,false)}</g></g>`
+    +goal+arrow+dots+`</svg>`;
+  const note=faced.length?'':`<div class="sm-sub">No shot on target faced has been placed in the goal yet.</div>`;
+  return `<div class="chart-card map-card">`
+    +`<div class="shotmap-pitch shotmap-v">${pitch}</div>${note}</div>`;
+}
+/* hover a row in the opponent ranking to isolate that shooter's marks in the goal above
+   the map. Nothing is re-rendered — every mark is drawn already, so this only flips
+   display, the way shotHover / defHover do. */
+function gkHover(p){
+  document.querySelectorAll('.gk-mark').forEach(g=>{g.style.display=(!p||g.dataset.p===p)?'':'none';});
+  document.querySelectorAll('.gkr-rank tbody tr').forEach(tr=>{
+    tr.classList.toggle('sel',!!p&&tr.dataset.p===p);
+    tr.classList.toggle('dim',!!p&&tr.dataset.p!==p);
+  });
+}
+/* Who beat this keeper's goal, or made him work — the opposition players behind the
+   on-target shots faced, most first. Own goals are this side's players, so they are left
+   off the ranking (they still show on the map and in the list). Ties share a rank and
+   the next one skips it, as in the shooting ranking. */
+function gkOppRankHTML(team){
+  const opp=team==='home'?'away':'home';
+  const faced=gkFaced(team).filter(f=>!f.own);
+  const cnt={}; faced.forEach(f=>{const no=String(f.row.playerFrom||'').trim(); if(no)cnt[no]=(cnt[no]||0)+1;});
+  const order=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]
+    ||((isNaN(+a)||isNaN(+b))?String(a).localeCompare(String(b)):+a-+b));
+  const names=squadNames(lineups,opp);
+  let prevC=null;
+  const rankRows=order.map((no,i)=>{
+    const c=cnt[no], rk=c===prevC?'':String(i+1); prevC=c;
+    return `<tr data-p="${esc(no)}" onmouseenter="gkHover('${jsArg(no)}')" onmouseleave="gkHover('')">`
+      +`<td class="sr-r">${rk}</td>`
+      +`<td><b class="sr-no">${esc(no)}.</b> ${esc(playerLabel(names,no))}</td>`
+      +`<td class="sr-c">${c}</td></tr>`;
+  }).join('');
+  return `<div class="chart-card sr-card"><div class="sr-title">Shots on target faced</div>`
+    +`<div class="sr-wrap"><table class="sr-rank gkr-rank">`
+    +`<thead><tr><th class="sr-r">Rank</th><th>Name</th><th class="sr-c">Count</th></tr></thead><tbody>`
+    +(rankRows||`<tr><td colspan="3" class="sr-empty">No shot on target faced has been placed in the goal yet.</td></tr>`)
+    +`</tbody></table></div></div>`;
+}
+/* Event List — one row per on-target shot faced, time-ordered, the same columns the PDF
+   prints: the running number (its colour = caught / conceded), the shooter's shirt, the
+   match minute, who took it, and the body part it was struck with. */
+function gkEventListHTML(team){
+  const faced=gkFaced(team);
+  if(!faced.length)
+    return `<div class="chart-card gkel-card"><div class="sr-title">Event List</div>`
+      +`<div class="stats-empty">No shot on target faced yet.</div></div>`;
+  const oppNames=squadNames(lineups,team==='home'?'away':'home');
+  const ourNames=squadNames(lineups,team);
+  const L=+dur.halfLen||45;
+  const minLbl=(sec,half)=>{const m=Math.floor(sec/60)+1, cap=(half||2)*L;
+    return m>cap?`${cap}+${m-cap}'`:`${m}'`;};
+  const body=faced.map(f=>{
+    const r=f.row, no=String(r.playerFrom||'').trim(), bp=shotBodyPart(rows,r);
+    return `<tr><td class="gkel-c"><span class="gkel-idx" style="background:${f.color}">${f.idx}</span></td>`
+      +`<td class="gkel-c">${esc(no)}</td>`
+      +`<td class="gkel-c">${esc(minLbl(matchTime(r.t),eventHalf(r)))}</td>`
+      +`<td>${esc(playerLabel(f.own?ourNames:oppNames,no))}${f.own?' <span class="gkel-og">(own goal)</span>':''}</td>`
+      +`<td>${bp?esc(bp):'<span class="gkel-dash">&ndash;</span>'}</td></tr>`;
+  }).join('');
+  return `<div class="chart-card gkel-card"><div class="sr-title">Event List</div>`
+    +`<div class="gkel-wrap"><table class="gkel">`
+    +`<thead><tr><th class="gkel-c">#</th><th class="gkel-c">Num</th><th class="gkel-c">Time</th>`
+    +`<th>Opponent</th><th>Body Part</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
 }
 /* ---- Distribution: ONE upright map for passes, crosses, take-ons and step-ins ----
    The dropdown picks which, the All / 1st / 2nd buttons pick the period, and the
@@ -2463,6 +2638,7 @@ window.setDistHalf=setDistHalf; window.setDistCat=setDistCat;
 window.setHeatHalf=setHeatHalf; window.setOthCat=setOthCat;
 window.defHover=defHover;       window.distHover=distHover;
 window.heatHover=heatHover;     window.shotHover=shotHover;
+window.gkHover=gkHover;
 
 /* ---- the twelve names Stats/report.js calls but does not define ----
    The report was written when this file WAS the Stats page's inline script and

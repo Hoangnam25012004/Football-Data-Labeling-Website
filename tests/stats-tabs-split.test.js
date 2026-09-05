@@ -70,19 +70,18 @@ test('the Dashboard can never render a blank page', () => {
      a button that renders nothing — no error, nothing in the console, and no way to tell
      it from a bug.
 
-     Goalkeeper and Set Pieces have no chart yet, on purpose: the map they were given
-     first is being replaced. What makes that safe is the chain ending in a bare `else`
-     rather than in two named cases — a category added later cannot fall through it
-     either. That terminal branch is what this checks; the notice's own wording is
-     checked below. */
+     Set Pieces has no chart yet, on purpose: the map it was given first is being
+     replaced. What makes that safe is the chain ending in a bare `else` rather than in a
+     named case — a category added later cannot fall through it either. That terminal
+     branch is what this checks; the notice's own wording is checked below. */
   const fn=grabFunction('dashboardHTML',STATS,'Stats/stats-view.js');
   ok(/\}else\{/.test(fn),'the if/else chain ends in a bare else, not in a named case');
   ok(/stats-empty/.test(fn),'and that else says so on screen');
-  // the four that do have one, named
-  ['shooting','distribution','defensive','fouls'].forEach(k=>
+  // the five that do have one, named
+  ['shooting','distribution','defensive','fouls','goalkeeper'].forEach(k=>
     ok(fn.includes("statCat==='"+k+"'"),k+' still draws its own chart'));
-  // …and the two that deliberately do not
-  ['goalkeeper','setPieces'].forEach(k=>
+  // …and the one that deliberately does not
+  ['setPieces'].forEach(k=>
     notOk(fn.includes("statCat==='"+k+"'"),k+' has no chart branch yet, by design'));
 });
 
