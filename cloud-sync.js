@@ -69,6 +69,19 @@ const CONFIG = {
     });
   }
 
+  /* A write onto the match row that does not land is something the person tagging has to
+     be told AT ONCE: from that moment the only copy that exists is in this one browser's
+     localStorage, and opening the match anywhere else shows nothing. console.warn() hid
+     exactly that for a week — `revoke update on public.matches` (migration 0023) refused
+     every lineups / config / name / video write and the app said nothing at all.
+     See docs/match-save-permission-design.md §4. */
+  function saveFailed(what, error) {
+    const msg = (error && error.message) || 'unknown error';
+    console.warn(what + ' save:', msg);
+    status('⚠ ' + what + ' not saved to the cloud: ' + msg, false);
+    if (PT().toast) PT().toast('⚠ ' + what + ' is saved on this computer only — ' + msg);
+  }
+
   /* ---------- connect + auth ---------- */
   async function connect(silent) {
     const c = cfg();
@@ -337,10 +350,17 @@ const CONFIG = {
     setTeamInputs(row.home_name, row.away_name);   // load this match's team names
     // link this session to the match (+ its teams) so Player-Lists loads the DB roster
     if (PT().setMatchTeams) PT().setMatchTeams(row.home_team_id || null, row.away_team_id || null, row.id, row.code || null);
-    if (row.config) PT().applyCloudDuration(row.config);   // load this match's duration mapping
-    // lineups belong to THIS match: load them, or start blank when the match has none yet
-    // (the match id travels along so the local copy is stamped for the right match)
-    if (row.lineups) PT().applyCloudLineups(row.lineups, row.id);
+    /* The clock and the squad belong to THIS match, and a row can hold an EMPTY one of
+       either as well as none at all: `config` is `not null default '{}'`, so it is never
+       null, and `lineups` ends up an empty object when a squad was entered while
+       matches.lineups could not be written. Empty and absent say the same thing here —
+       the cloud has nothing for this match — so both go to the reset path, which keeps
+       the copy stamped for this match in this browser when there is one and starts blank
+       when there is not. Handing an empty cloud copy to applyCloud*() instead was the
+       wipe: it overwrote a good local squad with nothing on the next reload. */
+    if (row.config && Object.keys(row.config).length) PT().applyCloudDuration(row.config, row.id);
+    else if (PT().resetDuration) PT().resetDuration(row.id);
+    if (row.lineups && !(PT().lineupsEmpty && PT().lineupsEmpty(row.lineups))) PT().applyCloudLineups(row.lineups, row.id);
     else if (PT().resetLineups) PT().resetLineups(row.id);
     // the video belongs to THIS match: load its shared URL, or — when switching to a match
     // that has none — unload whatever was playing, or the PREVIOUS match's video keeps
@@ -380,7 +400,11 @@ const CONFIG = {
         (p) => {                                          // live team-name + duration + video sync
           if (!p.new) return;
           setTeamInputs(p.new.home_name, p.new.away_name);
-          if (p.new.config) PT().applyCloudDuration(p.new.config);
+          /* Deliberately NOT the open-match rule above: there, an empty copy means the
+             cloud never got one. Here it is a live UPDATE on the match being watched, so
+             an empty clock or an empty squad is somebody clearing it right now, on another
+             machine — real news, and it has to arrive. */
+          if (p.new.config) PT().applyCloudDuration(p.new.config, matchId);
           if (p.new.lineups) PT().applyCloudLineups(p.new.lineups, matchId);
           // video changed on THIS match (a URL was set, swapped, or removed)
           if ((p.new.video_url || null) !== lastVideoUrl) {
@@ -398,7 +422,7 @@ const CONFIG = {
   async function setVideoUrl(url) {
     if (!connected || !matchId) return false;
     const { error } = await sb.from('matches').update({ video_url: url }).eq('id', matchId);
-    if (error) { console.warn('video_url save:', error.message); return false; }
+    if (error) { saveFailed('video', error); return false; }
     lastVideoUrl = url;
     return true;
   }
@@ -437,16 +461,25 @@ const CONFIG = {
   async function onTeamNamesChanged(home, away) {
     if (!connected || !matchId) return;
     const { error } = await sb.from('matches').update({ home_name: home, away_name: away }).eq('id', matchId);
-    if (error) console.warn('match name update:', error.message);
+    if (error) saveFailed('team names', error);
   }
   // called by the app when the Match Duration settings change -> save on the match (matches.config)
   let durTimer = null;
-  function onDurationChanged(d) {
+  /* `forMatchId` names the match this clock belongs to and MUST be the open one — the same
+     rule, and the same reason, as onLineupsChanged() below: the write is debounced, so
+     without it a clock typed for one match lands on whichever match is open 250ms later. */
+  function onDurationChanged(d, forMatchId) {
     if (!connected || !matchId) return;
+    if (String(forMatchId || '') !== String(matchId)) {
+      console.warn('duration save skipped: clock belongs to match', forMatchId || '(none)', 'not', matchId);
+      return;
+    }
+    const forId = matchId;
     clearTimeout(durTimer);
     durTimer = setTimeout(async () => {
-      const { error } = await sb.from('matches').update({ config: d }).eq('id', matchId);
-      if (error) console.warn('duration save:', error.message);
+      if (forId !== matchId) return;                 // another match was opened while we waited
+      const { error } = await sb.from('matches').update({ config: d }).eq('id', forId);
+      if (error) saveFailed('duration', error);
     }, 250);
   }
   // Called by the app when player lists / formation change -> save on the match
@@ -466,7 +499,7 @@ const CONFIG = {
     luTimer = setTimeout(async () => {
       if (forId !== matchId) return;                 // another match was opened while we waited
       const { error } = await sb.from('matches').update({ lineups: l }).eq('id', forId);
-      if (error) console.warn('lineups save:', error.message);
+      if (error) saveFailed('lineups', error);
     }, 300);
   }
 

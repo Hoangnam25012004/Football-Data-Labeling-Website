@@ -974,17 +974,74 @@ const lineupsEmpty=l=>!l||(teamLUEmpty(l.home)&&teamLUEmpty(l.away)&&!((l.histor
 /* Stamp FIRST, then the lineups: a tab woken by the lineups event then always reads the stamp
    that goes with the copy it is being handed. A write with no match open is refused while the
    store still holds a real squad — that copy is the only one there is until its match is
-   opened again. Returns false when the write was refused. */
+   opened again. Returns false when the write was refused — or when it threw: a store that
+   is full, or a browser that refuses one, has to read as "nothing was saved" rather than as
+   success. The stamp goes down first, on purpose, so a throw on the second call would leave
+   it naming this match over the PREVIOUS match's squad and lineupsAreFor() would say yes
+   about a copy that is not this one's — hence the stamp is put back before returning.
+   Kept identical to saveLineupsLS() in shared.js, which the sub-pages use. */
 function writeLineupsLS(l,matchId){
   const id=String(matchId||'');
   if(!id&&!lineupsEmpty(loadLineups()))return false;
-  try{localStorage.setItem(LU_MATCH_STORE,id);localStorage.setItem(LU_STORE,JSON.stringify(l));}catch(e){}
+  let prev=null;
+  try{prev=localStorage.getItem(LU_MATCH_STORE);}catch(e){return false;}
+  try{localStorage.setItem(LU_MATCH_STORE,id);localStorage.setItem(LU_STORE,JSON.stringify(l));}
+  catch(e){
+    try{if(prev==null)localStorage.removeItem(LU_MATCH_STORE);
+        else localStorage.setItem(LU_MATCH_STORE,prev);}catch(_){}
+    return false;
+  }
   return true;
 }
 // team ids (public.teams) + match id/code of the currently open match — restored via the meta store
 function loadTeamIds(){try{const m=JSON.parse(localStorage.getItem('pitchtagger.meta.v1'))||{};
   return {home:m.homeTeamId||null,away:m.awayTeamId||null,matchId:m.matchId||null,code:m.matchCode||null};}
   catch(e){return {home:null,away:null,matchId:null,code:null};}}
+/* ---- match duration mapping (original video time -> match timeline) ----
+   The clock belongs to ONE match, exactly as a lineup set does, and it is stamped for the
+   same reason: pitchtagger.duration.v1 is a single value shared by every match this browser
+   has ever opened, so without a stamp, opening match B after match A left A's kick-off
+   times in place and mapped every one of B's events onto A's clock — silently, and on the
+   Stats page and in the report too. Mirrored in shared.js for the sub-pages. */
+const DUR_STORE='pitchtagger.duration.v1';
+const DUR_MATCH_STORE='pitchtagger.duration.match.v1';
+const blankDur=()=>({enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0});
+function durStamp(){try{const s=localStorage.getItem(DUR_MATCH_STORE);return s==null?null:String(s);}catch(e){return null;}}
+const durationIsFor=id=>!!id&&durStamp()===String(id);
+/* NO one-off migration, unlike migrateLineupStamp(). A stored lineup set and the meta store
+   were only ever written together, so an unstamped one does belong to the match meta names.
+   The clock is not like that: it is written when Duration is filled in and then left alone
+   across every match opened afterwards, so an unstamped copy names no match at all — the
+   store found on this machine while match 37138 was open held match 32746's kick-off times.
+   Adopting it would write one match's clock onto another's row. So an unstamped clock is
+   nobody's, and it is retyped once. */
+function loadDuration(){
+  if(!durationIsFor(loadTeamIds().matchId))return blankDur();
+  try{const s=localStorage.getItem(DUR_STORE);if(s){const o=JSON.parse(s);if(o)return o;}}catch(e){}
+  return blankDur();
+}
+// Stamp FIRST, then the clock — the same order, and for the same reason, as writeLineupsLS().
+function saveDuration(matchId){
+  const id=String(matchId==null?(state.teamIds.matchId||''):(matchId||''));
+  try{localStorage.setItem(DUR_MATCH_STORE,id);localStorage.setItem(DUR_STORE,JSON.stringify(state.duration));}catch(e){}
+}
+/* The opened match has no clock of its own (config is `{}` — the column defaults to it, so
+   it is never null). Keep the copy stamped for THIS match when there is one and put it up
+   where the Stats page and the report can read it; otherwise start blank rather than letting
+   the previous match's clock stand. The mirror of resetLineups(), for the same store shape. */
+function resetDuration(matchId){
+  const id=matchId||state.teamIds.matchId||'';
+  if(durationIsFor(id)){
+    window.Cloud&&window.Cloud.onDurationChanged&&window.Cloud.onDurationChanged(state.duration,id);
+  }else{
+    state.duration=blankDur();
+    saveDuration(id);
+    if($('durModal'))fillDur();
+  }
+  renderTable();
+  if(video.src)$('tcode').textContent=state.duration.enabled?'⚽ '+fmtMatchClock(video.currentTime):fmt(video.currentTime);
+}
+
 const state = {
   sport:'football', team:'home', activeEvent:null,
   events:loadEvents(),
@@ -1013,14 +1070,6 @@ function undoLastDot(){
   if(pvRedraw)pvRedraw();
 }
 const newId=()=>(crypto&&crypto.randomUUID)?crypto.randomUUID():('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&0x3|0x8)).toString(16);}));
-
-/* ---- match duration mapping (original video time -> match timeline) ---- */
-const DUR_STORE='pitchtagger.duration.v1';
-function loadDuration(){
-  try{const s=localStorage.getItem(DUR_STORE);if(s){const o=JSON.parse(s);if(o)return o;}}catch(e){}
-  return {enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0};
-}
-function saveDuration(){try{localStorage.setItem(DUR_STORE,JSON.stringify(state.duration));}catch(e){}}
 
 /* ---- shared stores read by the standalone Stats/ and Player-Lists/ pages ---- */
 const ROWS_STORE='pitchtagger.rows.v1';   // tagged events (so the Stats page can read them)
@@ -4207,13 +4256,15 @@ function applyDur(){const d=state.duration;
   d.h2End=parseTime($('durH2End').value);
   d.enabled=$('durEnabled').checked;
   saveDuration(); renderTable();
-  window.Cloud&&window.Cloud.onDurationChanged&&window.Cloud.onDurationChanged(d); // save to the match (matches.config)
+  // the match this clock belongs to travels with it — see onDurationChanged()
+  window.Cloud&&window.Cloud.onDurationChanged&&window.Cloud.onDurationChanged(d,state.teamIds.matchId); // save to the match (matches.config)
 }
 // apply a duration/config pushed from the cloud (opening a match or another client)
-function applyCloudDuration(cfg){
+function applyCloudDuration(cfg,matchId){
   if(!cfg||!Object.keys(cfg).length)return;
-  state.duration=Object.assign({enabled:false,halfLen:45,h1Start:0,h1End:0,h2Start:0,h2End:0},cfg);
-  saveDuration();
+  state.duration=Object.assign(blankDur(),cfg);
+  // the match id travels with the clock so the local copy is stamped for the right match
+  saveDuration(matchId||state.teamIds.matchId);
   if($('durModal'))fillDur();
   renderTable();
   if(video.src)$('tcode').textContent=state.duration.enabled?'⚽ '+fmtMatchClock(video.currentTime):fmt(video.currentTime);
@@ -4686,8 +4737,8 @@ updateMatchGate();   // opening with no #match= link means the two match-bound t
    applyEventTypes is the INBOUND path (cloud -> here) and deliberately does not push, so a
    script adding events needs the outbound one. It is the same call the ＋ button makes:
    seedSiteKeys(), localStorage, then Cloud.onEventTypesChanged(). */
-window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, applyUserPrefs, localPrefs, renderEvents, renderMacros, updateBanner, updateStoreStatus, saveEvents, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
+window.PT={state, renderTable, eventHalf, fmt, applyEventTypes, applyUserPrefs, localPrefs, renderEvents, renderMacros, updateBanner, updateStoreStatus, saveEvents, loadVideoUrl, unloadVideo, toast, applyCloudDuration, applyCloudLineups, setMatchTeams, resetLineups, resetDuration, lineupsEmpty, openMatchModal, renderMatchPreview, rememberMatch, renderRecentMatches};
 </script>
-<script src="cloud-sync.js?v=51"></script>
+<script src="cloud-sync.js?v=52"></script>
 </body>
 </html>

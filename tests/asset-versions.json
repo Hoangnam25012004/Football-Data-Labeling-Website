@@ -8,8 +8,8 @@
     "sha256": "3ef8829ec33899e6"
   },
   "Stats/stats-view.js": {
-    "v": 28,
-    "sha256": "d043cd9bf025c2ab"
+    "v": 29,
+    "sha256": "c74dd0f1c680ae43"
   },
   "auth.js": {
     "v": 1,
@@ -24,8 +24,8 @@
     "sha256": "37fee08ede58b61d"
   },
   "client/assets/app.js": {
-    "v": 58,
-    "sha256": "993e15f7b83bfd8b"
+    "v": 59,
+    "sha256": "2af901a1e9e874c1"
   },
   "client/assets/film-tools.css": {
     "v": 4,
@@ -56,8 +56,8 @@
     "sha256": "778765d9d219a2eb"
   },
   "cloud-sync.js": {
-    "v": 51,
-    "sha256": "5567b83287f582fe"
+    "v": 52,
+    "sha256": "7faf055b92eea202"
   },
   "shared-page.css": {
     "v": 1,
@@ -68,7 +68,7 @@
     "sha256": "103be207c19f844c"
   },
   "shared.js": {
-    "v": 27,
-    "sha256": "31ae2c13031d8ef1"
+    "v": 28,
+    "sha256": "fd57e34bfacb73e6"
   }
 }

@@ -95,7 +95,7 @@
   </div>
 </div>
 
-<script src="../shared.js?v=27"></script>
+<script src="../shared.js?v=28"></script>
 <script>
 let meta=loadMeta();
 migrateLineupStamp(meta.matchId);                 // stores written before stamps existed
@@ -257,7 +257,14 @@ async function loadMatchLineups(){
     setSaveStatus('⚠ could not load this match’s squad: '+error.message,true);
     console.warn('lineups load:',error.message); return;
   }
-  const cloud=data&&data.lineups;
+  /* A match row can hold an EMPTY lineups object as well as none at all — that is what it
+     ends up with when a squad was entered while matches.lineups could not be written. Both
+     mean the same thing: the cloud has nothing for this match. Taking the empty one as the
+     published copy was a wipe — it overwrote the good copy stamped for this match in this
+     browser, here AND (through saveLineupsLS) on the tagging tab. Reading it as "nothing"
+     instead also arms the push below, which puts the local copy back where it belongs. */
+  const raw=data&&data.lineups;
+  const cloud=(raw&&!lineupsEmpty(raw))?raw:null;
   const hadLocal=lineupsAreFor(id)&&!lineupsEmpty(published);
   if(cloud&&cloud.home&&cloud.away){published=cloud;saveLineupsLS(published,id);}
   else if(!hadLocal)published=blankLineups();

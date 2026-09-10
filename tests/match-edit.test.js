@@ -361,3 +361,66 @@ test('no stat, no column set and no shared figure was touched', () => {
   ok(/location\.hash = '#\/match\/' \+ encodeURIComponent\(m\.slug \|\| m\.id\);/.test(matches),
      'and clicking a row still opens the analysis');
 });
+
+/* ================= 0025 — the tagging app can save a match again ================= */
+/* 0023 revoked UPDATE on public.matches from `authenticated` and granted five columns
+   back for the channel's Edit form; 0024 opened a sixth. The tagging app runs under that
+   SAME role, so from the day 0023 was applied every squad, clock, team-name and video-URL
+   write it made answered "permission denied for table matches" and nothing reached the
+   database — for a week, silently. 0025 is what gives those five columns back, and the
+   tests here are what keep it from quietly turning into "grant update on matches".
+   See docs/match-save-permission-design.md §2 and §6.1. */
+const MIG25=readSrc('supabase/migrations/0025_match_tagging_columns.sql');
+const SQL25=MIG25.replace(/--[^\n]*/g,'');
+
+test('0025 grants the five columns the tagging app writes, and no sixth', () => {
+  const grant=/grant update \(([^)]*)\)\s*\n?\s*on public\.matches to authenticated;/.exec(SQL25);
+  ok(grant,'a column grant, not a table-wide one');
+  notOk(/grant\s+update\s+on\s+public\.matches/.test(SQL25),
+     'never the blanket grant — that is the hole 0023 closed');
+  const cols=grant[1].split(',').map(s=>s.trim()).sort();
+  deepEq(cols,['away_name','config','home_name','lineups','video_url'],
+     'exactly the five cloud-sync.js and Player-Lists write after a match exists');
+  /* the score, the publish gate and which channel a match belongs to are decisions,
+     not tagging output — they must stay out of reach of a browser */
+  ['home_score','away_score','published','club_id','our_side','code','home_team_id',
+   'away_team_id','sport','created_by'].forEach(k=>
+    notOk(cols.indexOf(k)>=0,k+' must not become writable'));
+});
+
+test('0025 takes nothing away from the channel form', () => {
+  /* grant is cumulative, so 0025 only has to add. A `revoke` here would take 0023's and
+     0024's six columns down with it — exactly the trap 0024's own header warns about. */
+  notOk(/revoke/i.test(SQL25),'no revoke anywhere in it');
+  ['kickoff','match_date','league','season','round','venue'].forEach(k=>
+    ok(/\['kickoff', 'match_date', 'league', 'season', 'round', 'venue'\]\.forEach/.test(SUPA),
+       k+' is still the channel form\'s to write'));
+  notOk(/alter table/i.test(SQL25),'and it adds no column — every one of the five exists already');
+});
+
+test('0025 widens who may update by exactly one clause, and states both halves', () => {
+  const up=/create policy matches_update on public\.matches for update to authenticated[\s\S]*?;/.exec(SQL25);
+  ok(up,'the policy is rebuilt');
+  ok(/drop policy if exists matches_update on public\.matches;/.test(SQL25),
+     'dropped first, so the file can be run twice');
+  /* 0023's two clauses survive verbatim; created_by is the third and it is the whole
+     change. A tagging session is not staff and its fresh match has no club_id, so
+     without this the column grant above lands on ZERO rows — 204, no error, no data. */
+  ok(/public\.is_staff\(\)/.test(up[0]),'staff still may');
+  ok(/club_id is not null and public\.is_club_admin\(club_id\)/.test(up[0]),
+     'and a channel admin of the match\'s own club still may');
+  ok(/created_by = auth\.uid\(\)/.test(up[0]),'and now the account that created the match');
+  notOk(/using\s*\(\s*true\s*\)/.test(up[0]),'never using(true) — that was the hole');
+  // using says which rows may be changed; with check says what they may become. Without
+  // the second, the match's creator could move it into a channel they do not administer.
+  eq((up[0].match(/created_by = auth\.uid\(\)/g)||[]).length,2,
+     'named in both using and with check');
+});
+
+test('0025 leaves the other three policies on matches alone', () => {
+  ['matches_select','matches_insert','matches_delete'].forEach(p=>
+    notOk(new RegExp('policy '+p).test(SQL25),p+' is not this migration\'s business'));
+  ['public.events','public.match_reports','public.clubs'].forEach(t=>
+    notOk(new RegExp('grant[\s\S]{0,40}'+t.replace('.','\.')).test(SQL25),
+      t+' was never broken and is not touched'));
+});

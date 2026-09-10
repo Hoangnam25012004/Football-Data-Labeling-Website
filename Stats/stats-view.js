@@ -44,6 +44,10 @@ let root=null, opts={}, mounted=false;
    it unconditionally is what put a previous match's formation on this page when no match had
    been opened at all. Player-Lists has always checked; this page did not. */
 const ourLineups=()=>lineupsAreFor(loadMeta().matchId)?loadLineups():blankLineups();
+/* The stored clock is stamped for one match too, and for the same reason: reading it
+   flat put the LAST match's kick-off times on this page and mapped every event of the
+   open match onto them — every minute in every table, silently wrong. */
+const ourDur=()=>durationIsFor(loadMeta().matchId)?loadJSON(PT_KEYS.duration,blankDur()):blankDur();
 // no shotHalf any more: the shooting map shows both halves at once, normalised to attack up
 let rows=[], meta=blankMeta(), lineups=blankLineups(), statView='overall', statTeam='home', statCat='shooting', defHalf=0, defCat='tackles', othCat='fouls';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
@@ -2436,8 +2440,8 @@ function watchLocalStorage(){
     if(cloudMode)return;
     if(e.key===PT_KEYS.rows){rows=loadRows();renderStats();}
     // the match itself can change under us — the squad on screen has to change with it
-    else if(e.key===PT_KEYS.meta){meta=loadMeta();lineups=ourLineups();renderStats();}
-    else if(e.key===PT_KEYS.duration){dur=loadJSON(PT_KEYS.duration,dur);renderStats();}
+    else if(e.key===PT_KEYS.meta){meta=loadMeta();lineups=ourLineups();dur=ourDur();renderStats();}
+    else if(e.key===PT_KEYS.duration||e.key===PT_KEYS.durationMatch){dur=ourDur();renderStats();}
     // lineups feed the General formation AND the per-player tables / heatmap squad, so
     // a lineup edit in the main tab has to re-render whatever is on screen
     else if(e.key===PT_KEYS.lineups||e.key===PT_KEYS.lineupsMatch){lineups=ourLineups();renderStats();}
@@ -2569,7 +2573,7 @@ function loadLocal(){
   rows=loadRows();
   meta=loadMeta();
   lineups=ourLineups();
-  dur=loadJSON(PT_KEYS.duration,blankDur());
+  dur=ourDur();
   // the tagging tab holds its video in the page, never in a store — a shared URL
   // only reaches this page through the cloud (statsCloud) or a published report
   videoSrc=null;

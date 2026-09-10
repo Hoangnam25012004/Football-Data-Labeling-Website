@@ -15,6 +15,7 @@ const PT_KEYS = {
   lineups:'pitchtagger.lineups.v1',
   lineupsMatch:'pitchtagger.lineups.match.v1',
   duration:'pitchtagger.duration.v1',
+  durationMatch:'pitchtagger.duration.match.v1',
   rows:'pitchtagger.rows.v1',
   meta:'pitchtagger.meta.v1'
 };
@@ -38,13 +39,33 @@ const lineupsEmpty=l=>!l||(teamLUEmpty(l.home)&&teamLUEmpty(l.away)&&!((l.histor
 /* Stamp FIRST, then the lineups: a tab woken by the lineups event then always reads the
    stamp that goes with the copy it is being handed. A write with no match open is refused
    while the store still holds a real squad — that copy is the only one there is until its
-   match is opened again. */
+   match is opened again.
+   Returns false when NOTHING was stored, and that has to be the truth: the caller
+   (publishTeam) tells the user the squad has been sent on the strength of it. Writing the
+   stamp first means a throw on the second call would leave the stamp naming this match
+   while the store still holds the previous one's squad — lineupsAreFor() would then say
+   yes about a copy that is not this match's — so the stamp is put back before returning. */
 function saveLineupsLS(l,matchId){
   const id=String(matchId||'');
   if(!id&&!lineupsEmpty(loadLineups()))return false;
-  try{localStorage.setItem(PT_KEYS.lineupsMatch,id);localStorage.setItem(PT_KEYS.lineups,JSON.stringify(l));}catch(e){}
+  let prev=null;
+  try{prev=localStorage.getItem(PT_KEYS.lineupsMatch);}catch(e){return false;}
+  try{localStorage.setItem(PT_KEYS.lineupsMatch,id);localStorage.setItem(PT_KEYS.lineups,JSON.stringify(l));}
+  catch(e){
+    try{if(prev==null)localStorage.removeItem(PT_KEYS.lineupsMatch);
+        else localStorage.setItem(PT_KEYS.lineupsMatch,prev);}catch(_){}
+    return false;
+  }
   return true;
 }
+/* ---- which match the stored duration belongs to ----
+   Same rule as the lineups stamp above, and for the same reason: the clock that maps video
+   time onto match time belongs to ONE match, but pitchtagger.duration.v1 is a single value
+   shared by every match this browser has ever opened. Without a stamp, opening match B
+   after match A left A's kick-off times in place and silently mapped every one of B's
+   events onto A's clock. */
+const durStamp=()=>{try{const s=localStorage.getItem(PT_KEYS.durationMatch);return s==null?null:String(s);}catch(e){return null;}};
+const durationIsFor=id=>!!id&&durStamp()===String(id);
 // one-off: a store written before the stamp existed belongs to the match the meta store
 // still names — the two were only ever written together, for the match that was open.
 function migrateLineupStamp(matchId){
