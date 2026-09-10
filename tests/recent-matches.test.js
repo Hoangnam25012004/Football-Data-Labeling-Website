@@ -91,7 +91,9 @@ test('a corrupt store is treated as empty rather than thrown on', () => {
 
 /* ================= how it reaches the screen ================= */
 test('it is recorded at the one place every route into a match passes', () => {
-  const open=/async function openMatchRow\(row\) \{[\s\S]*?\n    if \(row\.config\)/.exec(CLOUD)[0];
+  // sliced down to where the match row's own fields start being applied; the condition on
+  // row.config grew a check for an EMPTY one, so the anchor stops before its closing paren
+  const open=/async function openMatchRow\(row\) \{[\s\S]*?\n    \/\* The clock and the squad/.exec(CLOUD)[0];
   ok(/PT\(\)\.rememberMatch\(row\)/.test(open),'openMatchRow records the visit');
   // a typed code, the preview card, a #match= link and a fresh match all funnel through it
   ok(/await openMatchRow\(data\)/.test(CLOUD),'…which openByInput calls');
