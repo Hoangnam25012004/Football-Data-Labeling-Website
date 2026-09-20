@@ -47,6 +47,9 @@ jobs:
           cp client/app.html    _site/app.html
           cp client/login.html  _site/login.html
           cp client/guide.html  _site/guide.html
+          # Google's brand verification reads this at https://hoangnams.com/privacy.html,
+          # so the address has to resolve on the authorized domain, not just in the repo.
+          cp client/privacy.html _site/privacy.html
           mkdir -p _site/assets
           cp client/assets/site.css _site/assets/site.css
           cp client/assets/app.css  _site/assets/app.css
