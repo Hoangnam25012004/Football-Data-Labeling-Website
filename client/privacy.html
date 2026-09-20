@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy — HoangNam Analytics</title>
+<meta name="description" content="What HoangNam Analytics collects, who processes it, and how to have it deleted.">
+<link rel="stylesheet" href="assets/site.css?v=3">
+<!-- Styling is inline and scoped to body.legal on purpose: a stylesheet of its own
+     would be a fourth file for every page's ?v= to keep in step, and a rule added to
+     app.css would make app.html and guide.html re-download a sheet for a page they
+     never open. Nothing here can reach another page. -->
+<style>
+  body.legal{background:var(--void); color:var(--chalk)}
+  body.legal .legal-wrap{max-width:760px; margin:0 auto; padding:0 var(--gut) 90px}
+  body.legal h1{
+    font-family:var(--f-display); font-weight:700; font-stretch:87.5%;
+    font-size:clamp(34px,6vw,50px); line-height:1.06; letter-spacing:.01em;
+    margin:0 0 10px; text-wrap:balance;
+  }
+  body.legal .updated{
+    font-family:var(--f-mono); font-size:11px; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--ash-dim); margin:0 0 30px;
+  }
+  body.legal .lede{font-size:17px; color:var(--ash); max-width:64ch; margin:0 0 8px}
+  body.legal h2{
+    font-family:var(--f-display); font-weight:700; font-stretch:87.5%;
+    font-size:24px; line-height:1.15; letter-spacing:.01em;
+    margin:44px 0 12px; padding-top:22px; border-top:1px solid var(--line-soft);
+    text-wrap:balance;
+  }
+  body.legal h3{font-size:15px; font-weight:600; margin:22px 0 6px; color:var(--chalk)}
+  body.legal p{margin:0 0 13px; max-width:66ch; color:var(--ash); font-size:15.5px; line-height:1.7}
+  body.legal ul{margin:0 0 13px; padding-left:20px; max-width:66ch}
+  body.legal li{margin:0 0 7px; color:var(--ash); font-size:15.5px; line-height:1.7}
+  body.legal strong{color:var(--chalk); font-weight:600}
+  body.legal a{color:var(--ash); text-decoration-thickness:1px; text-underline-offset:2px}
+  body.legal a:hover{color:var(--red)}
+  body.legal code{
+    font-family:var(--f-mono); font-size:12.5px; background:var(--carbon-2);
+    border:1px solid var(--line-soft); border-radius:3px; padding:1px 5px; color:var(--chalk);
+  }
+  body.legal .tbl{overflow-x:auto; margin:0 0 13px}
+  body.legal table{border-collapse:collapse; width:100%; min-width:520px; font-size:14px}
+  body.legal th,body.legal td{
+    text-align:left; padding:9px 12px; border-bottom:1px solid var(--line-soft);
+    vertical-align:top; color:var(--ash);
+  }
+  body.legal th{
+    font-family:var(--f-mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ash-dim); font-weight:400; border-bottom-color:var(--line);
+  }
+  body.legal td:first-child{color:var(--chalk); white-space:nowrap}
+  body.legal .never{
+    border-left:2px solid var(--red); padding:2px 0 2px 16px; margin:0 0 13px;
+  }
+  body.legal .legal-foot{
+    margin-top:56px; padding-top:20px; border-top:1px solid var(--line-soft);
+    display:flex; gap:16px; flex-wrap:wrap;
+    font-family:var(--f-mono); font-size:10.5px; letter-spacing:.06em; color:var(--ash-dim);
+  }
+  body.legal .legal-foot a{font-size:10.5px; letter-spacing:.06em}
+</style>
+</head>
+<body class="legal">
+
+<header class="app-top">
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg width="15" height="15" viewBox="0 0 48 48" fill="#fff"><path d="M13 39V11l22 28V11" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="39" r="5.4"/><circle cx="13" cy="11" r="5.4"/><circle cx="35" cy="39" r="5.4"/><circle cx="35" cy="11" r="5.4"/></svg>
+    </span>
+    <span class="brand-name">Hoang<em>Nam</em> Analytics</span>
+  </a>
+  <span class="divider" aria-hidden="true"></span>
+  <span class="chan"><span>Privacy</span></span>
+  <span class="app-user">
+    <a class="btn btn-ghost" href="index.html">Back to the site</a>
+  </span>
+</header>
+
+<main class="legal-wrap">
+
+  <h1>Privacy policy</h1>
+  <p class="updated">HoangNam Analytics · last updated 21 September 2026</p>
+
+  <p class="lede">This policy covers <strong>hoangnams.com</strong>, the club channel at
+  <code>/app.html</code>, and the tagging app at <code>/tagger/</code>. It is written to be read
+  rather than to be survived, so it says what is actually stored, in the order you are likely to
+  meet it.</p>
+
+  <p>HoangNam Analytics is a football data labelling and analysis service run by Hoang Nam
+  Dang. If you want anything on this page explained or acted on, email
+  <a href="mailto:dnam2501@gmail.com">dnam2501@gmail.com</a>.</p>
+
+  <h2>1. Your account</h2>
+  <p>You can create an account with an email address and a password, or with
+  <strong>Continue with Google</strong>.</p>
+
+  <h3>If you sign in with Google</h3>
+  <p>We receive exactly three things from your Google account: your <strong>email
+  address</strong>, your <strong>name</strong>, and your <strong>profile picture</strong>. That is
+  the whole of it. We request only the <code>openid</code>, <code>email</code> and
+  <code>profile</code> scopes, which means we have <strong>no access</strong> to Gmail, Drive,
+  Contacts, Calendar, Photos or any other Google service, and no ability to act on your behalf
+  anywhere in Google.</p>
+  <div class="never">
+    <p>We do not use data received from Google for advertising, and we do not use it to train
+    machine-learning or AI models. We do not sell it, and we do not pass it to anyone outside
+    the processors listed in section 7.</p>
+  </div>
+
+  <h3>If you sign in with a password</h3>
+  <p>Your password is held by our authentication provider, Supabase, in hashed form.
+  <strong>We never see it and never store it ourselves.</strong> The site keeps your email
+  address in your own browser so the sign-in box is not empty next time; it never keeps a
+  password there.</p>
+
+  <h2>2. Your club's channel</h2>
+  <p>A channel is one club's own space. So that the people running it can see who has access,
+  we store, for each member: <strong>the email address and the display name</strong> of that
+  account, and the role it holds (admin, analyst or viewer).</p>
+  <p>When an admin invites someone who does not have an account yet, we store
+  <strong>the email address they were invited at</strong> until that person signs in and the
+  invitation becomes a membership.</p>
+
+  <h2>3. Settings, for analysts</h2>
+  <p>The tagging app saves your <strong>keyboard shortcuts and macros</strong> against your
+  account, so they follow you from one machine to another. Nothing else about how you work is
+  recorded — no timings, no keystroke logs, no session tracking.</p>
+
+  <h2>4. The contact form</h2>
+  <p>If you use the enquiry form on the front page, we store what you typed: <strong>name, email
+  address, club, your role, country, your message</strong>, and the video link if you gave
+  one. We also store two things you did not type:</p>
+  <ul>
+    <li><strong>A hash of your IP address</strong> — a SHA-256 of the address with a secret salt,
+      never the address itself. It exists to rate limit the form and to notice a flood of
+      submissions, and neither of those needs the real address.</li>
+    <li><strong>Your browser's user-agent string</strong>, for the same reason.</li>
+  </ul>
+  <p>The enquiry is emailed to us through Resend. It is used to answer you, and for nothing
+  else — you are not added to a mailing list, because there is no mailing list.</p>
+
+  <h2>5. Match data</h2>
+  <p>The service exists to tag matches. For a match a club commissions, we hold the events we
+  tagged (what happened, when, and where on the pitch), the team sheets, and the
+  <strong>names and shirt numbers of the players</strong> on both sides.</p>
+  <p>Player names are personal data about people who are not our users. We hold them only to
+  produce the analysis the club asked for, only for as long as that club is a customer, and only
+  the club's own channel can read them. Where a squad includes youth players, we hold those
+  names on the club's instruction and on the club's legal basis for holding them.</p>
+  <p>Match video that a club uploads for tagging is stored in Cloudflare R2 and is reachable
+  only through short-lived signed links, not from a public address.</p>
+
+  <h2>6. What is kept in your browser</h2>
+  <p>The apps keep some things in your browser's own storage so that a reload, or a lost
+  connection, does not cost you work. These never leave your device except where a feature
+  explicitly syncs them to your account:</p>
+  <ul>
+    <li>your sign-in session, so you are not asked to sign in on every visit;</li>
+    <li>tagged events, line-ups and match details in progress;</li>
+    <li>your keyboard shortcuts and macros (also synced to your account, see section 3);</li>
+    <li>small conveniences — the last email address used to sign in, whether the side rail is
+      open, which film tools you had selected.</li>
+  </ul>
+  <p>Clearing your browser's site data removes all of it.</p>
+
+  <h2>7. Who else handles the data</h2>
+  <p>We are a small operation and we do not run our own servers. These are the services that
+  process data on our behalf, and the whole list:</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Service</th><th>What it does for us</th></tr></thead>
+      <tbody>
+        <tr><td>Supabase</td><td>Holds the database and the accounts, including passwords in hashed form</td></tr>
+        <tr><td>Google</td><td>Signs you in, only if you choose Continue with Google</td></tr>
+        <tr><td>Cloudflare</td><td>Runs the contact form endpoint, and stores match video in R2</td></tr>
+        <tr><td>Resend</td><td>Delivers the email that tells us a contact form was submitted</td></tr>
+        <tr><td>GitHub Pages</td><td>Serves the website itself</td></tr>
+        <tr><td>jsDelivr, cdnjs</td><td>Serve two JavaScript libraries the pages load; your browser's request tells them your IP address, as any request to any server does</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>8. What this site does not do</h2>
+  <div class="never">
+    <p>There is <strong>no analytics</strong> on this site. No Google Analytics, no Tag Manager,
+    no Plausible, no Mixpanel, no Facebook pixel, no advertising network, no tracking cookie, and
+    no third-party tracker of any kind. Nothing here follows you to another website, and no
+    cookie banner is needed because there is nothing to ask you about.</p>
+  </div>
+  <p>We do not sell, rent or trade personal data. We do not build profiles for advertising. We
+  do not share data between one club's channel and another's — that separation is enforced by the
+  database itself, not by our good intentions.</p>
+
+  <h2>9. How long we keep it</h2>
+  <ul>
+    <li><strong>Accounts and channel membership</strong> — until you ask us to delete the account,
+      or the club's channel is closed.</li>
+    <li><strong>Match data and reports</strong> — for as long as the club that commissioned them
+      is a customer, and then for as long as they ask us to keep them available.</li>
+    <li><strong>Contact enquiries</strong> — kept as the record of the enquiry and of what we did
+      about it. Ask and we will delete yours.</li>
+  </ul>
+
+  <h2>10. What you can ask for</h2>
+  <p>Email <a href="mailto:dnam2501@gmail.com">dnam2501@gmail.com</a> and we will:</p>
+  <ul>
+    <li>tell you what we hold about you;</li>
+    <li>correct anything that is wrong;</li>
+    <li>send you a copy of it;</li>
+    <li>delete your account and the personal data attached to it.</li>
+  </ul>
+  <p>If you are in the United Kingdom or the European Economic Area, those are your rights under
+  the UK GDPR and the GDPR, and you may also complain to your national data protection authority.
+  We would rather you came to us first.</p>
+  <p>If you signed in with Google and want to disconnect that, you can also remove this app's
+  access from your own Google account at
+  <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.
+  That stops future sign-ins; email us to have the account itself deleted.</p>
+
+  <h2>11. Children</h2>
+  <p>Accounts are for adults acting on behalf of a club, academy or analysis team. We do not
+  knowingly create accounts for children. Squad lists we tag may contain the names of youth
+  players, as described in section 5; those are held for the club, and a club can ask us to
+  remove any of them at any time.</p>
+
+  <h2>12. Changes to this policy</h2>
+  <p>If this policy changes, the date at the top changes with it. If a change affects what we
+  collect or who we share it with, we will email the address on each affected account rather than
+  leave it to be noticed.</p>
+
+  <h2>13. Contact</h2>
+  <p>Hoang Nam Dang — HoangNam Analytics<br>
+  <a href="mailto:dnam2501@gmail.com">dnam2501@gmail.com</a><br>
+  <a href="https://hoangnams.com">hoangnams.com</a></p>
+
+  <div class="legal-foot">
+    <span>© 2026 HoangNam Analytics</span>
+    <a href="index.html">Back to the site</a>
+    <a href="login.html">Sign in</a>
+  </div>
+
+</main>
+
+</body>
+</html>
