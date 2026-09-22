@@ -148,7 +148,8 @@ test('every function an inline handler names is published to window', () => {
 test('and nothing else is published, so the module is not leaking', () => {
   const {win}=load();
   const allowed=new Set(['PTStats','setDefHalf','setDefCat','setDistHalf','setDistCat',
-    'setHeatHalf','setOthCat','defHover','distHover','heatHover','shotHover','gkHover']);
+    'setHeatHalf','setOthCat','defHover','distHover','heatHover','shotHover','gkHover',
+    'setSpKind','setSpHalf','spHover']);
   Object.keys(win).forEach(k=>ok(allowed.has(k),'window.'+k+' should not be there'));
   /* The other direction too: a name left on the whitelist after its control was removed
      is a name this test would go on excusing for ever. */
