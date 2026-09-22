@@ -137,7 +137,12 @@ function ensureCss(){
   border-bottom:2px solid ${C.line};margin:-46px -50px 16px;padding:11px 50px 10px;
   box-sizing:border-box}
 /* the site red, written out: report pages must not inherit the app's CSS variables */
-.rp-logo{flex:none;width:28px;height:28px;border-radius:5px;background:#e03131;
+/* The brand chip, to the same recipe as .brand-mark in client/assets/site.css:
+   the red is --red (#E0122B, not the #e03131 this carried for a while, which put a
+   different red on every report a club received), and the corner is 11.5% of the
+   chip — 3.2px here where the header uses 3px on 26px. The mark inside is 16px of
+   28px, the same 57% the header gives 15px of 26px. */
+.rp-logo{flex:none;width:28px;height:28px;border-radius:3.2px;background:#E0122B;
   display:flex;align-items:center;justify-content:center}
 .rp-logo svg{display:block}
 .rp-htxt{flex:1;min-width:0;display:block}

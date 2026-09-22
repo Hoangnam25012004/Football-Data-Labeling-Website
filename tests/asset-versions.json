@@ -1,7 +1,7 @@
 {
   "Stats/report.js": {
-    "v": 42,
-    "sha256": "0618686a22d86cdc"
+    "v": 43,
+    "sha256": "7a8dccc59e46cd15"
   },
   "Stats/stats-view.css": {
     "v": 11,
@@ -24,8 +24,8 @@
     "sha256": "37fee08ede58b61d"
   },
   "client/assets/app.js": {
-    "v": 59,
-    "sha256": "2af901a1e9e874c1"
+    "v": 60,
+    "sha256": "80882d2eca81cae4"
   },
   "client/assets/film-tools.css": {
     "v": 4,
