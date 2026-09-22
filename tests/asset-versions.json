@@ -8,8 +8,8 @@
     "sha256": "3ef8829ec33899e6"
   },
   "Stats/stats-view.js": {
-    "v": 29,
-    "sha256": "c74dd0f1c680ae43"
+    "v": 30,
+    "sha256": "9f35de9b13212de9"
   },
   "auth.js": {
     "v": 1,
@@ -24,8 +24,8 @@
     "sha256": "37fee08ede58b61d"
   },
   "client/assets/app.js": {
-    "v": 60,
-    "sha256": "80882d2eca81cae4"
+    "v": 61,
+    "sha256": "e34a411c41d088ab"
   },
   "client/assets/film-tools.css": {
     "v": 4,

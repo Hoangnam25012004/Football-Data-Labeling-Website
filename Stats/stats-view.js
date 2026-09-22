@@ -52,6 +52,7 @@ const ourDur=()=>durationIsFor(loadMeta().matchId)?loadJSON(PT_KEYS.duration,bla
 let rows=[], meta=blankMeta(), lineups=blankLineups(), statView='overall', statTeam='home', statCat='shooting', defHalf=0, defCat='tackles', othCat='fouls';
 let heatHalf=0;   // touch heatmap half filter: 0 = both halves
 let distCat='passes', distHalf=0;   // the distribution map: which action, and which half
+let spKind='freeKicks', spHalf=0;   // the set-piece map: which kind, and which half
 
 /* per-category column sets — the wide table split into 4 tabs.
    The definition moved down into shared.js as PLAYER_CATS, because the client
@@ -181,19 +182,22 @@ function dashboardHTML(team){
   }else if(statCat==='goalkeeper'){
     /* The PDF's "Goalkeeper — Saves" page, on the dashboard: Details donut, the goal-mouth
        + defending-half Event Map, the opponent ranking (hover isolates a shooter), and the
-       Event List. Set Pieces still falls through to the notice below. */
+       Event List. */
     extra=`<div class="chart-row sh-row"><div class="sh-grid">`
       +`${gkDetailsHTML(team)}${gkMapHTML(team)}${gkOppRankHTML(team)}</div></div>`
       +`<div class="chart-row">${gkEventListHTML(team)}</div>`;
+  }else if(statCat==='setPieces'){
+    /* Where each set piece went, one upright map per kind, beside who took them — the
+       Distribution map's frame without its bands. See spMapHTML. */
+    extra=`<div class="chart-row">${spMapHTML(team)}</div>`;
   }else{
-    /* Set Pieces has no visualization yet — the located-event map it was given first is
-       being replaced by something designed for it.
+    /* No tab falls here today: all six have a chart of their own.
 
        A NOTICE rather than nothing. Dashboard and Stats share the category tabs, so a
        branch that returns '' is a tab that renders a blank page: no error, nothing in
-       the console, and no way to tell it from a bug. This is also the else of the chain
-       rather than two named cases, so a category added later cannot silently fall
-       through it either — it says what it says for any tab with no chart of its own. */
+       the console, and no way to tell it from a bug. It stays the else of the chain rather
+       than a named case, so a category added later cannot silently fall through it — it
+       says what it says for any tab with no chart of its own. */
     extra=`<div class="stats-empty">No dashboard for ${esc(catLabel(statCat))} yet. `
       +`Its table is on the <b>Stats</b> tab.</div>`;
   }
@@ -809,6 +813,187 @@ function distMapHTML(team){
 }
 function setDistCat(v){distCat=v;renderStats();}
 function setDistHalf(h){distHalf=h;renderStats();}
+/* ---- Set Pieces: ONE upright map per kind of restart, beside who took them ----
+   The Distribution map's frame, which is what this tab was asked to look like: the
+   dropdown picks the kind, All / 1st / 2nd pick the period, both halves are normalised so
+   the team always attacks UP, and hovering a taker in the ranking isolates that player's
+   marks. No bands down the side and no 18-cell grid — the map, the ranking and the hover
+   only, by request (docs/setpiece-dashboard-design.md).
+
+   ONE mark per set piece, and it is the TAKER'S DELIVERY — the pass, cross or shot it was
+   struck with — never the set-piece row itself. No set-piece event is one of
+   TRANSFER_EVENTS (index.html:2519), so a set-piece row never carries an rXY: not one of
+   the 590 on file does. The row that says where the ball went is the pass or cross typed
+   beside it in the same entry ("2k*cc" = free-kick by 2 + cross fail by 2), which shares its
+   grp, its player and its dot. What happened AFTER the delivery — the receiver's next pass,
+   a header — is somebody else's action and is not drawn here.
+
+   Free-kicks only: a delivery that is a SHOT is drawn as a ball where it was struck, in the
+   colour of what came of it. */
+const SP_KINDS={
+  freeKicks:{label:'Freekicks',    keys:['free-kick'],            ball:true},
+  corners:  {label:'Corner Kicks', keys:['corner-kick']},
+  throwIns: {label:'Throw-Ins',    keys:['throw-ins','throw-in']},
+  goalKicks:{label:'Goal Kicks',   keys:['goal kick']}
+};
+/* What a delivery was, and whether it came off. `goal` sits with `shot on target` because
+   EVENT_INC already counts it as one (report.js's SP_OUT reads it the same way); a blocked
+   or missed shot is a failure, as Shooting Accuracy reads it. */
+const SP_DELIVERY={
+  'pass success':{kind:'pass',ok:true},    'pass fail':{kind:'pass',ok:false},
+  'cross success':{kind:'cross',ok:true},  'cross fail':{kind:'cross',ok:false},
+  'shot on target':{kind:'shot',ok:true},  'goal':{kind:'shot',ok:true,goal:true},
+  'shot off target':{kind:'shot',ok:false},'blocked shot':{kind:'shot',ok:false},
+  'miss shot':{kind:'shot',ok:false}
+};
+/* One line each, not one line for all three: the test harness lifts a const by name, and
+   cannot pick one name out of a shared declaration. */
+const SP_OK='#39d98a';     // it came off — the green every map uses for it
+const SP_FAIL='#f7506b';   // it did not
+const SP_GOAL='#f7b32f';   // a free-kick in the net: Shooting's gold
+/* Every set piece of `kind` this team took in the period, each with the delivery it was
+   struck with, or null.
+     - the delivery is the first row of the SAME entry (grp), by the SAME player, at or after
+       the set piece's position in it (ord), that is a pass, a cross or a shot;
+     - "at or after", not "after": the 15 set pieces tagged before `ord` existed (all in
+       Kidsgrove v Hanley) read ord 0 on every row of their entry (dbToRow's `a.ord ?? 0`),
+       so their delivery TIES with them. report.js's spChains asks `ord > o` and finds
+       nothing for those. The same-player rule is what keeps "12j*c*z5d" — corner by 12,
+       cross by 12, a shot by 5 — from handing 12's corner to 5's shot when ord cannot say;
+     - an entry holding two set pieces is opened by the first, as spChains reads it; the
+       second still counts as taken, with no delivery. There are none on file.
+   A set piece with no delivery — typed alone, so grp is null — is still taken: the
+   ranking's Total is the Stats tab's column. It is simply not on the map. */
+function spTaken(team,kind,half){
+  const keys=new Set(SP_KINDS[kind].keys);   // already in evKey's shape
+  const mine=rows.filter(r=>r.team===team), byGrp=new Map();
+  mine.forEach(r=>{if(r.grp!=null){
+    const g=byGrp.get(r.grp); if(g)g.push(r); else byGrp.set(r.grp,[r]);}});
+  const ordOf=r=>+r.ord||0, who=r=>String(r.playerFrom||'').trim();
+  return mine.filter(r=>keys.has(evKey(r.event))&&(!half||eventHalf(r)===half)).map(sp=>{
+    const list=sp.grp!=null?(byGrp.get(sp.grp)||[]):[];
+    const first=list.filter(r=>SET_PIECE_EVENTS.has(evKey(r.event))).sort((a,b)=>ordOf(a)-ordOf(b))[0];
+    const del=first!==sp?null:(list.filter(r=>r!==sp&&ordOf(r)>=ordOf(sp)&&who(r)===who(sp)
+      &&SP_DELIVERY[evKey(r.event)]).sort((a,b)=>ordOf(a)-ordOf(b))[0]||null);
+    return {sp, no:who(sp), del, out:del?SP_DELIVERY[evKey(del.event)]:null};
+  });
+}
+/* The ball a direct free-kick shot is drawn as: a disc in the outcome's colour with a
+   football's panels over it — the centre pentagon, a seam out of each of its corners, and
+   the five panels those seams reach, cut off by the edge of the ball the way the printed
+   icon draws them — in the dark ink every marker's number uses. The outline goes on last,
+   so the panels at the edge sit under it. */
+function spBallSVG(x,y,c){
+  const R=17, INK='#06281a';
+  const P=(r,a)=>(x+r*Math.cos(a)).toFixed(1)+' '+(y+r*Math.sin(a)).toFixed(1);
+  const cx=x.toFixed(1), cy=y.toFixed(1);
+  let centre='', panels='', seams='';
+  for(let k=0;k<5;k++){
+    const a=-Math.PI/2+k*2*Math.PI/5;
+    centre+=(k?'L':'M')+P(R*0.38,a);
+    seams+='M'+P(R*0.38,a)+'L'+P(R*0.62,a);
+    panels+='M'+P(R*0.62,a)+'L'+P(R*0.8,a-0.36)+'L'+P(R,a-0.25)
+      +`A${R} ${R} 0 0 1 `+P(R,a+0.25)+'L'+P(R*0.8,a+0.36)+'Z';
+  }
+  return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${c}"/>`
+    +`<path d="${centre}Z${panels}" fill="${INK}"/>`
+    +`<path d="${seams}" stroke="${INK}" stroke-width="2" fill="none"/>`
+    +`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#000000" stroke-width="2"/>`;
+}
+/* hover a taker to isolate their set pieces. Nothing is re-rendered: every mark is drawn
+   already, so this only flips display, the way shotHover / defHover / distHover do. */
+function spHover(p){
+  document.querySelectorAll('.sp-mark').forEach(g=>{g.style.display=(!p||g.dataset.p===p)?'':'none';});
+  document.querySelectorAll('.sp-rank tbody tr').forEach(tr=>{
+    tr.classList.toggle('sel',!!p&&tr.dataset.p===p);
+    tr.classList.toggle('dim',!!p&&tr.dataset.p!==p);
+  });
+}
+function spMapHTML(team){
+  const kind=SP_KINDS[spKind]?spKind:'freeKicks', cat=SP_KINDS[kind];
+  const opts=Object.entries(SP_KINDS).map(([k,c])=>`<option value="${k}"${k===kind?' selected':''}>${c.label}</option>`).join('');
+  const head=`<div class="chart-head"><div></div>`
+    +`<div class="head-ctrls"><select class="def-sel" onchange="setSpKind(this.value)">${opts}</select>`
+    +`<div class="half-toggle"><button class="${spHalf===0?'on':''}" onclick="setSpHalf(0)">All</button>`
+    +`<button class="${spHalf===1?'on':''}" onclick="setSpHalf(1)">1st</button>`
+    +`<button class="${spHalf===2?'on':''}" onclick="setSpHalf(2)">2nd</button></div></div></div>`;
+  // the pitch on end with no margins, since there are no bands to put in them — only a
+  // few units of air round the edge, so a corner's dot and an arrowhead on the line show whole
+  const d=PITCH_DIMS.football, PW=d.h, PH=d.w, PAD=14;
+  const dir={1:attackDir(team,1),2:attackDir(team,2)};
+  const N=(xy,h)=>{const flip=dir[h]==='left';
+    const px=flip?100-xy.x:xy.x, py=flip?100-xy.y:xy.y;
+    return {x:py/100*PW, y:(100-px)/100*PH};};   // attacking right -> attacking up
+  const taken=spTaken(team,kind,spHalf);
+  const marks=taken.map(t=>{
+    const from=t.del&&(t.del.pXY||t.sp.pXY); if(!from)return null;
+    const h=eventHalf(t.sp), rx=t.del.rXY;
+    return {no:t.no, kind:t.out.kind, ok:t.out.ok, goal:!!t.out.goal, a:N(from,h),
+      b:(t.out.kind!=='shot'&&rx&&rx.x!=null)?N(rx,h):null};
+  }).filter(Boolean)
+    .sort((a,b)=>(a.kind==='shot')-(b.kind==='shot'));   // balls over arrows, never under
+  // the ranking: everyone who took one, ordered on TOTAL, ties sharing a rank
+  const cnt={}, won={};
+  taken.forEach(t=>{if(!t.no)return;
+    cnt[t.no]=(cnt[t.no]||0)+1; if(t.out&&t.out.ok)won[t.no]=(won[t.no]||0)+1;});
+  const order=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]||(won[b]||0)-(won[a]||0)
+    ||((isNaN(+a)||isNaN(+b))?String(a).localeCompare(String(b)):+a-+b));
+  // two arrowheads, because there are two outcomes; ids of their own, not the dlm* ones
+  const defs='<defs>'+[['spmOk',SP_OK],['spmFail',SP_FAIL]].map(([id,c])=>
+    `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4"`
+    +` orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`).join('')+'</defs>';
+  const svgMarks=marks.map(m=>{
+    const g=`<g class="sp-mark" data-p="${esc(m.no)}">`, ax=m.a.x.toFixed(1), ay=m.a.y.toFixed(1);
+    if(m.kind==='shot'&&cat.ball)return g+spBallSVG(m.a.x,m.a.y,m.goal?SP_GOAL:m.ok?SP_OK:SP_FAIL)+'</g>';
+    // a pass and a cross are drawn alike, one solid arrow: colour says whether it came off,
+    // and nothing on this map says which of the two it was
+    const c=m.ok?SP_OK:SP_FAIL;
+    if(m.b)return g+`<line x1="${ax}" y1="${ay}" x2="${m.b.x.toFixed(1)}" y2="${m.b.y.toFixed(1)}"`
+      +` stroke="${c}" stroke-width="3" stroke-opacity="0.85" marker-end="url(#${m.ok?'spmOk':'spmFail'})"/>`
+      +`<circle cx="${ax}" cy="${ay}" r="7" fill="${c}"/></g>`;
+    return g+`<circle cx="${ax}" cy="${ay}" r="12" fill="${c}" fill-opacity="0.92" stroke="#000000" stroke-width="1.5"/></g>`;
+  }).join('');
+  const ax=PW/2, ay=PH/2;
+  const arrow=`<g opacity="0.5" stroke="#fff" fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">`
+    +`<line x1="${ax}" y1="${ay+54}" x2="${ax}" y2="${ay-54}"/>`
+    +`<polyline points="${ax-26},${ay-28} ${ax},${ay-54} ${ax+26},${ay-28}"/></g>`;
+  const pitch=`<rect width="${PW}" height="${PH}" fill="rgba(26,62,32,0.72)"/>`
+    +`<g transform="translate(0 ${PH}) rotate(-90)"><g fill="none" stroke="${PITCH_LINE}" stroke-width="3">${pitchFootball(PH,PW,false)}</g></g>`
+    +arrow+svgMarks;
+  /* The key: outcome only. No line under the map explains how the balls compare with the
+     Stats tab's two Freekicks columns (a team-mate's shot is counted there and not drawn
+     here) — by request, the map carries no notes. See docs/setpiece-dashboard-design.md. */
+  const leg=(mark,l)=>`<span class="sm-leg">${mark}${l}</span>`;
+  const dot=c=>`<span class="leg-dot" style="background:${c}"></span>`;
+  const ball=c=>`<svg width="18" height="18" viewBox="-19 -19 38 38" aria-hidden="true">${spBallSVG(0,0,c)}</svg>`;
+  const legend=`<div class="shotmap-legend" style="flex-wrap:wrap">`
+      +leg(dot(SP_OK),'Succeeded')+leg(dot(SP_FAIL),'Failed')+`</div>`
+    +(cat.ball?`<div class="shotmap-legend" style="flex-wrap:wrap">`
+      +leg(ball(SP_GOAL),'Goal')+leg(ball(SP_OK),'On target')
+      +leg(ball(SP_FAIL),'Off target / Blocked / Missed')+`</div>`:'');
+  const names=squadNames(lineups,team);
+  let prevK=null;
+  const rankRows=order.map((no,i)=>{
+    const c=cnt[no], s=won[no]||0, k=c+'/'+s;   // tied when both figures match
+    const rk=k===prevK?'':String(i+1); prevK=k;
+    return `<tr data-p="${esc(no)}" onmouseenter="spHover('${jsArg(no)}')" onmouseleave="spHover('')">`
+      +`<td class="dl-r">${rk}</td>`
+      +`<td><b class="dl-no">${esc(no)}.</b> ${esc(playerLabel(names,no))}</td>`
+      +`<td class="dl-c">${s}</td><td class="dl-c">${c}</td>`
+      +`<td class="dl-c">${Math.round(s/c*100)}%</td></tr>`;
+  }).join('');
+  return `<div class="chart-card map-card sp-card">${head}<div class="dl-flex">`
+    +`<div class="dl-map"><svg viewBox="${-PAD} ${-PAD} ${PW+2*PAD} ${PH+2*PAD}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">`
+    +`${defs}${pitch}</svg>${legend}</div>`
+    +`<div class="dl-side"><div class="dl-title">${esc(cat.label)}</div>`
+    +`<div class="dl-wrap"><table class="dl-rank sp-rank">`
+    +`<thead><tr><th class="dl-r">Rank</th><th>Name</th><th class="dl-c">Succ.</th>`
+    +`<th class="dl-c">Total</th><th class="dl-c">%</th></tr></thead><tbody>`
+    +(rankRows||`<tr><td colspan="5" class="dl-empty">No ${esc(cat.label.toLowerCase())} tagged for this period.</td></tr>`)
+    +`</tbody></table></div></div></div></div>`;
+}
+function setSpKind(v){spKind=v;renderStats();}
+function setSpHalf(h){spHalf=h;renderStats();}
 const FOUL_EVENTS=new Set(['foul','foul throw','handball foul']);
 /* Fouls tab: dropdown switches between the foul map, the foul-won map and the offside map.
    Inherited unchanged from the Other tab this one replaced — same three maps, same key
@@ -2631,8 +2816,8 @@ function destroy(){
    not made: this is the same data the view is drawing. */
 function data(){return {rows:rows,meta:meta,lineups:lineups,dur:dur};}
 
-/* ---- the ten names that must stay global ----
-   The three maps draw their own controls as markup:
+/* ---- the fourteen names that must stay global ----
+   The maps draw their own controls as markup:
    onclick="setHeatHalf(1)", onmouseenter="shotHover(...)". An inline handler
    is compiled against the GLOBAL scope, never against this closure, so wrapping
    the file up without publishing these would leave every half toggle and every
@@ -2646,6 +2831,8 @@ window.setHeatHalf=setHeatHalf; window.setOthCat=setOthCat;
 window.defHover=defHover;       window.distHover=distHover;
 window.heatHover=heatHover;     window.shotHover=shotHover;
 window.gkHover=gkHover;
+window.setSpKind=setSpKind;     window.setSpHalf=setSpHalf;
+window.spHover=spHover;
 
 /* ---- the twelve names Stats/report.js calls but does not define ----
    The report was written when this file WAS the Stats page's inline script and
