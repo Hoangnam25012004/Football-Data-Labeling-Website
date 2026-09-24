@@ -476,7 +476,7 @@ const SET_PIECE_EVENTS = new Set(['free-kick','corner-kick','penalty kick',
 | `Set Piece Shot` | `SHOT_KINDS.has(e)` — cả 5 loại: goal, on/off target, blocked, miss |
 | `Set Piece Goal` | `e === 'goal'` |
 | `Freekicks: Shots On Target` | chuỗi có `free-kick` **và** `e ∈ {'shot on target','goal'}` |
-| `Freekicks: Shots Off Target` | chuỗi có `free-kick` **và** `e === 'shot off target'` |
+| `Freekicks: Shots Off Target` | chuỗi có `free-kick` **và** `e === 'shot off target'` — **từ 2026-09-24** cột này là `Freekicks: Shots Off Target/ Blocked Shots/ Miss Shots`: `e ∈ {'shot off target','blocked shot','miss shot'}` (ba bộ đếm `fkShotsOff` + `fkShotsBlocked` + `fkMissShots`) |
 | `Freekicks: Crosses` | chuỗi có `free-kick` **và** `e ∈ {'cross success','cross fail'}` |
 | `Freekicks: Crosses Succeeded` | chuỗi có `free-kick` **và** `e === 'cross success'` |
 

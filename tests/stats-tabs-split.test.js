@@ -263,6 +263,39 @@ test('only a free-kick feeds the Freekicks columns', () => {
   eq(p['10'].fkCrosses,1); eq(p['10'].fkCrossesComp,0,'his cross was cleared');
 });
 
+test('the Freekicks miss column is off target, blocked and missed added up', () => {
+  /* One column since 2026-09-24 — every free-kick shot that did not hit the target,
+     however it failed, which is what the Set Pieces map draws as one red ball. Three
+     counters under it, so each is still a subset of its own Shooting column. */
+  const rows=[
+    ev({event:'free-kick',playerFrom:'10',grp:'a'}),ev({event:'shot off target',playerFrom:'10',grp:'a'}),
+    ev({event:'free-kick',playerFrom:'10',grp:'b'}),ev({event:'blocked shot',playerFrom:'10',grp:'b'}),
+    ev({event:'free-kick',playerFrom:'10',grp:'c'}),ev({event:'miss shot',playerFrom:'10',grp:'c'}),
+    // crossed in by 7 and blocked on 11's shot: the shooter's, as every Freekicks column reads it
+    ev({event:'free-kick',playerFrom:'7',grp:'d'}),ev({event:'cross success',playerFrom:'7',grp:'d'}),
+    ev({event:'blocked shot',playerFrom:'11',grp:'d'}),
+    // a corner is not a free-kick, and a shot typed as its own entry joins nothing
+    ev({event:'corner-kick',playerFrom:'17',grp:'e'}),ev({event:'miss shot',playerFrom:'17',grp:'e'}),
+    ev({event:'free-kick',playerFrom:'8'}),ev({event:'blocked shot',playerFrom:'8'})
+  ];
+  const p=P(rows), c=col('setPieces','Freekicks: Shots Off Target/ Blocked Shots/ Miss Shots');
+  eq(p['10'].fkShotsOff,1); eq(p['10'].fkShotsBlocked,1); eq(p['10'].fkMissShots,1);
+  eq(c(p['10']),3,'off target, blocked and missed, in one column');
+  eq(c(p['11']),1,'a team-mate-s blocked shot after the delivery is his');
+  eq(c(p['7']),0,'the taker who crossed it is credited with the cross, not the shot');
+  eq(c(p['17']),0,'a corner feeds Set Piece Shot, never a Freekicks column');
+  eq(p['17'].setPieceShots,1);
+  eq(c(p['8']),0,'two entries carry no join');
+  notOk(S.PLAYER_CATS.setPieces.some(x=>x[0]==='Freekicks: Shots Off Target'),
+    'the old column is replaced, not kept beside it');
+  Object.values(p).forEach(s=>{
+    ok(s.fkShotsBlocked<=s.shotsBlocked,'fkShotsBlocked ⊆ shotsBlocked');
+    ok(s.fkMissShots<=s.missShots,'fkMissShots ⊆ missShots');
+    ok(c(s)<=s.shotsOff+s.shotsBlocked+s.missShots,'a subset of the three Shooting columns added up');
+    ok(s.fkShotsOn+c(s)<=s.setPieceShots,'every free-kick shot is a set-piece shot');
+  });
+});
+
 test('open play is not a set piece', () => {
   eq(P(SP_ROWS)['9'].setPieceShots,0);
   eq(P(SP_ROWS)['9'].shotsOn,1,'…but it is still a shot');

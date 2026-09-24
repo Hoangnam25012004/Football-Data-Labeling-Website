@@ -8,6 +8,9 @@ thức giống hệt bản đồ **Passes** của tab Distribution trong video t
 **Trạng thái: ĐÃ TRIỂN KHAI (2026-09-23)** đúng theo bản thiết kế này, sau khi bản thiết
 kế được duyệt. Kết quả kiểm chứng sau triển khai ở §7.4. Bốn câu hỏi mở đã được trả lời
 ngày **2026-09-23** (§0.3), và bản thiết kế đã được **điều chỉnh lần 2** cùng ngày (§0.5).
+**Cập nhật 2026-09-24:** cột Stats *"Freekicks: Shots Off Target"* được gộp với cú đá phạt
+bị chặn và sút hỏng thành *"Freekicks: Shots Off Target/ Blocked Shots/ Miss Shots"* (PDF:
+`FK Sh Off/Blk/Miss`), nên bóng đỏ và cột này nay đếm cùng ba loại — xem Q2 và §4.6.
 Trước khi triển khai, thiết kế đã được **chạy thử dưới dạng prototype trên 4 trận thật**
 (bản sao `stats-view.js` trong scratchpad). Mọi ảnh và con số trong tài liệu này đều đến từ
 prototype đó, **sau** lần điều chỉnh 2; code đã ship render **giống hệt** prototype (§7.4).
@@ -53,7 +56,7 @@ Bóc 61 khung hình của video, thấy đúng là bản đồ Passes đang ch�
 | # | Câu hỏi | Trả lời | Hệ quả thiết kế |
 |---|---|---|---|
 | Q1 | Map Freekicks có vẽ bóng cho cú sút của **đồng đội** sau quả đá phạt (7 tạt, 14 đánh đầu) không? Hai cột Stats đang đếm cả loại này. | **Không — chỉ sút trực tiếp** | Bóng chỉ xuất hiện khi **chính người đá phạt sút**, tại điểm đá phạt. Màn hình **không** in dòng nào giải thích chênh lệch với cột Stats (§0.5). |
-| Q2 | Cú đá phạt bị chặn (`blocked shot` / `miss shot`) — không thuộc cột nào. | **Bóng đỏ** | Đỏ = "không trúng đích": off target, blocked, missed. Số bóng đỏ **có thể lớn hơn** cột "Freekicks: Shots Off Target" — đã chấp nhận. |
+| Q2 | Cú đá phạt bị chặn (`blocked shot` / `miss shot`) — không thuộc cột nào. | **Bóng đỏ** | Đỏ = "không trúng đích": off target, blocked, missed. Số bóng đỏ **có thể lớn hơn** cột "Freekicks: Shots Off Target" — đã chấp nhận. **Từ 2026-09-24** cột đã gộp cả blocked và miss (*"Freekicks: Shots Off Target/ Blocked Shots/ Miss Shots"*), nên chênh lệch này không còn. |
 | Q3 | Dải % bên trái/dưới sân tính theo điểm đầu hay điểm đến? | **Không làm dải %** — chỉ map, ranking và hover | Không `.dl-band`, không lưới 18 ô, không lề trái/dưới cho dải. |
 | Q4 | Bàn thắng trực tiếp từ đá phạt: bóng màu gì? | **Vàng như tab Shooting** | `#f7b32f`. Vẫn tính là **thành công** trong ranking. |
 
@@ -414,13 +417,18 @@ số mark                        == số quả có cú giao bóng và có toạ 
 mọi mark.data-p                == playerFrom của quả set piece
 bóng vàng + bóng xanh
   + đồng-đội(on)               == Σ 'Freekicks: Shots On Target'
-bóng đỏ − (blocked+miss trực tiếp)
-  + đồng-đội(off)              == Σ 'Freekicks: Shots Off Target'
+bóng đỏ
+  + đồng-đội(off)              == Σ 'Freekicks: Shots Off Target/ Blocked Shots/ Miss Shots'
 ```
 
-`đồng-đội(on)` / `đồng-đội(off)`: số row `shot on target`+`goal` / `shot off target` có số
-áo, nằm trong một chuỗi có `free-kick` (đúng định nghĩa `setPieceFold`), mà **không phải**
-cú giao bóng đã vẽ. Nói cách khác: cú sút của đồng đội, được cột Stats đếm mà map không vẽ.
+`đồng-đội(on)` / `đồng-đội(off)`: số row `shot on target`+`goal` / `shot off target`+
+`blocked shot`+`miss shot` có số áo, nằm trong một chuỗi có `free-kick` (đúng định nghĩa
+`setPieceFold`), mà **không phải** cú giao bóng đã vẽ. Nói cách khác: cú sút của đồng đội,
+được cột Stats đếm mà map không vẽ.
+
+*Trước 2026-09-24* dòng thứ hai là `bóng đỏ − (blocked+miss trực tiếp) + đồng-đội(off) ==
+Σ 'Freekicks: Shots Off Target'`, vì cột khi đó chỉ đếm `shot off target`. Cột đã được gộp
+theo yêu cầu, nên bóng đỏ và cột nay đếm cùng ba loại; chỉ còn cú sút của đồng đội là lệch.
 
 Hai dòng cuối là cách **đối chiếu được chính xác** giữa map và bảng Stats, dù chúng cố ý
 đếm khác nhau (Q1, Q2). **Chúng không hiện trên màn hình** (§0.5); chúng là test. Đã chạy
@@ -654,7 +662,7 @@ spHalf}`), dùng fixture dựng từ **mẫu chuỗi thật** §2:
 **Hover và an toàn**
 20. Mọi mark có `data-p` = người thực hiện; hàng ranking gọi `spHover('…')`
 21. Số áo và tên qua `esc` / `jsArg` (số áo `7'"<` không phá markup)
-22. Đối chiếu §4.6: vàng + xanh + đồng-đội(on) = Σ `fkShotsOn`; đỏ − (chặn + miss trực tiếp) + đồng-đội(off) = Σ `fkShotsOff`
+22. Đối chiếu §4.6: vàng + xanh + đồng-đội(on) = Σ `Freekicks: Shots On Target`; đỏ + đồng-đội(off/blocked/miss) = Σ `Freekicks: Shots Off Target/ Blocked Shots/ Miss Shots` (trước 2026-09-24: đỏ − (chặn + miss trực tiếp) + đồng-đội(off) = Σ `fkShotsOff`)
 
 ### 8.3 Kiểm tra bằng mắt khi triển khai
 
@@ -710,8 +718,9 @@ Sáu chỗ trông **giống bug** mà không phải bug:
 2. **`ord ≥` chứ không `>`**, và **phải cùng người.** Bỏ một trong hai thì 15 quả thiếu `ord`
    hoặc biến mất, hoặc gắn nhầm vào cú sút của người khác (§2.4).
 3. **Số bóng trên map Freekicks ≠ hai cột Stats, và màn hình không giải thích.** Cố ý: map
-   chỉ vẽ cú sút trực tiếp (Q1), bóng đỏ gồm cả bị chặn và missed (Q2), và dòng note giải
-   thích đã được bỏ theo yêu cầu (§0.5). Đừng thêm lại note; §4.6 là cách đối chiếu, có test.
+   chỉ vẽ cú sút trực tiếp (Q1), và dòng note giải thích đã được bỏ theo yêu cầu (§0.5).
+   Bóng đỏ gồm cả bị chặn và missed (Q2) — từ 2026-09-24 cột Stats cũng vậy. Đừng thêm lại
+   note; §4.6 là cách đối chiếu, có test.
 4. **Map không vẽ đường chuyền tiếp theo của người nhận**, dù PDF vẽ (§2.3, §6).
 5. **`SP_OK` / `SP_FAIL` / `SP_GOAL` ba dòng riêng.** Gộp lại thì harness không lấy được (§5.6).
 6. **Cross vẽ nét liền, giống pass**, dù PDF vẽ cross nét đứt. Theo yêu cầu (§0.5). Đừng

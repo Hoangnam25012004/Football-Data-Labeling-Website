@@ -916,12 +916,19 @@ function defensivePlayerPages(){
    How wide is not a guess. Measured at the 694px flow box, in the header's own font:
    PLAYER_CATS.goalkeeper wants 1411px of label on 18 columns and PLAYER_CATS.setPieces
    wants 1128px on 14, against 694px of page — four and three lines of wrapped header.
-   Through this map they want 657px and 661px, on one line each. */
+   Through this map they want 657px and 661px, on one line each.
+
+   The free-kick miss column has been off target, blocked and missed in one since
+   2026-09-24, and its full name alone is 269px of label: printed as it is, the Set Pieces
+   table ran to 832px and page overflow cut the columns past 694. As "FK Sh Off/Blk/Miss"
+   it was measured on all four published matches: the table exactly 694px, every label on
+   one line, the head still 24.6px. */
 const RPT_ABBR={
   'Save Standing':'Stand',            'Save Collapse':'Collapse',
   'Save Diving':'Diving',             'Save Kneeling':'Kneel',
   'Save Overhead':'Overhd',           'Goals Conceded':'Conceded',
-  'Freekicks':'FK',                   'Freekicks: Shots Off Target':'FK Sh Off',
+  'Freekicks':'FK',
+  'Freekicks: Shots Off Target/ Blocked Shots/ Miss Shots':'FK Sh Off/Blk/Miss',
   'Freekicks: Shots On Target':'FK Sh On',
   'Freekicks: Crosses':'FK Cross',    'Freekicks: Crosses Succeeded':'FK Cr Succ',
   'Penalty Kicks':'Pens',             'Throw-Ins':'Throw-in',

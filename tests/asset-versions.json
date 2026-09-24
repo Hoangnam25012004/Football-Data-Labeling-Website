@@ -1,7 +1,7 @@
 {
   "Stats/report.js": {
-    "v": 43,
-    "sha256": "7a8dccc59e46cd15"
+    "v": 44,
+    "sha256": "3cc1bc0e15cb4ebf"
   },
   "Stats/stats-view.css": {
     "v": 11,
@@ -24,8 +24,8 @@
     "sha256": "37fee08ede58b61d"
   },
   "client/assets/app.js": {
-    "v": 61,
-    "sha256": "e34a411c41d088ab"
+    "v": 62,
+    "sha256": "d3c7cd3e8b362645"
   },
   "client/assets/film-tools.css": {
     "v": 4,
@@ -68,7 +68,7 @@
     "sha256": "103be207c19f844c"
   },
   "shared.js": {
-    "v": 28,
-    "sha256": "fd57e34bfacb73e6"
+    "v": 29,
+    "sha256": "ac96780ec6f3ec10"
   }
 }

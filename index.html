@@ -4079,7 +4079,8 @@ function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,s
   // computeStats(), not EVENT_INC, so a second yellow books a yellow AND the red it is
   foulsPlain:0,foulThrows:0,handballFouls:0,yellowCards:0,redCards:0,
   // what a set piece produced, read off the entry it was tagged in (setPieceFold)
-  fkShotsOn:0,fkShotsOff:0,fkCrosses:0,fkCrossesComp:0,setPieceShots:0,setPieceGoals:0,
+  fkShotsOn:0,fkShotsOff:0,fkShotsBlocked:0,fkMissShots:0,fkCrosses:0,fkCrossesComp:0,
+  setPieceShots:0,setPieceGoals:0,
   // "was this match tagged in enough detail to answer" — never a measurement
   duelDetail:0,saveDetail:0,gkTechDetail:0,gkCtrlDetail:0,concededDetail:0,
   // spDetail is a flag about the MATCH, stamped on everyone tagged in it — see shared.js
@@ -4139,6 +4140,8 @@ function setPieceFold(mine,get){
       if(!fromFK)return;
       if(e==='shot on target'||e==='goal')p.fkShotsOn++;      // a goal is on target
       else if(e==='shot off target')p.fkShotsOff++;
+      else if(e==='blocked shot')p.fkShotsBlocked++;
+      else if(e==='miss shot')p.fkMissShots++;
       else if(e==='cross success'){p.fkCrosses++;p.fkCrossesComp++;}
       else if(e==='cross fail')p.fkCrosses++;
     });
