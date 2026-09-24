@@ -377,6 +377,10 @@ test('the abbreviations are labels only — every number still comes from PLAYER
   const setp=b.of('Set Pieces — Player Stats')[0];
   ok(/>FK Sh On</.test(setp)&&/>SP Goals</.test(setp),'the short labels are printed');
   notOk(/Freekicks: Shots On Target/.test(setp),'and the long ones are not');
+  /* the merged column's full name wants 269px on one line and would push the table to
+     832px, past the 694px of A4 that overflow:hidden cuts at */
+  ok(/>FK Sh Off\/Blk\/Miss</.test(setp),'off target, blocked and missed print as one short label');
+  notOk(/Freekicks: Shots Off Target/.test(setp),'never at full width');
   // the source reads the shared list rather than restating its columns
   ok(/teamPlayerPages\('Set Pieces — Player Stats',PLAYER_CATS\.setPieces\)/.test(REPORT));
   ok(/teamPlayerPages\('Fouls — Player Stats',PLAYER_CATS\.fouls\)/.test(REPORT));

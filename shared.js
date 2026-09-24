@@ -327,7 +327,8 @@ function newStat(){return{goals:0,assists:0,keyPasses:0,totalShots:0,shotsOn:0,s
   /* set pieces, joined by grp: what a free-kick or a corner actually produced. Filled in
      by the third pass of computeStats(), never by EVENT_INC — no row carries the answer
      on its own, only a row read beside the others tagged in the same entry. */
-  fkShotsOn:0,fkShotsOff:0,fkCrosses:0,fkCrossesComp:0,setPieceShots:0,setPieceGoals:0,
+  fkShotsOn:0,fkShotsOff:0,fkShotsBlocked:0,fkMissShots:0,fkCrosses:0,fkCrossesComp:0,
+  setPieceShots:0,setPieceGoals:0,
   /* "was this match tagged in enough detail to answer" — never a measurement, and no
      longer read by any column: every table prints its tally, so a match from before an
      event existed reads 0. Kept, and still summable, because they are the one record of
@@ -406,6 +407,8 @@ function setPieceFold(mine,get){
       if(!fromFK)return;
       if(e==='shot on target'||e==='goal')p.fkShotsOn++;      // a goal is on target
       else if(e==='shot off target')p.fkShotsOff++;
+      else if(e==='blocked shot')p.fkShotsBlocked++;
+      else if(e==='miss shot')p.fkMissShots++;
       else if(e==='cross success'){p.fkCrosses++;p.fkCrossesComp++;}
       else if(e==='cross fail')p.fkCrosses++;
     });
@@ -543,10 +546,15 @@ const PLAYER_CATS={
     ['Goals Conceded',s=>s.goalsConceded]],
   /* Five columns that moved here from the old Other tab unchanged, and six that are read
      off the entry a set piece was tagged in (setPieceFold). The six are each a subset of
-     a column on another tab, so they can be checked against it. */
+     what another tab counts, so they can be checked against it. */
   setPieces:[
     ['Freekicks',s=>s.freeKicks],
-    ['Freekicks: Shots Off Target',s=>s.fkShotsOff],
+    /* Every free-kick shot that did not hit the target, however it failed: off target,
+       blocked or missed — the three the Set Pieces map draws as one red ball. Three
+       counters under one column, so each stays a subset of its own Shooting column and
+       this one is a subset of those three added up. */
+    ['Freekicks: Shots Off Target/ Blocked Shots/ Miss Shots',
+      s=>s.fkShotsOff+s.fkShotsBlocked+s.fkMissShots],
     ['Freekicks: Shots On Target',s=>s.fkShotsOn],
     ['Freekicks: Crosses',s=>s.fkCrosses],
     ['Freekicks: Crosses Succeeded',s=>s.fkCrossesComp],

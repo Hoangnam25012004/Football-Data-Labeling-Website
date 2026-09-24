@@ -264,13 +264,20 @@ test('22 · the balls reconcile with the two Stats columns exactly (§4.6)', () 
     // team-mates' shots after a delivery: counted in the columns, not drawn
     ...entry([['free-kick','7'],['cross success','7',TO],['shot on target','14',{pXY:{x:85,y:60}}]]),
     ...entry([['free-kick','7'],['pass success','7',TO],['shot off target','9',{pXY:{x:75,y:50}}]]),
+    ...entry([['free-kick','7'],['cross success','7',TO],['blocked shot','12',{pXY:{x:80,y:45}}]]),
     ...entry([['free-kick','7'],['cross success','7',TO],['goal','11',{pXY:{x:90,y:50}}]])];
-  const s=map(rows), P=loadShared().computeStats(rows,'home');
-  const sum=k=>Object.values(P).reduce((a,p)=>a+p[k],0);
+  const s=map(rows), sh=loadShared(), P=sh.computeStats(rows,'home');
+  // read through the columns themselves, so the labels are held to it as well
+  const sum=label=>{const c=sh.PLAYER_CATS.setPieces.find(x=>x[0]===label)[1];
+    return Object.values(P).reduce((a,p)=>a+c(p),0);};
   const gold=count(s,BALL(GOLD)), green=count(s,BALL(GREEN)), red=count(s,BALL(RED));
-  const mateOn=2, mateOff=1, directBlockedOrMissed=2;
-  eq(gold+green+mateOn,sum('fkShotsOn'),"gold + green + team-mates' on target == Freekicks: Shots On Target");
-  eq(red-directBlockedOrMissed+mateOff,sum('fkShotsOff'),"red − blocked/missed + team-mates' off target == Freekicks: Shots Off Target");
+  const mateOn=2, mateOff=2;   // 14 and 11 on target; 9 off target and 12 blocked
+  eq(gold+green+mateOn,sum('Freekicks: Shots On Target'),
+    "gold + green + team-mates' on target == Freekicks: Shots On Target");
+  /* Red is off target, blocked AND missed, and so is the column since 2026-09-24 — the
+     only thing the map leaves out now is the team-mates' shots. */
+  eq(red+mateOff,sum('Freekicks: Shots Off Target/ Blocked Shots/ Miss Shots'),
+    "red + team-mates' off target/blocked/missed == Freekicks: Shots Off Target/ Blocked Shots/ Miss Shots");
 });
 
 /* ================= the row wiring ================= */
