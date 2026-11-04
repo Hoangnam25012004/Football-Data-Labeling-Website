@@ -4,7 +4,7 @@
 | --- | --- |
 | URL live | `https://hoangnams.com/tagger/`. Mở thẳng một trận bằng `…/tagger/#match=<code 5 số hoặc uuid>`. |
 | File nguồn | [`apps/tagger/index.html`](../../apps/tagger/index.html): HTML, CSS và ~3900 dòng JS inline, chạy cùng [`apps/tagger/cloud-sync.js`](../../apps/tagger/cloud-sync.js) (`window.Cloud`, đồng bộ Supabase) |
-| Script | `auth.js` (cổng), `xlsx 0.18.5`, `supabase-js@2`, `cloud-sync.js?v=52` |
+| Script | `auth.js` (cổng), `xlsx 0.18.5`, `supabase-js@2.118.0`, `cloud-sync.js?v=53` |
 | Người dùng | Analyst |
 | Đăng nhập | Bắt buộc ([tagger-auth.md](tagger-auth.md)) |
 | Design doc | [`entry-number-gate-design.md`](../design/entry-number-gate-design.md), [`user-hotkeys-macros-design.md`](../design/user-hotkeys-macros-design.md), [`submit-analysis-gate-design.md`](../design/submit-analysis-gate-design.md), [`gk-events-and-duel-split-design.md`](../design/gk-events-and-duel-split-design.md), [`red-card-moment-design.md`](../design/red-card-moment-design.md), [`minutes-played-design.md`](../design/minutes-played-design.md), [`match-save-permission-design.md`](../design/match-save-permission-design.md) |
@@ -120,7 +120,7 @@ nhập, rồi đưa các phím chữ và số vào ô nhập.
 | Modal chọn nguồn: URL, upload R2, file local | [`openVideoModal`](../../apps/tagger/index.html#L1805) |
 | File local (chỉ trình duyệt này xem được) | [`loadFile`](../../apps/tagger/index.html#L1783), kéo thả vào `#drop` |
 | Dán URL `.mp4`/`.webm`; trong trận chia sẻ thì lưu vào `matches.video_url` | [`useVideoUrl`](../../apps/tagger/index.html#L1814), [`loadVideoUrl`](../../apps/tagger/index.html#L1791), `Cloud.setVideoUrl` |
-| Upload lên Cloudflare R2: Worker ký link PUT, trình duyệt PUT thẳng lên R2 | `r2Pick` / `r2File`, rồi [`Cloud.uploadToR2`](../../apps/tagger/cloud-sync.js#L431) |
+| Upload lên Cloudflare R2: Worker ký link PUT (chỉ cho tài khoản staff, gửi kèm access token), trình duyệt PUT thẳng lên R2 | `r2Pick` / `r2File`, rồi [`Cloud.uploadToR2`](../../apps/tagger/cloud-sync.js#L431) |
 | Gỡ video chia sẻ | [`unloadVideo`](../../apps/tagger/index.html#L1832) |
 | Thanh tua tự làm (thay cho control gốc của trình duyệt) | [`makeSeekBar`](../../apps/tagger/index.html#L1942) |
 | Tách video ra cửa sổ riêng, để bảng event chiếm cả màn hình | [`openVideoWindow`](../../apps/tagger/index.html#L1984), [`returnVideo`](../../apps/tagger/index.html#L2162), [`bringHome`](../../apps/tagger/index.html#L2005) |
@@ -288,7 +288,7 @@ Hiện tên và ảnh tài khoản (`otherWho`), **☁ Cloud**, **⇪ Submit Ana
 | `user_prefs` | Hotkey và macro (realtime) |
 | `clubs` | Danh sách channel cho Submit |
 | `rpc publish_match_report` | Ghi `match_reports` và đánh dấu trận đã publish |
-| Worker `/` | Ký link upload R2 |
+| Worker `/` | Ký link upload R2 (cần `Authorization: Bearer <token>` của tài khoản staff) |
 
 ## 12. Lưu ý khi sửa
 

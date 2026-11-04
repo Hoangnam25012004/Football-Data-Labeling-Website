@@ -431,11 +431,16 @@ const CONFIG = {
   async function uploadToR2(file, onProgress) {
     const R2 = CONFIG.R2 || {};
     if (!R2.workerUrl) throw new Error('R2 not configured (set CONFIG.R2.workerUrl).');
-    // 1) ask the Worker to sign an upload URL for this match
+    // 1) ask the Worker to sign an upload URL for this match. It signs only for a
+    //    signed-in staff account, and this token is how it tells (r2-presign.js).
+    const { data: { session } } = await sb.auth.getSession();
+    const token = (session && session.access_token) || '';
     const resp = await fetch(R2.workerUrl, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
       body: JSON.stringify({ matchId, filename: file.name, contentType: file.type || 'video/mp4' })
     });
+    if (resp.status === 401) throw new Error('upload refused: sign in with a staff account');
     if (!resp.ok) throw new Error('sign failed (' + resp.status + ')');
     const { uploadUrl, publicUrl } = await resp.json();
     if (!uploadUrl || !publicUrl) throw new Error('bad sign response');

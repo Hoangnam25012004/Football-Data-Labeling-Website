@@ -4,7 +4,7 @@
 | --- | --- |
 | URL live | `https://hoangnams.com/tagger/auth`. Bản sao ở `https://hoangnams.com/auth` giữ cho link trong email xác nhận cũ. GitHub Pages phục vụ `auth.html` dưới URL không đuôi. |
 | File nguồn | [`apps/tagger/auth.html`](../../apps/tagger/auth.html) (trang, JS inline từ [dòng 150](../../apps/tagger/auth.html#L150)) · [`apps/tagger/auth.js`](../../apps/tagger/auth.js) (`window.PTAuth`, cổng chạy trên **mọi** trang của tagger) |
-| Script | `supabase-js@2`, `auth.js?v=1` |
+| Script | `supabase-js@2.118.0`, `auth.js?v=1` |
 | Người dùng | Analyst của HoangNam Analytics |
 | Design doc | [`google-sign-in-design.md`](../design/google-sign-in-design.md) |
 

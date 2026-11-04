@@ -4,7 +4,7 @@
 | --- | --- |
 | URL live | `https://hoangnams.com/tagger/Stats/#match=<code>`, mở từ nút 📊 Stats của tab gắn nhãn |
 | File nguồn | [`apps/tagger/Stats/index.html`](../../apps/tagger/Stats/index.html) (khung, 79 dòng) · [`Stats/stats-view.js`](../../apps/tagger/Stats/stats-view.js) (`window.PTStats`, ~2900 dòng) · [`Stats/report.js`](../../apps/tagger/Stats/report.js) (`window.PTReport`, báo cáo PDF) · [`Stats/stats-view.css`](../../apps/tagger/Stats/stats-view.css) · [`../shared.js`](../../apps/tagger/shared.js) (engine thống kê) |
-| Script | `../auth.js`, `xlsx 0.18.5`, `supabase-js@2`, `../shared.js?v=29`, `stats-view.js?v=30`, `report.js?v=44`. jsPDF và html2canvas được nạp khi bấm PDF. |
+| Script | `../auth.js`, `xlsx 0.18.5`, `supabase-js@2.118.0`, `../shared.js?v=29`, `stats-view.js?v=30`, `report.js?v=44`. jsPDF và html2canvas được nạp khi bấm PDF. |
 | Người dùng | Analyst (trang này). CLB cũng thấy cùng nội dung trong portal ([portal-app.md](portal-app.md), mục 3). |
 | Đăng nhập | Bắt buộc (cổng `auth.js`) |
 | Design doc | [`stats-tabs-split-design.md`](../design/stats-tabs-split-design.md), [`match-report-sections-design.md`](../design/match-report-sections-design.md), [`setpiece-dashboard-design.md`](../design/setpiece-dashboard-design.md), [`gk-setpiece-dashboard-design.md`](../design/gk-setpiece-dashboard-design.md), [`minutes-played-design.md`](../design/minutes-played-design.md), [`film-*-design.md`](../design/) |

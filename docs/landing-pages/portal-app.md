@@ -294,7 +294,7 @@ nhưng vẫn giữ route. Cầu thủ ghi bàn và kiến tạo hiện ở Playe
 | `teamByCode(code)` | `teams` | |
 | `match.update(uuid, fields)` | `matches` | Whitelist 6 cột |
 | `matches(clubId, clubCode)` | `matches`, `teams` | `shape()` + `resolveSide()` + `statsFromView()` |
-| `report(uuid)` / `reports(uuids)` | `match_reports` | Bản mới nhất của mỗi trận |
+| `report(uuid)` / `reports(uuids)` | `match_reports` / `match_reports_latest` (0026; thiếu view thì đọc bảng) | Bản mới nhất của mỗi trận |
 
 ## 9. Dữ liệu trên trình duyệt
 

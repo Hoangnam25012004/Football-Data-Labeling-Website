@@ -1,0 +1,79 @@
+name: Database backup
+
+# The Free plan keeps no backup you can download. Once a week this dumps the
+# database, encrypts it, and keeps it as a workflow artifact for 30 days.
+#
+# THE REPO IS PUBLIC, and so are its workflow artifacts to anyone signed in to
+# GitHub — the dump holds player names and account emails. It is therefore
+# encrypted with BACKUP_PASSPHRASE before it is uploaded, and never stored any
+# other way. Keep the passphrase somewhere outside GitHub, or the backup is
+# unreadable when it is needed.
+#
+# Secrets (Settings -> Secrets and variables -> Actions):
+#   SUPABASE_DB_URL     Supabase -> Connect -> Session pooler URI (port 5432),
+#                       with the database password filled in. The direct
+#                       db.<ref>.supabase.co host is IPv6-only, and GitHub's
+#                       runners are not, so it has to be the pooler.
+#   BACKUP_PASSPHRASE   a long random string
+# Without both, the job says so and stops green.
+#
+# Restore:  gpg -d backup.dump.gpg > backup.dump
+#           pg_restore --no-owner --clean --if-exists -d "<db url>" backup.dump
+on:
+  schedule:
+    - cron: '41 19 * * 0'      # Sunday 19:41 UTC = Monday 02:41 in Vietnam
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check the secrets are set
+        id: gate
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$PASSPHRASE" ]; then
+            echo "::warning::SUPABASE_DB_URL / BACKUP_PASSPHRASE not set — no backup taken."
+            echo "run=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=yes" >> "$GITHUB_OUTPUT"
+          fi
+
+      # pg_dump must be at least the server's major version (Postgres 17)
+      - name: Install pg_dump 17
+        if: steps.gate.outputs.run == 'yes'
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Dump and encrypt
+        if: steps.gate.outputs.run == 'yes'
+        run: |
+          set -euo pipefail
+          stamp=$(date -u +%Y%m%d)
+          # public = everything the apps wrote; auth.users/identities so that
+          # club_members and created_by still point at someone after a restore
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" -Fc --no-owner --no-privileges \
+            -n public -n private -t auth.users -t auth.identities -f backup.dump
+          ls -l backup.dump
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASSPHRASE" \
+            --symmetric --cipher-algo AES256 -o "hna-db-$stamp.dump.gpg" backup.dump
+          rm -f backup.dump
+
+      - name: Keep it
+        if: steps.gate.outputs.run == 'yes'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hna-db-backup
+          path: hna-db-*.dump.gpg
+          retention-days: 30
+          if-no-files-found: error

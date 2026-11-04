@@ -90,16 +90,32 @@ const res={};
   api.reports(['m1']).then(()=>{},e=>{res.repMissing=e;});
 })();
 
+/* the database has match_reports but not yet 0026's view */
+(function(){
+  const {api,calls}=loadAPI(s=>s.table==='match_reports_latest'
+    ? {data:null,error:{code:'PGRST205',message:"Could not find the table 'public.match_reports_latest' in the schema cache"}}
+    : {error:null,data:[{match_id:'m1',version:1,payload:{rows:['old']}},{match_id:'m1',version:3,payload:{rows:['new']}}]});
+  res.fbCalls=calls;
+  api.reports(['m1']).then(r=>{res.fallback=r;},e=>{res.fbErr=e;});
+})();
+
 /* ================= reading them ================= */
 test('the newest version of each report is the one kept', () => {
   eq(res.reports.m1.rows[0],'v2','version 2 wins over version 1');
   eq(res.reports.m2.rows[0],'other','and a match with one version is untouched');
   const c=res.repCalls[0];
-  eq(c.table,'match_reports','it reads the signed-off reports, not public.events');
+  eq(c.table,'match_reports_latest','it reads one row per match (0026), not every version ever published');
+  eq(res.repCalls.length,1,'and asks once when the view is there');
   eq(JSON.stringify(c.order),JSON.stringify(['version',{ascending:true}]),
      'ordered oldest-first, because the last row written into the map is the one that survives');
   eq(JSON.stringify(c.filters),JSON.stringify([['in','match_id',['m1','m2']]]),
      'and asks for the whole channel in one go');
+});
+
+test('a database without 0026 still gets the newest report, from the table', () => {
+  notOk(res.fbErr,'a missing view is not an error the club sees');
+  eq(res.fallback.m1.rows[0],'new','version 3 wins');
+  eq(res.fbCalls.map(c=>c.table).join(','),'match_reports_latest,match_reports','the view first, then the table');
 });
 
 test('a channel of many matches is asked for in chunks', () => {

@@ -36,8 +36,8 @@
     "sha256": "85046042bdfd81f9"
   },
   "apps/portal/assets/supa.js": {
-    "v": 17,
-    "sha256": "778765d9d219a2eb"
+    "v": 18,
+    "sha256": "d0940c2c6ef9346c"
   },
   "apps/tagger/Stats/report.js": {
     "v": 44,
@@ -56,8 +56,8 @@
     "sha256": "8b01800a0a5476be"
   },
   "apps/tagger/cloud-sync.js": {
-    "v": 52,
-    "sha256": "7faf055b92eea202"
+    "v": 53,
+    "sha256": "effa300326a546a9"
   },
   "apps/tagger/shared-page.css": {
     "v": 1,

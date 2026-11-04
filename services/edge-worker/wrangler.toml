@@ -37,5 +37,7 @@ RESEND_FROM    = "onboarding@resend.dev"
 #   wrangler secret put R2_SECRET_ACCESS_KEY
 #   wrangler secret put SUPABASE_URL            # https://xtzmtdcohoixoxqusyyz.supabase.co
 #   wrangler secret put SUPABASE_SERVICE_KEY    # Settings -> API -> service_role. NOT the anon key.
+#                                               # Both are needed by / (presign) too: it signs only
+#                                               # for staff, and without them it signs for nobody.
 #   wrangler secret put RESEND_API_KEY          # resend.com -> API Keys
 #   wrangler secret put IP_SALT                 # any long random string

@@ -4,7 +4,7 @@
 | --- | --- |
 | URL live | `https://hoangnams.com/tagger/Player-Lists/#match=<code>`, mở bằng nút 👥 Player lists của tab gắn nhãn (tab mới) |
 | File nguồn | [`apps/tagger/Player-Lists/index.html`](../../apps/tagger/Player-Lists/index.html): HTML và ~570 dòng JS inline |
-| Script | `../auth.js`, `supabase-js@2`, `../shared.js?v=29` |
+| Script | `../auth.js`, `supabase-js@2.118.0`, `../shared.js?v=29` |
 | CSS | `../shared-page.css`, `../shared.css` |
 | Người dùng | Analyst |
 | Đăng nhập | Bắt buộc |

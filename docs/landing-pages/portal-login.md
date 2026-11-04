@@ -4,7 +4,7 @@
 | --- | --- |
 | URL live | `https://hoangnams.com/login.html` |
 | File nguồn | [`apps/portal/login.html`](../../apps/portal/login.html), JS inline từ [dòng 97](../../apps/portal/login.html#L97) |
-| Script | `supabase-js@2` (CDN), [`assets/supa.js`](../../apps/portal/assets/supa.js) (`window.HNA`) |
+| Script | `supabase-js@2.118.0` (CDN), [`assets/supa.js`](../../apps/portal/assets/supa.js) (`window.HNA`) |
 | CSS | `assets/site.css`, `assets/app.css` |
 | Người dùng | Thành viên CLB (admin/analyst/viewer của một channel) |
 | Đăng nhập | Đây là cửa đăng nhập. Đã có phiên thì tự chuyển sang `app.html`. |

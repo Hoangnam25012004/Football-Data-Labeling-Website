@@ -755,19 +755,35 @@
 
        Chunked because the ids travel in the URL and a payload is a whole
        match of events — twenty at a time keeps both the request line and the
-       response inside anything sensible. */
+       response inside anything sensible.
+
+       Read from match_reports_latest (0026): one row per match, the newest.
+       Reading match_reports itself sent every version ever published, which
+       on the first public channel was 19 payloads for 4 matches — 9 MB where
+       2 MB was drawn. A database that has not had 0026 yet answers "no such
+       relation", and the old query runs instead, so this file can ship before
+       the migration does. */
     reports: function (matchUuids) {
       var c = client();
       var ids = (matchUuids || []).filter(Boolean);
       if (!c || !ids.length) return Promise.resolve({});
       var out = {}, chunks = [];
       for (var i = 0; i < ids.length; i += 20) chunks.push(ids.slice(i, i + 20));
+      function ask(table, chunk) {
+        return c.from(table)
+          .select('match_id,version,payload')
+          .in('match_id', chunk)
+          .order('version', { ascending: true });
+      }
+      function noView(e) {
+        var code = (e && e.code) || '';
+        return code === '42P01' || code === 'PGRST205' ||
+               /match_reports_latest/.test((e && e.message) || '');
+      }
       return chunks.reduce(function (p, chunk) {
         return p.then(function () {
-          return c.from('match_reports')
-            .select('match_id,version,payload')
-            .in('match_id', chunk)
-            .order('version', { ascending: true })
+          return ask('match_reports_latest', chunk)
+            .then(function (r) { return (r.error && noView(r.error)) ? ask('match_reports', chunk) : r; })
             .then(function (r) {
               if (r.error) throw asError(r.error);
               (r.data || []).forEach(function (row) {

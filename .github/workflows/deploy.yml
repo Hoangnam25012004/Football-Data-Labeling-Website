@@ -19,7 +19,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The suite has no dependencies, so it runs on the runner's own Node. A red
+  # test now stops the deploy instead of only being noticed later.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run the test suite
+        run: node tests/run.js
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -98,3 +111,24 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # A file missing from the cp list above 404s live while everything else is
+      # green. Ask the live site for every file that was staged, at the path it
+      # is served from. Pages can take a minute to serve a new deployment, so a
+      # miss is retried before it fails the run.
+      - name: Smoke-test the deployed paths
+        run: |
+          base="${{ steps.deployment.outputs.page_url }}"
+          base="${base%/}"
+          fails=0
+          for f in $(cd _site && find . -type f | sed 's#^\./##' | sort); do
+            ok=""
+            for try in 1 2 3 4 5 6; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$base/$f?smoke=${{ github.sha }}")
+              if [ "$code" = "200" ]; then ok=1; break; fi
+              sleep 10
+            done
+            if [ -z "$ok" ]; then echo "::error::$base/$f -> $code"; fails=$((fails+1)); fi
+          done
+          echo "checked $(cd _site && find . -type f | wc -l) files, $fails failed"
+          [ "$fails" = "0" ]
