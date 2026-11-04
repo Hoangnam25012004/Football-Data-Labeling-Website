@@ -16,8 +16,8 @@ const {test,eq,ok,notOk}=require('./tiny-test');
 const {readSrc}=require('./harness');
 
 /* every page someone can land on, both halves of the deployed site */
-const PAGES=['client/index.html','client/app.html','client/login.html',
-             'client/guide.html','client/privacy.html',
+const PAGES=['apps/portal/index.html','apps/portal/app.html','apps/portal/login.html',
+             'apps/portal/guide.html','apps/portal/privacy.html',
              'index.html','auth.html','Stats/index.html','Player-Lists/index.html'];
 
 const iconOf=src=>{
@@ -38,7 +38,7 @@ test('and it is the SAME one everywhere, so the tab cannot drift page to page', 
      Object.keys(seen).map(k=>seen[k].join(', ')+'\n        '+k.slice(0,80)).join('\n      '));
 });
 
-const ICON=iconOf(readSrc('client/index.html'));
+const ICON=iconOf(readSrc('apps/portal/index.html'));
 
 test('it needs no file, so deploy.yml has nothing to copy and nothing to forget', () => {
   ok(/^data:image\/svg\+xml,/.test(ICON),'inline, not a path');
@@ -58,7 +58,7 @@ test('the # in the brand red is escaped — raw, it silently becomes a fragment'
 
 test('it draws the same mark the page header draws', () => {
   // the header's inline <svg>, in client/login.html and everywhere else
-  const header=readSrc('client/login.html');
+  const header=readSrc('apps/portal/login.html');
   ok(/d="M13 39V11l22 28V11"/.test(header),'the header path is what it always was');
   ok(ICON.includes("d='M13 39V11l22 28V11'"),'and the icon carries the same path');
   [['13','39'],['13','11'],['35','39'],['35','11']].forEach(([cx,cy])=>
@@ -82,7 +82,7 @@ test('adding it did not push auth.js behind the CDN bundles', () => {
    drew it at 15/26 inside a 3px-rounded chip, so the two read as different logos
    at a glance. These derive the icon's numbers from the CSS the header actually
    uses, which means the icon cannot drift from it without this going red. */
-const CSS=readSrc('client/assets/site.css');
+const CSS=readSrc('apps/portal/assets/site.css');
 const brandMark=/\.brand-mark\{([\s\S]*?)\}/.exec(CSS)[1];
 const px=(prop)=>{
   const m=new RegExp(prop+'\\s*:\\s*([0-9.]+)px').exec(brandMark);
@@ -94,7 +94,7 @@ const r3=n=>Math.round(n*1000)/1000;
 test('the icon is the header chip, scaled — derived from site.css, not typed in', () => {
   const chip=px('width'), radius=px('border-radius');
   const mark=parseFloat(/<svg width="([0-9.]+)" height="[0-9.]+" viewBox="0 0 48 48"/
-                        .exec(readSrc('client/login.html'))[1]);
+                        .exec(readSrc('apps/portal/login.html'))[1]);
   eq(chip,26,'the chip the header draws');
   eq(mark,15,'and the mark inside it');
 
@@ -122,7 +122,7 @@ test('the chip is filled, so the corner is a corner and not a hole', () => {
 test('every brand surface uses the one red', () => {
   const RED=/#E0122B/i;
   const WRONG=/#e0313[0-9a-f]|#e11d48|#dc2626|#ef4444/i;   // the near-misses
-  [['client/assets/site.css','--red'],
+  [['apps/portal/assets/site.css','--red'],
    ['Stats/stats-view.css','--accent'],
    ['Stats/report.js','.rp-logo'],
    ['auth.html','--accent']].forEach(([f,what])=>{

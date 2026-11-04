@@ -1877,13 +1877,14 @@
      that page reads the tagging tab's localStorage and follows a #match=
      link, while here it is handed one published report and fetches nothing.
 
-     Its files live with the tagging app, and the deploy moves that whole app
-     under /tagger while this site becomes the root — so where they are
-     depends on which of the two layouts is being served. Read it off the URL
-     rather than guessing, the same way auth.js finds the site root.
+     Its files live with the tagging app. In the repo the two apps sit side by
+     side (apps/portal, apps/tagger); the deploy makes this site the root and
+     moves the tagger under /tagger — so where they are depends on which of the
+     two layouts is being served. Read it off the URL rather than guessing, the
+     same way auth.js finds the site root.
      --------------------------------------------------------- */
   function taggerRoot() {
-    return /\/client\//.test(location.pathname) ? '../' : 'tagger/';
+    return /\/apps\/portal\//.test(location.pathname) ? '../tagger/' : 'tagger/';
   }
 
   var loaded = {};

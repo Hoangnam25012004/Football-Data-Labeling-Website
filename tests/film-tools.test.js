@@ -24,9 +24,9 @@ const {grabFunction,grabConst,STATS,readSrc}=require('./harness');
 const {test,eq,ok,notOk}=require('./tiny-test');
 const vm=require('vm');
 
-const TOOLS=readSrc('client/assets/film-tools.js');
-const TOOLS_CSS=readSrc('client/assets/film-tools.css');
-const APP=readSrc('client/assets/app.js');
+const TOOLS=readSrc('apps/portal/assets/film-tools.js');
+const TOOLS_CSS=readSrc('apps/portal/assets/film-tools.css');
+const APP=readSrc('apps/portal/assets/app.js');
 const PAGE=readSrc('Stats/index.html');
 const YML=readSrc('.github/workflows/deploy.yml');
 
@@ -157,7 +157,7 @@ test('nothing in the toolkit can upload anything, anywhere', () => {
 });
 
 test('the only place a rendered blob can go is the analyst own disk', () => {
-  const dl=grabFunction('download',TOOLS,'client/assets/film-tools.js');
+  const dl=grabFunction('download',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/a\.download\s*=\s*name/.test(dl),'an <a download>, and nothing else');
   ok(/URL\.createObjectURL/.test(dl),'from a blob held in this tab');
   // every Blob built in the file is handed to download(), never to anything else
@@ -168,7 +168,7 @@ test('the only place a rendered blob can go is the analyst own disk', () => {
 
 test('and it never touches the original video object', () => {
   ['setVideoUrl','video_url','matches','removeAttribute(\'src\')']
-    .forEach(n=>notOk(grabFunction('exportClip',TOOLS,'client/assets/film-tools.js')
+    .forEach(n=>notOk(grabFunction('exportClip',TOOLS,'apps/portal/assets/film-tools.js')
       .indexOf('video_url')>=0,'the export never names '+n));
   // the export reads the SAME url the player is already playing, and only reads.
   // The element is built in openSource() now, so the binding is named there.
@@ -332,7 +332,7 @@ test('z is gone, and nothing still advertises it', () => {
   const {hit}=keyed();
   notOk(hit('z'),'the key is unbound');
   notOk(hit('Z'),'in both cases');
-  const model=grabFunction('menuModel',TOOLS,'client/assets/film-tools.js');
+  const model=grabFunction('menuModel',TOOLS,'apps/portal/assets/film-tools.js');
   notOk(/key:\s*'Z'/.test(model),'and the menu no longer offers it');
   ok(/use the wheel/.test(model),'it points at the wheel instead');
 });
@@ -507,7 +507,7 @@ test('mp4 is preferred, and webm is the honest fallback', () => {
 test('the render pump is ours, not the compositor', () => {
   ok(/captureStream\(0\)/.test(TOOLS),'frames are asked for, not taken');
   ok(/track\.requestFrame\(\)/.test(TOOLS),'one call per output frame');
-  const pump=grabFunction('pump',TOOLS,'client/assets/film-tools.js');
+  const pump=grabFunction('pump',TOOLS,'apps/portal/assets/film-tools.js');
   notOk(/requestAnimationFrame/.test(pump),'nothing in the pump waits on rAF');
   ok(/setTimeout\(pump,\s*1000\s*\/\s*fps\)/.test(pump),'it drives itself');
   ok(/var now\s*=\s*v\.currentTime/.test(pump),
@@ -515,12 +515,12 @@ test('the render pump is ours, not the compositor', () => {
 });
 
 test('a tainted canvas is proved on one pixel before forty seconds are spent', () => {
-  const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
+  const ex=grabFunction('exportClip',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/getImageData\(0,\s*0,\s*1,\s*1\)/.test(ex),'one pixel, read early');
   ok(ex.indexOf('getImageData')<ex.indexOf('rec.start'),'before the recorder is started');
   // crossOrigin lives in openSource() now — still on an element of its own, and
   // still never on the one the analyst is watching
-  const open=grabFunction('openSource',TOOLS,'client/assets/film-tools.js');
+  const open=grabFunction('openSource',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/crossOrigin\s*=\s*'anonymous'/.test(open),'on a SECOND element');
   ok(/document\.createElement\('video'\)/.test(open),'built there, not borrowed');
   notOk(/ctx\.video\.crossOrigin/.test(TOOLS),
@@ -534,9 +534,9 @@ test('a player who opens no clip gets no layer and no query', () => {
   const c=ctxFor(v);
   T._internals.setCtx(c);
   eq(c.stage.children.length,0,'nothing has been appended to the stage');
-  const ens=grabFunction('ensureLayer',TOOLS,'client/assets/film-tools.js');
+  const ens=grabFunction('ensureLayer',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/if\s*\(layer\s*\|\|\s*!ctx/.test(ens),'the layer is built once, on demand');
-  const rest=grabFunction('restore',TOOLS,'client/assets/film-tools.js');
+  const rest=grabFunction('restore',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/if\s*\(shapes\.length\)/.test(rest),'and only restored when there is something to restore');
 });
 
@@ -612,7 +612,7 @@ test('playing a clip leaves the match drawing alone', () => {
   eq(I.state().shapes.length,3);
   const clip=I.saveClip(190,200,'Clip A');
   eq(clip.shapes.length,1,'the clip still carries only what overlaps it');
-  const playClip=grabFunction('playClip',TOOLS,'client/assets/film-tools.js');
+  const playClip=grabFunction('playClip',TOOLS,'apps/portal/assets/film-tools.js');
   notOk(/shapes\s*=\s*c\.shapes/.test(playClip),'and playing it never reassigns shapes');
   eq(I.state().shapes.length,3,'so all three survive');
 });
@@ -661,7 +661,7 @@ test('right-clicking opens the toolkit without stopping the film', () => {
   v.paused=false;
   c.stage.on['contextmenu'][0]({clientX:700,clientY:400,preventDefault(){},stopPropagation(){}});
   eq(v.paused,false,'the analyst keeps their playback');
-  const open=grabFunction('openMenu',TOOLS,'client/assets/film-tools.js');
+  const open=grabFunction('openMenu',TOOLS,'apps/portal/assets/film-tools.js');
   notOk(/ctx\.pause\(\)/.test(open),'and the pause is gone from the source, not just quiet');
 });
 
@@ -751,7 +751,7 @@ test('the wheel refuses the two cases where it is not ours', () => {
 });
 
 test('the wheel listener is on the stage, and asks for the right to cancel', () => {
-  const at=grabFunction('attach',TOOLS,'client/assets/film-tools.js');
+  const at=grabFunction('attach',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/ctx\.stage\.addEventListener\('wheel',\s*onWheel,\s*\{\s*passive:\s*false\s*\}\)/.test(at),
      'on ctx.stage, never document, and passive:false or preventDefault is ignored');
   notOk(/document\.addEventListener\('wheel'/.test(TOOLS),'nothing global');
@@ -767,7 +767,7 @@ test('the zoom origin is worked out in each element own box', () => {
      'y=270 of 1080 sits at 73.5+(270/1080)*804 = 274.5 of 951, not at 25% — got '+o);
   const x=parseFloat(o.split(' ')[0]);
   ok(Math.abs(x-25)<0.01,'and the unboxed axis is still a plain quarter');
-  const az=grabFunction('applyZoom',TOOLS,'client/assets/film-tools.js');
+  const az=grabFunction('applyZoom',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/originOnElement/.test(az),'the video uses the element-space origin');
   ok(/layer\.w\s*\*\s*100/.test(az),'the SVG keeps the picture-space one, because it IS the picture');
 });
@@ -861,7 +861,7 @@ test('shift+arrow nudges the window by a frame, and leaves the transport keys al
 });
 
 test('nothing here relies on a modifier stats-view throws away first', () => {
-  const k=grabFunction('key',TOOLS,'client/assets/film-tools.js');
+  const k=grabFunction('key',TOOLS,'apps/portal/assets/film-tools.js');
   ['altKey','ctrlKey','metaKey'].forEach(m=>
     notOk(k.indexOf(m)>=0,
       'key() reads '+m+' — filmKeys() returns before us on those, so it would never run'));
@@ -870,7 +870,7 @@ test('nothing here relies on a modifier stats-view throws away first', () => {
 
 /* ================= the exports ================= */
 test('the export builds its overlay detached, and stops driving the screen', () => {
-  const ov=grabFunction('overlaySVGString',TOOLS,'client/assets/film-tools.js');
+  const ov=grabFunction('overlaySVGString',TOOLS,'apps/portal/assets/film-tools.js');
   notOk(/\bpaint\(/.test(ov),'a forty-second render may not move the analyst own picture');
   ok(/liveAt\(now\)/.test(ov),'the same window the screen uses');
   ok(/alpha\(s,\s*now\)/.test(ov),'and the same fade, so the file matches what was seen');
@@ -878,13 +878,13 @@ test('the export builds its overlay detached, and stops driving the screen', () 
 
 /* Q1 was answered B: the reference product stops on the frame. */
 test('a freeze segment holds one frame, and the file comes out longer for it', () => {
-  const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
+  const ex=grabFunction('exportClip',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/s\.freeze\s*>\s*0/.test(ex),'a shape can ask for a hold');
   ok(/Math\.abs\(last\.t\s*-\s*f\.t\)\s*<\s*0\.25/.test(ex),
      'points within a quarter second merge — an arrow, a zone and a caption on one frame stop it once');
   ok(/Math\.max\(last\.hold,\s*f\.hold\)/.test(ex),'and the longest hold wins');
   ok(/total\s*=\s*dur\s*\+\s*holdTotal/.test(ex),'the progress figure counts the holds');
-  const pump=grabFunction('pump',TOOLS,'client/assets/film-tools.js');
+  const pump=grabFunction('pump',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/if\s*\(frozen\)/.test(pump),'the pump has a holding branch');
   ok(/v\.pause\(\)/.test(pump),'the source stops, so the picture really is one frame');
   ok(/Date\.now\(\)\s*>=\s*frozen\.until/.test(pump),
@@ -922,11 +922,11 @@ test('detach takes off every listener attach put on', () => {
    analyst was told something and then changed half. Both ends are held: the
    timer is cancelled with everything else, and it checks before it reaches. */
 test('a toast still counting down cannot outlive the box it hangs in', () => {
-  const det=grabFunction('detach',TOOLS,'client/assets/film-tools.js');
+  const det=grabFunction('detach',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/clearTimeout\(toastT\)/.test(det),'detach cancels the countdown');
   ok(det.indexOf('clearTimeout(toastT)')<det.indexOf('toastEl = null'),
      'before the node it would have reached for is dropped');
-  const t=grabFunction('toast',TOOLS,'client/assets/film-tools.js');
+  const t=grabFunction('toast',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/if \(toastEl\) toastEl\.classList\.remove\('on'\)/.test(t),
      'and the timer looks before it touches');
 });
@@ -988,7 +988,7 @@ test('a source that answers twice only settles once', async () => {
 });
 
 test('the export asks three times, and the last answer picks the message', () => {
-  const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
+  const ex=grabFunction('exportClip',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/openSource\(src,\s*true\)/.test(ex),'beat one, with the header demanded');
   ok(/openSource\(corsUrl\(src\),\s*true\)/.test(ex),'beat two, off the cache path');
   ok(/openSource\(src,\s*false\)/.test(ex),'beat three, without the header at all');
@@ -1017,14 +1017,14 @@ test('a cache poisoned by the player is retried before the bucket is blamed', ()
      'the same file, one parameter, a different cache entry');
   eq(I.corsUrl('https://x.test/m.mp4?a=1'),'https://x.test/m.mp4?a=1&cors=1',
      'and a url that already carries a query keeps it');
-  const open=grabFunction('openSource',TOOLS,'client/assets/film-tools.js');
+  const open=grabFunction('openSource',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/crossOrigin = 'anonymous'/.test(open),'the retry still demands the header');
 });
 
 test('the diagnosing element renders nothing and is thrown away at once', () => {
-  const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
+  const ex=grabFunction('exportClip',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/dropSource\(el\)/.test(ex),'beat two is disposed of the moment it has answered');
-  const drop=grabFunction('dropSource',TOOLS,'client/assets/film-tools.js');
+  const drop=grabFunction('dropSource',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/removeAttribute\('src'\)/.test(drop),'src let go');
   ok(/\.load\(\)/.test(drop),'and the buffer with it');
 });
@@ -1034,11 +1034,11 @@ test('a proven missing header is remembered, and said before it is asked again',
   eq(I.state().corsState,null,'nothing assumed to begin with');
   I.setCors(false);
   eq(I.state().corsState,false);
-  const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
+  const ex=grabFunction('exportClip',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/corsState === false/.test(ex),'a second attempt says so at once');
   ok(ex.indexOf('corsState === false')<ex.indexOf('pickMime'),
      'before a recorder, an audio graph or a canvas is built for nothing');
-  const rp=grabFunction('renderPanel',TOOLS,'client/assets/film-tools.js');
+  const rp=grabFunction('renderPanel',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/corsState === false/.test(rp),'and the drawer stops offering the button as ready');
 });
 
@@ -1047,7 +1047,7 @@ test('a proven missing header is remembered, and said before it is asked again',
 test('diagnosing CORS added no way to talk to anything', () => {
   ['fetch(','XMLHttpRequest','navigator.sendBeacon','.upload('].forEach(n=>
     notOk(TOOLS.indexOf(n)>=0,'film-tools.js mentions '+n));
-  const open=grabFunction('openSource',TOOLS,'client/assets/film-tools.js');
+  const open=grabFunction('openSource',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/document\.createElement\('video'\)/.test(open),
      'the only thing that touches the network is a <video>, which the player was already doing');
 });
@@ -1055,7 +1055,7 @@ test('diagnosing CORS added no way to talk to anything', () => {
 /* A render that cannot draw the drawing must STOP. Handing over a file that
    looks finished but carries no graphics is the worst of the three outcomes. */
 test('an overlay that will not rasterise stops the render instead of shipping a bare clip', () => {
-  const ex=grabFunction('exportClip',TOOLS,'client/assets/film-tools.js');
+  const ex=grabFunction('exportClip',TOOLS,'apps/portal/assets/film-tools.js');
   const then=ex.slice(ex.indexOf('overlayImage(str).then'));
   notOk(/overlayImage\(str\)\.then\(function \(img\) \{ lastImg = img; after\(\); \}, after\)/.test(ex),
      'the rejection no longer falls through to after() with lastImg still null');
@@ -1141,7 +1141,7 @@ test('with no menu open, a click on the frame does what it always did: nothing',
     preventDefault(){prevented=true;},stopPropagation(){}});
   eq(I.state().shapes.length,before,'no shape');
   notOk(prevented,'and the press is not claimed — the video surface takes no click');
-  const od=grabFunction('onDown',TOOLS,'client/assets/film-tools.js');
+  const od=grabFunction('onDown',TOOLS,'apps/portal/assets/film-tools.js');
   ok(od.indexOf('if (menu)')<od.indexOf('if (!mode && adjust)'),
      'the dismiss branch is FIRST, so one click can only ever mean one thing');
 });
@@ -1169,7 +1169,7 @@ test('and nothing in it reaches for a bare tag', () => {
 
 /* ================= shipping ================= */
 test('both new files are staged for GitHub Pages', () => {
-  ['cp client/assets/film-tools.js','cp client/assets/film-tools.css']
+  ['cp apps/portal/assets/film-tools.js','cp apps/portal/assets/film-tools.css']
     .forEach(line=>ok(YML.indexOf(line)>=0,
       'deploy.yml is missing: '+line+' — it would 404 live while the build stays green'));
 });

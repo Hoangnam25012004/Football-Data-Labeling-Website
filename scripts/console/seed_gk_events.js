@@ -10,7 +10,7 @@
 
    VI SAO KHONG BAM NUT "＋ Add":
    nextFreeKey() phat ma tu DEFAULT_KEYS. Ma o day duoc dat thang, dung bang da duyet
-   trong docs/gk-events-and-duel-split-design.md §6.2.
+   trong docs/design/gk-events-and-duel-split-design.md §6.2.
 
    AN TOAN:
    - Khong doi ten, khong xoa event nao. Macro luu theo TEN nen khong macro nao chet.

@@ -4,9 +4,9 @@
    a rename or a behaviour change there fails here loudly. */
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk,deepEq}=require('./tiny-test');
-const {grabFunction,grabConst,loadShared}=require('./harness');
+const {grabFunction,grabConst,loadShared,repoPath}=require('./harness');
 
-const REPORT=fs.readFileSync(path.join(__dirname,'..','Stats','report.js'),'utf8');
+const REPORT=fs.readFileSync(repoPath('Stats/report.js'),'utf8');
 const S=loadShared();
 const grabR=n=>grabFunction(n,REPORT,'Stats/report.js');
 const grabRC=n=>grabConst(n,REPORT,'Stats/report.js');
@@ -312,7 +312,7 @@ test('every Stats-tab defensive category, take-on concern included, gets a repor
 });
 // DEF_CATS lives in the Stats page; lift it out so the two stay in step
 function statsDefCats(){
-  const src=fs.readFileSync(path.join(__dirname,'..','Stats','stats-view.js'),'utf8');
+  const src=fs.readFileSync(repoPath('Stats/stats-view.js'),'utf8');
   const ctx={};vm.createContext(ctx);
   vm.runInContext(grabConst('DEF_CATS',src,'Stats/stats-view.js')+'\n;globalThis.d=DEF_CATS;',ctx);
   return ctx.d;

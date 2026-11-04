@@ -21,10 +21,10 @@ const F=n=>grabFunction(n,STATS,'Stats/stats-view.js');
 const G=n=>grabConst(n,STATS,'Stats/stats-view.js');
 
 const CSS   =readSrc('Stats/stats-view.css');
-const APP   =readSrc('client/assets/app.js');
-const TOOLS =readSrc('client/assets/film-tools.js');
-const PAGE  =readSrc('client/guide.html');
-const GUIDE =readSrc('client/assets/guide.js');
+const APP   =readSrc('apps/portal/assets/app.js');
+const TOOLS =readSrc('apps/portal/assets/film-tools.js');
+const PAGE  =readSrc('apps/portal/guide.html');
+const GUIDE =readSrc('apps/portal/assets/guide.js');
 const TAGGER=readSrc('Stats/index.html');
 
 /* ================= filmHTML, actually run ================= */
@@ -66,7 +66,7 @@ test('the tagging app is exactly one of those hosts', () => {
 
 test('the channel asks, and keeps what it was already asking for', () => {
   const m=/PTStats\.mount\(holder,\s*rep\.payload,[\s\S]{0,140}?\)/.exec(APP);
-  ok(m,'client/assets/app.js still mounts the report');
+  ok(m,'apps/portal/assets/app.js still mounts the report');
   ok(/fullscreen:\s*true/.test(m[0]),'full screen is untouched');
   ok(/guide:\s*'guide\.html'/.test(m[0]),'and the guide is asked for beside it');
 });
@@ -203,7 +203,7 @@ test('the analyst menu is in the language the rest of the channel is in', () => 
    video went on playing detached, Space on the next page was still swallowed,
    and four listeners on `document` accumulated one set per match opened. */
 test('leaving a match tears the player down before the page is emptied', () => {
-  const route=grabFunction('route',APP,'client/assets/app.js');
+  const route=grabFunction('route',APP,'apps/portal/assets/app.js');
   ok(/PTStats\.destroy\(\)/.test(route),'destroy() is called on the way out');
   ok(route.indexOf('PTStats.destroy()')<route.indexOf("view.innerHTML = ''"),
     'and before the elements go, while there is still something to stop');
@@ -216,7 +216,7 @@ function link(href,t){
   const ctx={console,location:{href:href}};
   vm.createContext(ctx);
   vm.runInContext(
-    grabFunction('momentLink',TOOLS,'client/assets/film-tools.js')
+    grabFunction('momentLink',TOOLS,'apps/portal/assets/film-tools.js')
     +';globalThis.OUT=momentLink('+t+');',ctx,{filename:'moment.js'});
   return ctx.OUT;
 }
@@ -253,7 +253,7 @@ test('a page with no hash and no query still gets a usable link', () => {
 });
 
 test('the moment a ?t= link names is opened on Film, not on the default tab', () => {
-  const r=grabFunction('renderMatchStats',APP,'client/assets/app.js');
+  const r=grabFunction('renderMatchStats',APP,'apps/portal/assets/app.js');
   ok(/\[\?&\]t=/.test(r),'the URL is read');
   ok(/viewFilmBtn/.test(r),'and the view is changed through the button mount() drew');
   ok(r.indexOf('PTStats.mount')<r.indexOf('viewFilmBtn'),

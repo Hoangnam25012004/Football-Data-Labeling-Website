@@ -15,3 +15,15 @@ _site/
 
 # npm dependencies (restored with `npm install`; see worker/package-lock.json)
 node_modules/
+
+# Local browser profile used by the demo recorder (~190 MB of Chrome state)
+apps/portal/chrome-profile/
+
+# Client deliverables: rendered match reports and marketing material stay on
+# disk, not in git (the one Hanley Town sample report is tracked on purpose)
+deliverables/match-reports/*.pdf
+!deliverables/match-reports/Hanley_Town_vs_Gornal_Athletic_Match_Report.pdf
+deliverables/marketing/
+
+# Scratch API responses (can hold session tokens)
+resp.json

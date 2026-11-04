@@ -16,9 +16,8 @@
         match is open, so the pages are not reached by accident in the first place. */
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk,deepEq}=require('./tiny-test');
-const {grabConst,SHARED,STATS,SRC}=require('./harness');
+const {grabConst,SHARED,STATS,SRC,repoPath}=require('./harness');
 
-const ROOT=path.join(__dirname,'..');
 
 /* localStorage stand-in seeded the way the real one looks after a match has been open */
 function store(seed){
@@ -65,7 +64,7 @@ test('an unstamped store is not trusted on the strength of there being one', () 
 });
 
 /* ================= Stats says so, rather than showing leftovers ================= */
-const statsSrc=fs.readFileSync(path.join(ROOT,'Stats','stats-view.js'),'utf8');
+const statsSrc=fs.readFileSync(repoPath('Stats/stats-view.js'),'utf8');
 
 test('Stats shows a notice instead of another match\'s numbers', () => {
   ok(/id="noMatchMsg"/.test(statsSrc),'the notice exists');

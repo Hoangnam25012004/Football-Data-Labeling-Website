@@ -11,12 +11,12 @@
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk}=require('./tiny-test');
 
-const ROOT=path.join(__dirname,'..');
-const page=p=>fs.readFileSync(path.join(ROOT,p),'utf8');
+const {repoPath}=require('./harness');
+const page=p=>fs.readFileSync(repoPath(p),'utf8');
 
-const SUPA=page('client/assets/supa.js');
-const APPJS=page('client/assets/app.js');
-const APPCSS=page('client/assets/app.css');
+const SUPA=page('apps/portal/assets/supa.js');
+const APPJS=page('apps/portal/assets/app.js');
+const APPCSS=page('apps/portal/assets/app.css');
 const SQL=page('supabase/migrations/0018_club_team_code.sql');
 const SQL02=page('supabase/migrations/0002_match_code.sql');
 const bare=s=>s.replace(/--[^\n]*/g,'');
@@ -60,7 +60,7 @@ function loadAPI(handler,session){
   const win={supabase:{createClient:()=>db.client}};
   const ctx={console,window:win,URLSearchParams,Promise,URL};
   vm.createContext(ctx);
-  vm.runInContext(SUPA,ctx,{filename:'client/assets/supa.js'});
+  vm.runInContext(SUPA,ctx,{filename:'apps/portal/assets/supa.js'});
   return {api:win.HNA,calls:db.calls};
 }
 

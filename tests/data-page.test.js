@@ -16,9 +16,9 @@ const {grabFunction,readSrc}=require('./harness');
 const ROOT=path.join(__dirname,'..');
 const page=readSrc;                       // CRLF-folded: see readSrc in harness.js
 
-const SUPA=page('client/assets/supa.js');
-const APPJS=page('client/assets/app.js');
-const APPCSS=page('client/assets/app.css');
+const SUPA=page('apps/portal/assets/supa.js');
+const APPJS=page('apps/portal/assets/app.js');
+const APPCSS=page('apps/portal/assets/app.css');
 const SHARED=page('shared.js');
 const YML=page('.github/workflows/deploy.yml');
 
@@ -57,7 +57,7 @@ function loadAPI(handler){
   const win={supabase:{createClient:()=>db.client}};
   const ctx={console,window:win,URLSearchParams,Promise};
   vm.createContext(ctx);
-  vm.runInContext(SUPA,ctx,{filename:'client/assets/supa.js'});
+  vm.runInContext(SUPA,ctx,{filename:'apps/portal/assets/supa.js'});
   return {api:win.HNA,calls:db.calls};
 }
 
@@ -292,9 +292,9 @@ function runDiscipline(reports, matches){
   vm.runInContext([SHARED,
     'window.classifyCards=classifyCards;',
     'var state={reports:'+JSON.stringify(reports)+'};',
-    grabFunction('discipline',APPJS,'client/assets/app.js'),
+    grabFunction('discipline',APPJS,'apps/portal/assets/app.js'),
     ';globalThis.out=discipline('+JSON.stringify(matches)+');'
-  ].join('\n'),ctx,{filename:'client/assets/app.js-discipline'});
+  ].join('\n'),ctx,{filename:'apps/portal/assets/app.js-discipline'});
   return ctx.out;
 }
 
@@ -412,11 +412,11 @@ test('the team stats card is two rows on one grid', () => {
 
 /* ================= deploy ================= */
 test('the Data view added no file the deploy would have to be told about', () => {
-  ['client/assets/app.js','client/assets/app.css','client/assets/supa.js']
+  ['apps/portal/assets/app.js','apps/portal/assets/app.css','apps/portal/assets/supa.js']
     .forEach(f=>ok(YML.includes(f),f+' is staged'));
   // ?v= is how a returning browser is made to re-fetch these
   const v=(src,name)=>(new RegExp(name.replace('.','\\.')+'\\?v=(\\d+)').exec(src)||[])[1];
-  const app=page('client/app.html');
+  const app=page('apps/portal/app.html');
   ok(+v(app,'app.js')>=12,'app.js is bumped for the new Data view');
   ok(+v(app,'supa.js')>=10,'supa.js too, for reports()');
   ok(+v(app,'app.css')>=8,'and app.css for what draws it');

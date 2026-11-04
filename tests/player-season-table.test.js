@@ -1,7 +1,7 @@
 /* The Season table: what a player has played, by league and by season.
 
    It stands where four tiles used to, in the right-hand half of the row the
-   position board opens (docs/player-season-table-design.md). Four columns, and
+   position board opens (docs/design/player-season-table-design.md). Four columns, and
    the same four for a centre back, a striker and a keeper alike — that a table
    does not change with the job he did is the whole reason it replaced the tiles.
 
@@ -26,9 +26,9 @@ const vm=require('vm');
 const {test,eq,deepEq,ok,notOk}=require('./tiny-test');
 const {grabFunction,readSrc,SHARED}=require('./harness');
 
-const APPJS=readSrc('client/assets/app.js');
-const APPCSS=readSrc('client/assets/app.css');
-const SUPA=readSrc('client/assets/supa.js');
+const APPJS=readSrc('apps/portal/assets/app.js');
+const APPCSS=readSrc('apps/portal/assets/app.css');
+const SUPA=readSrc('apps/portal/assets/supa.js');
 
 const profile=/function renderPlayerProfile\([^)]*\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const rowsFn=/function seasonRows\(who\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
@@ -63,10 +63,10 @@ function paintSeason(who){
     '(function(){',
     /\n  var el = function[\s\S]*?\n  \};/.exec(APPJS)[0],
     ['esc','num','minsTotal','seasonRows','seasonCard']
-      .map(n=>grabFunction(n,APPJS,'client/assets/app.js')).join('\n'),
+      .map(n=>grabFunction(n,APPJS,'apps/portal/assets/app.js')).join('\n'),
     ';globalThis.ROWS=seasonRows;globalThis.CARD=seasonCard;',
     '})();'
-  ].join('\n'),ctx,{filename:'client/assets/app.js-season.js'});
+  ].join('\n'),ctx,{filename:'apps/portal/assets/app.js-season.js'});
 
   const card=ctx.CARD(who);
   const table=card.kids.filter(n=>n.className==='stbl-wrap')[0];

@@ -22,7 +22,7 @@ một dòng nào**; test cũ duy nhất phải đổi là `macros are kept in th
 `worker/**` · `auth.js` · `auth.html` · `shared.css` · `.github/workflows/deploy.yml` ·
 `supabase/migrations/0001…0019` (mọi migration cũ). Lý do từng file ở §7.
 
-**Cache-bust:** `cloud-sync.js` đổi ⇒ bump `?v=49` → `?v=50` tại [index.html:4131](../index.html:4131)
+**Cache-bust:** `cloud-sync.js` đổi ⇒ bump `?v=49` → `?v=50` tại [index.html:4131](../../apps/tagger/index.html:4131)
 và `tests/asset-versions.json`. `shared.js` **không** đổi nên `Stats/index.html` và
 `Player-Lists/index.html` giữ nguyên `?v=21`.
 
@@ -72,7 +72,7 @@ cho ra cùng một kết quả: đổi máy, đổi trình duyệt, dùng máy �
 ### 1.2 Chuyện đang sai về mặt mô hình
 
 `public.event_types` đang giữ **cả tên event lẫn hotkey** trong một hàng, dùng chung cho mọi
-người ([0003_event_types.sql](../supabase/migrations/0003_event_types.sql)):
+người ([0003_event_types.sql](../../supabase/migrations/0003_event_types.sql)):
 
 ```sql
 create table public.event_types (
@@ -83,7 +83,7 @@ create table public.event_types (
 
 Nên hôm nay:
 
-- A đổi `pass success` từ `s` sang `p` → [cloud-sync.js:176](../cloud-sync.js:176) `onEventTypesChanged`
+- A đổi `pass success` từ `s` sang `p` → [cloud-sync.js:176](../../apps/tagger/cloud-sync.js:176) `onEventTypesChanged`
   → `pushEventTypes` upsert → realtime bắn về máy B → **bàn phím của B đổi giữa lúc B đang tag.**
 - Không ai có bộ phím riêng. Người thuận tay trái, người quen layout khác, người tag chuyên về
   set-piece — tất cả bị ép dùng chung một bản đồ phím.
@@ -124,16 +124,16 @@ Toàn bộ, không sót:
 
 | Nơi | Dùng để làm gì |
 |---|---|
-| [index.html:1988](../index.html:1988) `updateBanner` | hiện `[s]` cạnh tên event đang chọn |
-| [index.html:1990](../index.html:1990) `setKey` | ô nhập phím trong bảng Event |
-| [index.html:2008](../index.html:2008) `renderEvents` | vẽ ô phím |
-| [index.html:2024](../index.html:2024) `nextFreeKey` | cấp phím trống khi tạo event mới |
-| [index.html:2111](../index.html:2111) `eventForKey` | gõ → tên event |
-| [index.html:2123](../index.html:2123) `expandKey` | một token → danh sách `{key,name}` |
-| [index.html:2147](../index.html:2147) `expandMacros` | viết macro ra dạng dài |
-| [index.html:2402](../index.html:2402) submit | `action:ev.key` ghi vào row |
+| [index.html:1988](../../apps/tagger/index.html:1988) `updateBanner` | hiện `[s]` cạnh tên event đang chọn |
+| [index.html:1990](../../apps/tagger/index.html:1990) `setKey` | ô nhập phím trong bảng Event |
+| [index.html:2008](../../apps/tagger/index.html:2008) `renderEvents` | vẽ ô phím |
+| [index.html:2024](../../apps/tagger/index.html:2024) `nextFreeKey` | cấp phím trống khi tạo event mới |
+| [index.html:2111](../../apps/tagger/index.html:2111) `eventForKey` | gõ → tên event |
+| [index.html:2123](../../apps/tagger/index.html:2123) `expandKey` | một token → danh sách `{key,name}` |
+| [index.html:2147](../../apps/tagger/index.html:2147) `expandMacros` | viết macro ra dạng dài |
+| [index.html:2402](../../apps/tagger/index.html:2402) submit | `action:ev.key` ghi vào row |
 
-Tất cả đều đọc qua `curEvents()` ([index.html:1979](../index.html:1979)), tức
+Tất cả đều đọc qua `curEvents()` ([index.html:1979](../../apps/tagger/index.html:1979)), tức
 `state.events[state.sport]`, hình dạng `[{name,key}, …]`.
 
 > **Đây là chỗ tựa của cả thiết kế:** nếu `state.events` **giữ nguyên hình dạng** và chỉ đổi
@@ -150,9 +150,9 @@ Tất cả đều đọc qua `curEvents()` ([index.html:1979](../index.html:1979
   của Supabase anon key — không liên quan.
 - **`Player-Lists/index.html`** — `.key` duy nhất là `srt.key` (khoá sắp xếp bảng).
 - **`client/**`** (landing, app.html, film-tools) — không hề biết đến bảng Event.
-- Listener `storage` giữa các tab: [index.html:1006](../index.html:1006) chỉ nghe `LU_STORE`;
-  [Stats/stats-view.js:2055](../Stats/stats-view.js:2055) nghe `rows/meta/duration/lineups`;
-  [Player-Lists/index.html:638](../Player-Lists/index.html:638) nghe `meta/lineups`.
+- Listener `storage` giữa các tab: [index.html:1006](../../apps/tagger/index.html:1006) chỉ nghe `LU_STORE`;
+  [Stats/stats-view.js:2055](../../apps/tagger/Stats/stats-view.js:2055) nghe `rows/meta/duration/lineups`;
+  [Player-Lists/index.html:638](../../apps/tagger/Player-Lists/index.html:638) nghe `meta/lineups`.
   **Không tab nào nghe `pitchtagger.events.v1`, và cũng sẽ không nghe khoá prefs mới.**
 
 Kết luận: thay đổi này **không chạm được** vào Stats, Player-Lists, client site, film tools,
@@ -161,13 +161,13 @@ report PDF. Đó là dữ kiện, không phải lời hứa.
 ### 3.3 Chỗ nguy hiểm duy nhất: `row.action` và `row.raw`
 
 Mỗi row lưu lại **phím lúc tag** chứ không chỉ tên event
-([index.html:2402](../index.html:2402)):
+([index.html:2402](../../apps/tagger/index.html:2402)):
 
 ```js
 event:ev.name, playerFrom:ev.from, playerTo:ev.to||'', action:ev.key, raw, …
 ```
 
-và cả hai đi lên cloud ([cloud-sync.js:35](../cloud-sync.js:35), `:40`) thành `action_code` +
+và cả hai đi lên cloud ([cloud-sync.js:35](../../apps/tagger/cloud-sync.js:35), `:40`) thành `action_code` +
 `attributes.raw`. Rồi ✎ Edit dựng lại ô nhập **từ phím đó**:
 
 ```js
@@ -300,7 +300,7 @@ Phương án thay thế là `user_hotkeys(user_id,sport,event_name,key)` +
 1. **App vốn ghi cả cụm.** `saveEvents`/`saveMacros` xưa nay serialize nguyên object. Một
    `upsert` một hàng khớp đúng thói quen đó — **không cần logic diff/delete**.
 2. **`pushEventTypes` đã cho thấy giá phải trả.** Nó phải `select` lại rồi `delete .in(id)` cho
-   những hàng biến mất ([cloud-sync.js:162-167](../cloud-sync.js:162)). Đó chính là loại code dễ
+   những hàng biến mất ([cloud-sync.js:162-167](../../apps/tagger/cloud-sync.js:162)). Đó chính là loại code dễ
    xoá nhầm. Không nhân bản nó thêm hai lần nữa.
 3. **Macro là mảng có thứ tự, phần tử không có id ổn định.** Lưu quan hệ sẽ phải bịa `ord` và
    diff theo vị trí — mong manh.
@@ -316,7 +316,7 @@ last-write-wins. Cả hai chấp nhận được — §8 xử lý cái thứ hai
 
 ### 5.1 `index.html` — hotkey
 
-**Thêm** (đặt ngay dưới khối macro hiện có, ~[index.html:1520](../index.html:1520)):
+**Thêm** (đặt ngay dưới khối macro hiện có, ~[index.html:1520](../../apps/tagger/index.html:1520)):
 
 ```js
 /* ---- bàn phím của riêng tôi ----
@@ -328,9 +328,9 @@ const HK_STORE='pitchtagger.hotkeys.v1';
 ```
 
 `loadHotkeys()` / `saveHotkeys()` viết theo đúng khuôn `recentAll()`/`rememberMatch()` đã có
-([index.html:3913-3925](../index.html:3913)): blob ngoài cùng khoá theo `uid`.
+([index.html:3913-3925](../../apps/tagger/index.html:3913)): blob ngoài cùng khoá theo `uid`.
 
-**Sửa `applyEventTypes`** ([index.html:1487](../index.html:1487)) — thu `siteKeys` rồi resolve:
+**Sửa `applyEventTypes`** ([index.html:1487](../../apps/tagger/index.html:1487)) — thu `siteKeys` rồi resolve:
 
 ```js
 function applyEventTypes(ev){
@@ -345,7 +345,7 @@ function applyEventTypes(ev){
 }
 ```
 
-**Sửa `setKey`** ([index.html:1990](../index.html:1990)) — ghi vào prefs, **không** ghi vào từ điển chung:
+**Sửa `setKey`** ([index.html:1990](../../apps/tagger/index.html:1990)) — ghi vào prefs, **không** ghi vào từ điển chung:
 
 ```js
 function setKey(ev,val){
@@ -386,7 +386,7 @@ Quy tắc di trú (chạy đúng một lần cho mỗi user, khi cloud chưa có
    nhánh 3 này.
 
 `loadMacros()` giữ nguyên toàn bộ phần lọc/chuẩn hoá đang có
-([index.html:1503-1515](../index.html:1503)) — chỉ đổi chỗ lấy blob.
+([index.html:1503-1515](../../apps/tagger/index.html:1503)) — chỉ đổi chỗ lấy blob.
 
 ### 5.3 `cloud-sync.js`
 
@@ -423,10 +423,10 @@ async function initUserPrefs(session) {
 ```
 
 `pushUserPrefs` / `onUserPrefsChanged` / `subscribeUserPrefs` sao chép nguyên khuôn debounce +
-cờ `applying` của `event_types` ([cloud-sync.js:167-180](../cloud-sync.js:167)), khác mỗi
+cờ `applying` của `event_types` ([cloud-sync.js:167-180](../../apps/tagger/cloud-sync.js:167)), khác mỗi
 `filter: 'user_id=eq.' + prefsUid` trên kênh realtime.
 
-Trong `connect()`, chèn **sau** `initEventTypes()` ([cloud-sync.js:102](../cloud-sync.js:102)) —
+Trong `connect()`, chèn **sau** `initEventTypes()` ([cloud-sync.js:102](../../apps/tagger/cloud-sync.js:102)) —
 thứ tự bắt buộc, vì phải có danh sách event rồi mới resolve phím lên nó:
 
 ```js
@@ -434,7 +434,7 @@ await initEventTypes();      // shared event dictionary (live)
 await initUserPrefs(session); // ← MỚI: bàn phím + macro của riêng người này
 ```
 
-**Sửa `pushEventTypes`** ([cloud-sync.js:154](../cloud-sync.js:154)) — thôi ghi đè `key`:
+**Sửa `pushEventTypes`** ([cloud-sync.js:154](../../apps/tagger/cloud-sync.js:154)) — thôi ghi đè `key`:
 
 ```js
 // key chỉ được đặt khi event LẦN ĐẦU vào bảng: nó là "phím mặc định của site" mà người
@@ -456,7 +456,7 @@ Object.keys(events).forEach(sport => (events[sport]||[]).forEach((e,i) => {
 > `upsert` cho hàng đã tồn tại (không có `key`), một `insert` cho hàng mới (có `key`).
 > Đây là chi tiết dễ sai nhất trong cả thay đổi; test §10 chốt nó lại.
 
-**Mở rộng `window.PT`** ([index.html:4129](../index.html:4129)): thêm `applyUserPrefs`,
+**Mở rộng `window.PT`** ([index.html:4129](../../apps/tagger/index.html:4129)): thêm `applyUserPrefs`,
 `localPrefs`. Không bỏ khoá nào đang có.
 
 ---
@@ -543,8 +543,8 @@ Ba đường đi, bạn chọn ở **Q3**:
 | `parseChain`, `expandKey`, `expandMacros`, `eventForKey`, `nextFreeKey`, `updateBanner`, `renderEvents` | **0 thay đổi** | Nhờ §4.2 resolve tại điểm nạp. |
 | `shared.js`, `Stats/*`, `Player-Lists/*` | **0 dòng** | §3.2: không đọc hotkey/macro. |
 | `client/**`, `worker/**`, `auth.js`, `auth.html` | **0 dòng** | Không liên quan. |
-| `updateStoreStatus` che lỗi lưu ([index.html:1521](../index.html:1521)) | **để nguyên trong lần này** | Là bug thật, nhưng là bug *khác*. Xem **Q4**. |
-| Sửa nút `Backup` không tồn tại ([index.html:1526](../index.html:1526)) | **để nguyên** | Sau khi macro lên cloud, câu chữ ấy còn sai theo kiểu khác. Xem **Q5**. |
+| `updateStoreStatus` che lỗi lưu ([index.html:1521](../../apps/tagger/index.html:1521)) | **để nguyên trong lần này** | Là bug thật, nhưng là bug *khác*. Xem **Q4**. |
+| Sửa nút `Backup` không tồn tại ([index.html:1526](../../apps/tagger/index.html:1526)) | **để nguyên** | Sau khi macro lên cloud, câu chữ ấy còn sai theo kiểu khác. Xem **Q5**. |
 | `deploy.yml` | **0 dòng** | `supabase/` không phục vụ qua web; `index.html`/`cloud-sync.js` đã có `cp`. |
 
 ---
@@ -555,7 +555,7 @@ Ba đường đi, bạn chọn ở **Q3**:
 |---|---|---|
 | A đổi phím, B đang tag | **Bàn phím B đổi giữa chừng** | B không thấy gì. Đúng như mong muốn. |
 | A tạo event mới | B thấy event mới (realtime) | Y hệt — cộng thêm: B nhận `key` mặc định của site nếu phím đó còn trống với B |
-| A xoá event | B mất event đó | Y hệt. Macro của B trỏ vào nó chuyển sang đỏ "no longer exists" — cơ chế đã có sẵn ([index.html:2067](../index.html:2067)) |
+| A xoá event | B mất event đó | Y hệt. Macro của B trỏ vào nó chuyển sang đỏ "no longer exists" — cơ chế đã có sẵn ([index.html:2067](../../apps/tagger/index.html:2067)) |
 | **Cùng một account, 2 tab tagger** | macro lệch nhau vĩnh viễn | Kênh realtime lọc `user_id=eq.<uid>` kéo tab kia về đúng, debounce 150 ms |
 | Tab Stats / Player-Lists mở song song | — | **Không đổi gì.** Không tab nào nghe khoá prefs; chúng chỉ dùng tên event |
 | Hai account trên cùng một trình duyệt | macro trộn vào nhau (v1 không khoá theo user) | Tách sạch: cache local khoá theo `uid`, cloud khoá bằng RLS |
@@ -582,7 +582,7 @@ hành vi cũ trở lại nguyên vẹn. Không mất dữ liệu ở bất kỳ 
 ## 10. Kế hoạch test
 
 Harness lấy hàm thẳng từ `index.html` bằng cách quét tên + đếm ngoặc
-([tests/harness.js](../tests/harness.js)), nên đổi tên hàm là fail ngay — cố ý như vậy.
+([tests/harness.js](../../tests/harness.js)), nên đổi tên hàm là fail ngay — cố ý như vậy.
 
 ### 10.1 Suite cũ phải xanh, không sửa một dòng
 
@@ -660,7 +660,7 @@ lên giống hệt hôm nay. Trong bản cài đặt, "kế thừa" = **không c
 **Q3 — ✎ Edit (§6.3).** → **3A** `retypeForMe`, cộng phần siết thêm ở §0.2.
 
 **Q4 — Badge trạng thái.** `updateStoreStatus` đang `return` sớm khi có cloud nên nuốt luôn cảnh
-báo `STORAGE_OK=false` ([index.html:1521](../index.html:1521)). → **tách PR riêng**, không đụng tới trong lần này.
+báo `STORAGE_OK=false` ([index.html:1521](../../apps/tagger/index.html:1521)). → **tách PR riêng**, không đụng tới trong lần này.
 
 **Q5 — Backup/Restore JSON.** Sau khi lên cloud thì nó bớt cấp thiết, nhưng dòng chữ
 `⚠ can't save — use Backup` vẫn trỏ tới một nút không tồn tại. → **để yên**, không đụng tới trong lần này.

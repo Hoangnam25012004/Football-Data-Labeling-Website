@@ -22,7 +22,7 @@ const {test,eq,ok,notOk,deepEq}=require('./tiny-test');
 const {loadShared,grabFunction,grabConst,readSrc,SRC,SHARED,STATS}=require('./harness');
 
 const S=loadShared();
-const APPJS=readSrc('client/assets/app.js');
+const APPJS=readSrc('apps/portal/assets/app.js');
 const REPORT=readSrc('Stats/report.js');
 const PAGE=readSrc('Stats/index.html');
 
@@ -71,7 +71,7 @@ test('the Dashboard can never render a blank page', () => {
      it from a bug.
 
      All six tabs draw a chart of their own now — Set Pieces was the last, and got its
-     map (docs/setpiece-dashboard-design.md). What keeps a seventh safe is the chain
+     map (docs/design/setpiece-dashboard-design.md). What keeps a seventh safe is the chain
      ending in a bare `else` rather than in a named case: a category added later cannot
      fall through it. That terminal branch is what this checks; the notice's own wording
      is checked below. */

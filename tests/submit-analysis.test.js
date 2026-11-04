@@ -5,15 +5,14 @@
    what the other side does with it. */
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk}=require('./tiny-test');
-const {grabFunction}=require('./harness');
+const {grabFunction,repoPath}=require('./harness');
 
-const ROOT=path.join(__dirname,'..');
-const page=p=>fs.readFileSync(path.join(ROOT,p),'utf8');
+const page=p=>fs.readFileSync(repoPath(p),'utf8');
 const CLOUD=page('cloud-sync.js');
 const TAGGER=page('index.html');
-const APPJS=page('client/assets/app.js');
-const APPHTML=page('client/app.html');
-const SUPA=page('client/assets/supa.js');
+const APPJS=page('apps/portal/assets/app.js');
+const APPHTML=page('apps/portal/app.html');
+const SUPA=page('apps/portal/assets/supa.js');
 const SQL=page('supabase/migrations/0016_match_reports.sql');
 const YML=page('.github/workflows/deploy.yml');
 
@@ -128,11 +127,11 @@ vm.runInContext(grabFunction('taggerRoot',APPJS,'app.js')+
 
 test('the view-s files are found in both layouts, without a build step', () => {
   // the deploy puts this site at the root and the whole tagging app under
-  // /tagger; the repo has them side by side with the client in client/
+  // /tagger; the repo has them side by side, as apps/portal and apps/tagger
   const at=p=>{ctx.location={pathname:p};return ctx.taggerRoot();};
   eq(at('/Football-Data-Labeling-Website/app.html'),'tagger/','deployed');
-  eq(at('/client/app.html'),'../','served from the repo');
-  eq(at('/client/app.html?x=1'),'../','a query string changes nothing');
+  eq(at('/apps/portal/app.html'),'../tagger/','served from the repo');
+  eq(at('/apps/portal/app.html?x=1'),'../tagger/','a query string changes nothing');
 });
 
 test('shared.js is loaded before the view, and the view before the exports', () => {
@@ -279,7 +278,7 @@ test('the seed only ever adds — it drops and deletes nothing', () => {
 /* ================= shipping ================= */
 test('the client can reach the files it loads at runtime', () => {
   // it loads them out of the deployed tagging app, so those cp lines cover both
-  ['cp Stats/stats-view.js','cp Stats/stats-view.css','cp Stats/report.js','cp shared.js']
+  ['cp apps/tagger/Stats/stats-view.js','cp apps/tagger/Stats/stats-view.css','cp apps/tagger/Stats/report.js','cp apps/tagger/shared.js']
     .forEach(l=>ok(YML.includes(l),'deploy.yml is missing: '+l));
 });
 

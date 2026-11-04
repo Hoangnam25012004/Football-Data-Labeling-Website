@@ -12,7 +12,7 @@
 
    The second is that the board REPORTS and no longer acts. It was a filter once:
    a click on a square chose the row of four tiles for the job that square belonged
-   to. Those tiles went on 2026-09-03 (see docs/player-season-table-design.md), and
+   to. Those tiles went on 2026-09-03 (see docs/design/player-season-table-design.md), and
    with them the click, the role segment in the URL and the Total / Per 90 bar. What
    is left is a picture — a square lit for everywhere he has stood, nothing at all
    where he has not, every square of his role lit together, and the badge beside his
@@ -26,8 +26,8 @@ const vm=require('vm');
 const {test,eq,deepEq,ok,notOk}=require('./tiny-test');
 const {grabFunction,readSrc,SHARED}=require('./harness');
 
-const APPJS=readSrc('client/assets/app.js');
-const APPCSS=readSrc('client/assets/app.css');
+const APPJS=readSrc('apps/portal/assets/app.js');
+const APPCSS=readSrc('apps/portal/assets/app.css');
 
 const profile=/function renderPlayerProfile\([^)]*\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
 const headCard=/function playerHead\([^)]*\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
@@ -51,11 +51,11 @@ function sandbox(){
   vm.runInContext([SHARED,
     'window.newStat=newStat;window.gkShirts=gkShirts;window.onPitchAt=onPitchAt;',
     'var state={};',
-    LIFT.map(n=>grabFunction(n,APPJS,'client/assets/app.js')).join('\n'),
+    LIFT.map(n=>grabFunction(n,APPJS,'apps/portal/assets/app.js')).join('\n'),
     ROLEBLOCK,
     ';globalThis.A={'+LIFT.join(',')+',ROLES,ROLE_POS,ROLE_OF,ROLE_LABEL,ROLE_BADGE,'
       +'PLAYER_CATS,FORMATION_GRID,newStat,pct};'
-  ].join('\n'),ctx,{filename:'client/assets/app.js-extract.js'});
+  ].join('\n'),ctx,{filename:'apps/portal/assets/app.js-extract.js'});
   return ctx.A;
 }
 const A=sandbox();
@@ -361,7 +361,7 @@ test('these two cards name themselves without moving every other card', () => {
   ok(/text-transform:none/.test(rule[1]),'sentence case rather than the mono capitals');
   ok(/font-family:var\(--f-display\)/.test(rule[1]),'at display weight');
   /* the site-wide .card-h is what every other card uses, and it has not moved */
-  ok(/\.card-h\{[^}]*text-transform:uppercase/.test(readSrc('client/assets/site.css')
+  ok(/\.card-h\{[^}]*text-transform:uppercase/.test(readSrc('apps/portal/assets/site.css')
        .replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s*\n\s*/g,'')),
      'site.css still uppercases .card-h for everybody else');
 });
@@ -432,10 +432,10 @@ function paintProfile(person){
     /\n  var GK_TABS = TD_TABS[\s\S]*?\n  \}\);/.exec(APPJS)[0],
     /\n  var tabsFor = [^\n]*/.exec(APPJS)[0],
     ROLEBLOCK,
-    NAMES.map(n=>grabFunction(n,APPJS,'client/assets/app.js')).join('\n'),
+    NAMES.map(n=>grabFunction(n,APPJS,'apps/portal/assets/app.js')).join('\n'),
     ';globalThis.OUT=renderPlayerProfile;globalThis.SEASONROWS=seasonRows;',
     '})();'
-  ].join('\n'),ctx,{filename:'client/assets/app.js-render.js'});
+  ].join('\n'),ctx,{filename:'apps/portal/assets/app.js-render.js'});
 
   const body=mk('div');
   ctx.OUT(body,person,[person],'shooting');

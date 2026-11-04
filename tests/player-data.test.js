@@ -26,8 +26,8 @@ const vm=require('vm');
 const {test,eq,deepEq,ok,notOk}=require('./tiny-test');
 const {grabFunction,readSrc,SHARED}=require('./harness');
 
-const APPJS=readSrc('client/assets/app.js');
-const APPCSS=readSrc('client/assets/app.css');
+const APPJS=readSrc('apps/portal/assets/app.js');
+const APPCSS=readSrc('apps/portal/assets/app.css');
 const VIEW=readSrc('Stats/stats-view.js');
 
 const renderData=/function renderData\(view\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
@@ -62,7 +62,7 @@ function sandbox(state){
     'window.sumTeam=sumTeam;window.squadNames=squadNames;window.playedMinutes=playedMinutes;',
     'window.squadIds=squadIds;window.gkShirts=gkShirts;window.onPitchAt=onPitchAt;',
     'var state='+JSON.stringify(state||{})+';',
-    LIFT.map(n=>grabFunction(n,APPJS,'client/assets/app.js')).join('\n'),
+    LIFT.map(n=>grabFunction(n,APPJS,'apps/portal/assets/app.js')).join('\n'),
     /* app.js declares with `var`, which grabConst does not scan for */
     /\n  var PL_OUT = \[[\s\S]*?\n  \];/.exec(APPJS)[0],
     /\n  var PL_GK = \[[\s\S]*?\n  \];/.exec(APPJS)[0],
@@ -70,7 +70,7 @@ function sandbox(state){
     ';globalThis.A={'+LIFT.join(',')+',PL_OUT,PL_GK,PLAYER_CATS,GK_COLS,'
       +'ROLES,ROLE_POS,ROLE_OF,ROLE_LABEL,ROLE_BADGE,'
       +'squadIds,gkShirts,onPitchAt,newStat,pct,computeStats};'
-  ].join('\n'),ctx,{filename:'client/assets/app.js-extract.js'});
+  ].join('\n'),ctx,{filename:'apps/portal/assets/app.js-extract.js'});
   return ctx.A;
 }
 const A=sandbox();

@@ -12,8 +12,8 @@
    script is what keeps the third in step, and tests/seed-event-types.test.js fails if the
    committed .sql does not match what this would print today.
 
-       node tools/gen-event-types-sql.js            # write the migration
-       node tools/gen-event-types-sql.js --stdout   # print it instead
+       node scripts/gen-event-types-sql.js           # write the migration
+       node scripts/gen-event-types-sql.js --stdout  # print it instead
 
    Adding the ten names the live project has and this repo does not (goal kick, throw-Ins,
    foul won, miss shot, the five body parts, and one more) is a matter of putting them in
@@ -28,8 +28,8 @@ const read = p => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '
    Generating from one while the other has moved is how the migration would come to
    describe a dictionary that no longer exists. */
 function dictionary() {
-  const json = JSON.parse(read('pitchtagger_events.json')).football;
-  const src = read('index.html');
+  const json = JSON.parse(read('data/definitions/pitchtagger_events.json')).football;
+  const src = read('apps/tagger/index.html');
   const from = src.indexOf('const DEFAULT_EVENTS = {');
   const to = src.indexOf('const SPORTS=', from);
   if (from < 0 || to < 0) throw new Error('DEFAULT_EVENTS not found in index.html');

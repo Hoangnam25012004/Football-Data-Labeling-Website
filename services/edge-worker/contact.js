@@ -45,7 +45,7 @@ const json = (obj, status, headers) =>
 const MAX = { name: 120, email: 200, club: 120, role: 120, country: 120, videoUrl: 500, message: 4000 };
 
 /* The same test the client site applies to an invite address — one shape of
-   "is this an email" across the project, not two. See client/assets/supa.js. */
+   "is this an email" across the project, not two. See apps/portal/assets/supa.js. */
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /* Nobody reads seven fields and writes a message in under three seconds. */

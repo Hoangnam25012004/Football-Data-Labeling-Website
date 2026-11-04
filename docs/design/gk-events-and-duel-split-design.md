@@ -21,7 +21,7 @@ Test: `node tests/run.js` → **1333/1333 passed** (baseline 1298 + 35 test mớ
 
 > **Còn một việc phải làm bằng tay — §6.1 + §15 bước 10.** Từ điển trên cloud có **48** event,
 > `pitchtagger_events.json` chỉ có **38**; 10 event kia chỉ sống trên cloud và repo không biết
-> hotkey của chúng. **[seed_gk_events.js](../seed_gk_events.js)** giải quyết chuyện đó lúc chạy:
+> hotkey của chúng. **[seed_gk_events.js](../../scripts/console/seed_gk_events.js)** giải quyết chuyện đó lúc chạy:
 > nó làm việc trên danh sách THẬT trong app, nên không cần biết trước 10 tên ấy. Dán vào Console
 > rồi gõ `__seedGkEvents()`.
 
@@ -44,7 +44,7 @@ Bản thiết kế (§5.1) nói sửa `DEFAULT_EVENTS` là event mới sẽ tự
 đó `applyEventTypes()` ghi đè `state.events` bằng bản trên cloud. Với một máy đã từng vào — tức
 mọi máy đang dùng — **17 tên mới sẽ không bao giờ tự xuất hiện.**
 
-Nên có thêm **[seed_gk_events.js](../seed_gk_events.js)**, theo đúng khuôn mẫu
+Nên có thêm **[seed_gk_events.js](../../scripts/console/seed_gk_events.js)**, theo đúng khuôn mẫu
 `restore_macros.js` đã có: dán vào Console, nó chạy trên `PT.state.events.football` thật.
 Việc này cũng giải luôn bài toán 48-vs-38 — script không cần biết 10 tên kia là gì, và §10 (xếp
 lại thứ tự) được làm cùng lúc. Script **từ chối ghi** nếu bất kỳ mã nào đụng event hoặc macro
@@ -134,16 +134,16 @@ lặng trả về 0** chứ không báo lỗi.
 
 | # | Trạm | Ở đâu | Khớp tên kiểu gì |
 |---|---|---|---|
-| 1 | **Từ điển** (nguồn sự thật) | `public.event_types` ← [cloud-sync.js:136](../cloud-sync.js:136) | `unique(sport,event_name)` — **phân biệt hoa/thường** |
-| 2 | Từ điển hạt giống / fixture test | [pitchtagger_events.json](../pitchtagger_events.json) | nguyên văn |
-| 3 | Từ điển lần-mở-đầu-tiên | [index.html:828](../index.html:828) `DEFAULT_EVENTS` | nguyên văn |
-| 4 | **Gõ phím → hàng** | `eventForKey` → `expandKey` → `parseChain` — [index.html:2219](../index.html:2219), [:2231](../index.html:2231), [:2312](../index.html:2312) | mã khớp **chính xác** |
+| 1 | **Từ điển** (nguồn sự thật) | `public.event_types` ← [cloud-sync.js:136](../../apps/tagger/cloud-sync.js:136) | `unique(sport,event_name)` — **phân biệt hoa/thường** |
+| 2 | Từ điển hạt giống / fixture test | [pitchtagger_events.json](../../data/definitions/pitchtagger_events.json) | nguyên văn |
+| 3 | Từ điển lần-mở-đầu-tiên | [index.html:828](../../apps/tagger/index.html:828) `DEFAULT_EVENTS` | nguyên văn |
+| 4 | **Gõ phím → hàng** | `eventForKey` → `expandKey` → `parseChain` — [index.html:2219](../../apps/tagger/index.html:2219), [:2231](../../apps/tagger/index.html:2231), [:2312](../../apps/tagger/index.html:2312) | mã khớp **chính xác** |
 | 5 | **Macro** | `macroForKey`, `renderMacros`, `expandMacros` | **tên khớp chính xác, phân biệt hoa/thường** (§7.1) |
-| 6 | **Lưu** | `public.events.event_name` ← [cloud-sync.js:34](../cloud-sync.js:34) | nguyên văn tên trong từ điển |
-| 7 | **Đếm** | `EVENT_INC` × **2 bản**: [shared.js:191](../shared.js:191), [index.html:3706](../index.html:3706) | qua `evKey()` — thường hoá + trim + `EV_ALIAS` |
+| 6 | **Lưu** | `public.events.event_name` ← [cloud-sync.js:34](../../apps/tagger/cloud-sync.js:34) | nguyên văn tên trong từ điển |
+| 7 | **Đếm** | `EVENT_INC` × **2 bản**: [shared.js:191](../../apps/tagger/shared.js:191), [index.html:3706](../../apps/tagger/index.html:3706) | qua `evKey()` — thường hoá + trim + `EV_ALIAS` |
 | 8 | **Hiện** | `STAT_HEADERS`/`statRow` · `PLAYER_CATS` · `GK_COLS` · `TEAM_SECTIONS` ×2 · `DEF_CATS` · `evtClass` · `FILM_EV_GROUPS` · `SUMMARY_EVENTS` · `Stats/report.js` | phần lớn qua `evKey()`; **`filmMatches`, `teamGoals`, `SUMMARY_EVENTS` thì không** |
-| 9 | **Cổng Submit analysis** | `DUEL_MIRRORS` / `DUEL_TOTALS` — [index.html:2798](../index.html:2798) | qua `anKey()` (= thường hoá) |
-| 10 | **SQL cho site khách** | `public.match_stats` — [0015](../supabase/migrations/0015_match_stats_event_names.sql) | `lower(trim(event_name))` |
+| 9 | **Cổng Submit analysis** | `DUEL_MIRRORS` / `DUEL_TOTALS` — [index.html:2798](../../apps/tagger/index.html:2798) | qua `anKey()` (= thường hoá) |
+| 10 | **SQL cho site khách** | `public.match_stats` — [0015](../../supabase/migrations/0015_match_stats_event_names.sql) | `lower(trim(event_name))` |
 
 ### 2.1 Bốn chỗ lệch giữa hai bản sao của bộ đếm (Q5 = **Có**, sẽ vá — §9)
 
@@ -152,10 +152,10 @@ bản đã lệch từ trước tài liệu này:
 
 | | `shared.js` | `index.html` |
 |---|---|---|
-| `EVENT_INC['take-on concern']` | `['takeOns','takeOnConcerns']` ([:206](../shared.js:206)) | `['takeOns']` ([:3725](../index.html:3725)) |
-| `EVENT_INC['foul won']` | có ([:224](../shared.js:224)) | **không có** |
-| `STAT_GROUPS` | `Defensive 9 · Discipline 4` ([:232](../shared.js:232)) | `Defensive 8 · Discipline 3` ([:3745](../index.html:3745)) |
-| `TEAM_SECTIONS` | 41 dòng, có `Take-on Concerns` ([:627](../shared.js:627)) | **40 dòng, thiếu `Take-on Concerns`** ([:3922](../index.html:3922)) |
+| `EVENT_INC['take-on concern']` | `['takeOns','takeOnConcerns']` ([:206](../../apps/tagger/shared.js:206)) | `['takeOns']` ([:3725](../../apps/tagger/index.html:3725)) |
+| `EVENT_INC['foul won']` | có ([:224](../../apps/tagger/shared.js:224)) | **không có** |
+| `STAT_GROUPS` | `Defensive 9 · Discipline 4` ([:232](../../apps/tagger/shared.js:232)) | `Defensive 8 · Discipline 3` ([:3745](../../apps/tagger/index.html:3745)) |
+| `TEAM_SECTIONS` | 41 dòng, có `Take-on Concerns` ([:627](../../apps/tagger/shared.js:627)) | **40 dòng, thiếu `Take-on Concerns`** ([:3922](../../apps/tagger/index.html:3922)) |
 
 *(Chỗ thứ tư là mới tìm thấy trong lượt này — tài liệu trước chỉ nói 3.)*
 
@@ -171,8 +171,8 @@ Bốn chỗ **không** đi qua `evKey`, nên cách viết là quan trọng:
 * `filmMatches()` — so `r.event` **nguyên văn** với giá trị option (mã ghi rõ: *"the option VALUE
   stays the raw string"*);
 * **`curEvents().some(o=>o.name===n)` trong `renderMacros`** — §7.1;
-* `teamGoals()` ([Stats/stats-view.js:929](../Stats/stats-view.js:929)) và `SUMMARY_EVENTS`
-  ([:967](../Stats/stats-view.js:967)) — so `r.event==='goal'` nguyên văn.
+* `teamGoals()` ([Stats/stats-view.js:929](../../apps/tagger/Stats/stats-view.js:929)) và `SUMMARY_EVENTS`
+  ([:967](../../apps/tagger/Stats/stats-view.js:967)) — so `r.event==='goal'` nguyên văn.
 
 Đây là lý do Q1 = Cột B (toàn bộ chữ thường, cách bằng dấu cách) là lựa chọn đúng: nó xoá cả bốn
 loại rủi ro trên cùng lúc.
@@ -205,7 +205,7 @@ Ba điều Cột B đã sửa so với bản viết tay đầu tiên, mỗi đi�
 
 * **`Supports` → `support`** — cặp success/fail nay khớp nhau. Repo đã trả giá hai lần cho đúng
   kiểu lệch này (`take-on succes`, `gain possesion`), và cái giá là `EV_ALIAS` phải mang chúng
-  **vĩnh viễn** ([shared.js:245](../shared.js:245)) cộng hai dòng trong SQL view.
+  **vĩnh viễn** ([shared.js:245](../../apps/tagger/shared.js:245)) cộng hai dòng trong SQL view.
 * **`saveStanding` → `save standing`** — camelCase đứng cạnh `pass success` trong 5 nơi người dùng
   nhìn thấy (bảng Event types, badge `#…` ở bảng Events, dòng lọc Film, dòng macro, tiêu đề xlsx).
 * **`Catches`/`Parries` → `catch`/`parry`** — từ điển đặt tên theo **hành động số ít**: `save`,
@@ -237,7 +237,7 @@ Mọi quy tắc backfill nghĩ ra được ("trong vòng cấm thì physical", "
 "chia 50/50", "gán hết vào physical") đều là **bịa dữ liệu**: nó tạo ra một con số *trông như* đo
 được nhưng thực ra do một dòng `if` sinh ra, và **không có cách nào phân biệt lại về sau**.
 
-Chính `shared.js` đã viết sẵn luật này, ngay trên `EV_ALIAS` ([shared.js:245](../shared.js:245)):
+Chính `shared.js` đã viết sẵn luật này, ngay trên `EV_ALIAS` ([shared.js:245](../../apps/tagger/shared.js:245)):
 
 > *The rule for adding to this: only ever a rename of the SAME event. Two events that are genuinely
 > different must not be folded together — the fold is invisible in the data and there would be
@@ -253,8 +253,8 @@ tách sai thì cả hai số con đều sai.
 | | Phương án | Điều gì xảy ra | Phán quyết |
 |---|---|---|---|
 | **A** | `EV_ALIAS['ground duel success']='physical duel success'` | Mọi loose-ball duel trong lịch sử **biến thành** physical duel. Không un-fold được. Trái §4.1. | ❌ **Bịa dữ liệu** |
-| **B** | `UPDATE public.events SET event_name=…` | Xoá bản ghi gốc, **vẫn phải bịa** để chọn nhánh, và làm hỏng vòng `action_code` ↔ `raw` của `✎ Edit` ([index.html:2261](../index.html:2261) `retypeForMe`). | ❌ **Phá huỷ + bịa** |
-| **C** | Xoá `ground duel …` / `save` khỏi từ điển | `renderEvents()` **cố tình không có nút ×** ([index.html:2125](../index.html:2125)): *"…broke every macro pointing at it, and left the matches already tagged with it naming something the dictionary no longer has"*. Macro `xa` và `xxaa` chết ngay. | ❌ **Đã bị cấm sẵn trong mã** |
+| **B** | `UPDATE public.events SET event_name=…` | Xoá bản ghi gốc, **vẫn phải bịa** để chọn nhánh, và làm hỏng vòng `action_code` ↔ `raw` của `✎ Edit` ([index.html:2261](../../apps/tagger/index.html:2261) `retypeForMe`). | ❌ **Phá huỷ + bịa** |
+| **C** | Xoá `ground duel …` / `save` khỏi từ điển | `renderEvents()` **cố tình không có nút ×** ([index.html:2125](../../apps/tagger/index.html:2125)): *"…broke every macro pointing at it, and left the matches already tagged with it naming something the dictionary no longer has"*. Macro `xa` và `xxaa` chết ngay. | ❌ **Đã bị cấm sẵn trong mã** |
 | **D** | **Roll-up cũ giữ nguyên + chi tiết mới cộng vào cùng roll-up** | Trận cũ: tổng đúng như nó vẫn luôn đúng, chi tiết là `—`. Trận mới: tổng đúng **và** chi tiết đúng. Không hàng nào bị viết lại. | ✅ **Chọn** |
 
 ### 4.3 Phương án D — cơ chế
@@ -283,8 +283,8 @@ họ event*.** Tên cũ là một thành viên; các tên mới là thành viên
 |---|---|---|---|
 | `Ground Duels` / `Ground Duels Won` | y như cũ | = physical + loose ball | **liền mạch** |
 | `Saves` | y như cũ | = catch + parry | **liền mạch** |
-| `Save Rate`, `On Target Faced` ([shared.js:329](../shared.js:329)) | y như cũ | y như cũ | **liền mạch** |
-| Radar defensive + cột `Ground` của PDF ([Stats/report.js:744](../Stats/report.js:744), [:1118](../Stats/report.js:1118)) | y như cũ | y như cũ | **liền mạch** |
+| `Save Rate`, `On Target Faced` ([shared.js:329](../../apps/tagger/shared.js:329)) | y như cũ | y như cũ | **liền mạch** |
+| Radar defensive + cột `Ground` của PDF ([Stats/report.js:744](../../apps/tagger/Stats/report.js:744), [:1118](../../apps/tagger/Stats/report.js:1118)) | y như cũ | y như cũ | **liền mạch** |
 | `Physical Duels`, `Loose Ball Duels`, `Catches`, `Parries` | **`—`** | số thật | cộng phần biết được |
 
 Không một hàng nào trong `public.events` bị chạm. **Không có migration dữ liệu.**
@@ -295,7 +295,7 @@ Một trận tháng 5 có 34 ground duel và **0** physical duel. Nếu bảng i
 "trận này không có pha tranh chấp thể chất nào" — một lời nói dối. Sự thật là *"chưa ai hỏi câu đó
 khi tag trận này"*.
 
-Repo đã có sẵn đúng cách xử lý, ở `GK_COLS` ([shared.js:316-331](../shared.js:316)):
+Repo đã có sẵn đúng cách xử lý, ở `GK_COLS` ([shared.js:316-331](../../apps/tagger/shared.js:316)):
 
 > *`known` counts the matches whose line-ups could answer the question at all. 0 means nothing can
 > be said, and "—" is what says so — never 0, which would claim a clean sheet nobody recorded.*
@@ -313,7 +313,7 @@ Mọi event mới của nhánh nào thì tăng cờ nhánh ấy. Cột hiển th
 ['Catches',        s=>s.saveDetail ? s.catches       : '—']
 ```
 
-`sumTeam()` ([shared.js](../shared.js)) cộng **mọi khoá** của `newStat()` bằng `for(const k in t)`,
+`sumTeam()` ([shared.js](../../apps/tagger/shared.js)) cộng **mọi khoá** của `newStat()` bằng `for(const k in t)`,
 nên cờ **tự cộng dồn**: một mùa gồm 12 trận cũ + 6 trận mới cho ra chi tiết của 6 trận mới mà không
 giả vờ 12 trận kia bằng 0. Đúng cách `g.known` đã hoạt động.
 
@@ -330,14 +330,14 @@ tách từ đâu. Cùng cơ chế cờ ở §4.5 diễn đạt "chưa đo". Khô
 
 | File | Sửa gì | Ghi chú |
 |---|---|---|
-| [pitchtagger_events.json](../pitchtagger_events.json) | **đồng bộ với cloud (§6.1) rồi** +17 mục | đồng thời là **fixture test** ([harness.js:23](../tests/harness.js:23)) |
-| [index.html:828](../index.html:828) `DEFAULT_EVENTS` | như trên | chỉ dùng cho lần mở đầu tiên khi chưa có cloud |
+| [pitchtagger_events.json](../../data/definitions/pitchtagger_events.json) | **đồng bộ với cloud (§6.1) rồi** +17 mục | đồng thời là **fixture test** ([harness.js:23](../../tests/harness.js:23)) |
+| [index.html:828](../../apps/tagger/index.html:828) `DEFAULT_EVENTS` | như trên | chỉ dùng cho lần mở đầu tiên khi chưa có cloud |
 | `public.event_types` | +17 hàng, và **xếp lại `ord`** (§10) | **không cần migration SQL** |
 
-**Vì sao không cần migration:** [cloud-sync.js:173-188](../cloud-sync.js:173) `pushEventTypes()` đọc
+**Vì sao không cần migration:** [cloud-sync.js:173-188](../../apps/tagger/cloud-sync.js:173) `pushEventTypes()` đọc
 danh sách trên cloud, `insert` tên **chưa** có và `upsert` tên **đã** có. Một analyst đăng nhập mở
 app một lần với `DEFAULT_EVENTS` mới → 17 hàng tự sinh, realtime bắn về mọi máy khác
-([cloud-sync.js:193](../cloud-sync.js:193)).
+([cloud-sync.js:193](../../apps/tagger/cloud-sync.js:193)).
 
 ### 5.2 Bộ đếm — `EVENT_INC` + `newStat()`, **hai bản sao**
 
@@ -378,7 +378,7 @@ app một lần với `DEFAULT_EVENTS` mới → 17 hàng tự sinh, realtime b�
 ### 5.3 Nơi các số mới hiện ra
 
 #### 5.3.1 `PLAYER_CATS.defensive` — 4 cột duel · **cộng thêm**
-[shared.js:304-310](../shared.js:304), ngay sau `Ground Duels Won`:
+[shared.js:304-310](../../apps/tagger/shared.js:304), ngay sau `Ground Duels Won`:
 ```js
 ['Physical Duels',   s=>s.duelDetail?s.physicalDuels:'—'],
 ['Physical Won',     s=>s.duelDetail?s.physicalDuelsWon:'—'],
@@ -386,11 +386,11 @@ app một lần với `DEFAULT_EVENTS` mới → 17 hàng tự sinh, realtime b�
 ['Loose Ball Won',   s=>s.duelDetail?s.looseBallDuelsWon:'—'],
 ```
 Hiện ở tab *Defensive* của Stats **và** trang Data của site khách — cùng một mảng
-([client/assets/app.js:1009](../client/assets/app.js:1009) đọc thẳng `PLAYER_CATS`).
+([client/assets/app.js:1009](../../apps/portal/assets/app.js:1009) đọc thẳng `PLAYER_CATS`).
 
 #### 5.3.2 `GK_COLS` — 10 cột thủ môn · **cộng thêm** (6 → 16)
-[shared.js:326](../shared.js:326). Đúng chỗ cho R2/R3: `GK_COLS` chỉ vẽ cho cầu thủ được nhận là
-thủ môn ([client/assets/app.js:1008](../client/assets/app.js:1008)), nên cầu thủ ngoài sân **không**
+[shared.js:326](../../apps/tagger/shared.js:326). Đúng chỗ cho R2/R3: `GK_COLS` chỉ vẽ cho cầu thủ được nhận là
+thủ môn ([client/assets/app.js:1008](../../apps/portal/assets/app.js:1008)), nên cầu thủ ngoài sân **không**
 mọc thêm 11 cột số 0.
 ```js
 ['Catches',(s,g)=>s.saveDetail?s.catches:'—'],  ['Parries',(s,g)=>s.saveDetail?s.parries:'—'],
@@ -411,8 +411,8 @@ App **đã có hai** con số tên gần giống, cả hai đều **suy ra**:
 
 | Ở đâu | Công thức | Nghĩa |
 |---|---|---|
-| [shared.js:647](../shared.js:647) / [index.html:3942](../index.html:3942) | `(s,o)=>o.goals` | bàn thua của **đội** |
-| [shared.js:328](../shared.js:328) | `g.known?g.conceded:'—'` | bàn thua **lúc thủ môn này đang trên sân** |
+| [shared.js:647](../../apps/tagger/shared.js:647) / [index.html:3942](../../apps/tagger/index.html:3942) | `(s,o)=>o.goals` | bàn thua của **đội** |
+| [shared.js:328](../../apps/tagger/shared.js:328) | `g.known?g.conceded:'—'` | bàn thua **lúc thủ môn này đang trên sân** |
 
 Event tag tay đi vào counter **riêng** `goalsConceded`, nhãn **`Conceded (tagged)`**, và **hai dòng
 suy ra không bị chạm** vì lý do này. Dòng suy ra vẫn có thẩm quyền — nó đúng theo cấu trúc, không
@@ -423,7 +423,7 @@ cú tick · **độc lập với bảng đội hình** (`g.known` trả `—` kh
 
 ### 5.4 Màu badge — `evtClass` + CSS (R10, Q4 = **không** cho GK)
 
-[index.html:3510](../index.html:3510) hiện chỉ biết `ground` và `aerial`. Hai class mới, đặt
+[index.html:3510](../../apps/tagger/index.html:3510) hiện chỉ biết `ground` và `aerial`. Hai class mới, đặt
 **trước** `ground` (phòng thủ, dù các mẫu không chồng nhau):
 
 ```js
@@ -434,7 +434,7 @@ const evtClass=n=>SHOT_EVENTS.test(n||'')?' shot'
   :/^aerial duel/i.test(n||'')?' duel-aerial':'';
 ```
 
-CSS, cạnh hai dòng đang có ở [index.html:185-186](../index.html:185):
+CSS, cạnh hai dòng đang có ở [index.html:185-186](../../apps/tagger/index.html:185):
 
 ```css
 .evt.duel-ground  {color:#b5713f}   /* ground duel — nâu   (giữ nguyên) */
@@ -450,11 +450,11 @@ Hex chỉ là đề nghị — đổi một chữ là xong.
 **Không** thêm màu cho 11 event thủ môn (Q4 = Không) và **không** cho `own goal` — `own goal` đã
 khớp `SHOT_EVENTS` (`/shot|^goal$|^own goal$/i`) nên tự nhận badge đen `.shot` sẵn có (§11.4).
 
-`evtClass` cũng được **bảng Macro** dùng ([index.html:2179](../index.html:2179)) ⇒ dòng macro chứa
+`evtClass` cũng được **bảng Macro** dùng ([index.html:2179](../../apps/tagger/index.html:2179)) ⇒ dòng macro chứa
 duel mới cũng lên đúng màu. Nhất quán, và là thay đổi duy nhất mà bảng Macro nhìn thấy (§7.4).
 
 ### 5.5 Bộ lọc Film — `FILM_EV_GROUPS`
-[Stats/stats-view.js:1345](../Stats/stats-view.js:1345). Không thêm thì vẫn chạy — tên lạ rơi xuống
+[Stats/stats-view.js:1345](../../apps/tagger/Stats/stats-view.js:1345). Không thêm thì vẫn chạy — tên lạ rơi xuống
 `FILM_EV_REST` = *"Other events"* và sắp A–Z. Nhưng 17 event mới sẽ dồn lẫn dưới đáy.
 
 * `Shooting`: thêm `own goal` ngay sau `goal`;
@@ -469,20 +469,20 @@ Bảng này vừa là **thứ tự** vừa là **heading** (`filmEvGroup` đọc
 cho thứ tự `ord` ở §10 — *"one table, two jobs"*.
 
 ### 5.6 Bản đồ Defensive — `DEF_CATS` · **hoãn (P2)**
-[Stats/stats-view.js:180](../Stats/stats-view.js:180). Thêm `physical`/`looseBall` vào dropdown là
+[Stats/stats-view.js:180](../../apps/tagger/Stats/stats-view.js:180). Thêm `physical`/`looseBall` vào dropdown là
 tính năng mới. PR riêng.
 
 ### 5.7 `Stats/report.js` (PDF) — **0 dòng**
-`Ground Won` ([:1118](../Stats/report.js:1118)) và cột `Ground` ([:744](../Stats/report.js:744)) đọc
+`Ground Won` ([:1118](../../apps/tagger/Stats/report.js:1118)) và cột `Ground` ([:744](../../apps/tagger/Stats/report.js:744)) đọc
 `groundDuelsWon`/`groundDuels`; §4.4 giữ nguyên nghĩa. `saves` cũng vậy
-([:1287](../Stats/report.js:1287)). `own goal` đã được xử lý sẵn ([:486](../Stats/report.js:486),
-[:512](../Stats/report.js:512)) — §11.1.
+([:1287](../../apps/tagger/Stats/report.js:1287)). `own goal` đã được xử lý sẵn ([:486](../../apps/tagger/Stats/report.js:486),
+[:512](../../apps/tagger/Stats/report.js:512)) — §11.1.
 
 ### 5.8 `client/assets/app.js` — chỉ bump `?v=`
 Trang Data đọc `PLAYER_CATS`/`GK_COLS` **của `shared.js`**
-([:1005-1010](../client/assets/app.js:1005)) ⇒ §5.3.1 và §5.3.2 tự hiện, **không sửa logic**.
+([:1005-1010](../../apps/portal/assets/app.js:1005)) ⇒ §5.3.1 và §5.3.2 tự hiện, **không sửa logic**.
 Nhưng file này **nạp `shared.js` bằng chuỗi phiên bản cứng**
-([:1623](../client/assets/app.js:1623)) ⇒ **bắt buộc bump** (§14).
+([:1623](../../apps/portal/assets/app.js:1623)) ⇒ **bắt buộc bump** (§14).
 
 ### 5.9 SQL — **0 dòng** (Q7 = **Không**)
 `public.match_stats` đếm `aerial_duels` nhưng **không** đếm ground duel, **không** đếm save, và
@@ -541,7 +541,7 @@ nhưng 10 event chưa biết rất có thể giữ vài chữ trong đó (`head`
 hai ký tự trở lên giảm hẳn rủi ro. Sau khi có dump ở §6.1, chạy lại đối chiếu là xong.
 
 ### 6.3 Mã event luôn thắng macro
-`expandKey()` ([index.html:2231](../index.html:2231)) tra event **trước**, macro sau. Một mã mới
+`expandKey()` ([index.html:2231](../../apps/tagger/index.html:2231)) tra event **trước**, macro sau. Một mã mới
 trùng mã macro sẽ làm macro đó **ngừng bắn** — §7.2.
 
 ---
@@ -553,7 +553,7 @@ tiếp xúc giữa "thêm event" và "macro", từng cái một.
 
 ### 7.1 Macro lưu theo TÊN, và so khớp CHÍNH XÁC
 
-[index.html:2166](../index.html:2166), trong `renderMacros()`:
+[index.html:2166](../../apps/tagger/index.html:2166), trong `renderMacros()`:
 
 ```js
 const known=curEvents().some(o=>o.name===n);
@@ -573,7 +573,7 @@ if(!known)s.title='This event no longer exists — the macro can\'t fire.';
 ### 7.2 Rủi ro thật: mã event mới trùng mã macro
 
 `expandKey` cho event thắng ⇒ macro **không bao giờ bắn**. Điều tốt: chuyện này **không im lặng** —
-`macroKeyProblem()` ([index.html:2143](../index.html:2143)) tô đỏ ô mã và ghi tooltip:
+`macroKeyProblem()` ([index.html:2143](../../apps/tagger/index.html:2143)) tô đỏ ô mã và ghi tooltip:
 
 > *The event hotkey "…" already uses this code — the macro would never fire.*
 
@@ -589,7 +589,7 @@ Nhưng **phải mở modal mới thấy**. Hai giới hạn cần nói thẳng:
 
 ### 7.3 🐛 Bug đang sống sẵn: `nextFreeKey()` không nhìn macro
 
-[index.html:2132](../index.html:2132):
+[index.html:2132](../../apps/tagger/index.html:2132):
 
 ```js
 function nextFreeKey(){const used=new Set(curEvents().map(e=>e.key));return DEFAULT_KEYS.find(k=>!used.has(k))||''}
@@ -621,7 +621,7 @@ Hai cách xử lý:
 | `evtClass` trong `renderMacros` (§5.4) | Dòng macro chứa `physical/loose ball duel` lên màu mới. **Chỉ là màu**, và nhất quán với bảng Events. Đây là thay đổi **duy nhất** bảng Macro nhìn thấy. |
 | Xếp lại `ord` (§10) | Macro lưu theo **tên**, `renderMacros` tra theo **tên** ⇒ **đổi thứ tự không chạm macro một chút nào.** Và `pushEventTypes` upsert `seen` chỉ gửi `{sport, event_name, ord}` — **không gửi `key`** ⇒ hotkey cũng không bị đụng. |
 | `addMacro()` / `expandMacros()` / `retypeForMe()` | Chỉ **thêm** mã có thể phân giải. Thuần cộng thêm, không có đường nào làm hỏng macro cũ. |
-| `freeCode()` ([index.html:2288](../index.html:2288)) | Đi từ `z`, `zz`, `zzz`… 17 mã mới không có mã nào toàn chữ `z` ⇒ không đổi số bước. |
+| `freeCode()` ([index.html:2288](../../apps/tagger/index.html:2288)) | Đi từ `z`, `zz`, `zzz`… 17 mã mới không có mã nào toàn chữ `z` ⇒ không đổi số bước. |
 
 ### 7.5 Tóm tắt R12
 
@@ -675,13 +675,13 @@ Toàn bộ nằm trong `index.html`, đưa nó về đúng bằng `shared.js`:
 
 | # | Chỗ | Sửa |
 |---|---|---|
-| 1 | `EVENT_INC['take-on concern']` [:3725](../index.html:3725) | `['takeOns']` → `['takeOns','takeOnConcerns']` |
-| 2 | `EVENT_INC` [:3706](../index.html:3706) | thêm `'foul won':['foulsWon']` |
-| 3 | `newStat()` [:3752](../index.html:3752) | thêm `takeOnConcerns:0, foulsWon:0` |
-| 4 | `STAT_GROUPS` [:3745](../index.html:3745) | `Defensive 8→9`, `Discipline 3→4` |
-| 5 | `STAT_HEADERS` [:3746](../index.html:3746) | thêm `'Take-on Concerns'` (sau `Recoveries`) và `'Fouls Won'` (sau `Fouls`) |
-| 6 | `statRow()` [:3775](../index.html:3775) | thêm `s.takeOnConcerns`, `s.foulsWon` đúng vị trí |
-| 7 | `TEAM_SECTIONS` [:3922](../index.html:3922) | thêm `['Take-on Concerns',(s,o)=>s.takeOnConcerns]` (sau `Ground Duels Won`, như `shared.js:645`) |
+| 1 | `EVENT_INC['take-on concern']` [:3725](../../apps/tagger/index.html:3725) | `['takeOns']` → `['takeOns','takeOnConcerns']` |
+| 2 | `EVENT_INC` [:3706](../../apps/tagger/index.html:3706) | thêm `'foul won':['foulsWon']` |
+| 3 | `newStat()` [:3752](../../apps/tagger/index.html:3752) | thêm `takeOnConcerns:0, foulsWon:0` |
+| 4 | `STAT_GROUPS` [:3745](../../apps/tagger/index.html:3745) | `Defensive 8→9`, `Discipline 3→4` |
+| 5 | `STAT_HEADERS` [:3746](../../apps/tagger/index.html:3746) | thêm `'Take-on Concerns'` (sau `Recoveries`) và `'Fouls Won'` (sau `Fouls`) |
+| 6 | `statRow()` [:3775](../../apps/tagger/index.html:3775) | thêm `s.takeOnConcerns`, `s.foulsWon` đúng vị trí |
+| 7 | `TEAM_SECTIONS` [:3922](../../apps/tagger/index.html:3922) | thêm `['Take-on Concerns',(s,o)=>s.takeOnConcerns]` (sau `Ground Duels Won`, như `shared.js:645`) |
 
 Sau bước này hai `EVENT_INC`, hai `newStat()`, hai `STAT_GROUPS`/`STAT_HEADERS`/`statRow` và hai
 `TEAM_SECTIONS` **khớp nhau hoàn toàn** — và test **T12/T13/T14** (§13) khoá chúng lại để không
@@ -717,9 +717,9 @@ mở bảng ra cũng thấy ngay cái mới nằm cạnh cái cũ, đó là hìn
 
 | Câu hỏi | Trả lời | Bằng chứng |
 |---|---|---|
-| Có mất hotkey không? | **Không.** `pushEventTypes` upsert nhánh `seen` chỉ gửi `{sport, event_name, ord}`, **không gửi `key`** ⇒ PostgREST chỉ `SET` những cột có trong payload, `key` giữ nguyên. | [cloud-sync.js:179-184](../cloud-sync.js:179) |
+| Có mất hotkey không? | **Không.** `pushEventTypes` upsert nhánh `seen` chỉ gửi `{sport, event_name, ord}`, **không gửi `key`** ⇒ PostgREST chỉ `SET` những cột có trong payload, `key` giữ nguyên. | [cloud-sync.js:179-184](../../apps/tagger/cloud-sync.js:179) |
 | Có hỏng macro không? | **Không.** Macro lưu theo tên; `renderMacros` tra theo tên. `ord` không tham gia. | §7.4 |
-| Có mất event đang chọn không? | **Không.** `applyEventTypes` giữ `state.activeEvent` **theo tên**, chỉ đổi khi tên đó biến mất. | [index.html:2113](../index.html:2113) |
+| Có mất event đang chọn không? | **Không.** `applyEventTypes` giữ `state.activeEvent` **theo tên**, chỉ đổi khi tên đó biến mất. | [index.html:2113](../../apps/tagger/index.html:2113) |
 
 **Cái giá duy nhất:** realtime bắn thứ tự mới về mọi máy, nên bảng *Event types* của người khác
 **nhảy chỗ ngay giữa lúc họ đang tag**. Không mất dữ liệu, chỉ giật mình. ⇒ §15 bước 10: làm khi
@@ -736,17 +736,17 @@ không ai đang tag, và báo trước.
 
 | Nơi | Đã làm gì |
 |---|---|
-| [Stats/stats-view.js:929](../Stats/stats-view.js:929) `teamGoals()` | *"goals scored by a team = its own 'goal' events + opponent own goals"* — **đúng luật bạn yêu cầu** |
-| [Stats/stats-view.js:967](../Stats/stats-view.js:967) `SUMMARY_EVENTS` | `'own goal':'og'` — hiện trên timeline tổng kết |
-| [Stats/report.js:486](../Stats/report.js:486), [:519](../Stats/report.js:519) | nhãn *"Own Goal <tên>"* và **cộng tỉ số cho phía kia** trong timeline PDF |
-| [client/assets/app.js:798](../client/assets/app.js:798) `gkFigures` | own goal của đội mình **tính là bàn thua** của thủ môn |
+| [Stats/stats-view.js:929](../../apps/tagger/Stats/stats-view.js:929) `teamGoals()` | *"goals scored by a team = its own 'goal' events + opponent own goals"* — **đúng luật bạn yêu cầu** |
+| [Stats/stats-view.js:967](../../apps/tagger/Stats/stats-view.js:967) `SUMMARY_EVENTS` | `'own goal':'og'` — hiện trên timeline tổng kết |
+| [Stats/report.js:486](../../apps/tagger/Stats/report.js:486), [:519](../../apps/tagger/Stats/report.js:519) | nhãn *"Own Goal <tên>"* và **cộng tỉ số cho phía kia** trong timeline PDF |
+| [client/assets/app.js:798](../../apps/portal/assets/app.js:798) `gkFigures` | own goal của đội mình **tính là bàn thua** của thủ môn |
 | `tests/player-data.test.js:357`, `tests/report-visuals.test.js:111` | đã có test cho cả hai |
 
 ⇒ `Stats/report.js` và `client/assets/app.js` vẫn **0 dòng**.
 
 ### 11.2 Chỗ phải sửa #1 — bảng điểm của app tag
 
-[index.html:1421](../index.html:1421) hiện chỉ đếm `goal`:
+[index.html:1421](../../apps/tagger/index.html:1421) hiện chỉ đếm `goal`:
 
 ```js
 state.rows.forEach(r=>{ if(r.event==='goal'){ r.team==='home'?home++:away++; } });
@@ -781,8 +781,8 @@ sửa, ngay trên cùng một trang Stats sẽ có:
 ['Goals Conceded', (s,o)=>o.goals + s.ownGoals],
 ```
 
-Hai bản: [shared.js:629](../shared.js:629) + [:647](../shared.js:647) và
-[index.html:3924](../index.html:3924) + [:3942](../index.html:3942).
+Hai bản: [shared.js:629](../../apps/tagger/shared.js:629) + [:647](../../apps/tagger/shared.js:647) và
+[index.html:3924](../../apps/tagger/index.html:3924) + [:3942](../../apps/tagger/index.html:3942).
 
 > ⚠️ Dòng `Goals Conceded` chính là dòng Q3 nói **"không đụng"**. Q3 nói vậy vì lý do *`goal
 > conceded` tag tay không được ghi đè con số suy ra* — và điều đó **vẫn giữ nguyên**. Sửa ở đây là
@@ -793,14 +793,14 @@ Hai bản: [shared.js:629](../shared.js:629) + [:647](../shared.js:647) và
 | Chỗ | Vì sao |
 |---|---|
 | `EVENT_INC` → `goals` / `totalShots` | **Không** cộng. `s.goals` nuôi *Goals* và *Goals Conceded*; cộng vào đó là ghi bàn cho nhầm đội. Chỉ `ownGoals`. |
-| `SHOT_KINDS` ([shared.js:334](../shared.js:334)) | `own goal` không có trong đó ⇒ không lọt vào Event List / bản đồ sút. Đúng. |
+| `SHOT_KINDS` ([shared.js:334](../../apps/tagger/shared.js:334)) | `own goal` không có trong đó ⇒ không lọt vào Event List / bản đồ sút. Đúng. |
 | `evtClass` | `SHOT_EVENTS = /shot\|^goal$\|^own goal$/i` **đã** khớp ⇒ badge đen `.shot` tự có. **0 dòng.** |
 | `GOAL_SPOT_EVENTS` / `SPOT_REQUIRED` | **Không** thêm. Bắt buộc chấm khung thành cho own goal là **siết cổng** — không ai yêu cầu → **Q11**. |
-| `attackDir()` ([Stats/stats-view.js:163](../Stats/stats-view.js:163)) | `shotKinds` cục bộ không có `own goal` ⇒ hướng tấn công không bị một pha phản lưới kéo lệch. Đúng. |
+| `attackDir()` ([Stats/stats-view.js:163](../../apps/tagger/Stats/stats-view.js:163)) | `shotKinds` cục bộ không có `own goal` ⇒ hướng tấn công không bị một pha phản lưới kéo lệch. Đúng. |
 
 ### 11.5 Chỗ phải sửa #3 — tỉ số xem trước khi join trận
 
-[cloud-sync.js:305](../cloud-sync.js:305) `findMatchByCode()` tính tỉ số bằng truy vấn server:
+[cloud-sync.js:305](../../apps/tagger/cloud-sync.js:305) `findMatchByCode()` tính tỉ số bằng truy vấn server:
 
 ```js
 const { data: goals } = await sb.from('events').select('team')
@@ -808,7 +808,7 @@ const { data: goals } = await sb.from('events').select('team')
 (goals || []).forEach(g => (g.team === 'home' ? h++ : a++));
 ```
 
-Không sửa thì ô xem trước trận ([index.html:4051](../index.html:4051)) hiện **1 – 0** trong khi bảng
+Không sửa thì ô xem trước trận ([index.html:4051](../../apps/tagger/index.html:4051)) hiện **1 – 0** trong khi bảng
 điểm hiện **0 – 1**. Sửa:
 
 ```js
@@ -857,7 +857,7 @@ const AN_ORDER=['aerial-total','aerial-mirror','ground-total','ground-mirror',
 ```
 
 `n` là số thứ tự của **mirror tương ứng** trong `AN_ORDER` (1-based) — dòng
-*"See check N for which half of the duel is missing"* ([index.html:2864](../index.html:2864)) trỏ
+*"See check N for which half of the duel is missing"* ([index.html:2864](../../apps/tagger/index.html:2864)) trỏ
 tới đó. Với thứ tự trên: 2, 4, 6, 8. ✔ *(hôm nay aerial-total n:2, ground-total n:4 — cùng quy tắc)*
 
 `duelTally()` tự lấy tên từ `DUEL_MIRRORS` ⇒ **không cần sửa**. `sumOf()`, `totalCheck()`,
@@ -872,7 +872,7 @@ tới đó. Với thứ tự trên: 2, 4, 6, 8. ✔ *(hôm nay aerial-total n:2,
 | trộn | kiểm thật ✔ | kiểm thật ✔ | kiểm thật ✔ |
 
 Không có ô nào "cổng ngừng kiểm mà vẫn báo ✓" — điều mà comment tại
-[index.html:2781](../index.html:2781) cảnh báo (*"A gate that misses … is worse than no gate: it
+[index.html:2781](../../apps/tagger/index.html:2781) cảnh báo (*"A gate that misses … is worse than no gate: it
 reports a clean match"*). Mỗi họ tự canh mình, và mỗi check độc lập.
 
 ### 12.3 Phần thưởng kèm theo: cổng bắt luôn lỗi §8.3
@@ -891,10 +891,10 @@ Cả hai cùng kêu, và người tag thấy ngay hai họ đang bị dùng lẫ
 
 | Nơi | Chuỗi |
 |---|---|
-| [index.html:3045](../index.html:3045) | `'… '+bad.length+' of the seven analysis checks …'` |
-| [index.html:4187](../index.html:4187) | `'Analysis checks — all seven passed.'` |
-| [index.html:4188](../index.html:4188) | `'Analysis checks — '+pass+' of 7 passed.'` |
-| [index.html:4188](../index.html:4188) | `'… blocked until all seven pass.'` |
+| [index.html:3045](../../apps/tagger/index.html:3045) | `'… '+bad.length+' of the seven analysis checks …'` |
+| [index.html:4187](../../apps/tagger/index.html:4187) | `'Analysis checks — all seven passed.'` |
+| [index.html:4188](../../apps/tagger/index.html:4188) | `'Analysis checks — '+pass+' of 7 passed.'` |
+| [index.html:4188](../../apps/tagger/index.html:4188) | `'… blocked until all seven pass.'` |
 
 **Sửa bằng cách suy ra, để không bao giờ nói dối nữa:**
 
@@ -904,8 +904,8 @@ Cả hai cùng kêu, và người tag thấy ngay hai họ đang bị dùng lẫ
 'Analysis checks — '+pass+' of '+AN_ORDER.length+' passed.  Publishing is blocked until all pass.'
 ```
 
-Cộng 4 comment cũng nói "seven": [index.html:239](../index.html:239),
-[:612](../index.html:612), [:2756](../index.html:2756), [:3025-3026](../index.html:3025).
+Cộng 4 comment cũng nói "seven": [index.html:239](../../apps/tagger/index.html:239),
+[:612](../../apps/tagger/index.html:612), [:2756](../../apps/tagger/index.html:2756), [:3025-3026](../../apps/tagger/index.html:3025).
 
 **Hệ quả cho test:** `tests/analysis-gate.test.js` khẳng định con số 7 ở **8 chỗ** (dòng 125, 129,
 298, 311, 312, 438, 446, 471). Chúng **sẽ phải sửa** — xem §13.2, và đó là cập nhật *số đếm*, không
@@ -975,18 +975,18 @@ Lần này **cả `shared.js` và `cloud-sync.js` đều đổi** ⇒ **5 nơi**
 
 | # | File | Dòng | Từ → đến |
 |---|---|---|---|
-| 1 | [Stats/index.html:62](../Stats/index.html:62) | `shared.js?v=22` | → `?v=23` |
-| 2 | [Player-Lists/index.html:98](../Player-Lists/index.html:98) | `shared.js?v=22` | → `?v=23` |
-| 3 | [client/assets/app.js:1623](../client/assets/app.js:1623) | `shared.js?v=22` | → `?v=23` ⚠️ **nằm trong JS, không phải markup** |
-| 4 | [client/app.html:81](../client/app.html:81) | `app.js?v=44` | → `?v=45` *(vì #3 vừa sửa app.js)* |
-| 5 | [index.html:4293](../index.html:4293) | `cloud-sync.js?v=50` | → `?v=51` *(§11.5)* |
+| 1 | [Stats/index.html:62](../../apps/tagger/Stats/index.html:62) | `shared.js?v=22` | → `?v=23` |
+| 2 | [Player-Lists/index.html:98](../../apps/tagger/Player-Lists/index.html:98) | `shared.js?v=22` | → `?v=23` |
+| 3 | [client/assets/app.js:1623](../../apps/portal/assets/app.js:1623) | `shared.js?v=22` | → `?v=23` ⚠️ **nằm trong JS, không phải markup** |
+| 4 | [client/app.html:81](../../apps/portal/app.html:81) | `app.js?v=44` | → `?v=45` *(vì #3 vừa sửa app.js)* |
+| 5 | [index.html:4293](../../apps/tagger/index.html:4293) | `cloud-sync.js?v=50` | → `?v=51` *(§11.5)* |
 
 Vì §5.5 (`FILM_EV_GROUPS`) nằm trong phạm vi ⇒ thêm:
 
 | # | File | Dòng | Từ → đến |
 |---|---|---|---|
-| 6 | [Stats/index.html:63](../Stats/index.html:63) | `stats-view.js?v=22` | → `?v=23` |
-| 7 | [client/assets/app.js:1634](../client/assets/app.js:1634) | `stats-view.js?v=22` | → `?v=23` |
+| 6 | [Stats/index.html:63](../../apps/tagger/Stats/index.html:63) | `stats-view.js?v=22` | → `?v=23` |
+| 7 | [client/assets/app.js:1634](../../apps/portal/assets/app.js:1634) | `stats-view.js?v=22` | → `?v=23` |
 
 `index.html` không mang `?v=` cho chính nó (nó **là** trang) ⇒ không bump.
 
@@ -999,7 +999,7 @@ node tests/asset-versions.test.js --update
 rồi commit `tests/asset-versions.json`.
 
 **`deploy.yml`: 0 dòng.** Không tạo file mới; `pitchtagger_events.json` đã có `cp` ở
-[dòng 70](../.github/workflows/deploy.yml:70).
+[dòng 70](../../.github/workflows/deploy.yml:70).
 
 ---
 
@@ -1065,27 +1065,27 @@ Hàng đã tag bằng tên mới sẽ trỏ vào tên từ điển không còn c
 
 | Tên | Vì sao không xoá |
 |---|---|
-| `ground duel success` · `ground duel fail` | Hàng đã tag sẽ trỏ vào tên từ điển không còn có; **macro `xa` và `xxaa` chết** (§7.1); `renderEvents()` **cố tình không cho xoá** ([index.html:2125](../index.html:2125)) |
+| `ground duel success` · `ground duel fail` | Hàng đã tag sẽ trỏ vào tên từ điển không còn có; **macro `xa` và `xxaa` chết** (§7.1); `renderEvents()` **cố tình không cho xoá** ([index.html:2125](../../apps/tagger/index.html:2125)) |
 | `save` | Như trên, và `saves` nuôi `Save Rate` / `On Target Faced` / trang thủ môn của PDF |
 
 ## Phụ lục C — bảng "một dòng, một chỗ" để rà khi code
 
 | Sửa gì | `shared.js` | `index.html` | `Stats/stats-view.js` | khác |
 |---|---|---|---|---|
-| `EVENT_INC` | [:191](../shared.js:191) | [:3706](../index.html:3706) | — | — |
-| `newStat()` | [:239](../shared.js:239) | [:3752](../index.html:3752) | — | — |
-| `STAT_GROUPS` / `STAT_HEADERS` / `statRow` | [:232](../shared.js:232) | [:3745](../index.html:3745) | — | — |
-| `PLAYER_CATS` | [:293](../shared.js:293) | — | qua `STAT_CATS` [:57](../Stats/stats-view.js:57) | `client/assets/app.js` đọc |
-| `GK_COLS` | [:326](../shared.js:326) | — | — | `client/assets/app.js` [:1008](../client/assets/app.js:1008) |
-| `TEAM_SECTIONS` | [:627](../shared.js:627) | [:3922](../index.html:3922) | — | — |
-| `evtClass` + CSS | — | [:3510](../index.html:3510) + [:185](../index.html:185) | — | — |
-| `DUEL_MIRRORS`/`DUEL_TOTALS`/`AN_ORDER` | — | [:2798](../index.html:2798) / [:2812](../index.html:2812) / [:2822](../index.html:2822) | — | — |
-| chuỗi *"seven"* | — | [:3045](../index.html:3045), [:4187-4188](../index.html:4187) | — | — |
-| `computeScore` | — | [:1421](../index.html:1421) | *đối chiếu* `teamGoals` [:929](../Stats/stats-view.js:929) | — |
-| tỉ số xem trước | — | — | — | `cloud-sync.js` [:305](../cloud-sync.js:305) |
-| `FILM_EV_GROUPS` | — | — | [:1345](../Stats/stats-view.js:1345) | — |
-| Từ điển | — | [:828](../index.html:828) | — | `pitchtagger_events.json` |
-| `DEF_CATS` **(P2 — hoãn)** | — | — | [:180](../Stats/stats-view.js:180) | — |
+| `EVENT_INC` | [:191](../../apps/tagger/shared.js:191) | [:3706](../../apps/tagger/index.html:3706) | — | — |
+| `newStat()` | [:239](../../apps/tagger/shared.js:239) | [:3752](../../apps/tagger/index.html:3752) | — | — |
+| `STAT_GROUPS` / `STAT_HEADERS` / `statRow` | [:232](../../apps/tagger/shared.js:232) | [:3745](../../apps/tagger/index.html:3745) | — | — |
+| `PLAYER_CATS` | [:293](../../apps/tagger/shared.js:293) | — | qua `STAT_CATS` [:57](../../apps/tagger/Stats/stats-view.js:57) | `client/assets/app.js` đọc |
+| `GK_COLS` | [:326](../../apps/tagger/shared.js:326) | — | — | `client/assets/app.js` [:1008](../../apps/portal/assets/app.js:1008) |
+| `TEAM_SECTIONS` | [:627](../../apps/tagger/shared.js:627) | [:3922](../../apps/tagger/index.html:3922) | — | — |
+| `evtClass` + CSS | — | [:3510](../../apps/tagger/index.html:3510) + [:185](../../apps/tagger/index.html:185) | — | — |
+| `DUEL_MIRRORS`/`DUEL_TOTALS`/`AN_ORDER` | — | [:2798](../../apps/tagger/index.html:2798) / [:2812](../../apps/tagger/index.html:2812) / [:2822](../../apps/tagger/index.html:2822) | — | — |
+| chuỗi *"seven"* | — | [:3045](../../apps/tagger/index.html:3045), [:4187-4188](../../apps/tagger/index.html:4187) | — | — |
+| `computeScore` | — | [:1421](../../apps/tagger/index.html:1421) | *đối chiếu* `teamGoals` [:929](../../apps/tagger/Stats/stats-view.js:929) | — |
+| tỉ số xem trước | — | — | — | `cloud-sync.js` [:305](../../apps/tagger/cloud-sync.js:305) |
+| `FILM_EV_GROUPS` | — | — | [:1345](../../apps/tagger/Stats/stats-view.js:1345) | — |
+| Từ điển | — | [:828](../../apps/tagger/index.html:828) | — | `pitchtagger_events.json` |
+| `DEF_CATS` **(P2 — hoãn)** | — | — | [:180](../../apps/tagger/Stats/stats-view.js:180) | — |
 
 ---
 
@@ -1111,7 +1111,7 @@ Hàng đã tag bằng tên mới sẽ trỏ vào tên từ điển không còn c
 |---|---|---|
 | **P1** | Thêm dòng duel/GK vào `TEAM_SECTIONS` (§5.3.3) | bảng so sánh đội dài ra cho **mọi trận**, cả trận cũ |
 | **P2** | `DEF_CATS` — bản đồ Defensive (§5.6) | thêm mục vào dropdown |
-| **P4** | Tab thứ 5 *Goalkeeping* ở Stats ([Stats/index.html:53](../Stats/index.html:53)) | UI mới. Site khách **đã có** khái niệm này ([app.js:1008](../client/assets/app.js:1008)); app tag thì chưa |
+| **P4** | Tab thứ 5 *Goalkeeping* ở Stats ([Stats/index.html:53](../../apps/tagger/Stats/index.html:53)) | UI mới. Site khách **đã có** khái niệm này ([app.js:1008](../../apps/portal/assets/app.js:1008)); app tag thì chưa |
 
 *(P3 — luật chống tag-hai-lần — đã được Q2 trả lời **Không**, và §12.3 cho thấy cổng bắt được phần
 nguy hiểm nhất của nó rồi.)*

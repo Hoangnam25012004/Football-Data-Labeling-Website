@@ -55,7 +55,7 @@ Egress from R2 is free, storage is cheap, and the first **10 GB stored at any mo
 ## Deploy the Worker
 
 ```bash
-cd worker
+cd services/edge-worker
 npm install
 # fill in the [vars] in wrangler.toml (account id, bucket, public base, allowed origin)
 npx wrangler login
@@ -68,7 +68,7 @@ npx wrangler deploy
 
 ## Point the app at the Worker
 
-In [`../cloud-sync.js`](../cloud-sync.js), fill in `CONFIG.R2`:
+In [`../cloud-sync.js`](../../apps/tagger/cloud-sync.js), fill in `CONFIG.R2`:
 
 ```js
 R2: {
@@ -105,7 +105,7 @@ Anyone opening the match  -->  reads video_url  -->  <video> streams from R2 (CD
 
 The landing page's **Email us** button is a `mailto:`, which opens nothing at all on a machine
 with no mail client registered — and the page cannot detect that. So the page also carries a
-form, and the form posts here. See [`../docs/contact-form-design.md`](../docs/contact-form-design.md)
+form, and the form posts here. See [`../docs/contact-form-design.md`](../../docs/design/contact-form-design.md)
 for the full design.
 
 ```
@@ -134,7 +134,7 @@ The Worker holds the service role key, which bypasses row-level security.
 
 3. **Set the secrets:**
    ```bash
-   cd worker
+   cd services/edge-worker
    npx wrangler secret put SUPABASE_URL          # https://xtzmtdcohoixoxqusyyz.supabase.co
    npx wrangler secret put SUPABASE_SERVICE_KEY  # Supabase → Settings → API → service_role
    npx wrangler secret put RESEND_API_KEY

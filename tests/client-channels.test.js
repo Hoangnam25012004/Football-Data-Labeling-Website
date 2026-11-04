@@ -15,14 +15,14 @@ const {readSrc}=require('./harness');
 const ROOT=path.join(__dirname,'..');
 const page=readSrc;                       // CRLF-folded: see readSrc in harness.js
 
-const SUPA=page('client/assets/supa.js');
-const APPJS=page('client/assets/app.js');
-const APPHTML=page('client/app.html');
-const APPCSS=page('client/assets/app.css');
+const SUPA=page('apps/portal/assets/supa.js');
+const APPJS=page('apps/portal/assets/app.js');
+const APPHTML=page('apps/portal/app.html');
+const APPCSS=page('apps/portal/assets/app.css');
 const SQL=page('supabase/migrations/0014_channel_admin.sql');
 const YML=page('.github/workflows/deploy.yml');
 const SQL15=page('supabase/migrations/0015_match_stats_event_names.sql');
-const DICT=JSON.parse(page('pitchtagger_events.json'));
+const DICT=JSON.parse(page('data/definitions/pitchtagger_events.json'));
 /* comments stripped before anything is extracted — a stray semicolon in one
    would otherwise end a statement halfway through */
 const bare=s=>s.replace(/--[^\n]*/g,'');
@@ -71,7 +71,7 @@ function loadAPI(handler,session){
   const win={supabase:{createClient:()=>db.client}};
   const ctx={console,window:win,URLSearchParams,Promise};
   vm.createContext(ctx);
-  vm.runInContext(SUPA,ctx,{filename:'client/assets/supa.js'});
+  vm.runInContext(SUPA,ctx,{filename:'apps/portal/assets/supa.js'});
   return {api:win.HNA,calls:db.calls};
 }
 const one=(calls,table,op)=>calls.filter(c=>c.table===table&&(!op||c.op===op))[0];
@@ -550,7 +550,7 @@ test('the code column is what the share link and the tagger both use', () => {
 /* ================= no sample channel ================= */
 test('there is no seed channel left to fall back on', () => {
   notOk(/HNA_SEED|seedChannel|\.seed\b/.test(APPJS),'app.js holds no seed');
-  notOk(fs.existsSync(path.join(ROOT,'client/assets/data.js')),'and the file that carried it is gone');
+  notOk(fs.existsSync(path.join(ROOT,'apps/portal/assets/data.js')),'and the file that carried it is gone');
   notOk(/data\.js/.test(APPHTML),'app.html does not load it');
   notOk(/cp client\/assets\/data\.js/.test(YML),'nor does the deploy copy it');
 });
@@ -569,7 +569,7 @@ test('an app with no channel says which of the two reasons it is', () => {
 });
 
 test('nothing still promises a sample channel to a visitor', () => {
-  ['client/index.html','client/login.html','client/app.html'].forEach(f=>
+  ['apps/portal/index.html','apps/portal/login.html','apps/portal/app.html'].forEach(f=>
     notOk(/sample channel/i.test(page(f)),f+' still offers one'));
 });
 
@@ -585,7 +585,7 @@ test('the strip of running totals is gone from the bar', () => {
 });
 
 test('no monogram anywhere on the site — a club is its name', () => {
-  const SITECSS=page('client/assets/site.css');
+  const SITECSS=page('apps/portal/assets/site.css');
   notOk(/class="crest/.test(APPJS),'no badge is drawn beside a team or a channel');
   notOk(/chanCrest|crestPrev|ncCrest|crest-pick/.test(APPJS+APPHTML),
         'the bar, the form preview and the field it previewed are all gone');
@@ -817,10 +817,10 @@ test('the migration leaves the tagging app alone', () => {
 
 /* ================= shipping ================= */
 test('every asset the client pages load is staged for GitHub Pages', () => {
-  ['client/index.html','client/app.html','client/login.html'].forEach(f=>{
+  ['apps/portal/index.html','apps/portal/app.html','apps/portal/login.html'].forEach(f=>{
     (page(f).match(/assets\/([a-z0-9.\-]+)\?/g)||[]).forEach(ref=>{
       const name=ref.replace(/^assets\//,'').replace(/\?$/,'');
-      ok(YML.includes('cp client/assets/'+name),f+' loads '+name+', which deploy.yml must copy');
+      ok(YML.includes('cp apps/portal/assets/'+name),f+' loads '+name+', which deploy.yml must copy');
     });
   });
 });
@@ -828,7 +828,7 @@ test('every asset the client pages load is staged for GitHub Pages', () => {
 test('the two pages that share an asset ask for the same copy of it', () => {
   // an unbumped ?v= leaves a returning browser on the old file; a HALF-bumped one
   // is worse, because the two pages then disagree about which file they are on
-  const login=page('client/login.html');
+  const login=page('apps/portal/login.html');
   const ver=(src,name)=>(new RegExp(name.replace('.','\\.')+'\\?v=(\\d+)').exec(src)||[])[1];
   ['supa.js','app.css'].forEach(a=>{
     const inApp=ver(APPHTML,a), inLogin=ver(login,a);

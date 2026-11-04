@@ -11,12 +11,12 @@
    What it cannot check is SIZE. .rp-page is overflow:hidden, so a page that runs past
    1123px is cut off with no error anywhere, and a sandbox has no layout to measure. That
    check is run by hand against a real browser; the numbers it gave are in
-   docs/match-report-sections-design.md §9.3 and §5.1. */
+   docs/design/match-report-sections-design.md §9.3 and §5.1. */
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk}=require('./tiny-test');
 
-const ROOT=path.join(__dirname,'..');
-const read=p=>fs.readFileSync(path.join(ROOT,p),'utf8').replace(/\r\n/g,'\n');
+const {repoPath}=require('./harness');
+const read=p=>fs.readFileSync(repoPath(p),'utf8').replace(/\r\n/g,'\n');
 const SHARED=read('shared.js'), VIEW=read('Stats/stats-view.js'), REPORT=read('Stats/report.js');
 
 /* ---------- a DOM just rich enough for buildPages() ---------- */

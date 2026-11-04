@@ -11,8 +11,8 @@ const {readSrc}=require('./harness');
 const ROOT=path.join(__dirname,'..');
 const page=readSrc;                       // CRLF-folded: see readSrc in harness.js
 const SQL=page('supabase/migrations/0017_public_channels.sql');
-const SUPA=page('client/assets/supa.js');
-const APPJS=page('client/assets/app.js');
+const SUPA=page('apps/portal/assets/supa.js');
+const APPJS=page('apps/portal/assets/app.js');
 
 const bare=s=>s.replace(/--[^\n]*/g,'');
 const sql=bare(SQL);
@@ -100,7 +100,7 @@ test('closing it needs no confirm — only opening does', () => {
 test('a public channel says so in the channel list', () => {
   // the badge under the channel name was dropped; the list row still says it
   ok(/c\.isPublic \? ' · public' : ''/.test(APPJS),'the row in the channel list says so');
-  ok(!/chanPublic/.test(page('client/app.html')),'and no badge is left in the top bar');
+  ok(!/chanPublic/.test(page('apps/portal/app.html')),'and no badge is left in the top bar');
   ok(!/chanPublic/.test(APPJS),'nothing still reaches for it');
 });
 

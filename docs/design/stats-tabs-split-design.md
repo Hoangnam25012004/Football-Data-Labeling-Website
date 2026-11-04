@@ -10,7 +10,7 @@ counter mới nào.* Cả 15 cột đã nằm sẵn trong `newStat()` từ ngày
 bày chúng ra. Ngược lại, tab **Set Pieces** có **6 trên 11 cột không có gì đứng sau** — và đó là
 mục khó duy nhất của tài liệu này (§5).
 
-**Rủi ro lớn nhất KHÔNG nằm ở trang Stats.** Nằm ở [client/assets/app.js:321](../client/assets/app.js:321):
+**Rủi ro lớn nhất KHÔNG nằm ở trang Stats.** Nằm ở [client/assets/app.js:321](../../apps/portal/assets/app.js:321):
 `TD_TABS` dùng **cùng một khoá** cho hai việc — tên section của `TEAM_SECTIONS` *và* khoá của
 `PLAYER_CATS`. Xoá khoá `other` mà quên nó thì trang Data của site khách **vẽ ra bảng rỗng, không
 báo lỗi, không có gì trong console**. §8.6 là mục riêng cho chuyện đó.
@@ -121,8 +121,8 @@ sống cạnh nhau. Ba chỗ đổi:
 
 | Chỗ | Đổi gì |
 |---|---|
-| Bảng *Defensive — Player Stats* [:742](../Stats/report.js:742) | cột `Ground` → **`Physical` + `Loose`** (12 → 13 cột) |
-| Radar phòng ngự [:1124](../Stats/report.js:1124) | trục `Ground Won` → **`Physical Won` + `Loose Ball Won`** (7 → 8 trục) |
+| Bảng *Defensive — Player Stats* [:742](../../apps/tagger/Stats/report.js:742) | cột `Ground` → **`Physical` + `Loose`** (12 → 13 cột) |
+| Radar phòng ngự [:1124](../../apps/tagger/Stats/report.js:1124) | trục `Ground Won` → **`Physical Won` + `Loose Ball Won`** (7 → 8 trục) |
 | Trang bản đồ theo loại | **0 dòng** — nó lặp `DEF_CATS`, nên hai loại mới tự thành hai trang |
 
 Luật §2.1 vẫn được giữ nguyên vẹn: `sectionRows(0/1/2)` không đụng, ba section đầu của
@@ -131,7 +131,7 @@ Luật §2.1 vẫn được giữ nguyên vẹn: `sectionRows(0/1/2)` không đ�
 ### 0.2 `frac()` in `0/0`, không in `—`
 
 Bản thiết kế viết nhầm rằng `frac()` tự trả `—` khi mẫu số bằng 0. Nó trả `0/0`
-([report.js:95](../Stats/report.js:95)). Với trận tag trước ngày tách, `0/0` **khẳng định**
+([report.js:95](../../apps/tagger/Stats/report.js:95)). Với trận tag trước ngày tách, `0/0` **khẳng định**
 "cầu thủ này không có pha tranh chấp thể chất nào" — đúng lỗi §4.5 cảnh báo. Nên hai cột mới
 trong PDF đọc cờ `duelDetail` trước, y như mọi cột mới khác.
 
@@ -169,7 +169,7 @@ hằng `SHOT_KINDS` — file này chưa từng có cái nào. `SET_PIECE_EVENTS`
 
 ### 0.6 Một chỗ cố ý **không** đồng bộ
 
-Bảng rộng 40 cột của tab tagging (`STAT_HEADERS` / `statRow`, [index.html:4023](../index.html:4023))
+Bảng rộng 40 cột của tab tagging (`STAT_HEADERS` / `statRow`, [index.html:4023](../../apps/tagger/index.html:4023))
 **vẫn còn `Ground Duels` / `Ground Duels Won`** và không có 23 cột mới. Đó là bảng làm việc lúc
 đang tag, không phải bảng báo cáo, và §8.9 giữ nó ngoài phạm vi. Nói ra ở đây để lần sau không ai
 tưởng là sót.
@@ -193,7 +193,7 @@ tưởng là sót.
 | **Export** | 8 → **12 sheet**, tự động, `buildSheets()` đọc `Object.keys(STAT_CATS)` | §8.5 |
 | **Test cũ phải sửa** | **5 file**, mỗi cái vì một lý do chính đáng | §11.2 |
 | **Cache-bust** | `shared.js` · `stats-view.js` · `app.js` · (có thể) `stats-view.css` → **9 dòng `?v=`** trên 4 file + `asset-versions.json` | §12 |
-| **Chữ trên landing** | [client/index.html:432](../client/index.html:432) đang hứa *"four tables … eight sheets"* | §10.5 |
+| **Chữ trên landing** | [client/index.html:432](../../apps/portal/index.html:432) đang hứa *"four tables … eight sheets"* | §10.5 |
 
 **Câu một dòng cần nhớ:** `computeStats()` hôm nay là **một vòng lặp thuần trên từng hàng**. Cả thẻ
 phạt lẫn cột set-piece **đều cần nhìn nhiều hàng cùng lúc**. Đó là thay đổi kiến trúc thật sự
@@ -208,17 +208,17 @@ Nó qua **11 trạm**, và 4 trạm im lặng khi hỏng.
 
 | # | Trạm | Ở đâu | Hỏng thì thế nào |
 |---|---|---|---|
-| 1 | Định nghĩa cột | [shared.js:357](../shared.js:357) `PLAYER_CATS` | — |
-| 2 | Bảng trên màn hình | [Stats/stats-view.js:126](../Stats/stats-view.js:126) `statTableHTML` | ném lỗi nếu `c[1]` cần 2 tham số |
-| 3 | Nút chuyển nhóm ×2 bản | [Stats/index.html:54](../Stats/index.html:54) · [stats-view.js:2303](../Stats/stats-view.js:2303) `CHROME` | **nút không tồn tại → không bấm được** |
-| 4 | Dashboard cùng `statCat` | [stats-view.js:139](../Stats/stats-view.js:139) `dashboardHTML` | **im lặng vẽ rỗng** |
-| 5 | Sheet XLSX | [stats-view.js:1166](../Stats/stats-view.js:1166) `buildSheets` | tự động — đọc `Object.keys(STAT_CATS)` |
+| 1 | Định nghĩa cột | [shared.js:357](../../apps/tagger/shared.js:357) `PLAYER_CATS` | — |
+| 2 | Bảng trên màn hình | [Stats/stats-view.js:126](../../apps/tagger/Stats/stats-view.js:126) `statTableHTML` | ném lỗi nếu `c[1]` cần 2 tham số |
+| 3 | Nút chuyển nhóm ×2 bản | [Stats/index.html:54](../../apps/tagger/Stats/index.html:54) · [stats-view.js:2303](../../apps/tagger/Stats/stats-view.js:2303) `CHROME` | **nút không tồn tại → không bấm được** |
+| 4 | Dashboard cùng `statCat` | [stats-view.js:139](../../apps/tagger/Stats/stats-view.js:139) `dashboardHTML` | **im lặng vẽ rỗng** |
+| 5 | Sheet XLSX | [stats-view.js:1166](../../apps/tagger/Stats/stats-view.js:1166) `buildSheets` | tự động — đọc `Object.keys(STAT_CATS)` |
 | 6 | CSV | `buildCsv` | tự động, dùng chính worksheet trên |
-| 7 | Site khách — Player Data | [client/assets/app.js:1007](../client/assets/app.js:1007) `catCols` | **im lặng bảng rỗng** |
-| 8 | Site khách — Team Data | [app.js:321](../client/assets/app.js:321) `TD_TABS` → `TEAM_SECTIONS[title]` | **im lặng bảng rỗng** |
-| 9 | Site khách — tab của thủ môn | [app.js:1017](../client/assets/app.js:1017) `GK_TABS` | trùng tab (§8.6) |
-| 10 | Overall (2 bản) | [shared.js:728](../shared.js:728) · [index.html:4155](../index.html:4155) `TEAM_SECTIONS` | — |
-| 11 | PDF | [Stats/report.js:349](../Stats/report.js:349) `sectionRows(si)` — **theo chỉ số** | **im lặng in nhầm section** |
+| 7 | Site khách — Player Data | [client/assets/app.js:1007](../../apps/portal/assets/app.js:1007) `catCols` | **im lặng bảng rỗng** |
+| 8 | Site khách — Team Data | [app.js:321](../../apps/portal/assets/app.js:321) `TD_TABS` → `TEAM_SECTIONS[title]` | **im lặng bảng rỗng** |
+| 9 | Site khách — tab của thủ môn | [app.js:1017](../../apps/portal/assets/app.js:1017) `GK_TABS` | trùng tab (§8.6) |
+| 10 | Overall (2 bản) | [shared.js:728](../../apps/tagger/shared.js:728) · [index.html:4155](../../apps/tagger/index.html:4155) `TEAM_SECTIONS` | — |
+| 11 | PDF | [Stats/report.js:349](../../apps/tagger/Stats/report.js:349) `sectionRows(si)` — **theo chỉ số** | **im lặng in nhầm section** |
 
 ### 2.1 Trạm 11 là cái bẫy tinh vi nhất
 
@@ -233,8 +233,8 @@ function sectionRows(si){ … return TEAM_SECTIONS[si][1].map(…); }
 là trang *"Distribution"* của bản PDF in ra nội dung của section khác — **không lỗi, không cảnh
 báo, và đọc vẫn thấy hợp lý** vì các thanh bar vẫn vẽ đẹp.
 
-Section 3 (`Discipline & GK`) **không** được `sectionRows` đụng tới: [report.js:1311](../Stats/report.js:1311)
-và [:1314](../Stats/report.js:1314) tự dựng `discRows` / `spRows` từ `h.fouls`, `h.corners`… Nên:
+Section 3 (`Discipline & GK`) **không** được `sectionRows` đụng tới: [report.js:1311](../../apps/tagger/Stats/report.js:1311)
+và [:1314](../../apps/tagger/Stats/report.js:1314) tự dựng `discRows` / `spRows` từ `h.fouls`, `h.corners`… Nên:
 
 > **Luật của tài liệu này: mọi section mới chỉ được NỐI VÀO SAU index 2. Ba section đầu không đổi
 > thứ tự, không đổi số dòng bên trong.** Đó là điều biến cam kết *"report.js: 0 dòng"* từ một lời
@@ -256,8 +256,8 @@ xương sống của tài liệu.
 ### 3.1 Loại B là tin tốt nhất trong tài liệu này
 
 `foul`, `foul throw`, `handball foul` **luôn luôn là ba event riêng biệt** — xem
-[pitchtagger_events.json](../pitchtagger_events.json) (`f`, `tf`, `hf`) và
-[shared.js:226](../shared.js:226):
+[pitchtagger_events.json](../../data/definitions/pitchtagger_events.json) (`f`, `tf`, `hf`) và
+[shared.js:226](../../apps/tagger/shared.js:226):
 
 ```js
 'foul':['fouls'],'foul throw':['fouls'],'handball foul':['fouls'],
@@ -272,7 +272,7 @@ từ trước tới nay lấp đầy 5 cột này **chính xác**, không một 
 
 `yellow card` / `red card` cũng vậy: có trong từ điển từ đầu, đã được `matchSummaryHTML()`,
 `foulMapHTML()`, `classifyCards()` và trang Data của site khách đọc — chỉ là **`newStat()` chưa
-bao giờ mang chúng** ([app.js:761](../client/assets/app.js:761) nói thẳng điều đó).
+bao giờ mang chúng** ([app.js:761](../../apps/portal/assets/app.js:761) nói thẳng điều đó).
 
 ---
 
@@ -281,7 +281,7 @@ bao giờ mang chúng** ([app.js:761](../client/assets/app.js:761) nói thẳng 
 ### 4.1 Tab **Goalkeeper** — 15 cột, **0 event mới, 0 counter mới**
 
 Đúng thứ tự bạn viết. Cột `(s)` là hàm **một tham số**, bắt buộc — `statTableHTML` gọi
-`c[1](P[no])` ([stats-view.js:133](../Stats/stats-view.js:133)); một hàm 2 tham số kiểu `GK_COLS`
+`c[1](P[no])` ([stats-view.js:133](../../apps/tagger/Stats/stats-view.js:133)); một hàm 2 tham số kiểu `GK_COLS`
 sẽ **ném lỗi** ở `g.known`.
 
 | # | Nhãn | Biểu thức | Counter đã có |
@@ -305,7 +305,7 @@ sẽ **ném lỗi** ở `g.known`.
 **Ba ghi chú bắt buộc đọc:**
 
 **(a) `Saves` của bạn = "catches + parries". Counter `saves` hiện tại thì hơn thế.**
-[shared.js:254](../shared.js:254):
+[shared.js:254](../../apps/tagger/shared.js:254):
 
 ```js
 'save' :['saves'],           // tên cũ, KHÔNG bị bỏ
@@ -330,7 +330,7 @@ khớp nhau.
 | Ở đâu | Công thức | Nghĩa |
 |---|---|---|
 | `TEAM_SECTIONS` | `(s,o)=>o.goals+s.ownGoals` | bàn thua của **đội** |
-| `GK_COLS` [shared.js:401](../shared.js:401) | `g.known?g.conceded:'—'` | bàn thua **lúc thủ môn này trên sân** |
+| `GK_COLS` [shared.js:401](../../apps/tagger/shared.js:401) | `g.known?g.conceded:'—'` | bàn thua **lúc thủ môn này trên sân** |
 | **cột 15 (mới)** | `s.goalsConceded` | **event tag tay** |
 
 Ba nghĩa khác nhau, ba con số có thể lệch nhau. `GK_COLS` giải chuyện này bằng cách đặt nhãn
@@ -406,7 +406,7 @@ Không có event nào tên `free-kick shot on target`. Có `free-kick`, có `sho
 
 **Có — nhưng chỉ khi analyst tag chúng trong CÙNG MỘT LƯỢT NHẬP.**
 
-[index.html:2691](../index.html:2691):
+[index.html:2691](../../apps/tagger/index.html:2691):
 
 ```js
 const grpId = evs.length>1 ? newId() : null;
@@ -417,13 +417,13 @@ Enter rồi `12dd` Enter sinh **hai hàng `grp=null`**. Cùng một sự việc 
 liệu khác nhau.
 
 `grp` **có** đi qua cloud và **có** nằm trong báo cáo đã publish:
-[cloud-sync.js:40](../cloud-sync.js:40) ghi nó vào `attributes`, [:56](../cloud-sync.js:56) đọc
-lại, `buildReport()` [:556](../cloud-sync.js:556) mang `rows: stored.map(dbToRow)`. Nên cách suy
+[cloud-sync.js:40](../../apps/tagger/cloud-sync.js:40) ghi nó vào `attributes`, [:56](../../apps/tagger/cloud-sync.js:56) đọc
+lại, `buildReport()` [:556](../../apps/tagger/cloud-sync.js:556) mang `rows: stored.map(dbToRow)`. Nên cách suy
 ra này **chạy được ở cả ba nơi**: trang Stats, báo cáo publish, và site khách.
 
 ### 5.2 Repo đã dùng đúng thủ thuật này rồi
 
-[shared.js:438](../shared.js:438) `shotBodyPart()`:
+[shared.js:438](../../apps/tagger/shared.js:438) `shotBodyPart()`:
 
 ```js
 if(shot.grp!=null){const g=rows.find(r=>r.grp===shot.grp&&bp(r)); if(g)return bp(g);}
@@ -453,7 +453,7 @@ const SET_PIECE_EVENTS = new Set(['free-kick','corner-kick','penalty kick',
                                   'throw-ins','throw-in','goal kick']);
 ```
 ⚠️ **Bắt buộc tra qua `evKey()`.** Từ điển thật viết `throw-Ins` — **chữ I hoa**
-([pitchtagger_events.json](../pitchtagger_events.json)). So sánh `r.event === 'throw-ins'` sẽ ra
+([pitchtagger_events.json](../../data/definitions/pitchtagger_events.json)). So sánh `r.event === 'throw-ins'` sẽ ra
 **0, im lặng**. §10.1.
 
 **Định nghĩa 2 — chuỗi đủ điều kiện:** một tập hàng cùng `grp` (`grp != null`), cùng `team`, chứa
@@ -484,7 +484,7 @@ const SET_PIECE_EVENTS = new Set(['free-kick','corner-kick','penalty kick',
 > và với cột `Shots On Target` ở tab Shooting. Không làm thế thì bảng tự mâu thuẫn.
 >
 > `own goal` **không** được tính — nó không cộng vào `goals` hay `totalShots`
-> ([shared.js:272](../shared.js:272)) và bàn phản lưới từ quả phạt góc không phải "set piece goal"
+> ([shared.js:272](../../apps/tagger/shared.js:272)) và bàn phản lưới từ quả phạt góc không phải "set piece goal"
 > của đội đá phạt góc.
 
 **Cờ `spDetail` — và nó KHÁC `duelDetail`:**
@@ -516,12 +516,12 @@ trường hợp **không bao giờ chuỗi hoá** (in `—` cho cả bảng), nh
 
 Ba việc phải làm kèm theo, không phải tuỳ chọn:
 
-1. **Trang Guide** ([client/guide.html](../client/guide.html)) thêm một dòng: sáu cột này chỉ có
+1. **Trang Guide** ([client/guide.html](../../apps/portal/guide.html)) thêm một dòng: sáu cột này chỉ có
    khi set piece và kết quả của nó được gõ **trong cùng một lượt** — `12k*dd`, không phải `12k` ⏎
    `12dd`.
 2. **Tooltip trên `<th>`** của sáu cột, nói đúng câu ấy tại chỗ.
 3. **Không** thêm check vào cổng Submit Analysis. Cổng hiện có 11 check, mỗi check là một **đẳng
-   thức bắt buộc đúng** ([index.html:3000](../index.html:3000)). *"Đáng lẽ nên chuỗi hoá"* không
+   thức bắt buộc đúng** ([index.html:3000](../../apps/tagger/index.html:3000)). *"Đáng lẽ nên chuỗi hoá"* không
    phải đẳng thức — nó là thói quen, và biến nó thành cổng chặn sẽ chặn cả những trận hợp lệ.
    **→ Q4 (§14)** nếu bạn muốn một *cảnh báo* (không chặn) thay vì im lặng.
 
@@ -547,7 +547,7 @@ tài liệu này về mặt mã, và **lớn nhất về mặt hệ quả**.
 
 ### 6.1 Cái mất: mọi trận tag trước 2026-08-28 thành một hàng `—` toàn phần
 
-[shared.js:372](../shared.js:372) đã viết sẵn lý do, một tháng trước, bằng chữ:
+[shared.js:372](../../apps/tagger/shared.js:372) đã viết sẵn lý do, một tháng trước, bằng chữ:
 
 > *"They sit UNDER the total rather than replacing it, because the total is the one figure that
 > means the same thing in every match ever tagged."*
@@ -566,7 +566,7 @@ con số **duy nhất liền mạch** không còn cửa nào để hiện ra ở
 | Nơi | Sau thay đổi | Ghi chú |
 |---|---|---|
 | `TEAM_SECTIONS` → **trang Overall** | ✅ **còn** `Ground Duels` / `Ground Duels Won` | §9 không đụng |
-| **PDF** [report.js:742](../Stats/report.js:742) cột `Ground` | ✅ **còn** | `report.js` = 0 dòng |
+| **PDF** [report.js:742](../../apps/tagger/Stats/report.js:742) cột `Ground` | ✅ **còn** | `report.js` = 0 dòng |
 | **Dashboard** → `DEF_CATS.ground` | ✅ **còn** (và §8.4 thêm hai mục mới cạnh nó) | |
 | **Site khách** → Team Data / Defensive | ✅ **còn** (đọc `TEAM_SECTIONS`) | |
 | **Site khách** → Player Data / Defensive | ❌ **mất** (đọc `PLAYER_CATS`) | cùng mảng, cùng số phận |
@@ -589,14 +589,14 @@ và PDF, (c) tab Defensive đang có 17 cột và cần chỗ thở.
 
 ## 7. Thẻ vàng / thẻ đỏ — repo đã trả lời câu này rồi, và câu trả lời **không** phải `EVENT_INC`
 
-[client/assets/app.js:761](../client/assets/app.js:761) nói rõ:
+[client/assets/app.js:761](../../apps/portal/assets/app.js:761) nói rõ:
 
 > *"Cards are the one thing `newStat()` does not carry, so they are counted off the rows through
 > `shared.js`'s `classifyCards()` — the same reading the match timeline and the Overview's
 > `discipline()` take, so a player's two yellows and his club's card count cannot tell different
 > stories."*
 
-`classifyCards()` ([shared.js](../shared.js)) đọc **một thẻ vàng thứ hai** thành `y2`, và **bỏ**
+`classifyCards()` ([shared.js](../../apps/tagger/shared.js)) đọc **một thẻ vàng thứ hai** thành `y2`, và **bỏ**
 hàng `red card` dư thừa đi kèm nó:
 
 ```js
@@ -643,12 +643,12 @@ giữa hai đội.
 
 | Chỗ | Sửa gì |
 |---|---|
-| `EVENT_INC` [:191](../shared.js:191) | **3 dòng foul** cộng thêm counter thứ hai. Không có dòng nào bị xoá. |
-| `newStat()` [:284](../shared.js:284) | **+12 khoá**: `foulsPlain, foulThrows, handballFouls, yellowCards, redCards` · `fkShotsOn, fkShotsOff, fkCrosses, fkCrossesComp, setPieceShots, setPieceGoals` · cờ `spDetail`. Đặt **cuối object**, giá trị 0. |
-| `computeStats()` [:329](../shared.js:329) | **+2 lượt** (§8.2) |
-| `PLAYER_CATS` [:357](../shared.js:357) | `defensive` bỏ 2 dòng · `other` **xoá** · **+3 khoá mới** |
-| `TEAM_SECTIONS` [:728](../shared.js:728) | section 3 → 3 section (§9) |
-| `SET_PIECE_EVENTS` | **hằng mới**, đặt cạnh `SHOT_KINDS` [:435](../shared.js:435) |
+| `EVENT_INC` [:191](../../apps/tagger/shared.js:191) | **3 dòng foul** cộng thêm counter thứ hai. Không có dòng nào bị xoá. |
+| `newStat()` [:284](../../apps/tagger/shared.js:284) | **+12 khoá**: `foulsPlain, foulThrows, handballFouls, yellowCards, redCards` · `fkShotsOn, fkShotsOff, fkCrosses, fkCrossesComp, setPieceShots, setPieceGoals` · cờ `spDetail`. Đặt **cuối object**, giá trị 0. |
+| `computeStats()` [:329](../../apps/tagger/shared.js:329) | **+2 lượt** (§8.2) |
+| `PLAYER_CATS` [:357](../../apps/tagger/shared.js:357) | `defensive` bỏ 2 dòng · `other` **xoá** · **+3 khoá mới** |
+| `TEAM_SECTIONS` [:728](../../apps/tagger/shared.js:728) | section 3 → 3 section (§9) |
+| `SET_PIECE_EVENTS` | **hằng mới**, đặt cạnh `SHOT_KINDS` [:435](../../apps/tagger/shared.js:435) |
 | `STAT_HEADERS` / `STAT_GROUPS` / `statRow` | **KHÔNG ĐỤNG** — §8.9 |
 
 ### 8.2 `computeStats()` — thay đổi kiến trúc duy nhất
@@ -681,7 +681,7 @@ hiện có bất biến theo nghĩa đen, và là test T1 (§11.1).
 
 ### 8.3 `index.html` — **bản sao thứ hai của toàn bộ engine**
 
-[index.html:3890](../index.html:3890) trở đi mang bản sao riêng của `EVENT_INC`, `newStat`,
+[index.html:3890](../../apps/tagger/index.html:3890) trở đi mang bản sao riêng của `EVENT_INC`, `newStat`,
 `computeStats`, `TEAM_SECTIONS`. Tab tagging **không nạp `shared.js`**.
 
 Mọi thứ ở §8.1 và §8.2 phải làm **lần thứ hai** ở đây, trừ `PLAYER_CATS` (bản `index.html` không
@@ -704,18 +704,18 @@ Bản `index.html` phải sửa: `EVENT_INC` (3 dòng), `newStat()` (+12 khoá),
 
 | Chỗ | Sửa gì |
 |---|---|
-| `CHROME` [:2303](../Stats/stats-view.js:2303) | 4 → **6 nút** `data-cat` |
-| `statCat` mặc định [:48](../Stats/stats-view.js:48) | giữ `'shooting'` |
-| `othCat` [:48](../Stats/stats-view.js:48) | đổi tên → `foulCat`, hoặc **giữ nguyên tên** để bớt nhiễu — **khuyến nghị: giữ**, chỉ đổi chỗ dùng |
-| `dashboardHTML` [:139](../Stats/stats-view.js:139) | `statCat==='other'` → `'fouls'`, **+2 nhánh mới** |
-| `OTH_CATS` [:591](../Stats/stats-view.js:591) | giữ nguyên 3 mục, nay thuộc tab *Fouls* |
-| `DEF_CATS` [:180](../Stats/stats-view.js:180) | **+2 mục** `physical`, `looseBall` (§8.4.2) |
-| `buildSheets` [:1166](../Stats/stats-view.js:1166) | **0 dòng** — tự động ra 12 sheet |
-| `FILM_EV_GROUPS` [:1345](../Stats/stats-view.js:1345) | **0 dòng** — §8.7 |
+| `CHROME` [:2303](../../apps/tagger/Stats/stats-view.js:2303) | 4 → **6 nút** `data-cat` |
+| `statCat` mặc định [:48](../../apps/tagger/Stats/stats-view.js:48) | giữ `'shooting'` |
+| `othCat` [:48](../../apps/tagger/Stats/stats-view.js:48) | đổi tên → `foulCat`, hoặc **giữ nguyên tên** để bớt nhiễu — **khuyến nghị: giữ**, chỉ đổi chỗ dùng |
+| `dashboardHTML` [:139](../../apps/tagger/Stats/stats-view.js:139) | `statCat==='other'` → `'fouls'`, **+2 nhánh mới** |
+| `OTH_CATS` [:591](../../apps/tagger/Stats/stats-view.js:591) | giữ nguyên 3 mục, nay thuộc tab *Fouls* |
+| `DEF_CATS` [:180](../../apps/tagger/Stats/stats-view.js:180) | **+2 mục** `physical`, `looseBall` (§8.4.2) |
+| `buildSheets` [:1166](../../apps/tagger/Stats/stats-view.js:1166) | **0 dòng** — tự động ra 12 sheet |
+| `FILM_EV_GROUPS` [:1345](../../apps/tagger/Stats/stats-view.js:1345) | **0 dòng** — §8.7 |
 
 #### 8.4.1 Dashboard cho ba tab mới — bắt buộc, không phải tuỳ chọn
 
-`catToggle` do **Dashboard và Stats dùng chung** ([:92](../Stats/stats-view.js:92)
+`catToggle` do **Dashboard và Stats dùng chung** ([:92](../../apps/tagger/Stats/stats-view.js:92)
 `perTeam=statView!=='overall'&&statView!=='film'`). Thêm nút mà không thêm nhánh trong
 `dashboardHTML` thì **bấm Goalkeeper ở Dashboard sẽ ra một trang trắng** — không lỗi, không thông
 báo. Đây là trạm số 4 ở §2.
@@ -727,11 +727,11 @@ báo. Đây là trạm số 4 ở §2.
 | `goalkeeper` | `plainEventMapHTML(team, name)` + dropdown (save · catch · parry · def line support · aerial control · goal conceded) | ~8 dòng, dùng lại hàm đã có |
 
 Cả hai dropdown mới đi theo đúng khuôn `OTH_CATS` + `setOthCat` đã có, và **hai hàm setter mới
-phải được thêm vào danh sách `window.*`** ở [:2403](../Stats/stats-view.js:2403) — chúng được gọi
+phải được thêm vào danh sách `window.*`** ở [:2403](../../apps/tagger/Stats/stats-view.js:2403) — chúng được gọi
 từ `onchange="…"` nội tuyến, biên dịch trong **global scope**, nên quên là dropdown chết im lặng.
 Repo đã ghi rõ cảnh báo này ngay tại đó, và có test đọc lại danh sách.
 
-⚠️ `plainEventMapHTML` so `r.event === eventName` **nguyên văn** ([:653](../Stats/stats-view.js:653)).
+⚠️ `plainEventMapHTML` so `r.event === eventName` **nguyên văn** ([:653](../../apps/tagger/Stats/stats-view.js:653)).
 Với `throw-Ins` thì hỏng. §10.1.
 
 #### 8.4.2 `DEF_CATS` — thêm, không thay
@@ -831,7 +831,7 @@ Bộ lọc Film đã có nhóm `Goalkeeping` riêng, và nhóm `Other` gộp set
 
 Có nên tách `Other` thành `Set Pieces` / `Fouls` cho khớp với tab mới không? **Không, ở lần này.**
 
-Comment tại [:1319](../Stats/stats-view.js:1319) nói các nhóm ấy *"are shared.js's own
+Comment tại [:1319](../../apps/tagger/Stats/stats-view.js:1319) nói các nhóm ấy *"are shared.js's own
 PLAYER_CATS, the four tabs the player table has always been read in"* — nên khớp là đúng tinh
 thần. Nhưng: nó là **thứ tự tick trong một panel cuộn**, người dùng đã quen; đổi nhóm là đổi thứ
 tự tick của mọi người; và nó **không đổi một con số nào**. Đây là thay đổi thẩm mỹ trong một thay
@@ -853,10 +853,10 @@ việc chia tab hoàn toàn vô hình với bản PDF.
 
 ### 8.9 `STAT_HEADERS` / `STAT_GROUPS` / `statRow` — **không đụng**
 
-Ba hằng này là bảng rộng 40 cột của **tab tagging** ([index.html:4023](../index.html:4023)) và
+Ba hằng này là bảng rộng 40 cột của **tab tagging** ([index.html:4023](../../apps/tagger/index.html:4023)) và
 sheet xlsx của nó. Chúng **không** phải nguồn của tab Stats.
 
-Bản trong `shared.js` [:277](../shared.js:277) hôm nay **không có người đọc ngoài test** — nhưng
+Bản trong `shared.js` [:277](../../apps/tagger/shared.js:277) hôm nay **không có người đọc ngoài test** — nhưng
 `report-visuals.test.js:327` khoá `STAT_HEADERS.length === Σ STAT_GROUPS[i][1]` và
 `statRow().length === STAT_HEADERS.length`. Đụng vào một cái là phải đụng cả ba, cho **0 lợi ích**.
 
@@ -872,7 +872,7 @@ View chỉ nuôi bảng tổng hợp của site khách; mọi thứ trong tài l
 
 * `Stats/index.html`: `catToggle` 4 → 6 nút. **Phải khớp từng chữ với `CHROME`** — hai bản sao, và
   test đọc cả hai.
-* CSS: `.stats-toggle{display:flex;gap:6px}` ([shared.css:28](../shared.css:28)) **không có
+* CSS: `.stats-toggle{display:flex;gap:6px}` ([shared.css:28](../../apps/tagger/shared.css:28)) **không có
   `flex-wrap`**. Sáu nút với nhãn dài (`Distribution`, `Set Pieces`, `Goalkeeper`) sẽ tràn ngang
   ở màn hình hẹp. Thêm `flex-wrap:wrap;justify-content:center` **chỉ cho `.sub-row`** trong
   `stats-view.css`, không đụng `shared.css` — hàng nút ở `<header>` không được xuống dòng.
@@ -881,7 +881,7 @@ View chỉ nuôi bảng tổng hợp của site khách; mọi thứ trong tài l
 
 ## 9. Trang **Overall** — tách section 3
 
-Trang Overall vẽ `TEAM_SECTIONS` ([stats-view.js:908](../Stats/stats-view.js:908)) thành các thanh
+Trang Overall vẽ `TEAM_SECTIONS` ([stats-view.js:908](../../apps/tagger/Stats/stats-view.js:908)) thành các thanh
 bar đối đầu. Section 4 hiện tại nhét chung 9 dòng thủ môn + set piece + kỷ luật:
 
 ```js
@@ -921,17 +921,17 @@ Thay bằng **ba section, nối vào sau index 2** (§2.1 — luật bất di b�
 
 1. **`Goals Conceded` phải giữ biểu thức suy ra `o.goals+s.ownGoals`**, không đổi sang
    `s.goalsConceded`. Nó là bàn thua của **đội**, tính từ bàn thắng của đối phương, và
-   [shared.js:425](../shared.js:425) nói rõ nó "cannot be forgotten" trong khi event tag tay thì có.
+   [shared.js:425](../../apps/tagger/shared.js:425) nói rõ nó "cannot be forgotten" trong khi event tag tay thì có.
    Đây là dòng dễ sửa nhầm nhất trong toàn bộ tài liệu này.
 
-2. **`numOf()` đọc số đầu tiên trong chuỗi** ([shared.js:753](../shared.js:753)):
+2. **`numOf()` đọc số đầu tiên trong chuỗi** ([shared.js:753](../../apps/tagger/shared.js:753)):
    ```js
    const numOf=v=>{const m=(''+v).match(/-?\d+(\.\d+)?/);return m?+m[0]:0;};
    ```
    `'3/5'` → **3**. Nên `Def. Line Support` dạng phân số vẽ thanh bar theo **tử số**, đúng ý ("hỗ
    trợ thành công"). `'—'` → **0** → thanh bar 50/50 (vì `tot=0`). Hành vi hiện có, chấp nhận được.
 
-3. **`teamStatsSheet()`** [index.html:4202](../index.html:4202) lặp `TEAM_SECTIONS` để dựng
+3. **`teamStatsSheet()`** [index.html:4202](../../apps/tagger/index.html:4202) lặp `TEAM_SECTIONS` để dựng
    worksheet `team_stats` → tự động có 3 khối mới, **0 dòng**.
 
 4. **Trang Overall là nơi `Ground Duels` sống sót** (§6.2). Section `Defensive Stats` **không đổi**.
@@ -946,14 +946,14 @@ dòng mới nào (giữ 9 dòng, đổi tiêu đề). Ít thông tin hơn, nhưn
 
 ### 10.1 `throw-Ins` — chữ **I hoa** trong từ điển thật
 
-[pitchtagger_events.json](../pitchtagger_events.json): `"name": "throw-Ins"`.
+[pitchtagger_events.json](../../data/definitions/pitchtagger_events.json): `"name": "throw-Ins"`.
 
 `EVENT_INC` an toàn vì mọi tra cứu đi qua `evKey()` (thường hoá). Nhưng **bốn chỗ không đi qua**:
 
 | Chỗ | Mã | Hậu quả |
 |---|---|---|
-| `plainEventMapHTML` [:653](../Stats/stats-view.js:653) | `r.event===eventName` | bản đồ set piece **rỗng, im lặng** |
-| `foulMapHTML` [:601](../Stats/stats-view.js:601) | `FOUL_EVENTS.has(r.event)` | may mà 3 tên foul đều thường |
+| `plainEventMapHTML` [:653](../../apps/tagger/Stats/stats-view.js:653) | `r.event===eventName` | bản đồ set piece **rỗng, im lặng** |
+| `foulMapHTML` [:601](../../apps/tagger/Stats/stats-view.js:601) | `FOUL_EVENTS.has(r.event)` | may mà 3 tên foul đều thường |
 | `filmMatches()` | so nguyên văn — **cố ý** | không đụng |
 | `unique(sport,event_name)` Postgres | phân biệt hoa/thường | không đụng |
 
@@ -963,14 +963,14 @@ lỗi đang tiềm ẩn cho `foul won` / `offside` nếu ai đó viết hoa tên
 
 ### 10.2 `catToggle` có **hai bản sao** phải khớp từng chữ
 
-[Stats/index.html:54](../Stats/index.html:54) và [stats-view.js:2303](../Stats/stats-view.js:2303)
+[Stats/index.html:54](../../apps/tagger/Stats/index.html:54) và [stats-view.js:2303](../../apps/tagger/Stats/stats-view.js:2303)
 `CHROME`. Trang Stats dùng bản đầu (`chrome:false`); site khách dùng bản sau. Sửa một, quên một →
 **một trong hai site thiếu ba nút**. `tests/stats-view.test.js:166,174` đọc cả hai — và sẽ phải
 sửa (§11.2).
 
 ### 10.3 SQL đã lệch với `EVENT_INC` về `foul throw` — **từ trước**
 
-[0015_match_stats_event_names.sql:61](../supabase/migrations/0015_match_stats_event_names.sql:61):
+[0015_match_stats_event_names.sql:61](../../supabase/migrations/0015_match_stats_event_names.sql:61):
 
 ```sql
 -- a foul conceded. 'foul throw' is a throw-in offence and is left out
@@ -995,12 +995,12 @@ vào tab Goalkeeper → `g.known` với `g === undefined` → **`TypeError`, c�
 
 ### 10.5 Chữ trên landing đang hứa sai
 
-[client/index.html:432](../client/index.html:432):
+[client/index.html:432](../../apps/portal/index.html:432):
 
 > *"Shooting, Distribution, Defensive and Other — the four tables you read on screen — for both
 > squads, eight sheets in all."*
 
-Sau thay đổi: **sáu bảng, mười hai sheet**. [README.md:48](../README.md:48) cũng nói *"the four
+Sau thay đổi: **sáu bảng, mười hai sheet**. [README.md:48](../../README.md:48) cũng nói *"the four
 categories"*. Cả hai phải sửa **trong cùng commit** — landing chỉ được hứa thứ repo làm được.
 
 ### 10.6 `grp` sinh từ `newId()` — chỉ khi chuỗi có ≥2 event
@@ -1011,7 +1011,7 @@ const newId = () => crypto.randomUUID();       // index.html:1009
 ```
 
 UUID, nên không có chuyện hai chuỗi vô tình chung `grp`. Nhưng `dbToRow` viết
-`grp: a.grp || null` ([cloud-sync.js:56](../cloud-sync.js:56)) — chuỗi rỗng thành `null`. Với UUID
+`grp: a.grp || null` ([cloud-sync.js:56](../../apps/tagger/cloud-sync.js:56)) — chuỗi rỗng thành `null`. Với UUID
 thì không bao giờ xảy ra; ghi lại đây để lần sau không ai đổi `newId()` thành số đếm từ 0.
 
 ---

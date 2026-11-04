@@ -17,10 +17,26 @@ const ROOT=path.join(__dirname,'..');
    source SHAPE, and a pattern spanning two lines ("} \n    if") stops matching
    the moment a \r slips in between. Reading through one door means the suite
    sees what git sees, on every machine. */
-const readSrc=p=>fs.readFileSync(path.isAbsolute(p)?p:path.join(ROOT,p),'utf8').replace(/\r\n/g,'\n');
+const readSrc=p=>fs.readFileSync(repoPath(p),'utf8').replace(/\r\n/g,'\n');
+
+/* Where a path in this suite points. Two kinds, told apart by the first segment:
+     - it names a top-level folder of the repo (apps/, services/, supabase/, data/,
+       scripts/, docs/, tests/, .github/) → it is relative to the repo root;
+     - anything else ('index.html', 'Stats/stats-view.js', 'shared.js') → it is
+       relative to the tagging app, apps/tagger/.
+   The second rule is how the tagger's own code, its comments and its deployed URLs
+   (/tagger/Stats/…) already name its files, and it is what most of this suite reads.
+   Everything outside the tagger is written out in full: 'apps/portal/assets/app.js'. */
+const TOP_LEVEL=/^(apps|services|supabase|data|scripts|docs|tests|\.github)\//;
+const TAGGER='apps/tagger';
+function repoPath(p){
+  if(path.isAbsolute(p))return p;
+  const rel=p.split(path.sep).join('/');
+  return path.join(ROOT,TOP_LEVEL.test(rel)?rel:path.posix.join(TAGGER,rel));
+}
 
 const SRC=readSrc('index.html');
-const EVENTS=JSON.parse(readSrc('pitchtagger_events.json'));
+const EVENTS=JSON.parse(readSrc('data/definitions/pitchtagger_events.json'));
 
 /* ---- source scanning: skip strings/comments so braces inside them don't count ---- */
 function skipQuoted(s,i){
@@ -224,5 +240,5 @@ function fakeStorage(seed){
     snapshot:()=>Object.fromEntries(map)};
 }
 
-module.exports={makeApp,submit,submitShot,grabFunction,grabConst,loadShared,loadStats,fakeStorage,readSrc,
+module.exports={makeApp,submit,submitShot,grabFunction,grabConst,loadShared,loadStats,fakeStorage,readSrc,repoPath,
   SRC,SHARED,STATS,CLOUD,EVENTS};

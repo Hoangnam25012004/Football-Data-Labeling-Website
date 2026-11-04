@@ -1,5 +1,5 @@
 /* Dashboard → Set Pieces: one upright map per kind of restart, beside who took them.
-   docs/setpiece-dashboard-design.md is the design; §8.2 there is the list this file keeps.
+   docs/design/setpiece-dashboard-design.md is the design; §8.2 there is the list this file keeps.
 
    The dropdown picks Freekicks / Corner Kicks / Throw-Ins / Goal Kicks, All / 1st / 2nd pick
    the period, and hovering a taker isolates their marks — the Distribution map's frame, with

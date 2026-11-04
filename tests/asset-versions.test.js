@@ -27,20 +27,23 @@ const MANIFEST=path.join(__dirname,'asset-versions.json');
 
 /* Pages carry their references as markup. app.js issues its own at runtime —
    it pulls the tagging app's assets in the first time somebody opens a match —
-   so it is scanned as well, with its refs resolved against the deployed root
-   rather than against its own folder (see taggerRoot() in that file). */
-const PAGES=['index.html','auth.html','Stats/index.html','Player-Lists/index.html',
-             'client/index.html','client/app.html','client/login.html','client/guide.html',
-             'client/privacy.html'];
+   so it is scanned as well, with its refs resolved against the tagger's root
+   rather than against its own folder (see taggerRoot() in that file).
+   Every path here is written out from the repo root, because each one is
+   compared against the left-hand side of a cp line in deploy.yml. */
+const PAGES=['apps/tagger/index.html','apps/tagger/auth.html',
+             'apps/tagger/Stats/index.html','apps/tagger/Player-Lists/index.html',
+             'apps/portal/index.html','apps/portal/app.html','apps/portal/login.html',
+             'apps/portal/guide.html','apps/portal/privacy.html'];
 /* file -> the bases its refs may resolve against, in order.
    app.js addresses two different places. Refs into the tagging app are written
-   against the deployed root, where this site sits and the tagger is moved under
-   /tagger, so they resolve against the repo root. Refs to the files that ship
-   beside it are written against the PAGE that loads it — client/app.html — so
-   they resolve against client/. The first base the file actually exists under
+   against the tagger's root (taggerRoot() supplies the prefix at runtime), so
+   they resolve against apps/tagger. Refs to the files that ship beside it are
+   written against the PAGE that loads it — apps/portal/app.html — so they
+   resolve against apps/portal. The first base the file actually exists under
    wins; a ref matching none falls back to the first, so a genuine typo still
    fails the test below. */
-const LOADERS={'client/assets/app.js':['.','client']};
+const LOADERS={'apps/portal/assets/app.js':['apps/tagger','apps/portal']};
 
 const isExternal=u=>/^(?:https?:)?\/\//.test(u);
 const posix=p=>p.split(path.sep).join('/');

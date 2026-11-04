@@ -17,13 +17,13 @@ const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk}=require('./tiny-test');
 const {readSrc}=require('./harness');
 
-const LANDING=readSrc('client/index.html');
+const LANDING=readSrc('apps/portal/index.html');
 const CLOUD=readSrc('cloud-sync.js');
-const ROUTER=readSrc('worker/index.js');
-const PRESIGN=readSrc('worker/r2-presign.js');
-const TOML=readSrc('worker/wrangler.toml');
+const ROUTER=readSrc('services/edge-worker/index.js');
+const PRESIGN=readSrc('services/edge-worker/r2-presign.js');
+const TOML=readSrc('services/edge-worker/wrangler.toml');
 const SQL=readSrc('supabase/migrations/0019_leads.sql');
-const CONTACT=readSrc('worker/contact.js');
+const CONTACT=readSrc('services/edge-worker/contact.js');
 const YML=readSrc('.github/workflows/deploy.yml');
 
 /* the page's own script, without the markup above it */
@@ -130,7 +130,7 @@ test('the form needs no new file staged for GitHub Pages', () => {
   // CSS and script are inline in client/index.html on purpose: site.css is
   // loaded by all three client pages, so touching it would mean bumping ?v=
   // in three places. index.html already has its cp line.
-  ok(YML.includes('cp client/index.html'),'the page itself is copied');
+  ok(YML.includes('cp apps/portal/index.html'),'the page itself is copied');
   notOk(/assets\/contact/.test(LANDING),'and nothing new is loaded from assets/');
 });
 
@@ -192,7 +192,7 @@ function callContact(body,o){
   };
   vm.createContext(ctx);
   vm.runInContext(CONTACT.replace(/^export default /m,'globalThis.__contact = '),ctx,
-    {filename:'worker/contact.js'});
+    {filename:'services/edge-worker/contact.js'});
 
   const head={origin:'origin' in o?o.origin:ORIGIN,'cf-connecting-ip':'203.0.113.9','user-agent':'UA'};
   const request={

@@ -1,6 +1,6 @@
 /* Shirt-number gate: what the Enter event box is allowed to store.
 
-   Designed in docs/entry-number-gate-design.md. The rule in one line: a tagged number has
+   Designed in docs/design/entry-number-gate-design.md. The rule in one line: a tagged number has
    to be a number the side actually has on its board AT THAT MOMENT — and the board is not
    one list, it is the submitted XI plus every snapshot a substitution or a red card left
    behind, i.e. a step function of match time (effectiveLU).
