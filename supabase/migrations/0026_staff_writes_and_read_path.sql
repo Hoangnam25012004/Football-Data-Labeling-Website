@@ -278,6 +278,8 @@ create table if not exists private.refresh_state (
   events_fp bigint
 );
 revoke all on private.refresh_state from public, anon, authenticated;
+-- belt and braces: the schema is already shut, and the owner-run refresh bypasses RLS
+alter table private.refresh_state enable row level security;
 
 create or replace function private.refresh_match_stats() returns void
 language plpgsql security definer set search_path = '' as $$
