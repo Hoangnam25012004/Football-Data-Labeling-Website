@@ -15,10 +15,9 @@
    "…/#match=12345" link signed out must still land on that match afterwards. */
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk}=require('./tiny-test');
-const {grabConst,grabFunction}=require('./harness');
+const {grabConst,grabFunction,repoPath}=require('./harness');
 
-const ROOT=path.join(__dirname,'..');
-const AUTH_JS=fs.readFileSync(path.join(ROOT,'auth.js'),'utf8');
+const AUTH_JS=fs.readFileSync(repoPath('auth.js'),'utf8');
 
 /* localStorage stand-in: the entries are own enumerable properties, like the real one,
    because the gate finds the token by scanning Object.keys(localStorage). */
@@ -184,7 +183,7 @@ test('another tab writing unrelated keys does not sign you out', () => {
 });
 
 /* ================= the wiring the site depends on ================= */
-const page=p=>fs.readFileSync(path.join(ROOT,p),'utf8');
+const page=p=>fs.readFileSync(repoPath(p),'utf8');
 
 test('every page of the site is gated', () => {
   [['index.html','auth.js'],['Stats/index.html','../auth.js'],['Player-Lists/index.html','../auth.js']]
@@ -480,5 +479,5 @@ test('and so is the rest of the site, file by file', () => {
 test('the new files are staged for GitHub Pages', () => {
   const yml=page('.github/workflows/deploy.yml');
   // the site is assembled from an explicit list — a file left out of it is a 404, not a bug you see locally
-  ['auth.js','auth.html'].forEach(f=>ok(yml.includes('cp '+f+' _site/'+f),f+' is copied into _site'));
+  ['auth.js','auth.html'].forEach(f=>ok(yml.includes('cp apps/tagger/'+f+' _site/'+f),f+' is copied into _site'));
 });

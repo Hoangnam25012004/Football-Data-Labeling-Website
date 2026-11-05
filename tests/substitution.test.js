@@ -343,7 +343,7 @@ test('the away side keeps its own formation history', ()=>{
 });
 
 /* Was: "subs are still tagged when no starting XI has been entered". The shirt-number gate
-   reversed that rule (docs/entry-number-gate-design.md §5.1): a side whose line-up was
+   reversed that rule (docs/design/entry-number-gate-design.md §5.1): a side whose line-up was
    never submitted is not tagged at all — an entry it cannot check is an entry it refuses. */
 test('subs are refused when no line-up has been submitted', ()=>{
   const a=app(null,3000);

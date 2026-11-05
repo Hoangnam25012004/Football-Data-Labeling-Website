@@ -18,9 +18,9 @@ const ROOT=path.join(__dirname,'..');
    LF the repository stores. See the note over readSrc in harness.js. */
 const page=readSrc;
 
-const LOGIN=page('client/login.html');
-const SUPA=page('client/assets/supa.js');
-const APPCSS=page('client/assets/app.css');
+const LOGIN=page('apps/portal/login.html');
+const SUPA=page('apps/portal/assets/supa.js');
+const APPCSS=page('apps/portal/assets/app.css');
 const AUTH_HTML=page('auth.html');
 
 /* the page's own script, without the markup above it */
@@ -40,7 +40,7 @@ function loadAPI(authImpl){
   const win={supabase:{createClient:()=>({from:()=>({}),auth})}};
   const ctx={console,window:win,URLSearchParams,Promise,URL};
   vm.createContext(ctx);
-  vm.runInContext(SUPA,ctx,{filename:'client/assets/supa.js'});
+  vm.runInContext(SUPA,ctx,{filename:'apps/portal/assets/supa.js'});
   return {api:win.HNA,calls};
 }
 
@@ -219,7 +219,7 @@ test('the two sign-in pages offer the same provider', () => {
    it falls back to the Site URL, which is the landing page — and that page loads no
    Supabase client at all, so without this the sign-in would succeed and look like
    nothing happened. The tagging app has auth.js for this; the client site has these. */
-const LANDING=page('client/index.html');
+const LANDING=page('apps/portal/index.html');
 
 test('both sign-in pages leave a breadcrumb before they go to Google', () => {
   ok(/hna\.oauth\.home/.test(SCRIPT)&&/'login\.html'/.test(SCRIPT),'the club site says so');
@@ -238,7 +238,7 @@ test('the landing page hands the tokens to whichever page started the trip', () 
 });
 
 /* ================= the picture Google hands over ================= */
-const APPJS=page('client/assets/app.js');
+const APPJS=page('apps/portal/assets/app.js');
 
 test('an account signed in with Google shows its picture, one made with a password its initial', () => {
   const fn=/function showAvatar\(user\)[\s\S]*?\n  \}/.exec(APPJS)[0];

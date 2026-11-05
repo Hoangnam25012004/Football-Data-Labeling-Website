@@ -23,9 +23,9 @@
 const {test,eq,deepEq,ok,notOk}=require('./tiny-test');
 const {readSrc}=require('./harness');
 
-const APPJS=readSrc('client/assets/app.js');
-const APPCSS=readSrc('client/assets/app.css');
-const SUPA=readSrc('client/assets/supa.js');
+const APPJS=readSrc('apps/portal/assets/app.js');
+const APPCSS=readSrc('apps/portal/assets/app.css');
+const SUPA=readSrc('apps/portal/assets/supa.js');
 const MIG=readSrc('supabase/migrations/0023_match_round_and_edit.sql');
 
 const matches=/function renderMatches\(view\) \{[\s\S]*?\n  \}/.exec(APPJS)[0];
@@ -369,7 +369,7 @@ test('no stat, no column set and no shared figure was touched', () => {
    write it made answered "permission denied for table matches" and nothing reached the
    database — for a week, silently. 0025 is what gives those five columns back, and the
    tests here are what keep it from quietly turning into "grant update on matches".
-   See docs/match-save-permission-design.md §2 and §6.1. */
+   See docs/design/match-save-permission-design.md §2 and §6.1. */
 const MIG25=readSrc('supabase/migrations/0025_match_tagging_columns.sql');
 const SQL25=MIG25.replace(/--[^\n]*/g,'');
 

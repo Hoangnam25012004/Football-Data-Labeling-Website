@@ -19,7 +19,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The suite has no dependencies, so it runs on the runner's own Node. A red
+  # test now stops the deploy instead of only being noticed later.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run the test suite
+        run: node tests/run.js
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -30,9 +43,11 @@ jobs:
 
       # Stage only the files the public site needs (keeps the upload clean).
       #
-      # LAYOUT: the client-facing site is the root of the deployment; the whole
-      # tagging app moves under /tagger, assets and all, so its relative links
-      # (cloud-sync.js, Stats/, ../shared.js) keep resolving without edits.
+      # LAYOUT: the client-facing site (apps/portal) is the root of the
+      # deployment; the whole tagging app (apps/tagger) moves under /tagger,
+      # assets and all, so its relative links (cloud-sync.js, Stats/,
+      # ../shared.js) keep resolving without edits. The public URLs are the
+      # contract: the repo layout may change, the right-hand side of a cp may not.
       # auth.js derives its own root from document.currentScript.src, so the
       # sign-in gate follows the move by itself.
       #
@@ -43,45 +58,45 @@ jobs:
           mkdir -p _site
 
           # ---------- client site (the root) ----------
-          cp client/index.html  _site/index.html
-          cp client/app.html    _site/app.html
-          cp client/login.html  _site/login.html
-          cp client/guide.html  _site/guide.html
+          cp apps/portal/index.html  _site/index.html
+          cp apps/portal/app.html    _site/app.html
+          cp apps/portal/login.html  _site/login.html
+          cp apps/portal/guide.html  _site/guide.html
           # Google's brand verification reads this at https://hoangnams.com/privacy.html,
           # so the address has to resolve on the authorized domain, not just in the repo.
-          cp client/privacy.html _site/privacy.html
+          cp apps/portal/privacy.html _site/privacy.html
           mkdir -p _site/assets
-          cp client/assets/site.css _site/assets/site.css
-          cp client/assets/app.css  _site/assets/app.css
-          cp client/assets/app-mobile.css _site/assets/app-mobile.css
-          cp client/assets/supa.js  _site/assets/supa.js
-          cp client/assets/app.js   _site/assets/app.js
-          cp client/assets/film-tools.js  _site/assets/film-tools.js
-          cp client/assets/film-tools.css _site/assets/film-tools.css
-          cp client/assets/guide.css _site/assets/guide.css
-          cp client/assets/guide.js  _site/assets/guide.js
-          cp client/assets/hanley-town.png _site/assets/hanley-town.png
+          cp apps/portal/assets/site.css _site/assets/site.css
+          cp apps/portal/assets/app.css  _site/assets/app.css
+          cp apps/portal/assets/app-mobile.css _site/assets/app-mobile.css
+          cp apps/portal/assets/supa.js  _site/assets/supa.js
+          cp apps/portal/assets/app.js   _site/assets/app.js
+          cp apps/portal/assets/film-tools.js  _site/assets/film-tools.js
+          cp apps/portal/assets/film-tools.css _site/assets/film-tools.css
+          cp apps/portal/assets/guide.css _site/assets/guide.css
+          cp apps/portal/assets/guide.js  _site/assets/guide.js
+          cp apps/portal/assets/hanley-town.png _site/assets/hanley-town.png
 
           # ---------- tagging app, relocated under /tagger ----------
           mkdir -p _site/tagger/Stats _site/tagger/Player-Lists
-          cp index.html                 _site/tagger/index.html
-          cp cloud-sync.js              _site/tagger/cloud-sync.js
-          cp auth.js                    _site/tagger/auth.js
-          cp auth.html                  _site/tagger/auth.html
-          cp shared.css                 _site/tagger/shared.css
-          cp shared-page.css            _site/tagger/shared-page.css
-          cp shared.js                  _site/tagger/shared.js
-          cp pitchtagger_events.json    _site/tagger/pitchtagger_events.json || true
-          cp Stats/index.html           _site/tagger/Stats/index.html
-          cp Stats/stats-view.js        _site/tagger/Stats/stats-view.js
-          cp Stats/stats-view.css       _site/tagger/Stats/stats-view.css
-          cp Stats/report.js            _site/tagger/Stats/report.js
-          cp Player-Lists/index.html    _site/tagger/Player-Lists/index.html
+          cp apps/tagger/index.html                 _site/tagger/index.html
+          cp apps/tagger/cloud-sync.js              _site/tagger/cloud-sync.js
+          cp apps/tagger/auth.js                    _site/tagger/auth.js
+          cp apps/tagger/auth.html                  _site/tagger/auth.html
+          cp apps/tagger/shared.css                 _site/tagger/shared.css
+          cp apps/tagger/shared-page.css            _site/tagger/shared-page.css
+          cp apps/tagger/shared.js                  _site/tagger/shared.js
+          cp data/definitions/pitchtagger_events.json _site/tagger/pitchtagger_events.json || true
+          cp apps/tagger/Stats/index.html           _site/tagger/Stats/index.html
+          cp apps/tagger/Stats/stats-view.js        _site/tagger/Stats/stats-view.js
+          cp apps/tagger/Stats/stats-view.css       _site/tagger/Stats/stats-view.css
+          cp apps/tagger/Stats/report.js            _site/tagger/Stats/report.js
+          cp apps/tagger/Player-Lists/index.html    _site/tagger/Player-Lists/index.html
 
           # Old confirmation emails and bookmarks still point at /auth on the
           # root. Keep a copy there so those links resolve instead of 404ing.
-          cp auth.html _site/auth.html
-          cp auth.js _site/auth.js
+          cp apps/tagger/auth.html _site/auth.html
+          cp apps/tagger/auth.js _site/auth.js
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -96,3 +111,24 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # A file missing from the cp list above 404s live while everything else is
+      # green. Ask the live site for every file that was staged, at the path it
+      # is served from. Pages can take a minute to serve a new deployment, so a
+      # miss is retried before it fails the run.
+      - name: Smoke-test the deployed paths
+        run: |
+          base="${{ steps.deployment.outputs.page_url }}"
+          base="${base%/}"
+          fails=0
+          for f in $(cd _site && find . -type f | sed 's#^\./##' | sort); do
+            ok=""
+            for try in 1 2 3 4 5 6; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$base/$f?smoke=${{ github.sha }}")
+              if [ "$code" = "200" ]; then ok=1; break; fi
+              sleep 10
+            done
+            if [ -z "$ok" ]; then echo "::error::$base/$f -> $code"; fails=$((fails+1)); fi
+          done
+          echo "checked $(cd _site && find . -type f | wc -l) files, $fails failed"
+          [ "$fails" = "0" ]

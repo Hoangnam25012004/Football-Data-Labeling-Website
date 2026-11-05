@@ -80,7 +80,7 @@ test('a red card for a bench player leaves the pitch untouched', ()=>{
 });
 
 /* Was: "a red card with no starting XI records the event and leaves the formation alone".
-   The shirt-number gate reversed that rule (docs/entry-number-gate-design.md §5.1): a side
+   The shirt-number gate reversed that rule (docs/design/entry-number-gate-design.md §5.1): a side
    whose line-up was never submitted is not tagged at all, because there is nothing to
    check the number against and no board to draw. */
 test('a red card with no line-up submitted is refused — nothing recorded', ()=>{

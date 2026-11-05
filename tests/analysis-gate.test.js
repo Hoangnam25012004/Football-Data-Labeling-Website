@@ -1,7 +1,7 @@
 /* Analysis gate: what a match has to be before ⇪ Submit Analysis will publish it.
 
-   Designed in docs/submit-analysis-gate-design.md and extended in
-   docs/gk-events-and-duel-split-design.md. Eleven rules, scored against the PAYLOAD —
+   Designed in docs/design/submit-analysis-gate-design.md and extended in
+   docs/design/gk-events-and-duel-split-design.md. Eleven rules, scored against the PAYLOAD —
    what buildReport() read back out of the database and what the club will actually see —
    never against whatever this tab happens to be holding:
 

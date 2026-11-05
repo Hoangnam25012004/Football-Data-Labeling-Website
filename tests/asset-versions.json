@@ -1,73 +1,73 @@
 {
-  "Stats/report.js": {
-    "v": 44,
-    "sha256": "3cc1bc0e15cb4ebf"
-  },
-  "Stats/stats-view.css": {
-    "v": 11,
-    "sha256": "3ef8829ec33899e6"
-  },
-  "Stats/stats-view.js": {
-    "v": 30,
-    "sha256": "9f35de9b13212de9"
-  },
-  "auth.js": {
-    "v": 1,
-    "sha256": "8b01800a0a5476be"
-  },
-  "client/assets/app-mobile.css": {
+  "apps/portal/assets/app-mobile.css": {
     "v": 1,
     "sha256": "3a42916b46bf1352"
   },
-  "client/assets/app.css": {
+  "apps/portal/assets/app.css": {
     "v": 26,
     "sha256": "37fee08ede58b61d"
   },
-  "client/assets/app.js": {
-    "v": 62,
-    "sha256": "d3c7cd3e8b362645"
+  "apps/portal/assets/app.js": {
+    "v": 63,
+    "sha256": "d6cd774e520dc582"
   },
-  "client/assets/film-tools.css": {
+  "apps/portal/assets/film-tools.css": {
     "v": 4,
     "sha256": "f68b2b6724c08cb3"
   },
-  "client/assets/film-tools.js": {
+  "apps/portal/assets/film-tools.js": {
     "v": 6,
     "sha256": "0fd5daeb925cc848"
   },
-  "client/assets/guide.css": {
+  "apps/portal/assets/guide.css": {
     "v": 1,
     "sha256": "42295d8d8604843a"
   },
-  "client/assets/guide.js": {
+  "apps/portal/assets/guide.js": {
     "v": 1,
     "sha256": "1b47b310621fdfaa"
   },
-  "client/assets/hanley-town.png": {
+  "apps/portal/assets/hanley-town.png": {
     "v": 1,
     "sha256": "cca1db211feaf9d7"
   },
-  "client/assets/site.css": {
+  "apps/portal/assets/site.css": {
     "v": 3,
     "sha256": "85046042bdfd81f9"
   },
-  "client/assets/supa.js": {
-    "v": 17,
-    "sha256": "778765d9d219a2eb"
+  "apps/portal/assets/supa.js": {
+    "v": 18,
+    "sha256": "d0940c2c6ef9346c"
   },
-  "cloud-sync.js": {
-    "v": 52,
-    "sha256": "7faf055b92eea202"
+  "apps/tagger/Stats/report.js": {
+    "v": 44,
+    "sha256": "3cc1bc0e15cb4ebf"
   },
-  "shared-page.css": {
+  "apps/tagger/Stats/stats-view.css": {
+    "v": 11,
+    "sha256": "3ef8829ec33899e6"
+  },
+  "apps/tagger/Stats/stats-view.js": {
+    "v": 30,
+    "sha256": "9f35de9b13212de9"
+  },
+  "apps/tagger/auth.js": {
+    "v": 1,
+    "sha256": "8b01800a0a5476be"
+  },
+  "apps/tagger/cloud-sync.js": {
+    "v": 53,
+    "sha256": "effa300326a546a9"
+  },
+  "apps/tagger/shared-page.css": {
     "v": 1,
     "sha256": "d84a50785100f357"
   },
-  "shared.css": {
+  "apps/tagger/shared.css": {
     "v": 14,
     "sha256": "103be207c19f844c"
   },
-  "shared.js": {
+  "apps/tagger/shared.js": {
     "v": 29,
     "sha256": "ac96780ec6f3ec10"
   }

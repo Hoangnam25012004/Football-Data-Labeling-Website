@@ -14,20 +14,20 @@
 const {test,eq,ok,notOk}=require('./tiny-test');
 const {readSrc}=require('./harness');
 
-const PRIVACY=readSrc('client/privacy.html');
-const LANDING=readSrc('client/index.html');
+const PRIVACY=readSrc('apps/portal/privacy.html');
+const LANDING=readSrc('apps/portal/index.html');
 const YML=readSrc('.github/workflows/deploy.yml');
 
 /* every page a visitor can actually reach, and the two data layers behind them */
-const SHIPPED=['client/index.html','client/app.html','client/login.html','client/guide.html',
-               'client/privacy.html','index.html','auth.html','Stats/index.html',
-               'Player-Lists/index.html','client/assets/app.js','client/assets/supa.js',
+const SHIPPED=['apps/portal/index.html','apps/portal/app.html','apps/portal/login.html','apps/portal/guide.html',
+               'apps/portal/privacy.html','index.html','auth.html','Stats/index.html',
+               'Player-Lists/index.html','apps/portal/assets/app.js','apps/portal/assets/supa.js',
                'cloud-sync.js','shared.js'];
 
 /* ================= it exists, and it is reachable ================= */
 test('the page ships, and the deploy copies it to the address Google will read', () => {
   ok(/<title>Privacy — HoangNam Analytics<\/title>/.test(PRIVACY),'the page is there');
-  ok(YML.includes('cp client/privacy.html _site/privacy.html'),
+  ok(YML.includes('cp apps/portal/privacy.html _site/privacy.html'),
      'without this line it is a 404 on the live site and the build still goes green');
 });
 
@@ -56,7 +56,7 @@ test('"there is no analytics on this site" is still true', () => {
   /* The policy itself is the one file that may say these names: it lists them to say
      none of them is here. Scanning the sentence that makes the claim for the words the
      claim is about would fail by construction. */
-  const caught=SHIPPED.filter(f=>f!=='client/privacy.html'&&TRACKERS.test(readSrc(f)));
+  const caught=SHIPPED.filter(f=>f!=='apps/portal/privacy.html'&&TRACKERS.test(readSrc(f)));
   eq(caught.join(', '),'',
      'a tracker was added to these files while the privacy policy still says there is none');
 });
@@ -66,7 +66,7 @@ test('"we request only openid, email and profile" is still true', () => {
   // signInWithOAuth takes extra permissions through options.scopes. Naming one would
   // make the sentence above false, and could push the app into Google's paid
   // security assessment — the reason the three scopes were pinned in the first place.
-  ['auth.html','client/assets/supa.js'].forEach(f=>
+  ['auth.html','apps/portal/assets/supa.js'].forEach(f=>
     notOk(/scopes\s*:/.test(readSrc(f)),f+' asks for a scope beyond the three named'));
 });
 
@@ -105,7 +105,7 @@ test('the processors it does name are the ones the repo actually uses', () => {
   ['Supabase','Google','Cloudflare','Resend','GitHub Pages','jsDelivr','cdnjs']
     .forEach(name=>ok(PRIVACY.includes(name),'section 7 lists '+name));
   // Resend is the mailer behind the contact form, and R2 is where match video goes
-  ok(/resend/i.test(readSrc('worker/contact.js')),'the Worker really does send through Resend');
+  ok(/resend/i.test(readSrc('services/edge-worker/contact.js')),'the Worker really does send through Resend');
   ok(/R2/.test(PRIVACY),'and the video store is named too');
 });
 
@@ -120,7 +120,7 @@ test('what it says is kept in the browser matches what is written there', () => 
 });
 
 test('the contact form section matches what the Worker writes', () => {
-  const worker=readSrc('worker/contact.js');
+  const worker=readSrc('services/edge-worker/contact.js');
   ok(/SHA-256 of the address with a secret salt/.test(PRIVACY),'the page describes the hash');
   ok(/ipHash/.test(worker)&&/IP_SALT/.test(worker),'and the Worker computes one');
   ok(/user-agent string/i.test(PRIVACY),'the page admits the user-agent is kept');

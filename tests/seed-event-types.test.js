@@ -15,10 +15,10 @@
    reading order is event_types.ord. */
 const {readSrc}=require('./harness');
 const {test,eq,ok,notOk}=require('./tiny-test');
-const gen=require('../tools/gen-event-types-sql');
+const gen=require('../scripts/gen-event-types-sql');
 
 const SQL=readSrc('supabase/migrations/0021_seed_event_types.sql');
-const DICT=JSON.parse(readSrc('pitchtagger_events.json')).football;
+const DICT=JSON.parse(readSrc('data/definitions/pitchtagger_events.json')).football;
 
 test('the committed migration is what the generator writes today', () => {
   eq(SQL,gen.sql(gen.dictionary()),
@@ -30,7 +30,7 @@ test('the generator refuses to work from a dictionary that disagrees with itself
   /* It reads pitchtagger_events.json and checks index.html's DEFAULT_EVENTS says the same
      thing before writing anything. Generating from one copy while the other has moved is
      how the migration would come to describe a dictionary that does not exist. */
-  const src=readSrc('tools/gen-event-types-sql.js');
+  const src=readSrc('scripts/gen-event-types-sql.js');
   ok(/disagree/.test(src),'it says so rather than picking one');
   ok(/throw new Error/.test(src));
   // and it really does agree right now, which is what makes the check above meaningful

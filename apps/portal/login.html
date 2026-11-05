@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in — HoangNam Analytics</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='5.538' fill='%23E0122B'/%3E%3Cg fill='%23fff' transform='translate(10.154 10.154) scale(0.577)'%3E%3Ccircle cx='13' cy='39' r='5.4'/%3E%3Ccircle cx='13' cy='11' r='5.4'/%3E%3Ccircle cx='35' cy='39' r='5.4'/%3E%3Ccircle cx='35' cy='11' r='5.4'/%3E%3Cpath d='M13 39V11l22 28V11' fill='none' stroke='%23fff' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/site.css?v=3">
+<link rel="stylesheet" href="assets/app.css?v=26">
+</head>
+<body class="auth-page">
+
+<main class="auth-card">
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true">
+      <svg width="15" height="15" viewBox="0 0 48 48" fill="#fff"><path d="M13 39V11l22 28V11" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="39" r="5.4"/><circle cx="13" cy="11" r="5.4"/><circle cx="35" cy="39" r="5.4"/><circle cx="35" cy="11" r="5.4"/></svg>
+    </span>
+    <span class="brand-name">Hoang<em>Nam</em> Analytics</span>
+  </a>
+
+  <h1 id="title">Sign in</h1>
+  <p class="intro" id="intro">Your club's channel — matches, data and players from every game we have tagged for you.</p>
+
+  <div class="auth-tabs" role="tablist">
+    <button type="button" id="tabIn" class="on" role="tab" aria-selected="true">Sign in</button>
+    <button type="button" id="tabUp" role="tab" aria-selected="false">Sign up</button>
+  </div>
+
+  <!-- TWO forms, not one with fields hidden by CSS. A password manager reads
+       form.elements and never looks at what is on screen, so a single form
+       holding both a current-password and a new-password field is read as a
+       sign-up form — and those are not offered the login you saved. Sign in is
+       therefore a form with nothing in it but username + current-password.
+       The twin of this reasoning is in auth.html; keep the two in step. -->
+  <form id="loginForm" autocomplete="on">
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" name="username" type="email" autocomplete="username" required>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <button class="btn btn-primary" id="submitBtn" type="submit">Sign in</button>
+  </form>
+
+  <form id="signupForm" hidden autocomplete="on">
+    <div class="field">
+      <label for="suName">Full name</label>
+      <input id="suName" name="name" type="text" autocomplete="name" required>
+    </div>
+    <div class="field">
+      <label for="suEmail">Email</label>
+      <input id="suEmail" name="email" type="email" autocomplete="username" required>
+    </div>
+    <div class="field">
+      <label for="suPassword">Password</label>
+      <input id="suPassword" name="new-password" type="password" autocomplete="new-password" required>
+      <p class="field-note">At least 6 characters, one capital letter (A–Z) and one special character (!&nbsp;?&nbsp;@&nbsp;#&nbsp;…).</p>
+    </div>
+    <div class="field">
+      <label for="suConfirm">Confirm password</label>
+      <input id="suConfirm" name="confirm-password" type="password" autocomplete="new-password" required>
+    </div>
+    <button class="btn btn-primary" id="suBtn" type="submit">Create account</button>
+  </form>
+
+  <!-- OUTSIDE both forms, and type="button". A password manager reads form.elements and
+       never looks at the screen: a control inside the sign-in form is one more thing for
+       it to misread, and a button with no type inside a form submits it. -->
+  <div class="auth-or"><span>or</span></div>
+
+  <button type="button" class="btn btn-google" id="googleBtn">
+    <svg viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+    </svg>
+    Continue with Google
+  </button>
+  <p class="field-note" style="margin-top:10px; text-align:center">
+    Google creates your account the first time. It still waits for an invitation to your
+    club’s channel, the same as an account made with a password.
+  </p>
+
+  <div class="msg" id="msg" hidden></div>
+
+  <p class="auth-alt" id="foot">
+    No account yet? Choose <b>Sign up</b> — a new account then waits for an
+    invitation to its club's channel.
+  </p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
+<script src="assets/supa.js?v=18"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var mode = 'in', busy = false;
+
+  function show(text, isErr) {
+    var msg = $('msg');
+    msg.textContent = text || '';
+    msg.className = 'msg' + (isErr ? ' err' : '');
+    msg.hidden = !text;
+  }
+
+  /* ---------- the switch ----------
+     The form that is not in use keeps its values, and the email is carried
+     across: switching tabs after a typo should not cost the address already
+     typed. */
+  function setMode(m) {
+    mode = m;
+    var up = m === 'up';
+    $('tabIn').classList.toggle('on', !up);
+    $('tabUp').classList.toggle('on', up);
+    $('tabIn').setAttribute('aria-selected', String(!up));
+    $('tabUp').setAttribute('aria-selected', String(up));
+    $('loginForm').hidden = up;
+    $('signupForm').hidden = !up;
+    $('title').textContent = up ? 'Create an account' : 'Sign in';
+    $('intro').textContent = up
+      ? 'One account per person. Whoever runs your club’s channel then invites this email address to it.'
+      : 'Your club’s channel — matches, data and players from every game we have tagged for you.';
+    $('foot').innerHTML = up
+      ? 'Already have an account? Choose <b>Sign in</b>.'
+      : 'No account yet? Choose <b>Sign up</b> — a new account then waits for an ' +
+        'invitation to its club’s channel.';
+
+    var from = $(up ? 'email' : 'suEmail'), to = $(up ? 'suEmail' : 'email');
+    if (from.value && !to.value) to.value = from.value;
+    show('');
+    /* Never steal focus on the sign-in form: Chrome fills a saved login as
+       the page settles and focusing a field it has just filled can drop the
+       fill. The sign-up form has nothing to lose. */
+    if (up) $('suName').focus();
+  }
+  $('tabIn').addEventListener('click', function () { setMode('in'); });
+  $('tabUp').addEventListener('click', function () { setMode('up'); });
+
+  /* ---------- what a new password has to be ----------
+     The same three rules auth.html states, so an account made on either
+     sign-up page is held to one standard. Sign IN is not held to them: an
+     account created before the rule existed must still be able to get in. */
+  var PW_RULES = [
+    [function (p) { return p.length >= 6; },          'at least 6 characters'],
+    [function (p) { return /[A-Z]/.test(p); },        'one capital letter (A–Z)'],
+    [function (p) { return /[^A-Za-z0-9]/.test(p); }, 'one special character (! ? @ # …)']
+  ];
+  function pwProblem(pw) {
+    var missing = PW_RULES.filter(function (r) { return !r[0](pw); })
+                          .map(function (r) { return r[1]; });
+    return missing.length ? 'Password needs ' + missing.join(', ') + '.' : null;
+  }
+  var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  /* ---------- what Supabase says, in plain words ---------- */
+  function explain(err) {
+    var m = (err && err.message) || 'Something went wrong.';
+    if (/invalid login/i.test(m)) return 'That email and password do not match an account.';
+    if (/email not confirmed/i.test(m)) return 'This email has not been confirmed yet — open the link we sent you, then sign in.';
+    if (/already registered|already exists|user already/i.test(m)) return 'That email already has an account. Choose Sign in instead.';
+    if (/password should be at least|password.*weak/i.test(m)) return 'That password is too weak. ' + (pwProblem($('suPassword').value) || 'Try a longer one.');
+    if (/failed to fetch|networkerror|load failed/i.test(m)) return 'Cannot reach the server — check your connection and try again.';
+    if (/rate limit|too many/i.test(m)) return 'Too many attempts. Wait a minute and try again.';
+    // ---- what Google can send back ----
+    if (/unsupported provider|provider is not enabled/i.test(m))
+      return 'Google sign-in is not switched on for this site yet. Use your email and password for now.';
+    if (/access_denied|user denied|cancelled|canceled/i.test(m))
+      return 'Google sign-in was cancelled. Nothing has changed.';
+    if (/bad_oauth_state|invalid state|flow ?state|state not found/i.test(m))
+      return 'That sign-in took too long, or was finished in another tab. Press Continue with Google again.';
+    if (/identity is already linked|already linked to another user/i.test(m))
+      return 'That Google account already belongs to a different account here. Sign in with your email and password instead.';
+    return m;
+  }
+
+  function working(on, label) {
+    busy = on;
+    var btn = $(mode === 'in' ? 'submitBtn' : 'suBtn');
+    btn.disabled = on;
+    btn.textContent = on ? label : (mode === 'in' ? 'Sign in' : 'Create account');
+  }
+
+  /* Hold briefly before the page goes away so the browser's password manager
+     sees a successful login and offers to save it. Measured at nothing, the
+     navigation beats the prompt and nothing is ever saved — the same reason
+     auth.html waits. */
+  function land(text) {
+    show(text, false);
+    setTimeout(function () { location.replace('app.html'); }, 700);
+  }
+
+  /* ---------- sign in ---------- */
+  $('loginForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (busy) return;
+    var email = $('email').value.trim(), password = $('password').value;
+    if (!email || !password) return;
+
+    working(true, 'Signing in…');
+    show('');
+    window.HNA.auth.signIn(email, password).then(function () {
+      land('Signed in ✓ — opening your channel.');
+    }).catch(function (err) {
+      show(explain(err), true);
+      working(false);
+    });
+  });
+
+  /* ---------- sign up ---------- */
+  $('signupForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (busy) return;
+    var name = $('suName').value.trim();
+    var email = $('suEmail').value.trim();
+    var pw = $('suPassword').value, pw2 = $('suConfirm').value;
+
+    if (!name) return show('Enter your full name.', true);
+    if (!EMAIL.test(email)) return show('Enter a valid email address.', true);
+    var problem = pwProblem(pw);
+    if (problem) return show(problem, true);
+    if (pw !== pw2) return show('The two passwords do not match.', true);
+
+    working(true, 'Creating…');
+    show('');
+    window.HNA.auth.signUp(email, pw, name).then(function (data) {
+      /* No session back means the project asks new accounts to confirm their
+         email first. The account exists — it just cannot be used yet, so put
+         the credentials into the sign-in form ready for afterwards. */
+      if (!data || !data.session) {
+        working(false);
+        setMode('in');
+        $('email').value = email;
+        $('password').value = pw;
+        return show('Account created for ' + email + '. Open the confirmation link we just ' +
+                    'emailed you, then sign in here.', false);
+      }
+      land('Account created ✓ — opening the app.');
+    }).catch(function (err) {
+      show(explain(err), true);
+      working(false);
+    });
+  });
+
+  /* ---------- Continue with Google ----------
+     One button for both tabs: with an OAuth provider there is no separate sign-up. The
+     first time an address arrives it becomes an account; every time after that it signs
+     in. Nothing here asks for a password, so there is nothing to offer to save and no
+     reason to hold the page open the way a filled-in form is held.
+
+     gWorking is the button's own switch and working() is never told about it. In the
+     tagging app's sign-in screen working() once disabled this very button on every
+     submit, and when the button was removed the leftover reference killed Sign in and
+     Create account outright. Two switches that do not know about each other cannot do
+     that to each other; `busy` is what turns a click here away mid sign-in. */
+  function gWorking(on) {
+    busy = on;
+    $('googleBtn').disabled = on;
+  }
+
+  /* signInWithOAuth only builds a URL, so a project with Google switched off answers
+     AFTER the browser has already gone — leaving a club staring at a raw JSON error with
+     no way back. Ask first: that 400 is readable, while an enabled provider answers with
+     a redirect to accounts.google.com that CORS makes this fetch throw on. Only a
+     readable "not enabled" stops us. Capped, because this is insurance and must never
+     become the reason nothing happens on a slow connection. */
+  var PREFLIGHT_MS = 1200;
+  function alive(url) {
+    var ask = fetch(url, { headers: { accept: 'application/json' } })
+      .then(function (r) {
+        return r.text().then(function (body) {
+          return !(!r.ok && /provider is not enabled|unsupported provider/i.test(body));
+        });
+      })
+      .catch(function () { return true; });
+    var cap = new Promise(function (r) { setTimeout(function () { r(true); }, PREFLIGHT_MS); });
+    return Promise.race([ask, cap]);
+  }
+
+  $('googleBtn').addEventListener('click', function () {
+    if (busy) return;
+    gWorking(true);
+    show('Opening Google…', false);
+    window.HNA.auth.signInWithGoogle().then(function (url) {
+      if (!url) throw new Error('Google sign-in did not return a destination.');
+      return alive(url).then(function (ok) {
+        if (!ok) throw new Error('Unsupported provider: provider is not enabled');
+        /* A breadcrumb for the case where redirectTo is not in the project's Redirect
+           URLs: Supabase then drops the tokens on the Site URL — index.html — which
+           reads this to know they belong here and not to the tagging app. */
+        try { localStorage.setItem('hna.oauth.home', 'login.html'); } catch (e) {}
+        location.assign(url);
+      });
+    }).catch(function (err) {
+      gWorking(false);
+      show(explain(err), true);
+    });
+  });
+
+  /* ---------- on load ---------- */
+  if (window.HNA && window.HNA.configured()) {
+    /* session() also finishes the trip back from a confirmation link: the
+       tokens arrive in the hash (or ?code=), supabase-js reads them off the
+       URL, and this turns them into a signed-in browser. */
+    window.HNA.auth.session().then(function (s) {
+      if (s) location.replace('app.html');
+    });
+  }
+  /* A confirmation link that has expired or has already been used comes back
+     with the reason on the URL. Without this it would look like a blank
+     sign-in form for no reason. */
+  if (/error_description=|[?&]error=/.test(location.hash + location.search)) {
+    var p = new URLSearchParams((location.hash || '').replace(/^#/, '') || location.search);
+    show(explain({ message: p.get('error_description') || p.get('error') ||
+                            'That link is no longer valid.' }), true);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+name: Health check
+
+# Every hour, ask each piece of the live system whether it answers:
+# the portal and tagger on GitHub Pages, the Supabase REST API (with a query
+# that reaches Postgres), and the Cloudflare Worker. A failed run emails the
+# repo owner, which is the whole alerting system, and costs nothing.
+#
+# It is also the keep-alive: a Free-plan Supabase project with no traffic for
+# 7 days is paused, and a paused project is a portal that shows clubs nothing.
+#
+# GitHub turns scheduled workflows off in a public repo after 60 days without
+# a commit. If that email ever arrives, re-enable this under Actions.
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SITE: https://hoangnams.com
+      SUPABASE_URL: https://xtzmtdcohoixoxqusyyz.supabase.co
+      # The publishable key is public by design (it ships in supa.js).
+      SUPABASE_KEY: sb_publishable_ZcIbdPmEdfW0POArBW_eNg_aZbc-lFa
+      WORKER: https://r2-presign.hoangnam25012004.workers.dev
+    steps:
+      - name: Probe every service
+        run: |
+          fails=0
+          probe() {   # name, expected status, curl args...
+            name="$1"; want="$2"; shift 2
+            out=$(curl -s -o /dev/null -m 20 -w '%{http_code} %{time_total}' "$@") || out="000 0"
+            code=${out%% *}; t=${out#* }
+            if [ "$code" = "$want" ]; then echo "ok   $name  $code  ${t}s"
+            else echo "::error::$name answered $code (wanted $want) in ${t}s"; fails=$((fails+1)); fi
+          }
+          probe "portal landing"   200 "$SITE/"
+          probe "portal app"       200 "$SITE/app.html"
+          probe "portal app.js"    200 "$SITE/assets/app.js"
+          probe "tagger"           200 "$SITE/tagger/"
+          probe "tagger sync"      200 "$SITE/tagger/cloud-sync.js"
+          probe "stats view"       200 "$SITE/tagger/Stats/stats-view.js"
+          # a real read through PostgREST into Postgres: this is the keep-alive
+          probe "supabase rest"    200 "$SUPABASE_URL/rest/v1/clubs?select=id&is_public=eq.true&limit=1" -H "apikey: $SUPABASE_KEY"
+          probe "supabase auth"    200 "$SUPABASE_URL/auth/v1/health" -H "apikey: $SUPABASE_KEY"
+          probe "worker presign"   200 -X OPTIONS "$WORKER/" -H "Origin: $SITE"
+          probe "worker contact"   200 -X OPTIONS "$WORKER/contact" -H "Origin: $SITE"
+          [ "$fails" = "0" ]

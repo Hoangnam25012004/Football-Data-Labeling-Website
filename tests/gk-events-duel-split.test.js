@@ -1,6 +1,6 @@
 /* The goalkeeper event pack, the two split events, and own goal.
 
-   Designed in docs/gk-events-and-duel-split-design.md.
+   Designed in docs/design/gk-events-and-duel-split-design.md.
 
    The one that matters most here is the SPLIT. `ground duel success` became three ways of
    saying a ground duel was won, and `save` became three ways of saying one was made — but
@@ -339,7 +339,7 @@ test('T14 · no hotkey collides with another event, or with a macro', () => {
   /* An event hotkey beats a macro of the same code (expandKey), so a code taken from a
      macro kills it silently at the moment of tagging. The 40 macros in restore_macros.js
      are the ones this account really has. */
-  const MACROS=JSON.parse(/var MACROS = (\{[\s\S]*?\});/.exec(readSrc('restore_macros.js'))[1]);
+  const MACROS=JSON.parse(/var MACROS = (\{[\s\S]*?\});/.exec(readSrc('scripts/console/restore_macros.js'))[1]);
   const macKeys=new Set((MACROS.football||[]).map(m=>m.key));
   keys.forEach(k=>notOk(macKeys.has(k),'event code "'+k+'" would stop a macro firing'));
 });
@@ -353,7 +353,7 @@ test('T15 · every event the shipped macros point at is still in the dictionary'
 
      Nothing here renames or deletes: `ground duel success`, `ground duel fail` and `save`
      stay in the list precisely because macros (and months of tagged rows) point at them. */
-  const MACROS=JSON.parse(/var MACROS = (\{[\s\S]*?\});/.exec(readSrc('restore_macros.js'))[1]);
+  const MACROS=JSON.parse(/var MACROS = (\{[\s\S]*?\});/.exec(readSrc('scripts/console/restore_macros.js'))[1]);
   const dict=new Set(EVENTS.football.map(e=>e.name));
   /* No allowlist any more. It used to need one, because five of the names these macros
      point at — goal kick, throw-Ins and three body parts — existed only in the live

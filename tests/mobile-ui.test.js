@@ -10,13 +10,13 @@
      media   every rule sits inside the one @media (max-width:720px);
      scope   every selector starts body.app, which only app.html carries.
 
-   Designed in docs/mobile-ui-design.md, which also holds the measurements.     */
+   Designed in docs/design/mobile-ui-design.md, which also holds the measurements.     */
 const {test,eq,ok,notOk}=require('./tiny-test');
 const {readSrc}=require('./harness');
 
-const MOB     =readSrc('client/assets/app-mobile.css');
-const APPCSS  =readSrc('client/assets/app.css');
-const APPHTML =readSrc('client/app.html');
+const MOB     =readSrc('apps/portal/assets/app-mobile.css');
+const APPCSS  =readSrc('apps/portal/assets/app.css');
+const APPHTML =readSrc('apps/portal/app.html');
 const SHARED  =readSrc('shared.css');
 const SVCSS   =readSrc('Stats/stats-view.css');
 
@@ -63,14 +63,14 @@ test('the sheet is loaded by app.html and by nothing else', () => {
   /* last in the head: app.css is what it overrides, and a tie has to go to it */
   ok(APPHTML.indexOf('app-mobile.css')>APPHTML.indexOf('app.css?v='),
      'and after app.css, so an equal-specificity rule wins the tie');
-  ['client/index.html','client/login.html','client/guide.html','index.html',
+  ['apps/portal/index.html','apps/portal/login.html','apps/portal/guide.html','index.html',
    'Stats/index.html','Player-Lists/index.html','auth.html',
-   'client/assets/app.js','client/assets/site.css']
+   'apps/portal/assets/app.js','apps/portal/assets/site.css']
     .forEach(f=>notOk(/app-mobile/.test(readSrc(f)),f+' must not reach for it'));
 });
 
 test('the deploy copies it, or it 404s on the live site', () => {
-  ok(/cp client\/assets\/app-mobile\.css/.test(readSrc('.github/workflows/deploy.yml')));
+  ok(/cp apps\/portal\/assets\/app-mobile\.css/.test(readSrc('.github/workflows/deploy.yml')));
 });
 
 /* ================= what it actually does ================= */

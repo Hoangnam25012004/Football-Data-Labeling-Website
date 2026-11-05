@@ -7,10 +7,14 @@ Two websites in one repository, sharing one Supabase project.
 | **Client site** | Marketing pages plus the app clubs log into: one channel per club, holding matches, data and players | Customers | `/` |
 | **Labeling app** | The tagging tool — events + hotkeys, pitch coordinates, stats, XLSX/CSV export | Our analysts | `/tagger` |
 
-**Client site:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/
-**Client app:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/app.html
-**Labeling app:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/tagger/
-**Analyst sign-in:** https://hoangnam25012004.github.io/Football-Data-Labeling-Website/tagger/auth
+**Client site:** https://hoangnams.com/
+**Client app:** https://hoangnams.com/app.html
+**Labeling app:** https://hoangnams.com/tagger/
+**Analyst sign-in:** https://hoangnams.com/tagger/auth
+
+The old `hoangnam25012004.github.io/Football-Data-Labeling-Website/*` addresses
+301-redirect to the custom domain, which is why they still appear in the Supabase
+and Google OAuth allow-lists below.
 
 > **The labeling app moved.** It used to be the site root; the client site now is.
 > Old bookmarks to `/` land on the client site. Sign-in still works either way —
@@ -21,19 +25,38 @@ Two websites in one repository, sharing one Supabase project.
 > the tagging app rather than the client site.
 
 ## Repository layout
+Organised the way data providers split their work — **collection** (analysts tag a
+match), **definitions** (what an event is), **delivery** (what a club reads) and the
+**platform** underneath.
+
 ```
-index.html, shared.*, cloud-sync.js, auth.*   the labeling app (deployed to /tagger)
-Stats/, Player-Lists/                          its sub-pages    (deployed to /tagger/…)
-client/                                        the client site  (deployed to /)
-  index.html      landing page
-  app.html        the channel app — matches, data, players
-  login.html      client sign-in
-  assets/         site.css, app.css, supa.js, app.js
-supabase/migrations/                           schema, in order
+apps/
+  tagger/          COLLECTION — the labeling app             → /tagger/
+    index.html       tagging tab (video, entry box, events table)
+    auth.html/.js    sign-in page + the gate every tagger page loads
+    cloud-sync.js    Supabase sync, realtime, Submit Analysis
+    shared.js/.css   stat engine + tokens shared by the sub-pages
+    Stats/           Stats page: stats-view.js (also mounted by the portal), report.js (PDF)
+    Player-Lists/    line-ups / formation board
+  portal/          DELIVERY — the client site               → /
+    index.html       landing page          app.html    the channel app
+    login.html       client sign-in        guide.html  privacy.html
+    assets/          site.css, app.css, app.js, supa.js, film-tools.*, guide.*
+services/
+  edge-worker/     Cloudflare Worker: R2 upload presign + /contact form
+supabase/          PLATFORM — migrations/ (in order) and seed/
+data/
+  definitions/     pitchtagger_events.json — the event dictionary the tests pin
+scripts/           gen-event-types-sql.js; console/ holds paste-into-DevTools scripts
+deliverables/      match-reports/ (one sample PDF tracked) and marketing/ (local only)
+docs/design/       one design doc per feature
+docs/landing-pages/ one doc per served page — what each feature does and which functions do it
+tests/             node tests/run.js — no install step
 ```
-Nothing moves inside the repo — the relocation happens only in
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), so opening
-`index.html` from disk still works exactly as before.
+The deployed site does **not** mirror this tree. The URLs on the right are the
+contract, and [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) maps
+each file onto them with an explicit `cp` list, so a file missing from that list is a
+404 on the live site while the build stays green.
 
 ## The client site
 A **channel is a club**. A club signs in and sees only its own matches, and only the
@@ -48,7 +71,7 @@ public site.
   inside this site — three views, both sides, the six categories, the maps and
   the XLSX / CSV / PDF exports.
 
-  It is the same file the tagging app runs, not a copy: `Stats/stats-view.js`
+  It is the same file the tagging app runs, not a copy: `apps/tagger/Stats/stats-view.js`
   is mounted by `Stats/index.html` and by the client app alike. What differs is
   only how it is fed. The tagging app hands it the live match; the client hands
   it one **published report** — so a club never needs read access to
@@ -142,20 +165,20 @@ emailed on, with `reply_to` set to the sender so hitting Reply answers the club.
 for a browser running no JavaScript.
 
 Needs [`supabase/migrations/0019_leads.sql`](supabase/migrations/0019_leads.sql) and
-the secrets in [`worker/README.md`](worker/README.md#the-contact-form-contact).
+the secrets in [`services/edge-worker/README.md`](services/edge-worker/README.md#the-contact-form-contact).
 `public.leads` has **no policy for `anon` and no INSERT policy at all** — for the
 same reason 0017 warns about, the browser must not be able to write here, so the
 Worker does it with the service role key. Full design:
-[`docs/contact-form-design.md`](docs/contact-form-design.md).
+[`docs/design/contact-form-design.md`](docs/design/contact-form-design.md).
 
 ## How the labeling app runs
-The whole app is the static file [`index.html`](index.html) — no backend required.
+The whole app is the static file [`index.html`](apps/tagger/index.html) — no backend required.
 It is hosted for free on **GitHub Pages** and served over HTTPS, so anyone with the
 link can use it in a modern browser (Chrome/Edge recommended).
 
 ## Accounts (sign in / sign up)
 Every page of the site is behind an account. Opening any of them without one lands on
-[`auth.html`](auth.html) — served by GitHub Pages at the extension-less **`/auth`** — which
+[`auth.html`](apps/tagger/auth.html) — served by GitHub Pages at the extension-less **`/auth`** — which
 offers **Sign in** (email + password) and **Sign up** (full name, email, password, confirm
 password). After signing in you land on the main tagging tab, where **▾ Other** — the first
 button on the header bar — drops down the account you are signed in as and **⎋ Sign out**.
@@ -163,7 +186,7 @@ button on the header bar — drops down the account you are signed in as and **�
 There is also **Continue with Google**, under both forms. One button does the work of both
 tabs, because with an OAuth provider there is no separate sign-up: the first time an address
 arrives it becomes an account, and every time after that it signs in. The same button is on
-the client site's [`login.html`](client/login.html). An account that came in that way brings
+the client site's [`login.html`](apps/portal/login.html). An account that came in that way brings
 its name and its picture with it — the picture shows in **▾ Other** here and beside the
 account name on the client site; an account made with a password has none and keeps its
 initial. Both routes stay open, permanently: an account made with a password is signed into
@@ -207,7 +230,7 @@ form itself, so its own autofill always wins. A password in `localStorage` would
 readable by any script on the origin, which is why keeping one stays the browser's job.
 
 The accounts live in **Supabase Auth**, the project the app already syncs to, so there is
-still no backend of our own. [`auth.js`](auth.js) is the gate: every page loads it, and it
+still no backend of our own. [`auth.js`](apps/tagger/auth.js) is the gate: every page loads it, and it
 decides — synchronously, from the session supabase-js keeps in `localStorage` — whether to
 show the page or replace it with the sign-in screen. The page you were turned away from is
 remembered, so a shared `…/#match=12345` link still opens that match once you are in.
@@ -234,7 +257,7 @@ Email + password works as soon as the project exists. The rest is dashboard-only
    that actually succeeded. Nothing in this repo ever mentions `localhost:3000`; if you see
    it, these two fields are why.
 
-   [`auth.js`](auth.js) softens the blow — tokens that land on the app instead of `/auth` are
+   [`auth.js`](apps/tagger/auth.js) softens the blow — tokens that land on the app instead of `/auth` are
    handed over to it rather than dropped — but the fields still need to be right, or every
    confirmation link goes to whatever the Site URL says.
 2. **Confirmation emails.** The project currently has *Confirm email* **on**, so a new
@@ -246,7 +269,7 @@ Email + password works as soon as the project exists. The rest is dashboard-only
    inactivity timeout and no time-box — which is what keeps people signed in until they
    choose to sign out. Setting either of those would start expiring sessions on its own.
 
-Anonymous sign-in stays enabled — [`cloud-sync.js`](cloud-sync.js) falls back to it only
+Anonymous sign-in stays enabled — [`cloud-sync.js`](apps/tagger/cloud-sync.js) falls back to it only
 when there is no account session, and an anonymous session never opens the gate.
 
 ### Continue with Google — the dashboard half
@@ -291,7 +314,7 @@ arrive as a *new* `user_id` — and `user_prefs` (their hotkeys **and macros**) 
 tagged is at risk (events, lineups, matches and teams are `to authenticated`, not per-user),
 but a squad's worth of macros is. With a throwaway Gmail: create an account with a password,
 confirm it, sign out, Continue with Google with the same address, and check the `user.id` is
-the one it was. `docs/google-sign-in-design.md` §8 has the full procedure.
+the one it was. `docs/design/google-sign-in-design.md` §8 has the full procedure.
 
 ## Deployment (CI/CD)
 Every push to the `main` branch triggers the workflow in
@@ -303,25 +326,30 @@ repository's **Actions** tab.
 In the repository: **Settings → Pages → Build and deployment → Source: GitHub Actions.**
 
 ## Local development
-Just open `index.html` in your browser. For the "auto-save to file" feature (File System
+Just open `apps/tagger/index.html` in your browser. For the "auto-save to file" feature (File System
 Access API), serve it over `http://localhost` (e.g. `python -m http.server`) in Chrome/Edge.
 The sign-in gate works the same locally, except that only GitHub Pages resolves the pretty
 `/auth`, so off the live site it opens `auth.html` by name.
+
+To work on both apps together, serve the **repo root** (`python -m http.server 8765`, or
+the `static` config in `.claude/launch.json`) and open `/apps/tagger/` and
+`/apps/portal/app.html`. The portal finds the tagger beside it at `../tagger/` — see
+`taggerRoot()` in `apps/portal/assets/app.js`.
 
 ## Tests
 ```bash
 node tests/run.js
 ```
 No dependencies and no install step: the suite lifts the functions it exercises straight
-out of the `<script>` in [`index.html`](index.html) (and in [`Stats/index.html`](Stats/index.html)),
-plus [`shared.js`](shared.js) whole, and runs them in a `vm` sandbox against stubs for the
+out of the `<script>` in [`index.html`](apps/tagger/index.html) (and in [`Stats/index.html`](apps/tagger/Stats/index.html)),
+plus [`shared.js`](apps/tagger/shared.js) whole, and runs them in a `vm` sandbox against stubs for the
 DOM/video/cloud, so it always tests the shipped code. Covered today: the substitution →
 formation-history flow (single/double/triple swaps in one entry, pairs typed back-to-front,
 impossible pairs, dots and 2nd-half mirroring, re-tagging, deleting, and substitutions tagged
 out of order); the Stats General tab (which swaps collapse into one x2 / x3 timeline marker,
 and the bench listed under each formation); the Stats Distribution tab (the take-ons &
 step-ins map, the row it shares with the cross map, and who the touch map lists per half);
-the sign-in gate in [`auth.js`](auth.js) (who gets in, an anonymous session never counting
+the sign-in gate in [`auth.js`](apps/tagger/auth.js) (who gets in, an anonymous session never counting
 as an account, a session past its expiry still getting in, the page you were turned away
 from coming back, `next` refusing to be an open redirect, the password rules, and the
 sign-in screen carrying what a password manager needs); and what Stats and Player lists do
@@ -362,7 +390,7 @@ viewing the same match (video stays local — only event metadata is stored).
    the `event_types.name` → `event_name` rename, and the `teams` / `players` tables.
 3. Auth → Providers → enable **Allow anonymous sign-ins**.
 4. (Optional, for zero-friction sharing) put your project **URL** and **anon key** into
-   `CONFIG` at the top of [`cloud-sync.js`](cloud-sync.js). The anon key is public and safe
+   `CONFIG` at the top of [`cloud-sync.js`](apps/tagger/cloud-sync.js). The anon key is public and safe
    to commit — access is protected by Row-Level Security.
 
 **Recent matches.** Under the Match ID box, **⚽ Match** lists the last 5 matches *this
@@ -382,7 +410,7 @@ indexes, RLS, and the realtime publication.
 
 ## Notes
 - Without cloud sync, events and the event/hotkey list stay in the browser (localStorage)
-  and can be backed up to `pitchtagger_events.json`.
+  and can be backed up to `pitchtagger_events.json` (the shipped copy is `data/definitions/pitchtagger_events.json`).
 - **⚙ Event** holds two tables. *Event types* is one hotkey per event. *Macro* is one hotkey
   for a whole run of events: press **＋ Add Macro**, type the events the way you type them in
   the entry box (`qq*s`), then give the macro its own code (`qs`) — from then on `1qs2` tags

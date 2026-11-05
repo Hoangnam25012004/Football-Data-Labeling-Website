@@ -18,9 +18,9 @@
 const {test,eq,ok,notOk}=require('./tiny-test');
 const {readSrc}=require('./harness');
 
-const LANDING=readSrc('client/index.html');
+const LANDING=readSrc('apps/portal/index.html');
 const SHARED=readSrc('shared.js');
-const EVENTS=JSON.parse(readSrc('pitchtagger_events.json'));
+const EVENTS=JSON.parse(readSrc('data/definitions/pitchtagger_events.json'));
 
 const DICT=new Set(EVENTS.football.map(e=>e.name));
 

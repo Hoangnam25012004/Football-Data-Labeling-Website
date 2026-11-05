@@ -11,13 +11,13 @@
 const fs=require('fs'), path=require('path'), vm=require('vm');
 const {test,eq,ok,notOk}=require('./tiny-test');
 
-const ROOT=path.join(__dirname,'..');
+const {repoPath}=require('./harness');
 /* Folded to LF, the way harness.js's readSrc() has always folded it. Several assertions
    below scan the source for a literal \n ("const CHROME =…;\n", "buildPages(host){\n"),
    and git checks these files out with CRLF on Windows — so they matched on the machine
    that wrote them and on CI (ubuntu), and stopped matching the moment the same files were
    checked out fresh here. Nothing in this file wants a \r, so the fold costs nothing. */
-const page=p=>fs.readFileSync(path.join(ROOT,p),'utf8').replace(/\r\n/g,'\n');
+const page=p=>fs.readFileSync(repoPath(p),'utf8').replace(/\r\n/g,'\n');
 const VIEW=page('Stats/stats-view.js');
 const PAGE=page('Stats/index.html');
 const REPORT=page('Stats/report.js');
@@ -297,7 +297,7 @@ test('the two pages that share shared.css ask for the same copy of it', () => {
 test('both hosts of the view ask for the same copy of it', () => {
   // the Stats page loads it with a tag, the client site injects it from app.js —
   // bump one and not the other and the two sites run different shooting layouts
-  const APP=page('client/assets/app.js');
+  const APP=page('apps/portal/assets/app.js');
   // report.js is in that list because the helpers it needs are handed over by
   // stats-view.js: one host on the old pair and the new report.js is a ⭳ PDF
   // that throws, which is the shape of the bug that put them there
@@ -305,7 +305,7 @@ test('both hosts of the view ask for the same copy of it', () => {
     const re=new RegExp(f.replace('.','\\.')+'\\?v=(\\d+)');
     const inPage=(re.exec(PAGE)||[])[1], inApp=(re.exec(APP)||[])[1];
     ok(inPage,'Stats/index.html versions '+f);
-    eq(inApp,inPage,'client/assets/app.js loads '+f+' too, so it must be bumped in step');
+    eq(inApp,inPage,'apps/portal/assets/app.js loads '+f+' too, so it must be bumped in step');
   });
 });
 
@@ -329,7 +329,7 @@ test('the tokens the view draws with stayed in shared.css', () => {
 
 /* ================= shipping ================= */
 test('the new files are staged for GitHub Pages', () => {
-  ['cp Stats/stats-view.js','cp Stats/stats-view.css','cp shared-page.css']
+  ['cp apps/tagger/Stats/stats-view.js','cp apps/tagger/Stats/stats-view.css','cp apps/tagger/shared-page.css']
     .forEach(line=>ok(YML.includes(line),'deploy.yml is missing: '+line));
 });
 
