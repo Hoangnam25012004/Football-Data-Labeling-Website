@@ -14,7 +14,7 @@
 việc và không đụng tới bất cứ thứ gì ngoài trang này: nó **không** nạp Supabase, `app.js` hay
 bất kỳ script nào của channel.
 
-## 1. Nội dung (16 mục)
+## 1. Nội dung (19 mục)
 
 | # | Mục | Nội dung |
 | --- | --- | --- |
@@ -28,15 +28,18 @@ bất kỳ script nào của channel.
 | 08 | Full screen | Hai thứ chỉ có trong full screen |
 | 09 | The analyst tools | Menu chuột phải, từng mục |
 | 10 | Drawing on the frame | Vẽ, spotlight, sửa hình đã vẽ |
-| 11 | How long a drawing stays | Cửa sổ thời gian của hình vẽ |
-| 12 | Clips and playlists | 3 cách tạo clip |
-| 13 | Taking work out of the app | Export PNG, MP4, link khoảnh khắc |
-| 14 | Every keyboard shortcut | Bảng phím tắt |
-| 15 | If something does not work | Xử lý sự cố |
-| 16 | What Film does not do | Giới hạn |
+| 11 | How long a drawing stays | Làn timeline, cửa sổ thời gian, ghim, dừng hình khi export |
+| 12 | Following players | Spotlight bám theo keyframe, Link players, Defensive line |
+| 13 | Measuring on the pitch | Căn sân 4 điểm, đo Distance / Width / Depth / Area, số đo là xấp xỉ |
+| 14 | Clips and the clip editor | Tạo clip, clip list, timeline: Split, Speed, Freeze, Text, Transition, Preview |
+| 15 | Tags and playlists | Code, nhãn, ghi chú, playlist, Private / Whole channel |
+| 16 | Taking work out of the app | PNG, MP4, link |
+| 17 | Every keyboard shortcut | Toàn bộ phím, cả trong clip editor và panel Tag |
+| 18 | If something does not work | Bảng triệu chứng, nguyên nhân, cách xử lý |
+| 19 | What Film does not do | Những gì Film không làm |
 
 > Nội dung trang phải khớp với `film-tools.js` và phần Film của `stats-view.js`. Thêm hay đổi
-> mục menu hoặc phím tắt trong Film thì phải cập nhật mục 09 và 14 của trang này.
+> mục menu hoặc phím tắt trong Film thì phải cập nhật mục 09 và 17 của trang này.
 
 ## 2. Chức năng (guide.js)
 

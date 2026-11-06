@@ -8,16 +8,16 @@
     "sha256": "37fee08ede58b61d"
   },
   "apps/portal/assets/app.js": {
-    "v": 63,
-    "sha256": "d6cd774e520dc582"
+    "v": 64,
+    "sha256": "9c002c0627f5c226"
   },
   "apps/portal/assets/film-tools.css": {
-    "v": 4,
-    "sha256": "f68b2b6724c08cb3"
+    "v": 5,
+    "sha256": "07d906446ee658ca"
   },
   "apps/portal/assets/film-tools.js": {
-    "v": 6,
-    "sha256": "0fd5daeb925cc848"
+    "v": 7,
+    "sha256": "cbc2e14fd81922cf"
   },
   "apps/portal/assets/guide.css": {
     "v": 1,
@@ -36,8 +36,8 @@
     "sha256": "85046042bdfd81f9"
   },
   "apps/portal/assets/supa.js": {
-    "v": 18,
-    "sha256": "d0940c2c6ef9346c"
+    "v": 19,
+    "sha256": "d8f72c45d7fe62f1"
   },
   "apps/tagger/Stats/report.js": {
     "v": 44,

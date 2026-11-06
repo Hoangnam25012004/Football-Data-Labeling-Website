@@ -287,7 +287,7 @@ test('every one of the six things a meeting needs is on it', () => {
     if(i.sub)walk(i.sub);
   });})(m);
   const joined=flat.join(' | ');
-  [['frame','Step forward one frame'],['speed','Speed'],['spotlight','Spotlight here'],
+  [['frame','Step forward one frame'],['speed','Speed'],['spotlight','Spotlight & track player'],
    ['dim','Dim everything else'],['zoom','Zoom in here'],['arrow','Arrow'],
    ['freehand','Freehand'],['zone','Zone (half-space, pocket)'],['text','Text'],
    ['mark in','Mark clip START'],['mark out','Mark clip END'],
@@ -321,7 +321,7 @@ test('it claims its own keys and hands back everything else', () => {
   const {T,hit}=keyed();
   [',','.','[',']','h','H','d','D','c','C','l','L','t','T','s','S'].forEach(k=>
     ok(hit(k),k+' is claimed'));
-  [' ','ArrowLeft','ArrowRight','f','F','Enter','a'].forEach(k=>
+  [' ','ArrowLeft','ArrowRight','f','F','Enter','j'].forEach(k=>
     notOk(hit(k),k+' is left for the player'));
 });
 
@@ -551,7 +551,7 @@ test('a player who opens no clip gets no layer and no query', () => {
 test('a mark is alive at its moment and nowhere else', () => {
   const {I,v,live,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight & track player').run();
   const s=I.state().shapes[0];
   eq(s.t,194,'anchored to the frame it was drawn on');
   eq(s.in,194); eq(s.out,198,'four seconds, which is what Q2 settled');
@@ -564,7 +564,7 @@ test('a mark is alive at its moment and nowhere else', () => {
 test('pinning is the ONE way back to being there for the whole file', () => {
   const {I,v,live,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight & track player').run();
   const s=I.state().shapes[0];
   I.selectShape(s.id);
   ok(/📌/.test(pick(menu(194,{x:900,y:500}),'📌 Keep for the whole clip').label),'offered, not assumed');
@@ -608,7 +608,7 @@ test('a stroke that outlasts its own window is not born dead', () => {
    copy, and the next persist() wrote that truncated list to disk. */
 test('playing a clip leaves the match drawing alone', () => {
   const {I,v,menu,pick}=mounted();
-  [194,600,1200].forEach(t=>{v.currentTime=t;pick(menu(t,{x:900,y:500}),'Spotlight here').run();});
+  [194,600,1200].forEach(t=>{v.currentTime=t;pick(menu(t,{x:900,y:500}),'Spotlight & track player').run();});
   eq(I.state().shapes.length,3);
   const clip=I.saveClip(190,200,'Clip A');
   eq(clip.shapes.length,1,'the clip still carries only what overlaps it');
@@ -622,7 +622,7 @@ test('playing a clip leaves the match drawing alone', () => {
 test('a frame that changes nothing touches no DOM', () => {
   const {I,v,grp,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight & track player').run();
   I.paint(194,0);
   const n1=grp('fmt-shapes').children[0];
   I.paint(194.01,0.1);
@@ -632,7 +632,7 @@ test('a frame that changes nothing touches no DOM', () => {
 test('the dim mask is rebuilt when a spotlight moves, and only then', () => {
   const {I,v,grp,key,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight & track player').run();
   key('d');                                     // dim on
   const idOf=()=>{const m=grp('fmt-dim').children.find(n=>n.tag==='mask');return m&&m.attrs.id;};
   I.paint(194,0); const first=idOf();
@@ -670,13 +670,13 @@ test('a menu item anchors to the frame that was right-clicked, not to now', () =
   v.currentTime=300;
   const model=menu(300,{x:800,y:400});
   v.currentTime=303;                       // three seconds spent reading the menu
-  pick(model,'Spotlight here').run();
+  pick(model,'Spotlight & track player').run();
   const s=I.state().shapes.slice(-1)[0];
   eq(s.t,300,'the light lands on the frame that was pointed at');
   eq(s.in,300);
 });
 
-/* #1 — S has been printed beside "Spotlight here" since the day this file was
+/* #1 — S has been printed beside "Spotlight & track player" since the day this file was
    written, and nothing was ever bound to it. */
 test('S places a spotlight where the pointer is', () => {
   const {I,c,key}=mounted();
@@ -776,7 +776,7 @@ test('the zoom origin is worked out in each element own box', () => {
 test('the lane shows one bar per shape, at its own window', () => {
   // a 200s window, so a four-second mark is 2% wide and clears the floor below
   const {I,v,menu,pick}=mounted({win:{half:1,label:'1st Half',start:0,end:200},end:()=>200});
-  [20,60,120].forEach(t=>{v.currentTime=t;pick(menu(t,{x:900,y:500}),'Spotlight here').run();});
+  [20,60,120].forEach(t=>{v.currentTime=t;pick(menu(t,{x:900,y:500}),'Spotlight & track player').run();});
   const st=I.state().strip;
   ok(st,'it is up as soon as the match has a drawing (Q4)');
   eq(Object.keys(st.bars).length,3,'one bar each');
@@ -791,7 +791,7 @@ test('the lane shows one bar per shape, at its own window', () => {
 test('a very short window still gets a bar you can hit', () => {
   const {I,v,menu,pick}=mounted();                 // the default 3000s half
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight & track player').run();
   const bar=I.state().strip.lane.children[0];
   ok(Math.abs(parseFloat(bar.style.left)-194/3000*100)<0.01,'placed exactly');
   eq(parseFloat(bar.style.width),0.4,'but floored at 0.4% so it can be seen and hit');
@@ -835,7 +835,7 @@ test('the lane is a full-screen thing, and goes when full screen does', () => {
 test('the number row sets the window, and 0 pins it', () => {
   const {I,v,key,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight & track player').run();
   const s=I.state().shapes[0];
   I.selectShape(s.id);
   ok(key('8'),'claimed, because there is something to apply it to');
@@ -851,7 +851,7 @@ test('the number row sets the window, and 0 pins it', () => {
 test('shift+arrow nudges the window by a frame, and leaves the transport keys alone', () => {
   const {I,v,key,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight & track player').run();
   I.selectShape(I.state().shapes[0].id);
   const before=I.state().shapes[0].in;
   ok(key('ArrowRight',{shiftKey:true}),'shift+right is ours');
@@ -878,12 +878,12 @@ test('the export builds its overlay detached, and stops driving the screen', () 
 
 /* Q1 was answered B: the reference product stops on the frame. */
 test('a freeze segment holds one frame, and the file comes out longer for it', () => {
-  const ex=grabFunction('exportClip',TOOLS,'apps/portal/assets/film-tools.js');
+  const ex=grabFunction('planOf',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/s\.freeze\s*>\s*0/.test(ex),'a shape can ask for a hold');
   ok(/Math\.abs\(last\.t\s*-\s*f\.t\)\s*<\s*0\.25/.test(ex),
      'points within a quarter second merge — an arrow, a zone and a caption on one frame stop it once');
   ok(/Math\.max\(last\.hold,\s*f\.hold\)/.test(ex),'and the longest hold wins');
-  ok(/total\s*=\s*dur\s*\+\s*holdTotal/.test(ex),'the progress figure counts the holds');
+  ok(/total:\s*run\s*\+\s*holdTotal/.test(ex),'the progress figure counts the holds');
   const pump=grabFunction('pump',TOOLS,'apps/portal/assets/film-tools.js');
   ok(/if\s*\(frozen\)/.test(pump),'the pump has a holding branch');
   ok(/v\.pause\(\)/.test(pump),'the source stops, so the picture really is one frame');
@@ -894,7 +894,7 @@ test('a freeze segment holds one frame, and the file comes out longer for it', (
 test('a shape can be given a freeze from the menu it belongs to', () => {
   const {I,v,menu,pick}=mounted();
   v.currentTime=194;
-  pick(menu(194,{x:900,y:500}),'Spotlight here').run();
+  pick(menu(194,{x:900,y:500}),'Spotlight & track player').run();
   const model=menu(194,{x:900,y:500-81});          // on the ring of the light
   const item=pick(model,'4 s');
   ok(item,'the freeze lengths are offered on the shape that was hit');

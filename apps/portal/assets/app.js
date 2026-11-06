@@ -423,6 +423,17 @@
       var meta = Object.assign({}, rep.payload.meta);
       Object.keys(fx).forEach(function (k) { if (fx[k]) meta[k] = fx[k]; });
       rep.payload = Object.assign({}, rep.payload, { meta: meta });
+      /* Whose channel and which match, for the toolkit's tags. Told here rather
+         than through the view's context, because the view is the tagging app's
+         file and has no business knowing about either. */
+      if (window.PTFilmTools && window.PTFilmTools.setScope) {
+        window.PTFilmTools.setScope({
+          clubId: state.channel && state.channel.id,
+          matchUuid: m.uuid,
+          role: state.channel && state.channel.role,
+          userId: state.user && state.user.id
+        });
+      }
       window.PTStats.mount(holder, rep.payload,
         { fullscreen: true, guide: 'guide.html' });
       /* the PDF button is part of the chrome that mount() just drew, so it did
@@ -1931,9 +1942,9 @@
          exports exist in the channel and nowhere else. It registers itself with
          the mounted view through the one hook stats-view.js publishes; a host
          that never loads it is a host where none of it exists. */
-      .then(function () { return loadOnce('assets/film-tools.js?v=6'); })
+      .then(function () { return loadOnce('assets/film-tools.js?v=7'); })
       .then(function () {
-        loadOnce('assets/film-tools.css?v=4', 'css');
+        loadOnce('assets/film-tools.css?v=5', 'css');
         if (window.PTStats && window.PTStats.registerFilmTools && window.PTFilmTools)
           window.PTStats.registerFilmTools(window.PTFilmTools);
       });
