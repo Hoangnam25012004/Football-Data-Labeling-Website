@@ -1931,6 +1931,7 @@ window.PTFilmTools = (function () {
     // captions belong to this clip alone, whatever the screen happens to be showing
     exportTexts = (edit && edit.texts) || [];
     var fi = 0, frozen = null, outT = 0;  // outT: seconds of output emitted so far
+    var lastOut = 0;
 
     var finish = function () {
       busy = false;
@@ -2037,7 +2038,9 @@ window.PTFilmTools = (function () {
           g.globalAlpha = dark; g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
         }
         track.requestFrame();
-        outT += 1 / fps;
+        var at = Date.now();
+        outT += lastOut ? Math.min(0.5, (at - lastOut) / 1000) : 0;   // the file's clock is the wall clock
+        lastOut = at;
         toast('Rendering — ' + Math.round(clamp(outT / total, 0, 1) * 100) + '% ('
               + Math.round(outT) + 's / ' + Math.round(total) + 's). Keep this tab open.', true);
         cb();
@@ -2056,7 +2059,14 @@ window.PTFilmTools = (function () {
       if (stopped) return;
       // the pump drives ITSELF off a timer. Not rAF: measured, rAF stops dead
       // in a hidden tab while MediaRecorder's clock keeps running.
-      var again = function () { setTimeout(pump, 1000 / fps); };
+      /* The wait is what is LEFT of the frame, not a whole frame on top of the
+         work: measured, drawing a frame took long enough that a flat wait turned
+         25 frames a second into 22. Never below 30 a second, because a measured
+         rate only says what the screen managed, and a busy tab reads low. */
+      var began = Date.now();
+      var again = function () {
+        setTimeout(pump, Math.max(0, 1000 / Math.max(fps, 30) - (Date.now() - began)));
+      };
 
       /* Holding. The element is paused, so drawImage keeps yielding the same
          picture; the clock that ends the hold is the wall clock, because that
@@ -4449,7 +4459,7 @@ window.PTFilmTools = (function () {
       liveAt: liveAt, alpha: alpha, upgrade: upgrade, hitShape: hitShape,
       openSource: openSource, corsUrl: corsUrl, NEED_CORS: NEED_CORS,
       setCors: function (s) { corsState = s; },
-      exportClip: function (a, b, t) { return exportClip(a, b, t); },
+      exportClip: function (a, b, t, e) { return exportClip(a, b, t, e); },
       selectShape: selectShape, originOnElement: originOnElement,
       onWheel: function (e) { return onWheel(e); },
       overlaySVGString: function (n, p) { return overlaySVGString(n, p); },
