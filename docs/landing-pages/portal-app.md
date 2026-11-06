@@ -112,65 +112,98 @@ trang Stats của tagger, bản trong portal khác ở 3 điểm:
 ### 3.1 Bộ công cụ Film cho analyst ([`film-tools.js`](../../apps/portal/assets/film-tools.js))
 
 File này chỉ được nạp ở portal. `stats-view.js` biết đến nó qua 4 lời gọi
-([`attach`](../../apps/portal/assets/film-tools.js#L1832), `relayout`, `onMeta`,
-[`detach`](../../apps/portal/assets/film-tools.js#L1870)) và
-[`frame`](../../apps/portal/assets/film-tools.js#L1897) mỗi khung hình. Ba nguyên tắc của nó:
+([`attach`](../../apps/portal/assets/film-tools.js#L4239), `relayout`, `onMeta`,
+[`detach`](../../apps/portal/assets/film-tools.js#L4291)) và
+[`frame`](../../apps/portal/assets/film-tools.js#L4327) mỗi khung hình. Ba nguyên tắc của nó:
 **không bao giờ upload, không ghi video, không tự hiện ra** khi chưa ai dùng.
 
-**Menu chuột phải** (chỉ có trong full screen), do [`menuModel`](../../apps/portal/assets/film-tools.js#L1599)
-và [`openMenu`](../../apps/portal/assets/film-tools.js#L1704) dựng:
+**Menu chuột phải** (chỉ có trong full screen), do [`menuModel`](../../apps/portal/assets/film-tools.js#L3873)
+và [`openMenu`](../../apps/portal/assets/film-tools.js#L4010) dựng:
 
 | Nhóm | Mục (phím tắt) |
 | --- | --- |
-| Đầu menu | Đồng hồ trận và tên hiệp tại khung hình được bấm |
-| Phát | Step back one frame (`,`) · Step forward one frame (`.`) · Speed: 0.25× / 0.5× / 1× / 1.5× / 2× · Loop A–B from here / Stop the A–B loop (`L`) |
-| Nhìn | Spotlight here (`S`) · Dim everything else / Undim (`D`) · Zoom in here (hoặc lăn chuột) / Reset the zoom |
-| Vẽ | Draw ▸ Arrow, Curved arrow, Dashed arrow (chạy không bóng), Freehand, Zone (half-space, pocket), Text, Player marker, Undo the last shape, Clear all drawings · Show/Hide the drawings (`H`) · Show/Hide the timeline (`T`): làn phía trên khung hình, mỗi hình vẽ là một thanh nằm đúng cửa sổ thời gian của nó |
-| Sửa hình (khi bấm trúng một hình) | Drawing here: … ▸ Select to edit · Time window 1–10 s (phím `1`–`9`) · 📌 Keep for the whole clip / Stop keeping it up (`0`) · Freeze frame on export · Colour · Delete this drawing (`Del`) |
-| Clip | Mark clip START (`[`) · Mark clip END (`]`) · Clip around this event (±6s) · Clip list… (`C`) |
-| Xuất | Save this frame (.png) · Download the marked section (.mp4) · Copy a link to this moment |
-| | Exit full screen (`Esc`) |
+| Đầu menu | Đồng hồ trận, tên hiệp, chip `Event: #n` (cầu thủ của event gần nhất trong ±6 s) |
+| Hàng transport | Step back one frame (`,`) · Play / pause (`Space`) · Step forward one frame (`.`) · Speed ▸ 0.25× / 0.5× / 1× / 1.5× / 2× · Loop A–B (`L`) · Dim / Undim (`D`) |
+| Telestration | Spotlight & track player (`S`) · Link players (`K`) · Defensive line (`N`) · Measure ▸ Distance, Width, Depth, Area, Calibrate the pitch here (`M`) · Draw ▸ Arrow, Curved arrow, Dashed arrow, Freehand, Zone, Text, Player marker, Undo (`U`), Clear all · Freeze here & draw (`Q`) · Zoom in here |
+| Sửa hình (khi bấm trúng một hình) | Drawing here: … ▸ Select to edit · Time window 1–10 s (phím `1`–`9`) · 📌 Keep for the whole clip (`0`) · Freeze frame on export · Colour · Delete (`Del`) |
+| Clip | Hàng tile: Split (`X`), In (`[`), Out (`]`), ±6 s (`A`), Speed (`V`) · Open clip editor (`E`) · Clip list… (`C`) |
+| Tag & Share | Tag this moment (`G`) · Add to playlist ▸ · Export ▸ Save this frame (.png), Download the marked section (.mp4) · Copy a link to this moment |
+| Footer | Drawings (`H`) · Timeline (`T`) · Exit (`Esc`) |
+
+Thiết kế và các điểm khác Figma: [film-analyst-toolkit-design.md](../design/film-analyst-toolkit-design.md).
 
 Các function chính:
 
 - **Toạ độ:** mọi hình vẽ lưu theo **pixel của chính video**, không theo pixel màn hình
-  ([`pictureRect`](../../apps/portal/assets/film-tools.js#L122), [`toVideo`](../../apps/portal/assets/film-tools.js#L135)).
+  ([`pictureRect`](../../apps/portal/assets/film-tools.js#L435), [`toVideo`](../../apps/portal/assets/film-tools.js#L448)).
   Vì vậy hình vẽ đứng yên khi đổi kích thước cửa sổ và khớp với file export.
-- **Lớp vẽ:** [`ensureLayer`](../../apps/portal/assets/film-tools.js#L150) tạo một SVG phủ
-  lên khung hình. [`shapeNode`](../../apps/portal/assets/film-tools.js#L261) là renderer
-  dùng chung cho màn hình và cả hai kiểu export. [`paint`](../../apps/portal/assets/film-tools.js#L400)
+- **Lớp vẽ:** [`ensureLayer`](../../apps/portal/assets/film-tools.js#L463) tạo một SVG phủ
+  lên khung hình. [`shapeNode`](../../apps/portal/assets/film-tools.js#L740) là renderer
+  dùng chung cho màn hình và cả hai kiểu export. [`paint`](../../apps/portal/assets/film-tools.js#L895)
   đối chiếu thay đổi chứ không dựng lại từ đầu.
-- **Thời gian sống của hình:** [`liveAt`](../../apps/portal/assets/film-tools.js#L331) và
-  [`alpha`](../../apps/portal/assets/film-tools.js#L343). Mỗi hình chỉ hiện trong cửa sổ thời
+- **Thời gian sống của hình:** [`liveAt`](../../apps/portal/assets/film-tools.js#L819) và
+  [`alpha`](../../apps/portal/assets/film-tools.js#L834). Mỗi hình chỉ hiện trong cửa sổ thời
   gian của nó, có thể ghim (`togglePin`) hoặc đổi độ dài (`setDur`). Làn timeline phía trên
-  khung hình hiện các cửa sổ đó thành thanh ([`toggleStrip`](../../apps/portal/assets/film-tools.js#L874),
-  [`renderStrip`](../../apps/portal/assets/film-tools.js#L843)).
-- **Text:** [`textAt`](../../apps/portal/assets/film-tools.js#L882) đặt một ô nhập thật tại
+  khung hình hiện các cửa sổ đó thành thanh ([`toggleStrip`](../../apps/portal/assets/film-tools.js#L1484),
+  [`renderStrip`](../../apps/portal/assets/film-tools.js#L1419)).
+- **Text:** [`textAt`](../../apps/portal/assets/film-tools.js#L1492) đặt một ô nhập thật tại
   chỗ bấm, không dùng `prompt()` (vì `prompt()` làm thoát full screen).
-- **Phát chậm và từng khung:** [`step`](../../apps/portal/assets/film-tools.js#L933),
-  [`setSpeed`](../../apps/portal/assets/film-tools.js#L938). Số fps được đo bằng
-  `requestVideoFrameCallback` ([`measureFps`](../../apps/portal/assets/film-tools.js#L947)).
-- **Spotlight:** [`paintDim`](../../apps/portal/assets/film-tools.js#L383) làm tối màn hình
-  và khoét lỗ tại mỗi spotlight. Kéo hoặc lăn chuột để chỉnh ([`onWheel`](../../apps/portal/assets/film-tools.js#L775)).
-- **Zoom:** lăn chuột khi không chỉnh spotlight ([`zoomBy`](../../apps/portal/assets/film-tools.js#L240),
-  [`applyZoom`](../../apps/portal/assets/film-tools.js#L208)).
-- **Clip và playlist:** [`markAt`](../../apps/portal/assets/film-tools.js#L976),
-  [`saveClip`](../../apps/portal/assets/film-tools.js#L1015),
-  [`clipFromEvent`](../../apps/portal/assets/film-tools.js#L1033) (±6s quanh một event đã tag),
-  [`playClip`](../../apps/portal/assets/film-tools.js#L1055),
-  [`playAll`](../../apps/portal/assets/film-tools.js#L1062),
-  ngăn kéo clip ([`togglePanel`](../../apps/portal/assets/film-tools.js#L1439)).
-- **Export:** [`savePNG`](../../apps/portal/assets/film-tools.js#L1116) và
-  [`exportClip`](../../apps/portal/assets/film-tools.js#L1226) (.mp4 render ngay trong trình
-  duyệt và lưu xuống máy; [`corsUrl`](../../apps/portal/assets/film-tools.js#L1203) né cache
+- **Phát chậm và từng khung:** [`step`](../../apps/portal/assets/film-tools.js#L1543),
+  [`setSpeed`](../../apps/portal/assets/film-tools.js#L1548). Số fps được đo bằng
+  `requestVideoFrameCallback` ([`measureFps`](../../apps/portal/assets/film-tools.js#L1557)).
+- **Spotlight:** [`paintDim`](../../apps/portal/assets/film-tools.js#L878) làm tối màn hình
+  và khoét lỗ tại mỗi spotlight. Kéo hoặc lăn chuột để chỉnh ([`onWheel`](../../apps/portal/assets/film-tools.js#L1343)).
+- **Zoom:** lăn chuột khi không chỉnh spotlight ([`zoomBy`](../../apps/portal/assets/film-tools.js#L553),
+  [`applyZoom`](../../apps/portal/assets/film-tools.js#L521)).
+- **Clip và playlist:** [`markAt`](../../apps/portal/assets/film-tools.js#L1586),
+  [`saveClip`](../../apps/portal/assets/film-tools.js#L1625),
+  [`clipFromEvent`](../../apps/portal/assets/film-tools.js#L1643) (±6s quanh một event đã tag),
+  [`playClip`](../../apps/portal/assets/film-tools.js#L1665),
+  [`playAll`](../../apps/portal/assets/film-tools.js#L1674),
+  ngăn kéo clip ([`togglePanel`](../../apps/portal/assets/film-tools.js#L3598)).
+- **Export:** [`savePNG`](../../apps/portal/assets/film-tools.js#L1734) và
+  [`exportClip`](../../apps/portal/assets/film-tools.js#L1844) (.mp4 render ngay trong trình
+  duyệt và lưu xuống máy; [`corsUrl`](../../apps/portal/assets/film-tools.js#L1821) né cache
   không có CORS).
-- **Link tới khoảnh khắc:** [`momentLink`](../../apps/portal/assets/film-tools.js#L1586) tạo
+- **Link tới khoảnh khắc:** [`momentLink`](../../apps/portal/assets/film-tools.js#L3840) tạo
   URL `?t=<giây>`.
-- **Bàn phím:** [`key`](../../apps/portal/assets/film-tools.js#L1761) nhận các phím ở bảng
+- **Bàn phím:** [`key`](../../apps/portal/assets/film-tools.js#L4129) nhận các phím ở bảng
   trên. Còn Space, ←/→, `F` (full screen) và `Esc` do `filmKeys` của stats-view xử lý.
 - **Lưu trữ:** [`loadStore`/`saveStore`](../../apps/portal/assets/film-tools.js#L445) ghi
-  hình vẽ và clip vào `localStorage['hna.film.tools.v1']`, khoá theo trận. **Chỉ nằm trong
-  trình duyệt**, không đồng bộ cloud.
+  hình vẽ, clip và căn sân vào `localStorage['hna.film.tools.v1']`, khoá theo trận. **Chỉ nằm
+  trong trình duyệt**, không đồng bộ cloud. Tag là ngoại lệ duy nhất (xem dưới).
+- **Inspector:** [`openInsp`](../../apps/portal/assets/film-tools.js#L2344) và
+  [`renderInsp`](../../apps/portal/assets/film-tools.js#L2378). Panel là con của `#fmStage` nên không che
+  cột phải, kéo được bằng tiêu đề ([`inspGrab`](../../apps/portal/assets/film-tools.js#L2410)), và chặn
+  sự kiện ở chính nó ([`fenceUi`](../../apps/portal/assets/film-tools.js#L2339)).
+- **Bám keyframe:** [`resolved`](../../apps/portal/assets/film-tools.js#L183) trả hình đã nội suy tại một
+  thời điểm; màn hình, mặt nạ dim, PNG và MP4 đều đi qua nó. Bật/tắt bằng
+  [`setTrack`](../../apps/portal/assets/film-tools.js#L2176), thêm key khi kéo bằng
+  [`placeAdjust`](../../apps/portal/assets/film-tools.js#L2163). Không có thị giác máy tính.
+- **Link players:** [`startLink`](../../apps/portal/assets/film-tools.js#L2107),
+  [`collectPoint`](../../apps/portal/assets/film-tools.js#L2141),
+  [`finishCollect`](../../apps/portal/assets/film-tools.js#L2126), vẽ bằng
+  [`linkNode`](../../apps/portal/assets/film-tools.js#L630) (chain, defensive line, shape).
+- **Căn sân và đo:** [`homography`](../../apps/portal/assets/film-tools.js#L213) (4 điểm, DLT),
+  [`pitchMarks`](../../apps/portal/assets/film-tools.js#L262) (mốc theo luật sân),
+  [`calOk`](../../apps/portal/assets/film-tools.js#L2225) (chỉ tin trong 1 s quanh khung đã căn),
+  [`measureValue`](../../apps/portal/assets/film-tools.js#L2288). Số đo luôn có dấu `≈`.
+- **Clip editor:** [`openEditor`](../../apps/portal/assets/film-tools.js#L2772),
+  [`renderEditor`](../../apps/portal/assets/film-tools.js#L2978). Mô hình `clip.edit`:
+  [`splitAt`](../../apps/portal/assets/film-tools.js#L304),
+  [`trimSeg`](../../apps/portal/assets/film-tools.js#L314),
+  [`dropSeg`](../../apps/portal/assets/film-tools.js#L322),
+  [`syncClip`](../../apps/portal/assets/film-tools.js#L329). Preview:
+  [`runEdit`](../../apps/portal/assets/film-tools.js#L3269), [`editPeek`](../../apps/portal/assets/film-tools.js#L2900).
+  Render: [`planOf`](../../apps/portal/assets/film-tools.js#L351) và
+  [`fadeAlpha`](../../apps/portal/assets/film-tools.js#L337), dùng chung cho preview và file.
+- **Tag và playlist:** [`openTag`](../../apps/portal/assets/film-tools.js#L3351),
+  [`saveTagForm`](../../apps/portal/assets/film-tools.js#L3394),
+  [`loadTags`](../../apps/portal/assets/film-tools.js#L3325). Đi qua `HNA.film` trong
+  [`supa.js`](../../apps/portal/assets/supa.js), tới các bảng `film_tags`, `film_playlists`, `film_codes`
+  (migration 0027). `app.js` báo CLB, trận và vai trò qua `PTFilmTools.setScope` ngay trước `mount`.
+  Chỉ tải khi vào full screen và là thành viên channel; lỗi tải không hiện cho người đang xem, chỉ
+  báo khi analyst mở Tag.
 
 ## 4. Sửa thông tin trận
 

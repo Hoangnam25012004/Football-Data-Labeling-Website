@@ -796,6 +796,72 @@
   };
 
 
+  /* ---------- Film: tags, playlists, code buttons (0027) ----------
+     Words about a stretch of video, filed under a channel. RLS decides who sees
+     and writes what; a thrown error here is a sentence the toolkit shows, so the
+     analyst's form stays open with their note still in it. */
+  function filmTag(r) {
+    return { id: r.id, tIn: r.t_in, tOut: r.t_out, code: r.code || null, color: r.color || null,
+             team: r.team || null, outcome: r.outcome || null, zone: r.zone || null,
+             players: r.players || null, note: r.note || null, playlistId: r.playlist_id || null,
+             visibility: r.visibility, createdBy: r.created_by };
+  }
+  API.film = {
+    list: function (clubId, matchUuid) {
+      var c = client();
+      if (!c) return Promise.reject(new Error('The connection is not ready yet.'));
+      return Promise.all([
+        c.from('film_tags').select('*').eq('club_id', clubId).eq('match_id', matchUuid).order('t_in'),
+        c.from('film_playlists').select('id,name').eq('club_id', clubId).order('name'),
+        c.from('film_codes').select('id,name,color').eq('club_id', clubId).order('created_at')
+      ]).then(function (r) {
+        r.forEach(function (x) { if (x.error) throw asError(x.error); });
+        return { tags: (r[0].data || []).map(filmTag), playlists: r[1].data || [], codes: r[2].data || [] };
+      });
+    },
+    saveTag: function (clubId, matchUuid, t) {
+      var c = client();
+      if (!c) return Promise.reject(new Error('The connection is not ready yet.'));
+      var row = {
+        club_id: clubId, match_id: matchUuid, t_in: t.tIn, t_out: t.tOut,
+        code: t.code || null, color: t.color || null, team: t.team || null,
+        outcome: t.outcome || null, zone: t.zone || null, players: t.players || null,
+        note: t.note || null, playlist_id: t.playlistId || null,
+        visibility: t.visibility === 'channel' ? 'channel' : 'private'
+      };
+      var q = t.id ? c.from('film_tags').update(row).eq('id', t.id) : c.from('film_tags').insert(row);
+      return q.select('*').single().then(function (r) {
+        if (r.error) throw asError(r.error);
+        return filmTag(r.data);
+      });
+    },
+    removeTag: function (id) {
+      var c = client();
+      if (!c) return Promise.reject(new Error('The connection is not ready yet.'));
+      return c.from('film_tags').delete().eq('id', id).then(function (r) {
+        if (r.error) throw asError(r.error);
+      });
+    },
+    addPlaylist: function (clubId, name) {
+      var c = client();
+      if (!c) return Promise.reject(new Error('The connection is not ready yet.'));
+      return c.from('film_playlists').insert({ club_id: clubId, name: name }).select('id,name').single()
+        .then(function (r) {
+          if (r.error) throw asError(r.error);
+          return r.data;
+        });
+    },
+    addCode: function (clubId, name) {
+      var c = client();
+      if (!c) return Promise.reject(new Error('The connection is not ready yet.'));
+      return c.from('film_codes').insert({ club_id: clubId, name: name }).select('id,name,color').single()
+        .then(function (r) {
+          if (r.error) throw asError(r.error);
+          return r.data;
+        });
+    }
+  };
+
   API.monogram = monogram;
   API.dateLabel = dateLabel;
   API.shortDate = shortDate;

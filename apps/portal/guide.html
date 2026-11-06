@@ -45,7 +45,10 @@
       <li><a href="#s-tools">The analyst tools</a></li>
       <li><a href="#s-draw">Drawing on the frame</a></li>
       <li><a href="#s-time">How long a drawing stays</a></li>
-      <li><a href="#s-clips">Clips and playlists</a></li>
+      <li><a href="#s-track">Following players</a></li>
+      <li><a href="#s-measure">Measuring on the pitch</a></li>
+      <li><a href="#s-clips">Clips and the clip editor</a></li>
+      <li><a href="#s-tags">Tags and playlists</a></li>
       <li><a href="#s-export">Taking work out of the app</a></li>
       <li><a href="#s-keys">Every keyboard shortcut</a></li>
       <li><a href="#s-help">If something does not work</a></li>
@@ -59,8 +62,8 @@
     <p class="guide-lede">Film plays your match back over the video it was tagged against —
       every pass, tackle and shot placed on the exact second it happened. This page walks
       through everything it can do, in the order you are likely to need it. Nothing here
-      needs installing, and nothing here can damage your data: <strong>Film only ever
-      reads.</strong></p>
+      needs installing, and nothing here can damage your data: <strong>Film never changes a
+      tagged event, a line-up or a score.</strong></p>
     <p class="guide-lede"><strong>Keep this tab open beside your match.</strong> It opened in
       a new tab on purpose, so the video you were watching is still where you left it.</p>
 
@@ -281,9 +284,8 @@
       <h3>Two things only exist in full screen</h3>
       <ul class="g-bul">
         <li>the <strong>right-click analyst menu</strong>, and everything it opens</li>
-        <li>the <strong>frame-by-frame, drawing, clip and export keys</strong> —
-          <kbd>,</kbd> <kbd>.</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>H</kbd> <kbd>T</kbd>
-          <kbd>L</kbd> <kbd>[</kbd> <kbd>]</kbd> <kbd>C</kbd></li>
+        <li>the <strong>frame-by-frame, drawing, clip, tag and export keys</strong> — see
+          section 17 for all of them</li>
       </ul>
       <p>Outside full screen those keys do nothing at all. That is deliberate: at normal size
         the picture is about 1300 pixels wide, and drawing an accurate offside line across a
@@ -306,42 +308,48 @@
         "do something <em>here</em>".</p>
       <p><strong>The video does not stop when the menu opens.</strong> That is on purpose, and
         it is why every drawing you create from the menu is anchored to the frame you
-        right-clicked on, not to wherever the match has run on to while you were reading.</p>
+        right-clicked on, not to wherever the match has run on to while you were reading.
+        Tools that need the players to stay still (linking, measuring, freezing) hold that
+        frame for you when you choose them.</p>
 
-      <h3>The menu, item by item</h3>
+      <h3>The menu, top to bottom</h3>
       <div class="g-scroll">
         <table class="g-tbl">
           <thead><tr><th>On the menu</th><th>What it does</th><th>Key</th></tr></thead>
           <tbody>
-            <tr><td><em>12:34 &middot; 1st Half</em></td><td>the moment you right-clicked — not a button</td><td></td></tr>
-            <tr><td>Step back one frame</td><td>one frame back</td><td><kbd>,</kbd></td></tr>
-            <tr><td>Step forward one frame</td><td>one frame forward</td><td><kbd>.</kbd></td></tr>
-            <tr><td>Speed &#9656;</td><td>playback speed: 0.25&times; 0.5&times; 1&times; 1.5&times; 2&times;</td><td></td></tr>
-            <tr><td class="wrap">Loop A&ndash;B from here</td><td>loop the next 8 seconds over and over. <em>Stop the A–B loop</em> ends it</td><td><kbd>L</kbd></td></tr>
-            <tr><td>Spotlight here</td><td>put a circle of light on this spot</td><td><kbd>S</kbd></td></tr>
-            <tr><td class="wrap">Dim everything else</td><td>darken everything except the spotlights. <em>Undim</em> lifts it</td><td><kbd>D</kbd></td></tr>
+            <tr><td><em>12:34 &middot; 1st Half</em></td><td>the moment you right-clicked. The chip beside it, <em>Event: #6</em>, is the player of the tagged event at that moment</td><td></td></tr>
+            <tr><td class="wrap">The row of six buttons</td><td>one frame back, play / pause, one frame forward, playback speed, loop the next 8 seconds, darken everything except the spotlights. Rest the mouse on one to see its name</td><td><kbd>,</kbd> <kbd>Space</kbd> <kbd>.</kbd> <kbd>L</kbd> <kbd>D</kbd></td></tr>
+            <tr><td class="wrap">Spotlight &amp; track player</td><td>a ring and a beam of light on this spot. It can follow the player — section 12</td><td><kbd>S</kbd></td></tr>
+            <tr><td>Link players</td><td>join players with a line or a shape — section 12</td><td><kbd>K</kbd></td></tr>
+            <tr><td>Defensive line</td><td>a line through a unit, run out to the edges of the picture — section 12</td><td><kbd>N</kbd></td></tr>
+            <tr><td>Measure &#9656;</td><td>distance, width, depth and area on the pitch — section 13</td><td><kbd>M</kbd></td></tr>
+            <tr><td>Draw &#9656;</td><td>the drawing tools — next section</td><td></td></tr>
+            <tr><td class="wrap">Freeze here &amp; draw</td><td>holds this frame and arms the arrow. Whatever you draw also stops the exported film here for 3 seconds</td><td><kbd>Q</kbd></td></tr>
             <tr><td class="wrap">Zoom in here (or use the wheel)</td><td>zoom into this spot. <em>Reset the zoom</em> returns to full size</td><td></td></tr>
-            <tr><td>Draw &#9656;</td><td>the drawing tools — see the next section</td><td></td></tr>
-            <tr><td class="wrap">Hide the drawings</td><td>hide every drawing without deleting any. <em>Show the drawings</em> brings them back</td><td><kbd>H</kbd></td></tr>
-            <tr><td class="wrap">Hide the timeline</td><td>hide the drawing timeline. <em>Show the timeline</em> shows it</td><td><kbd>T</kbd></td></tr>
             <tr><td class="wrap">Drawing here: &hellip; &#9656;</td><td><strong>only appears if you right-clicked on top of a drawing</strong> — see section 11</td><td></td></tr>
-            <tr><td class="wrap">Mark clip START</td><td>mark the start of a clip here</td><td><kbd>[</kbd></td></tr>
-            <tr><td class="wrap">Mark clip END</td><td>mark the end of a clip — the clip saves as soon as both ends exist</td><td><kbd>]</kbd></td></tr>
-            <tr><td class="wrap">Clip around this event (&plusmn;6s)</td><td>save a 12-second clip centred on the nearest tagged event. The fastest way to cut a goal</td><td></td></tr>
-            <tr><td>Clip list&hellip;</td><td>open the clip list</td><td><kbd>C</kbd></td></tr>
-            <tr><td class="wrap">Save this frame (.png)</td><td>save this frame as a picture, with your drawings on it</td><td></td></tr>
-            <tr><td class="wrap">Download the marked section (.mp4)</td><td>render the marked section to a video file on your computer</td><td></td></tr>
+            <tr><td class="wrap">The row of five tiles</td><td><strong>Split</strong> the clip here, mark clip <strong>In</strong> and <strong>Out</strong>, save a clip <strong>&plusmn;6 s</strong> around the nearest tagged event, change the <strong>Speed</strong> of a stretch — section 14</td><td><kbd>X</kbd> <kbd>[</kbd> <kbd>]</kbd> <kbd>A</kbd> <kbd>V</kbd></td></tr>
+            <tr><td>Open clip editor</td><td>the timeline for the clip you are on — section 14</td><td><kbd>E</kbd></td></tr>
+            <tr><td>Clip list&hellip;</td><td>your clips, and the tags of this match</td><td><kbd>C</kbd></td></tr>
+            <tr><td>Tag this moment</td><td>give this stretch a code, labels and a note — section 15</td><td><kbd>G</kbd></td></tr>
+            <tr><td>Add to playlist &#9656;</td><td>file this stretch under a named playlist — section 15</td><td></td></tr>
+            <tr><td>Export &#9656;</td><td>save this frame as a picture, or render the marked section to a video — section 16</td><td></td></tr>
             <tr><td class="wrap">Copy a link to this moment</td><td>copy a link that reopens the match at this second</td><td></td></tr>
-            <tr><td>Exit full screen</td><td>leave full screen</td><td><kbd>Esc</kbd></td></tr>
+            <tr><td class="wrap">Drawings &middot; Timeline &middot; Exit</td><td>hide or show every drawing, hide or show the timeline above the picture, leave full screen</td><td><kbd>H</kbd> <kbd>T</kbd> <kbd>Esc</kbd></td></tr>
           </tbody>
         </table>
       </div>
 
+      <h3>The inspector</h3>
+      <p>Choosing a tool opens a panel beside the picture holding everything about the thing you
+        are working on: its colour, its size, how long it stays, whether the export stops on it.
+        It never covers the pitch or the event list. If it is in your way on the picture,
+        <strong>drag it by its title</strong>. <em>Done</em> or the &times; closes it.</p>
+
       <div class="g-note">
         <p><strong>Backing out of anything: press <kbd>Backspace</kbd>.</strong> It closes the
-          innermost thing first — the menu, then a half-drawn shape, then the spotlight you are
-          positioning, then the armed tool, then the selected drawing, then the clip list.
-          Press it a few times and you are back to plain playback.</p>
+          innermost thing first — the menu, a half-drawn shape, a link you are clicking out,
+          the spotlight you are positioning, the armed tool, the inspector, the clip editor,
+          then the clip list. Press it a few times and you are back to plain playback.</p>
       </div>
 
       <figure class="g-demo" data-clip="menu">
@@ -374,24 +382,27 @@
 
       <h3>The spotlight — the one you will use most</h3>
       <ol class="g-steps">
-        <li>Press <kbd>S</kbd> (or choose <em>Spotlight here</em>). A circle of light
-          appears.</li>
-        <li><strong>Drag it</strong> onto the player you mean. It stays in positioning mode, so
-          you do not have to start again.</li>
-        <li><strong>Roll the mouse wheel</strong> to make it bigger or smaller.</li>
+        <li>Press <kbd>S</kbd> (or choose <em>Spotlight &amp; track player</em>). A ring and a
+          beam of light appear, and the inspector opens.</li>
+        <li><strong>Drag it</strong> so the ring sits at the player's feet. It stays in
+          positioning mode, so you do not have to start again.</li>
+        <li><strong>Roll the mouse wheel</strong>, or use <em>Size</em>, to make it bigger or
+          smaller.</li>
+        <li>Pick the <em>Style</em>: Ring, Beam, Ring + beam, Arrow head or Circle. Type a
+          <em>Label</em> such as #6 to put a name tag on it.</li>
         <li>Press <kbd>D</kbd> to darken everything outside it. Press <kbd>D</kbd> again to
           lift the darkness.</li>
       </ol>
 
       <h3>Changing a drawing after you have made it</h3>
-      <p>Right-click on top of it. A new group appears in the menu,
-        <strong>Drawing here: &hellip;</strong>, holding everything about that one shape:
-        select it, set how long it lasts, keep it up for the whole clip, freeze the frame on it
-        when exporting, change its colour (Red &middot; White &middot; Yellow), or delete
-        it.</p>
+      <p>Click its bar on the timeline, or right-click on top of it and choose <em>Select to
+        edit</em>. The inspector opens with everything about that one shape. The group
+        <strong>Drawing here: &hellip;</strong> in the menu does the same jobs without the panel:
+        how long it lasts, keep it up for the whole clip, freeze the frame on it when exporting,
+        change its colour, or delete it.</p>
       <p>With a drawing selected: <kbd>Delete</kbd> removes it,
         <kbd>Shift</kbd>&nbsp;+&nbsp;<kbd>&larr;</kbd>&nbsp;/&nbsp;<kbd>&rarr;</kbd> slides it
-        one frame earlier or later.</p>
+        one frame earlier or later. <kbd>U</kbd> undoes the last shape you drew.</p>
 
       <div class="g-note">
         <p><strong>Where your drawings are kept.</strong> In this browser, on this computer,
@@ -444,8 +455,78 @@
     </section>
 
     <!-- ============================ 12 ============================ -->
+    <section id="s-track">
+      <h2><span class="h2-n">12</span>Following players</h2>
+
+      <h3>A spotlight that follows a player</h3>
+      <p>Film does not know where the players are. You show it, on a few frames, and it fills in
+        the frames between. These points are called <strong>keyframes</strong>.</p>
+      <ol class="g-steps">
+        <li>Put a spotlight on the player, and turn on <em>Track with keyframes</em> in the
+          inspector.</li>
+        <li>Go forward a second or two, with <kbd>.</kbd> or by playing and pausing.</li>
+        <li><strong>Drag the ring</strong> back onto the player. That adds a keyframe, and the ring
+          now glides between the two points.</li>
+        <li>Repeat until the run is covered. A straight run needs two or three keyframes; a
+          player who changes direction needs one at each turn.</li>
+        <li>Use <em>Show on screen</em> to set how long it stays. Moving the ring past the end of
+          that time carries the end along with it.</li>
+      </ol>
+      <p>The &#9664; and &#9654; buttons beside the keyframe count jump between them, and &#10005;
+        removes the one on the current frame. Everything you see here is what the exported file
+        shows.</p>
+
+      <h3>Linking players</h3>
+      <ol class="g-steps">
+        <li>Press <kbd>K</kbd> or choose <em>Link players</em>. The frame is held.</li>
+        <li><strong>Click each player</strong> on the picture, in order, then press
+          <em>Finish</em>.</li>
+        <li>Choose the <em>Mode</em>: <strong>Chain</strong> (a line from player to player),
+          <strong>Defensive line</strong> (one line through the first and the last player, run
+          out to the edges of the picture) or <strong>Shape</strong> (a shaded block).</li>
+        <li>Choose the colour and the <em>Line</em>: Solid, Dashed or Arrows.</li>
+      </ol>
+      <p>Drag any ring to move that player's point. In the inspector, click a numbered square to
+        remove that player, or <em>+ Add players</em> to carry on clicking. <em>Track with
+        keyframes</em> works the same way as for the spotlight, so a whole line can move with the
+        unit. <kbd>N</kbd> starts directly on Defensive line.</p>
+    </section>
+
+    <!-- ============================ 13 ============================ -->
+    <section id="s-measure">
+      <h2><span class="h2-n">13</span>Measuring on the pitch</h2>
+      <p>To turn pixels into metres, Film needs to know how the pitch sits in the picture. You tell
+        it by naming four pitch markings. This is called <strong>calibrating</strong>.</p>
+      <ol class="g-steps">
+        <li>Stop on the frame you want to measure and press <kbd>M</kbd>.</li>
+        <li><strong>Click four pitch markings</strong> you can name: corners of the penalty box,
+          the penalty spot, where the halfway line meets the touchline. Spread them out, and do
+          not put three in a line.</li>
+        <li>For each point, pick from the list which marking it is. &ldquo;Far&rdquo; is the
+          touchline away from the camera, &ldquo;near&rdquo; the one closest to it.</li>
+        <li>If your pitch is not 105 &times; 68 m, type its real size. Then press
+          <em>Apply</em>.</li>
+        <li>Choose <strong>Distance</strong>, <strong>Width</strong> (across the pitch) or
+          <strong>Depth</strong> (along it) and <strong>drag between two points</strong>. For
+          <strong>Area</strong>, click the corners and press <em>Finish area</em>.</li>
+      </ol>
+      <div class="g-note">
+        <p><strong>Every figure is approximate</strong>, which is why it carries a &asymp;. The result
+          depends on how exactly you clicked, on the pitch markings really being where the laws
+          say, and on the player's feet being on the ground.</p>
+        <p><strong>A calibration belongs to one camera position.</strong> Broadcast cameras pan
+          all the time, and Film cannot tell when they have. More than a second away from the
+          frame you calibrated, it asks you to calibrate again. If the camera really has not
+          moved, press <em>Camera hasn&rsquo;t moved</em>.</p>
+      </div>
+      <p>On a link, turn on <em>Distances on each link</em> to label every gap, plus the width and
+        depth of the unit. It needs a calibrated frame, and the figures show only within a second
+        of it.</p>
+    </section>
+
+    <!-- ============================ 14 ============================ -->
     <section id="s-clips">
-      <h2><span class="h2-n">12</span>Clips and playlists</h2>
+      <h2><span class="h2-n">14</span>Clips and the clip editor</h2>
       <p>A clip is a start time and an end time. Nothing is copied and nothing is re-encoded
         until you actually ask for a file, so making clips costs nothing.</p>
 
@@ -455,7 +536,7 @@
           <thead><tr><th></th><th>How</th><th>Best for</th></tr></thead>
           <tbody>
             <tr><td>Mark the ends</td><td>press <kbd>[</kbd> where it should start, <kbd>]</kbd> where it should end</td><td>a passage you are watching now</td></tr>
-            <tr><td>Around an event</td><td>right-click &#9656; <em>Clip around this event (&plusmn;6s)</em></td><td>goals, shots, turnovers — anything already tagged</td></tr>
+            <tr><td>Around an event</td><td>press <kbd>A</kbd>, or the <em>&plusmn;6 s</em> tile in the menu</td><td>goals, shots, turnovers — anything already tagged</td></tr>
             <tr><td>From the list</td><td>click the row, then press <kbd>[</kbd>, play on, press <kbd>]</kbd></td><td>working down a filtered list</td></tr>
           </tbody>
         </table>
@@ -471,6 +552,7 @@
           <tbody>
             <tr><td>&#9654; Play all</td><td>play every clip in order, back to back — your team meeting, in one press</td></tr>
             <tr><td>&#9654; on a row</td><td>play that clip</td></tr>
+            <tr><td>&#9998; on a row</td><td>open that clip in the clip editor</td></tr>
             <tr><td>&#11015; on a row</td><td>render that clip to an .mp4 on your computer, graphics included</td></tr>
             <tr><td>&#10005; on a row</td><td>remove that clip from the list</td></tr>
             <tr><td>&#10005; in the header</td><td>close the drawer</td></tr>
@@ -484,14 +566,87 @@
           <strong>&#11015;</strong> and send them the file.</p>
       </div>
 
+      <h3>The clip editor</h3>
+      <p>Press <kbd>E</kbd> on a clip, or anywhere in the match to make a clip around the moment
+        you are on. A timeline opens under the picture, and <strong>your original video is never
+        touched</strong>: all of this is a recipe that only takes effect when you export.</p>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>Tool</th><th>What it does</th><th>Key</th></tr></thead>
+          <tbody>
+            <tr><td>Split</td><td>cut the segment in two at the red playhead, so each part can have its own speed</td><td><kbd>X</kbd></td></tr>
+            <tr><td>Delete</td><td>remove the selected segment, caption or freeze. The film jumps over a removed segment</td><td><kbd>Delete</kbd></td></tr>
+            <tr><td>Speed</td><td>pick the segment under the playhead, then choose 0.25&times; to 2&times; in the inspector</td><td><kbd>V</kbd></td></tr>
+            <tr><td>Freeze</td><td>hold the frame under the playhead, for 3 seconds unless you change it</td><td><kbd>Q</kbd></td></tr>
+            <tr><td>Text</td><td>add a caption from the playhead. Type it in the inspector, and choose Top, Middle or Bottom</td><td><kbd>Y</kbd></td></tr>
+            <tr><td>Transition</td><td>go into the selected segment with a straight cut or a fade through black</td><td></td></tr>
+            <tr><td>Undo</td><td>take back the last change in the editor</td><td><kbd>U</kbd></td></tr>
+            <tr><td>Preview</td><td>fold the panels away and play the clip from its start, as the file will come out</td><td><kbd>P</kbd></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul class="g-bul">
+        <li><strong>Click or drag the ruler</strong> along the top of the timeline to move the
+          playhead.</li>
+        <li><strong>Drag the white ends</strong> of a segment to trim it, and of a caption to
+          change how long it stays. Drag the middle of a caption to move it.</li>
+        <li><kbd>[</kbd> and <kbd>]</kbd> set the start and the end of the whole clip to the
+          playhead.</li>
+        <li><kbd>Space</kbd> plays with every speed, freeze, cut and fade applied.</li>
+        <li><em>Mute commentary</em> silences the sound in the preview and in the file.</li>
+        <li>The figure at the top right is how long the exported file will run.</li>
+      </ul>
+
       <figure class="g-demo" data-clip="clips">
         <figcaption>Marking, listing and playing clips</figcaption>
       </figure>
     </section>
 
-    <!-- ============================ 13 ============================ -->
+    <!-- ============================ 15 ============================ -->
+    <section id="s-tags">
+      <h2><span class="h2-n">15</span>Tags and playlists</h2>
+      <p>A tag says something about a stretch of the match: a code, some labels, a note. Unlike
+        drawings and clips, <strong>tags are saved to your channel</strong>, so they follow you to
+        another computer and can be shared with colleagues. You need to be signed in as a member
+        of the channel. A tag never changes the tagged events of the match.</p>
+      <ol class="g-steps">
+        <li>Press <kbd>G</kbd>, or choose <em>Tag this moment</em>.</li>
+        <li>Check the <em>Window</em>. It starts 6 seconds either side of the nearest tagged event,
+          and the &minus; and + buttons move each end by a second. If you have marked a clip start,
+          <em>From the mark</em> uses it.</li>
+        <li>Pick a <em>Code</em> by clicking it or pressing its number, <kbd>1</kbd>&ndash;<kbd>9</kbd>.
+          Press it again to clear it. Analysts and admins can add the channel's own with <em>+ New code</em>.</li>
+        <li>Add whatever else helps: <em>Team</em>, <em>Outcome</em>, <em>Zone</em>, <em>Players</em>
+          and a <em>Note</em>.</li>
+        <li>Choose a playlist under <em>Save to playlist</em>, or <em>New playlist&hellip;</em>.</li>
+        <li>Under <em>Share with</em>, choose <strong>Private</strong> or <strong>Whole
+          channel</strong>. Only analysts and admins can share. Press <em>Save tag</em> or
+          <kbd>Enter</kbd>.</li>
+      </ol>
+      <p>A tag needs a code or a playlist. To file a stretch without filling anything in,
+        right-click and use <em>Add to playlist</em>: it takes the clip you are on, or 6 seconds
+        either side of the nearest event, and files it privately.</p>
+      <h3>Finding your tags again</h3>
+      <p>Tags appear as a second row of coloured bars on the timeline above the picture. Click one
+        to jump there. Press <kbd>C</kbd> and open the <strong>Tags</strong> tab for the list of
+        this match, which you can narrow to one playlist:</p>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>Control</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td>&#9654;</td><td>play that stretch</td></tr>
+            <tr><td>&#9998;</td><td>change it. Only on your own tags</td></tr>
+            <tr><td>&#10005;</td><td>delete it. On your own tags, and on every tag for a channel admin</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Rest the mouse on a row to read its labels and note. Colleagues see only tags marked
+        <em>Whole channel</em>.</p>
+    </section>
+
+    <!-- ============================ 16 ============================ -->
     <section id="s-export">
-      <h2><span class="h2-n">13</span>Taking work out of the app</h2>
+      <h2><span class="h2-n">16</span>Taking work out of the app</h2>
 
       <h3>A picture — <em>Save this frame (.png)</em></h3>
       <p>Saves the frame you are on, at the video's own resolution, with your drawings on it.
@@ -499,11 +654,12 @@
 
       <h3>A video — <em>Download the marked section (.mp4)</em></h3>
       <p>Renders the marked section — or the <strong>&#11015;</strong> button renders one clip
-        from the list — into a real video file with the graphics burned in, saved to your
-        computer.</p>
+        from the list, or <em>Export MP4</em> in the clip editor — into a real video file with the
+        graphics, speeds, freezes, captions and fades burned in, saved to your computer.</p>
       <ul class="g-bul">
-        <li><strong>It is not instant.</strong> Rendering runs at roughly real time: a
-          12-second clip takes about 12 seconds. Only one clip renders at a time.</li>
+        <li><strong>It is not instant.</strong> Rendering takes as long as the finished file runs:
+          a 12-second clip slowed to half speed takes about 24 seconds. Only one clip renders at a
+          time.</li>
         <li><strong>Nothing is uploaded.</strong> The file is built in your browser and written
           straight to your disk. It never touches our servers.</li>
         <li><strong>Keep the tab visible while it renders.</strong> Some browsers slow hidden
@@ -523,9 +679,9 @@
       </figure>
     </section>
 
-    <!-- ============================ 14 ============================ -->
+    <!-- ============================ 17 ============================ -->
     <section id="s-keys">
-      <h2><span class="h2-n">14</span>Every keyboard shortcut</h2>
+      <h2><span class="h2-n">17</span>Every keyboard shortcut</h2>
 
       <h3>Anywhere in Film</h3>
       <div class="g-scroll">
@@ -547,6 +703,15 @@
           <tbody>
             <tr><td><kbd>,</kbd> <kbd>.</kbd></td><td>one frame back / forward</td></tr>
             <tr><td><kbd>S</kbd></td><td>spotlight where the mouse is</td></tr>
+            <tr><td><kbd>K</kbd></td><td>link players</td></tr>
+            <tr><td><kbd>N</kbd></td><td>defensive line</td></tr>
+            <tr><td><kbd>M</kbd></td><td>measure, calibrating first if this frame needs it</td></tr>
+            <tr><td><kbd>Q</kbd></td><td>hold this frame and draw; the export stops here too</td></tr>
+            <tr><td><kbd>G</kbd></td><td>tag this moment</td></tr>
+            <tr><td><kbd>U</kbd></td><td>undo the last shape</td></tr>
+            <tr><td><kbd>A</kbd></td><td>save a clip &plusmn;6 seconds around the nearest event</td></tr>
+            <tr><td><kbd>E</kbd> <kbd>V</kbd></td><td>open the clip editor here</td></tr>
+            <tr><td><kbd>X</kbd></td><td>open the clip editor and split here</td></tr>
             <tr><td><kbd>D</kbd></td><td>darken everything else</td></tr>
             <tr><td><kbd>H</kbd></td><td>hide / show all drawings</td></tr>
             <tr><td><kbd>T</kbd></td><td>show / hide the drawing timeline</td></tr>
@@ -562,6 +727,35 @@
         </table>
       </div>
 
+      <h3>In the clip editor</h3>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>Key</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td><kbd>Space</kbd></td><td>play with every edit applied</td></tr>
+            <tr><td><kbd>P</kbd></td><td>preview from the start, with the panels folded away</td></tr>
+            <tr><td><kbd>X</kbd></td><td>split at the playhead</td></tr>
+            <tr><td><kbd>V</kbd></td><td>select the segment under the playhead, to change its speed</td></tr>
+            <tr><td><kbd>Q</kbd></td><td>freeze the frame under the playhead</td></tr>
+            <tr><td><kbd>Y</kbd></td><td>add a caption</td></tr>
+            <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>start / end of the clip at the playhead</td></tr>
+            <tr><td><kbd>Delete</kbd></td><td>remove the selected segment, caption or freeze</td></tr>
+            <tr><td><kbd>U</kbd></td><td>undo</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>In the tag panel</h3>
+      <div class="g-scroll">
+        <table class="g-tbl">
+          <thead><tr><th>Key</th><th>Does</th></tr></thead>
+          <tbody>
+            <tr><td><kbd>1</kbd>&ndash;<kbd>9</kbd></td><td>pick that code</td></tr>
+            <tr><td><kbd>Enter</kbd></td><td>save the tag</td></tr>
+          </tbody>
+        </table>
+      </div>
+
       <h3>Mouse</h3>
       <div class="g-scroll">
         <table class="g-tbl">
@@ -572,6 +766,7 @@
             <tr><td class="wrap">wheel over the picture <em>(full screen)</em></td><td>zoom in and out — or resize the spotlight you are positioning</td></tr>
             <tr><td class="wrap"><kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + wheel</td><td>your browser's own zoom, untouched</td></tr>
             <tr><td class="wrap">drag on the picture</td><td>draw, once a tool is chosen</td></tr>
+            <tr><td class="wrap">drag the title of the inspector</td><td>move it out of the way</td></tr>
             <tr><td class="wrap">click or drag the scrub bar</td><td>jump there</td></tr>
             <tr><td class="wrap">click a row in the list</td><td>jump to that entry</td></tr>
           </tbody>
@@ -579,9 +774,9 @@
       </div>
     </section>
 
-    <!-- ============================ 15 ============================ -->
+    <!-- ============================ 18 ============================ -->
     <section id="s-help">
-      <h2><span class="h2-n">15</span>If something does not work</h2>
+      <h2><span class="h2-n">18</span>If something does not work</h2>
       <div class="g-scroll">
         <table class="g-tbl">
           <thead><tr><th>What you see</th><th>Why</th><th>What to do</th></tr></thead>
@@ -593,6 +788,12 @@
             <tr><td class="wrap"><em>Right-click on the picture itself</em></td><td>you right-clicked the black bar, not the picture</td><td>right-click on the grass</td></tr>
             <tr><td class="wrap"><em>This browser can only make .webm</em></td><td>Firefox cannot write MP4</td><td>use Chrome or Edge for .mp4</td></tr>
             <tr><td class="wrap"><em>The video host has not enabled CORS&hellip;</em></td><td>the video host is not yet sending the header the renderer needs</td><td>tell us — it is a one-line setting on our side, not something you can fix. The .png export and everything else are unaffected</td></tr>
+            <tr><td class="wrap"><em>Tags and playlists need you signed in to this channel</em></td><td>you are reading a public channel, or are not a member of this one</td><td>sign in with the account that belongs to the channel. Everything else in Film still works</td></tr>
+            <tr><td class="wrap"><em>Could not save the tag&hellip;</em></td><td>the connection dropped, or the tag could not be stored</td><td>your form stays open with your note in it. Check the connection and press <em>Save tag</em> again</td></tr>
+            <tr><td class="wrap"><em>Those four points do not fix the pitch</em></td><td>three of the points are in a line, or too close together</td><td>choose markings spread across the picture</td></tr>
+            <tr><td class="wrap"><em>The camera may have moved</em></td><td>you are more than a second from the calibrated frame</td><td>calibrate again, or press <em>Camera hasn&rsquo;t moved</em></td></tr>
+            <tr><td class="wrap"><em>That clip is in the other half</em></td><td>the editor works inside one half at a time</td><td>switch half first</td></tr>
+            <tr><td class="wrap">A click puts a point on the picture instead of doing nothing</td><td>a link, an area or a calibration is still waiting for clicks</td><td>press <em>Finish</em>, or <kbd>Backspace</kbd></td></tr>
             <tr><td class="wrap">A drawing I made yesterday is gone</td><td>drawings live in the browser you made them in</td><td>they do not follow you between computers, or into a private window</td></tr>
             <tr><td class="wrap">A demo video here will not play</td><td>it may not be recorded yet</td><td>the written steps beside each video are complete on their own</td></tr>
           </tbody>
@@ -601,20 +802,25 @@
       <p>Anything not on this list: send us the match, the half, and the clock reading.</p>
     </section>
 
-    <!-- ============================ 16 ============================ -->
+    <!-- ============================ 19 ============================ -->
     <section id="s-limits">
-      <h2><span class="h2-n">16</span>What Film does not do</h2>
+      <h2><span class="h2-n">19</span>What Film does not do</h2>
       <p>Said plainly, so nobody spends an afternoon looking for it.</p>
       <ul class="g-bul">
         <li><strong>It does not follow players by itself.</strong> Every dot, every spotlight,
-          every arrow is somewhere a person pointed. Automatic tracking is a different class of
-          product and needs tracking data, not a feature.</li>
+          every arrow is somewhere a person pointed. A tracked ring goes where your keyframes put
+          it and nowhere else. Automatic tracking is a different class of product and needs
+          tracking data, not a feature.</li>
+        <li><strong>Its measurements are estimates.</strong> Good for &ldquo;about nine metres&rdquo;,
+          not for settling an offside.</li>
         <li><strong>It does not share your drawings or clips.</strong> They are kept in your own
-          browser. Export is how work leaves.</li>
-        <li><strong>It does not change the match.</strong> Film only reads. Nothing you do here
-          can alter a tagged event, a line-up or a score.</li>
-        <li><strong>It does not edit the video.</strong> No trimming the source, no joining two
-          matches, no re-ordering a playlist yet.</li>
+          browser. Tags are the one thing kept with the channel. Export is how everything else
+          leaves.</li>
+        <li><strong>It does not change the match.</strong> Nothing you do here can alter a tagged
+          event, a line-up or a score.</li>
+        <li><strong>It does not edit the source video.</strong> The clip editor is a recipe for the
+          exported file. It cannot join two matches, reorder segments or record a voice-over, and a
+          playlist plays one match at a time for now.</li>
         <li><strong>The analyst tools need a real screen.</strong> Playback, filters and the
           list are fine on a tablet; drawing needs a mouse.</li>
       </ul>

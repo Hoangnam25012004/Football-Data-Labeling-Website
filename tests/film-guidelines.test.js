@@ -141,11 +141,11 @@ test('the line is a row of the column, not something floating over it', () => {
 
 /* ================= the page ================= */
 const IDS=['s-quick','s-screen','s-play','s-halves','s-filters','s-list','s-pitch','s-full',
-           's-tools','s-draw','s-time','s-clips','s-export','s-keys','s-help','s-limits'];
+           's-tools','s-draw','s-time','s-track','s-measure','s-clips','s-tags','s-export','s-keys','s-help','s-limits'];
 
-test('the page has the sixteen sections, under the ids links are sent as', () => {
+test('the page has the nineteen sections, under the ids links are sent as', () => {
   const found=(PAGE.match(/<section id="([^"]+)"/g)||[]).map(s=>/id="([^"]+)"/.exec(s)[1]);
-  eq(found.length,16,'sixteen sections');
+  eq(found.length,19,'nineteen sections');
   IDS.forEach(id=>ok(found.indexOf(id)>=0,id+' is on the page'));
 });
 
@@ -194,7 +194,7 @@ const VIETNAMESE=/[ăâđêôơưĂÂĐÊÔƠƯàáảãạằắẳẵặầấ
 
 test('the analyst menu is in the language the rest of the channel is in', () => {
   notOk(VIETNAMESE.test(TOOLS),'no Vietnamese left in the toolkit the client sees');
-  ok(/'Spotlight here'/.test(TOOLS),'the menu is there, in English');
+  ok(/'Spotlight & track player'/.test(TOOLS),'the menu is there, in English');
   ok(/'Clip around this event/.test(TOOLS),'including the item with the parenthesis');
 });
 

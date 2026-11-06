@@ -72,19 +72,22 @@
    layer, so a menu appended to document.body would simply not be visible —
    no z-index rescues it. */
 .fmt-menu{
-  position:absolute; z-index:40; min-width:264px; padding:5px;
-  background:rgba(10,8,9,.97); border:1px solid #2A2325; border-radius:9px;
+  position:absolute; z-index:40; box-sizing:border-box; width:300px; padding:5px;
+  /* a short screen scrolls the menu instead of cutting it off */
+  max-height:calc(100vh - 12px); overflow-y:auto;
+  color-scheme:dark; scrollbar-width:thin; scrollbar-color:#3A3134 transparent;
+  background:rgba(10,8,9,.97); border:1px solid #2A2325; border-radius:10px;
   box-shadow:0 18px 48px rgba(0,0,0,.62);
   font-size:13.5px; color:#EFEAE8; user-select:none;
 }
 .fmt-m-head{
-  padding:6px 9px 8px; margin-bottom:4px; border-bottom:1px solid #2A2325;
+  display:flex; align-items:center; gap:8px; padding:5px 8px 7px 9px;
   color:#9C8F92; font-size:12px; font-variant-numeric:tabular-nums;
 }
 .fmt-m-sep{height:1px; margin:5px 4px; background:#2A2325}
 .fmt-m-it{
-  display:flex; align-items:center; gap:12px; width:100%;
-  padding:7px 9px; border:0; border-radius:6px; background:transparent;
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:4px 9px; border:0; border-radius:6px; background:transparent; line-height:1.35;
   color:inherit; font:inherit; text-align:left; cursor:pointer;
 }
 .fmt-m-it:hover,.fmt-m-it:focus{background:#E0122B; color:#fff; outline:none}
@@ -95,16 +98,18 @@
 }
 .fmt-m-it:hover .fmt-m-k,.fmt-m-it:focus .fmt-m-k{color:rgba(255,255,255,.75)}
 
-/* submenus open on hover, to the right, and flip left near the edge */
+/* submenus open on hover, to the right, and flip left near the edge. Fixed and
+   placed by placeSub(), because the menu scrolls and would cut off anything
+   absolute. A real menu row keeps its hover while the pointer crosses into it:
+   the submenu is a child of the wrapper, so leaving the row is not leaving it. */
 .fmt-m-wrap{position:relative}
 .fmt-m-sub{
-  display:none; position:absolute; left:100%; top:-5px; z-index:41;
-  min-width:220px; max-height:60vh; overflow-y:auto; padding:5px;
+  display:none; position:fixed; z-index:41; box-sizing:border-box;
+  width:270px; max-height:calc(100vh - 12px); overflow-y:auto; padding:5px;
   background:rgba(10,8,9,.98); border:1px solid #2A2325; border-radius:9px;
   box-shadow:0 18px 48px rgba(0,0,0,.62);
 }
 .fmt-m-wrap:hover>.fmt-m-sub,.fmt-m-wrap:focus-within>.fmt-m-sub{display:block}
-.fmt-menu.near-right .fmt-m-sub{left:auto; right:100%}
 
 /* ---------- the clip drawer ---------- */
 .fmt-panel{
@@ -167,3 +172,265 @@
 /* while a tool is armed the whole box says so, so nobody wonders why the
    pointer stopped behaving like a pointer */
 .film-full.fmt-drawing{cursor:crosshair}
+
+/* ==================== the analyst toolkit, redesigned ====================
+   docs/design/film-analyst-toolkit-design.md. Tokens are the ones the menu has
+   used since it was written: #0A0809 on #2A2325, red #E0122B, mono for keys. */
+
+/* ---------- icons ---------- */
+.fmt-ic{display:inline-flex; flex:none; width:16px; height:16px}
+.fmt-ic svg{width:100%; height:100%; display:block}
+.fmt-ic.none{visibility:hidden}
+
+/* the panels are in the full-screen box, on a page whose own font they should use */
+.fmt-menu,.fmt-insp,.fmt-ed{font-family:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif}
+
+/* ---------- menu parts ---------- */
+.fmt-m-now{flex:1; min-width:0; font-family:"Cascadia Mono","SF Mono",Menlo,Consolas,ui-monospace,monospace}
+.fmt-m-chip{
+  flex:none; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700;
+  color:#FFE14D; background:rgba(255,225,77,.12);
+}
+.fmt-m-sec{
+  padding:6px 9px 3px; color:#8B7E81; font-size:10px; font-weight:700; letter-spacing:.14em;
+  font-family:"Cascadia Mono","SF Mono",Menlo,Consolas,ui-monospace,monospace;
+}
+.fmt-m-chev{width:13px; height:13px; opacity:.6}
+.fmt-m-row{display:flex; gap:4px; padding:2px 4px 4px}
+.fmt-m-row .fmt-m-wrap{flex:1; min-width:0; display:flex}
+.fmt-m-cell{
+  flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:5px;
+  min-height:30px; padding:0; border:0; border-radius:6px; cursor:pointer;
+  background:#1B1718; color:inherit; font:inherit; font-size:12px; font-weight:600;
+}
+.fmt-m-cell:hover,.fmt-m-cell:focus-visible{background:#E0122B; color:#fff; outline:none}
+.fmt-m-cell.on{background:#5A0F1B}
+.fmt-m-ctext{white-space:nowrap}
+.fmt-m-row.tiles .fmt-m-cell{flex-direction:column; gap:2px; padding:7px 0 5px}
+.fmt-m-cl{font-size:10.5px; font-weight:500; color:#D8D0D2; white-space:nowrap}
+.fmt-m-ck{
+  font-size:9.5px; font-weight:700; color:#8B7E81; background:none; border:0; padding:0;
+  font-family:"Cascadia Mono","SF Mono",Menlo,Consolas,ui-monospace,monospace;
+}
+.fmt-m-cell:hover .fmt-m-cl,.fmt-m-cell:hover .fmt-m-ck{color:#fff}
+.fmt-m-row.foot .fmt-m-cell{background:none; color:#B6ABAE; font-weight:400; font-size:11.5px}
+.fmt-m-row.foot .fmt-m-cell:hover{background:#E0122B; color:#fff}
+.fmt-m-row.foot .fmt-ic{width:13px; height:13px}
+
+/* ---------- the inspector ---------- */
+.fmt-insp{
+  position:absolute; left:12px; top:10px; z-index:30; box-sizing:border-box;
+  width:296px; max-width:calc(100% - 24px); overflow-y:auto; padding:12px 14px 14px;
+  display:flex; flex-direction:column; gap:12px;
+  background:rgba(10,8,9,.96); border:1px solid #2A2325; border-radius:10px;
+  box-shadow:0 16px 40px rgba(0,0,0,.6); color:#EFEAE8; font-size:13px; user-select:none;
+  color-scheme:dark; scrollbar-width:thin; scrollbar-color:#3A3134 transparent;
+}
+.fmt-insp.peek{display:none}
+.fmt-insp.wide{width:640px}
+.fmt-i-head{display:flex; align-items:center; gap:10px; cursor:move}
+.fmt-i-tool{
+  flex:none; display:flex; align-items:center; justify-content:center;
+  width:28px; height:28px; border-radius:6px; background:#E0122B; color:#fff;
+}
+.fmt-i-title{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px}
+.fmt-i-title b{font-size:14px; font-weight:600}
+.fmt-i-title span{
+  color:#9C8F92; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  font-family:"Cascadia Mono","SF Mono",Menlo,Consolas,ui-monospace,monospace;
+}
+.fmt-i-x{
+  flex:none; display:flex; padding:4px; border:0; border-radius:5px; cursor:pointer;
+  background:none; color:#B6ABAE;
+}
+.fmt-i-x:hover,.fmt-i-x:focus-visible{background:#2A2325; color:#fff; outline:none}
+.fmt-i-x .fmt-ic{width:14px; height:14px}
+.fmt-i-f{display:flex; flex-direction:column; gap:7px; min-width:0}
+.fmt-i-f>.fmt-chip{align-self:flex-start}
+.fmt-i-l{
+  color:#8B7E81; font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  font-family:"Cascadia Mono","SF Mono",Menlo,Consolas,ui-monospace,monospace;
+}
+.fmt-i-cols{display:flex; gap:18px; align-items:flex-start}
+.fmt-i-col{flex:1; min-width:0; display:flex; flex-direction:column; gap:12px}
+.fmt-i-acts{display:flex; gap:8px; position:sticky; bottom:-14px; padding:6px 0 0; background:linear-gradient(transparent,rgba(10,8,9,.96) 8px)}
+.fmt-hint{color:#9C8F92; font-size:12px; line-height:1.45}
+
+.fmt-chips{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.fmt-chip{
+  padding:5px 10px; border:1px solid #2E2729; border-radius:6px; cursor:pointer;
+  background:#1E1A1B; color:#EFEAE8; font:inherit; font-size:12px; font-weight:500; white-space:nowrap;
+}
+.fmt-chip:hover,.fmt-chip:focus-visible{border-color:#E0122B; outline:none}
+.fmt-chip.on{background:#E0122B; border-color:#E0122B; color:#fff}
+.fmt-swatches{display:flex; gap:8px}
+.fmt-swatch{width:22px; height:22px; padding:0; border:2px solid transparent; border-radius:50%; cursor:pointer; box-shadow:inset 0 0 0 1px rgba(0,0,0,.3)}
+.fmt-swatch.on,.fmt-swatch:focus-visible{outline:2px solid #fff; outline-offset:1px}
+.fmt-input{
+  box-sizing:border-box; width:100%; min-width:0; padding:7px 10px; border-radius:6px;
+  background:#161213; border:1px solid #2E2729; color:#EFEAE8; font:inherit; font-size:12.5px;
+  user-select:text; resize:vertical;
+}
+.fmt-input:focus{outline:none; border-color:#E0122B}
+.fmt-input option{background:#161213; color:#EFEAE8}
+.fmt-input.num{width:50%; font-variant-numeric:tabular-nums}
+.fmt-range{width:100%; accent-color:#E0122B; cursor:pointer}
+.fmt-toggle{
+  display:flex; align-items:center; gap:10px; width:100%; padding:2px 0; border:0; cursor:pointer;
+  background:none; color:inherit; font:inherit; text-align:left;
+}
+.fmt-toggle.off{opacity:.5; cursor:default}
+.fmt-toggle-t{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px}
+.fmt-toggle-t b{font-size:12.5px; font-weight:500}
+.fmt-toggle-t em{font-style:normal; color:#8C8285; font-size:11px; line-height:1.4}
+.fmt-switch{
+  flex:none; position:relative; width:32px; height:18px; border-radius:9px; background:#3A3134;
+  transition:background .12s;
+}
+.fmt-switch::after{
+  content:""; position:absolute; left:2px; top:2px; width:14px; height:14px; border-radius:50%;
+  background:#fff; transition:left .12s;
+}
+.fmt-toggle.on .fmt-switch{background:#E0122B}
+.fmt-toggle.on .fmt-switch::after{left:16px}
+.fmt-toggle:focus-visible{outline:1px solid #E0122B; outline-offset:2px}
+.fmt-keys{display:flex; align-items:center; gap:6px}
+.fmt-keys-n{flex:1; color:#9C8F92; font-size:11.5px; font-variant-numeric:tabular-nums}
+.fmt-num{
+  min-width:24px; height:22px; padding:0 6px; border:0; border-radius:4px; cursor:pointer;
+  background:#FFE14D; color:#0B0909; font:inherit; font-size:12.5px; font-weight:700;
+}
+.fmt-num:hover,.fmt-num:focus-visible{background:#E0122B; color:#fff; outline:none}
+.fmt-btn{
+  flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+  padding:9px 8px; border:1px solid #2E2729; border-radius:6px; cursor:pointer;
+  background:#1B1718; color:#D8D0D2; font:inherit; font-size:13px; font-weight:600;
+}
+.fmt-btn:hover,.fmt-btn:focus-visible{border-color:#E0122B; outline:none}
+.fmt-btn.pri{background:#E0122B; border-color:#E0122B; color:#fff}
+.fmt-btn.pri:hover,.fmt-btn.pri:focus-visible{background:#C20F24}
+.fmt-btn .fmt-ic{width:14px; height:14px}
+.fmt-row{
+  display:flex; align-items:center; gap:8px; min-width:0;
+}
+.fmt-insp .fmt-i-f>.fmt-row{padding:0}
+.fmt-row-t{flex:1; min-width:0; font-size:12px; font-variant-numeric:tabular-nums; color:#D8D0D2}
+.fmt-row-v{font-size:12.5px; font-variant-numeric:tabular-nums}
+.fmt-cal{font-size:12.5px; line-height:1.4; color:#D9B44A}
+.fmt-cal.ok{color:#7FE0A0}
+
+/* the code window */
+.fmt-codes{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+.fmt-code{
+  display:flex; align-items:center; gap:8px; min-width:0; padding:7px 8px;
+  border:1px solid #2E2729; border-radius:6px; cursor:pointer; color:#fff;
+  font:inherit; font-size:12.5px; font-weight:600; text-align:left;
+}
+.fmt-code span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.fmt-code kbd{
+  flex:none; width:18px; line-height:18px; text-align:center; border-radius:3px; background:rgba(0,0,0,.4);
+  font-size:10.5px; font-family:"Cascadia Mono","SF Mono",Menlo,Consolas,ui-monospace,monospace;
+}
+.fmt-code:focus-visible{outline:1px solid #fff}
+.fmt-stepper{display:flex; gap:6px}
+.fmt-step{
+  flex:1; min-width:0; display:flex; align-items:center; justify-content:space-between;
+  background:#161213; border:1px solid #2E2729; border-radius:6px; overflow:hidden;
+}
+.fmt-step span{font-size:12.5px; font-variant-numeric:tabular-nums}
+.fmt-step button{
+  width:26px; height:30px; border:0; cursor:pointer; background:none; color:#D8D0D2; font:inherit; font-size:14px;
+}
+.fmt-step button:hover,.fmt-step button:focus-visible{background:#2A2325; color:#fff; outline:none}
+
+/* ---------- the clip editor ---------- */
+.fmt-ed{
+  position:absolute; left:8px; right:8px; bottom:8px; z-index:31; box-sizing:border-box;
+  padding:8px 10px 10px; border-radius:10px; user-select:none;
+  background:rgba(12,10,11,.97); border:1px solid #2A2325;
+  box-shadow:0 12px 36px rgba(0,0,0,.6); color:#EFEAE8; font-size:12px;
+}
+/* Preview: the toolbar stays, so it can be stopped from where it was started */
+.fmt-ed.peek{background:rgba(12,10,11,.82); padding-bottom:0}
+.fmt-ed.peek .fmt-ed-body{display:none}
+.fmt-ed-tools{display:flex; align-items:center; gap:4px; flex-wrap:wrap; padding-bottom:8px}
+.fmt-ed-tool{
+  display:flex; align-items:center; gap:6px; padding:6px 9px; border:0; border-radius:6px; cursor:pointer;
+  background:#1B1718; color:#EFEAE8; font:inherit; font-size:12px; font-weight:500; white-space:nowrap;
+}
+.fmt-ed-tool .fmt-ic{width:14px; height:14px}
+.fmt-ed-tool:hover,.fmt-ed-tool:focus-visible{background:#2A2325; outline:none}
+.fmt-ed-tool.on{background:#E0122B; color:#fff}
+.fmt-ed-k{
+  color:#8B7E81; font-size:10px; font-weight:700; background:none; border:0; padding:0;
+  font-family:"Cascadia Mono","SF Mono",Menlo,Consolas,ui-monospace,monospace;
+}
+.fmt-ed-tool.on .fmt-ed-k{color:#FFD6DB}
+.fmt-ed-sum{
+  margin-left:auto; padding:0 8px; color:#9C8F92; font-size:11px; white-space:nowrap; font-variant-numeric:tabular-nums;
+  font-family:"Cascadia Mono","SF Mono",Menlo,Consolas,ui-monospace,monospace;
+}
+.fmt-ed-body{position:relative; display:flex; flex-direction:column; gap:3px}
+.fmt-ed-row{display:flex; align-items:stretch; gap:8px; height:26px}
+.fmt-ed-row.ruler{height:18px}
+.fmt-ed-name{flex:none; width:62px; align-self:center; color:#9C8F92; font-size:11px; font-weight:500}
+.fmt-ed-tr{position:relative; flex:1; min-width:0; border-radius:4px; background:rgba(255,255,255,.03)}
+.fmt-ed-row.ruler .fmt-ed-tr{background:none; cursor:ew-resize}
+.fmt-ed-tick{
+  position:absolute; top:2px; padding-left:3px; border-left:1px solid #5E5356;
+  color:#7C6F72; font-size:9.5px; white-space:nowrap; pointer-events:none;
+  font-family:"Cascadia Mono","SF Mono",Menlo,Consolas,ui-monospace,monospace;
+}
+.fmt-ed-bar{
+  position:absolute; top:0; bottom:0; display:flex; align-items:center; overflow:hidden;
+  box-sizing:border-box; padding:0 8px; border-radius:4px; cursor:pointer;
+}
+.fmt-ed-bar.on{box-shadow:inset 0 0 0 1.5px #fff}
+.fmt-ed-lb{font-size:10.5px; font-weight:600; color:#fff; white-space:nowrap; pointer-events:none; text-shadow:0 1px 2px rgba(0,0,0,.7)}
+.fmt-ed-bar.text{background:#8E5CF7}
+.fmt-ed-bar.draw{opacity:.75}
+.fmt-ed-bar.vid{
+  background:#22432A repeating-linear-gradient(90deg,rgba(255,255,255,.1) 0 1px,transparent 1px 42px);
+}
+.fmt-ed-bar.spd{background:#3A3134}
+.fmt-ed-bar.spd .fmt-ed-lb{color:#B6ABAE}
+.fmt-ed-bar.spd.fast{background:#F2742B}
+.fmt-ed-bar.spd.fast .fmt-ed-lb{color:#fff}
+.fmt-ed-bar.aud{background:#2A2325}
+.fmt-ed-bar.aud .fmt-ed-lb{color:#9C8F92}
+.fmt-ed-h{
+  position:absolute; top:0; bottom:0; width:7px; cursor:ew-resize; background:rgba(255,255,255,.55);
+}
+.fmt-ed-h:hover{background:#fff}
+.fmt-ed-h.a{left:0}
+.fmt-ed-h.b{right:0}
+.fmt-ed-fz{
+  position:absolute; top:-6px; z-index:2; padding:0 5px; border:0; border-radius:4px; cursor:pointer;
+  background:#2EC4FF; color:#062430; font:inherit; font-size:10px; font-weight:700; line-height:15px; white-space:nowrap;
+}
+.fmt-ed-fz.on{outline:1.5px solid #fff}
+.fmt-ed-over{position:absolute; left:70px; right:0; top:0; bottom:0; pointer-events:none}
+.fmt-ed-out{position:absolute; top:18px; bottom:0; background:rgba(0,0,0,.5)}
+.fmt-ed-ph{position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:#E0122B}
+.fmt-ed-ph::before{content:""; position:absolute; left:-4px; top:0; width:10px; height:8px; border-radius:2px; background:#E0122B}
+
+/* the dip to black, on the preview only: the file paints its own */
+.fmt-fade{position:absolute; inset:0; z-index:4; background:#000; opacity:0; pointer-events:none}
+
+/* ---------- tags on the lane and in the drawer ---------- */
+.fmt-strip.two .fmt-lane{inset:4px 0 auto 0; height:18px}
+.fmt-lane2{position:absolute; left:0; right:0; bottom:4px; height:14px; pointer-events:none}
+.fmt-p-tab{
+  padding:4px 9px; border:0; border-radius:6px; cursor:pointer; background:none; color:#9C8F92;
+  font:inherit; font-size:12.5px; font-weight:600;
+}
+.fmt-p-tab.on{background:#2A2325; color:#fff}
+.fmt-p-grow{flex:1; min-width:0}
+.fmt-p-dot{flex:none; width:9px; height:9px; border-radius:50%}
+.fmt-panel>.fmt-input{margin-bottom:6px}
+
+@media (max-width:760px){
+  .fmt-insp.wide{width:296px}
+  .fmt-i-cols{flex-direction:column}
+  .fmt-i-col{width:100%}
+}
