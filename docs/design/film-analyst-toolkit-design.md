@@ -157,3 +157,15 @@ của họ, vì RLS của DELETE cũng cần quyền đọc dòng đó. Đây l�
 **Chưa kiểm được ngoài đời:** luồng Tag từ giao diện với tài khoản thật của channel, gồm cả các hàm
 `HNA.film` trong `supa.js`. Panel Tag đã chạy với data layer giả lập, còn phần quyền đã được thử trực
 tiếp trên database như trên.
+
+## 13. Export all as one file (2026-11-07)
+
+Nút trong Clip list, từ 2 clip trở lên. `mergedEdit` gộp mọi clip thành một `edit` theo thứ tự trận rồi
+đi qua đúng pipeline `exportClip`: không có đường render thứ hai.
+
+- Hai clip chồng nhau thì clip sau bắt đầu ở chỗ clip trước dừng, không lặp lại đoạn trùng.
+- Có fade ở mỗi lần nhảy giữa hai clip. Cut do analyst tự tạo trong một clip thì giữ nguyên.
+- Được phép gộp qua hai hiệp, vì render dùng video element riêng, không bị giữ trong cửa sổ hiệp.
+
+Kèm một sửa lỗi: *Play all* trước đây treo khi danh sách có clip ở hiệp khác, vì Film giữ video trong hiệp
+đang xem nên clip không bao giờ tới điểm kết thúc. Nay chỉ phát clip của hiệp hiện tại.
