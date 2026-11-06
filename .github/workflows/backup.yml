@@ -17,8 +17,9 @@ name: Database backup
 #   BACKUP_PASSPHRASE   a long random string
 # Without both, the job says so and stops green.
 #
-# Restore:  gpg -d backup.dump.gpg > backup.dump
-#           pg_restore --no-owner --clean --if-exists -d "<db url>" backup.dump
+# Restore:  gpg -d hna-db-YYYYMMDD.tar.gpg | tar x
+#           pg_restore --no-owner --data-only -d "<db url>" auth.dump   (accounts first)
+#           pg_restore --no-owner --clean --if-exists -d "<db url>" app.dump
 on:
   schedule:
     - cron: '41 19 * * 0'      # Sunday 19:41 UTC = Monday 02:41 in Vietnam
@@ -29,7 +30,7 @@ permissions:
 
 jobs:
   dump:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04      # pinned: the PGDG apt repo below is per Ubuntu release
     timeout-minutes: 15
     env:
       DB_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -60,20 +61,35 @@ jobs:
         run: |
           set -euo pipefail
           stamp=$(date -u +%Y%m%d)
-          # public = everything the apps wrote; auth.users/identities so that
-          # club_members and created_by still point at someone after a restore
-          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" -Fc --no-owner --no-privileges \
-            -n public -n private -t auth.users -t auth.identities -f backup.dump
-          ls -l backup.dump
+          PGBIN=/usr/lib/postgresql/17/bin
+          # TWO dumps, on purpose. pg_dump ignores -n as soon as any -t is given,
+          # so one command naming both would hold the auth tables and nothing else.
+          # app = everything the apps wrote.
+          "$PGBIN/pg_dump" "$DB_URL" -Fc --no-owner --no-privileges -n public -n private -f app.dump
+          # auth = so club_members and created_by still point at someone after a restore.
+          "$PGBIN/pg_dump" "$DB_URL" -Fc --no-owner --no-privileges --data-only \
+            -t auth.users -t auth.identities -f auth.dump
+          ls -l app.dump auth.dump
+          # A green run has to mean the data is in there. Lists go through files:
+          # grep -q closing a pipe early would trip pipefail on a good dump.
+          "$PGBIN/pg_restore" -l app.dump > app.list
+          "$PGBIN/pg_restore" -l auth.dump > auth.list
+          for t in events matches match_reports clubs; do
+            grep -qE "TABLE DATA public $t( |$)" app.list \
+              || { echo "::error::$t is missing from the dump"; exit 1; }
+          done
+          grep -qE "TABLE DATA auth users( |$)" auth.list \
+            || { echo "::error::auth.users is missing from the dump"; exit 1; }
+          tar cf backup.tar app.dump auth.dump
           gpg --batch --yes --pinentry-mode loopback --passphrase "$PASSPHRASE" \
-            --symmetric --cipher-algo AES256 -o "hna-db-$stamp.dump.gpg" backup.dump
-          rm -f backup.dump
+            --symmetric --cipher-algo AES256 -o "hna-db-$stamp.tar.gpg" backup.tar
+          rm -f app.dump auth.dump app.list auth.list backup.tar
 
       - name: Keep it
         if: steps.gate.outputs.run == 'yes'
         uses: actions/upload-artifact@v4
         with:
           name: hna-db-backup
-          path: hna-db-*.dump.gpg
+          path: hna-db-*.tar.gpg
           retention-days: 30
           if-no-files-found: error
