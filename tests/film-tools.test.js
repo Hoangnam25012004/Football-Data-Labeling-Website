@@ -509,8 +509,8 @@ test('the render pump is ours, not the compositor', () => {
   ok(/track\.requestFrame\(\)/.test(TOOLS),'one call per output frame');
   const pump=grabFunction('pump',TOOLS,'apps/portal/assets/film-tools.js');
   notOk(/requestAnimationFrame/.test(pump),'nothing in the pump waits on rAF');
-  ok(/setTimeout(pump,/.test(pump),'it drives itself');
-  ok(/Date.now() - began/.test(pump),'and waits only for what is left of the frame, or the rate drifts low');
+  ok(/setTimeout\(pump,/.test(pump),'it drives itself');
+  ok(/Date\.now\(\) - began/.test(pump),'and waits only for what is left of the frame, or the rate drifts low');
   ok(/var now\s*=\s*v\.currentTime/.test(pump),
      'and the clock is the SOURCE, so a drawing lands on the frame it was put on');
 });
