@@ -75,6 +75,28 @@ jobs:
           cp apps/portal/assets/film-tools.css _site/assets/film-tools.css
           cp apps/portal/assets/guide.css _site/assets/guide.css
           cp apps/portal/assets/guide.js  _site/assets/guide.js
+          mkdir -p _site/assets/guide
+          cp apps/portal/assets/guide/01-screen.jpg _site/assets/guide/01-screen.jpg
+          cp apps/portal/assets/guide/02-transport.jpg _site/assets/guide/02-transport.jpg
+          cp apps/portal/assets/guide/03-halves.jpg _site/assets/guide/03-halves.jpg
+          cp apps/portal/assets/guide/04-filters.jpg _site/assets/guide/04-filters.jpg
+          cp apps/portal/assets/guide/05-list.jpg _site/assets/guide/05-list.jpg
+          cp apps/portal/assets/guide/06-pitch.jpg _site/assets/guide/06-pitch.jpg
+          cp apps/portal/assets/guide/07-full.jpg _site/assets/guide/07-full.jpg
+          cp apps/portal/assets/guide/08-menu.jpg _site/assets/guide/08-menu.jpg
+          cp apps/portal/assets/guide/09-drawmenu.jpg _site/assets/guide/09-drawmenu.jpg
+          cp apps/portal/assets/guide/09-drawn.jpg _site/assets/guide/09-drawn.jpg
+          cp apps/portal/assets/guide/10-spot.jpg _site/assets/guide/10-spot.jpg
+          cp apps/portal/assets/guide/11-time.jpg _site/assets/guide/11-time.jpg
+          cp apps/portal/assets/guide/12-track.jpg _site/assets/guide/12-track.jpg
+          cp apps/portal/assets/guide/13-link.jpg _site/assets/guide/13-link.jpg
+          cp apps/portal/assets/guide/14-calib.jpg _site/assets/guide/14-calib.jpg
+          cp apps/portal/assets/guide/15-measure.jpg _site/assets/guide/15-measure.jpg
+          cp apps/portal/assets/guide/16-clips.jpg _site/assets/guide/16-clips.jpg
+          cp apps/portal/assets/guide/17-editor.jpg _site/assets/guide/17-editor.jpg
+          cp apps/portal/assets/guide/18-tag.jpg _site/assets/guide/18-tag.jpg
+          cp apps/portal/assets/guide/19-tags.jpg _site/assets/guide/19-tags.jpg
+          cp apps/portal/assets/guide/20-export.jpg _site/assets/guide/20-export.jpg
           cp apps/portal/assets/hanley-town.png _site/assets/hanley-town.png
 
           # ---------- tagging app, relocated under /tagger ----------

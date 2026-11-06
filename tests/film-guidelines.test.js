@@ -155,31 +155,48 @@ test('the contents and the page agree, in both directions', () => {
   IDS.forEach(id=>ok(hrefs.indexOf(id)>=0,'#'+id+' is reachable from the contents'));
 });
 
-test('a demo costs nothing until somebody presses play', () => {
-  ok(/preload\s*=\s*'none'/.test(GUIDE),
-    'thirteen clips asking for metadata on load would be thirteen unasked-for requests');
-  ok(/v\.controls\s*=\s*true/.test(GUIDE),'the reader drives it');
-  ok(/v\.poster\s*=/.test(GUIDE),'and there is something to look at before they do');
-  notOk(/autoplay/i.test(GUIDE+PAGE),'nothing plays by itself');
-  notOk(/\bv\.loop\b|loop\s*=\s*true/.test(GUIDE),'and nothing loops');
+/* The guide teaches with real screenshots. An image that is named here and not
+   staged 404s live while everything else stays green, so all three are checked
+   together: the file, its cp line, and the words that make it usable. */
+const FS=require('fs');
+const {repoPath}=require('./harness');
+const YML=readSrc('.github/workflows/deploy.yml');
+const SHOTS=(PAGE.match(/<figure class="g-shot">[\s\S]*?<\/figure>/g)||[]);
+test('there are no empty boxes left on the page', () => {
+  notOk(/g-demo|data-clip|Demo video not available/.test(PAGE+GUIDE),'the video placeholders are gone');
+  notOk(/<video/.test(PAGE),'and no video element');
+  ok(SHOTS.length>=20,'every part of the page has its picture, got '+SHOTS.length);
 });
-
-test('every clip the page names is one the manifest can address', () => {
-  const named=(PAGE.match(/data-clip="([^"]+)"/g)||[]).map(s=>/"([^"]+)"/.exec(s)[1]);
-  /* The slice starts AFTER `clips: {`, not at it: matched from the opening line
-     the reverse check below would count the container as a fourteenth entry —
-     and it would pass, silently, only because one of the clips happens to be
-     called `clips`. Rename that one and the test would have failed for a reason
-     that had nothing to do with the manifest. */
-  const open=GUIDE.indexOf('clips: {');
-  const manifest=GUIDE.slice(open+'clips: {'.length,GUIDE.indexOf('};',open));
-  ok(named.length>=13,'the page shows the demos it promises');
-  named.forEach(k=>ok(new RegExp('[\'"]?'+k+'[\'"]?\\s*:').test(manifest),
-    'the manifest knows '+k));
-  const keys=(manifest.match(/^\s*"?([a-z]+)"?\s*:\s*\{/gm)||[])
-    .map(l=>/"?([a-z]+)"?\s*:/.exec(l)[1]);
-  eq(keys.length,named.length,'the manifest holds exactly the clips the page shows');
-  keys.forEach(k=>ok(named.indexOf(k)>=0,'nothing is fetched that the page never shows: '+k));
+test('every screenshot exists, is deployed, and has text beside it', () => {
+  SHOTS.forEach(f=>{
+    const src=/<img src="assets\/guide\/([^"]+)"/.exec(f);
+    ok(src,'an image: '+f.slice(0,80));
+    const name=src[1];
+    ok(FS.existsSync(repoPath('apps/portal/assets/guide/'+name)),name+' is in the repo');
+    ok(YML.indexOf('cp apps/portal/assets/guide/'+name+' _site/assets/guide/'+name)>=0,name+' has a cp line');
+    ok(/alt="[^"]{20,}"/.test(f),name+' is described for a screen reader');
+    ok(/loading="lazy"/.test(f),name+' costs nothing until it is scrolled to');
+    ok(/width="\d+" height="\d+"/.test(f),name+' keeps its place while it loads');
+    ok(/<figcaption>[^<]+<\/figcaption>/.test(f),name+' has a caption');
+  });
+});
+test('every number on a picture has its line in the key, and no more', () => {
+  SHOTS.forEach(f=>{
+    const pins=(f.match(/class="g-pin"/g)||[]).length, keys=(f.match(/<li>/g)||[]).length;
+    eq(pins,keys,/assets\/guide\/([^"]+)/.exec(f)[1]);
+    (f.match(/left:([\d.]+)%;top:([\d.]+)%/g)||[]).forEach(p=>{
+      const m=/left:([\d.]+)%;top:([\d.]+)%/.exec(p);
+      ok(+m[1]<=100&&+m[2]<=100,'a number stays on its picture: '+p);
+    });
+  });
+});
+test('nothing is staged that the page does not show', () => {
+  const dir=FS.readdirSync(repoPath('apps/portal/assets/guide'));
+  dir.forEach(n=>ok(PAGE.indexOf('assets/guide/'+n)>=0,n+' is used'));
+});
+test('the page is not made heavy by its pictures', () => {
+  FS.readdirSync(repoPath('apps/portal/assets/guide')).forEach(n=>
+    ok(FS.statSync(repoPath('apps/portal/assets/guide/'+n)).size<450*1024,n+' is under 450 KB'));
 });
 
 test('documentation opens when the rest of the app cannot', () => {
