@@ -8,16 +8,16 @@
     "sha256": "37fee08ede58b61d"
   },
   "apps/portal/assets/app.js": {
-    "v": 65,
-    "sha256": "123ca6b058f5116b"
+    "v": 66,
+    "sha256": "a18d0962dea95b0e"
   },
   "apps/portal/assets/film-tools.css": {
     "v": 5,
     "sha256": "07d906446ee658ca"
   },
   "apps/portal/assets/film-tools.js": {
-    "v": 8,
-    "sha256": "2adbdfc782cd4be1"
+    "v": 9,
+    "sha256": "620881f712e628a0"
   },
   "apps/portal/assets/guide.css": {
     "v": 2,
