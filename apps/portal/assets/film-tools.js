@@ -332,6 +332,30 @@ window.PTFilmTools = (function () {
     c.out = e.segs[e.segs.length - 1].b;
     e.freezes = e.freezes.filter(function (f) { return !!segAt(e, f.t); });
   }
+  /* Every clip of the list as one edit, in match order. Two clips around nearby
+     moments often overlap, and the second then starts where the first stopped, or
+     the file would show the same seconds twice. A jump between clips gets a fade,
+     because a hard cut between two passages of play reads as a glitch; a clip's
+     own cuts are left as the analyst made them. Works across the halves: the render
+     has its own video element, which is not held to the window on screen. */
+  function mergedEdit(list) {
+    var segs = [], freezes = [], texts = [], muted = list.length > 0;
+    list.slice().sort(function (x, y) { return x.in - y.in; }).forEach(function (c) {
+      var e = c.edit || newEdit(c);
+      e.segs.forEach(function (s, i) {
+        var last = segs[segs.length - 1], a = s.a;
+        if (last && a < last.b) a = last.b;
+        if (s.b - a < MIN_SEG) return;
+        var joined = last && Math.abs(a - last.b) < 0.02;
+        segs.push({ id: id(), a: a, b: s.b, speed: s.speed || 1,
+                    trans: i === 0 && last && !joined ? 'fade' : (s.trans || 'cut') });
+      });
+      freezes = freezes.concat(e.freezes || []);
+      texts = texts.concat(e.texts || []);
+      if (!e.mute) muted = false;
+    });
+    return { segs: segs, freezes: freezes, texts: texts, mute: muted };
+  }
   /* Where the picture dips to black, as a function of the source clock, so the
      preview and the file are the same fade. */
   function fadeAlpha(segs, t) {
@@ -1662,8 +1686,16 @@ window.PTFilmTools = (function () {
      already does the job: inside [c.in, c.out] exactly the shapes whose window
      overlaps that stretch are alive. c.shapes stays in the schema for the
      export, which may be asked to rebuild a clip the analyst has since erased. */
+  function inThisHalf(c) { return c.in >= ctx.win.start - 0.05 && c.out <= ctx.end() + 0.05; }
   function playClip(c) {
     if (!ctx) return;
+    /* Film holds playback inside the half on screen, so a clip from the other half
+       could never reach its end and a playlist would sit there for ever. */
+    if (!inThisHalf(c)) {
+      play = null;
+      toast('That clip is in the other half. Switch half to play it');
+      return;
+    }
     play = { clip: c, list: play && play.list, i: play && play.i };
     if (editor && editor.clip.id !== c.id) closeEditor();
     if (c.edit) beginPreview(c);
@@ -1672,8 +1704,10 @@ window.PTFilmTools = (function () {
     toast('▶ ' + c.title);
   }
   function playAll() {
-    var list = clips();
-    if (!list.length) { toast('No clips yet'); return; }
+    /* Only what this half can play. The list keeps every clip, and the other half
+       plays its own when the analyst switches to it. */
+    var list = clips().filter(inThisHalf);
+    if (!list.length) { toast(clips().length ? 'These clips are in the other half' : 'No clips yet'); return; }
     play = { list: list, i: 0, clip: list[0] };
     playClip(list[0]);
     play.list = list; play.i = 0;
@@ -1687,9 +1721,10 @@ window.PTFilmTools = (function () {
       toast('End of playlist');
       return;
     }
+    var keep = play.list;
     play.i++; play.clip = next;
     playClip(next);
-    play.list = clips(); play.i = play.i;
+    if (play) play.list = keep;
   }
 
   /* ---------------------------------------------------------------
@@ -3630,6 +3665,13 @@ window.PTFilmTools = (function () {
       var bAll = el('button', 'fmt-p-btn', '▶ Play all');
       bAll.type = 'button'; bAll.onclick = playAll;
       head.appendChild(bAll);
+      if (list.length > 1) {
+        var bOne = el('button', 'fmt-p-btn', '⭳ Export all');
+        bOne.type = 'button'; bOne.title = 'Export all as one file, in match order';
+        if (corsState === false) bOne.classList.add('off');
+        bOne.onclick = exportAll;
+        head.appendChild(bOne);
+      }
     }
     head.appendChild(bX);
     panel.appendChild(head);
@@ -3668,6 +3710,12 @@ window.PTFilmTools = (function () {
       row.appendChild(go); row.appendChild(ed); row.appendChild(dl); row.appendChild(rm);
       panel.appendChild(row);
     });
+  }
+  function exportAll() {
+    var list = clips();
+    if (list.length < 2) { toast('Make at least two clips first'); return; }
+    var e = mergedEdit(list);
+    exportClip(e.segs[0].a, e.segs[e.segs.length - 1].b, 'Highlights', e);
   }
   function renderTagPanel() {
     var pls = (tagData && tagData.playlists) || [];
@@ -4411,7 +4459,7 @@ window.PTFilmTools = (function () {
       homography: homography, applyH: applyH, collinear: collinear, polyArea: polyArea,
       pitchMarks: pitchMarks, fmtLen: fmtLen, fmtArea: fmtArea, newEdit: newEdit,
       segAt: segAt, splitAt: splitAt, trimSeg: trimSeg, dropSeg: dropSeg, syncClip: syncClip,
-      fadeAlpha: fadeAlpha, planOf: planOf, cueAt: cueAt, cuePlayer: cuePlayer,
+      fadeAlpha: fadeAlpha, planOf: planOf, mergedEdit: mergedEdit, exportAll: exportAll, playAll: playAll, cueAt: cueAt, cuePlayer: cuePlayer,
       startLink: startLink, finishCollect: finishCollect, startMeasure: startMeasure,
       openCalib: openCalib, applyCalib: applyCalib, setTrack: setTrack, keyTimes: keyTimes,
       placeAdjust: placeAdjust, removeKeyAt: removeKeyAt, freezeDraw: freezeDraw,
@@ -4420,7 +4468,7 @@ window.PTFilmTools = (function () {
       undoEdit: undoEdit, runEdit: runEdit, openTag: openTag, saveTagForm: saveTagForm,
       pickCode: pickCode, canTag: canTag, canShare: canShare, loadTags: loadTags,
       removeTag: removeTag, fileToPlaylist: fileToPlaylist, renderPanel: renderPanel,
-      togglePanel: togglePanel, tagList: tagList,
+      togglePanel: togglePanel, tagList: tagList, frame: frame,
       ui: function () {
         return { insp: insp, editor: editor, collect: collect, calDraft: calDraft, cal: cal,
                  tagData: tagData, scope: scope, units: units, hold: hold, previewRate: previewRate,

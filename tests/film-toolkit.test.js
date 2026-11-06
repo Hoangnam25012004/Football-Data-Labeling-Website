@@ -533,6 +533,66 @@ test('the preview stops on a freeze, and stops at the end of the clip', () => {
   eq(v.paused,true,'the end of the clip');
 });
 
+/* ---- every clip in one file ---- */
+test('clips join in match order, with a fade across each jump', () => {
+  const {I}=mounted();
+  const e=I.mergedEdit([{in:300,out:312},{in:100,out:112}]);
+  eq(e.segs.map(s=>s.a).join(),'100,300');
+  eq(e.segs[0].trans,'cut','nothing to fade from at the start');
+  eq(e.segs[1].trans,'fade');
+  eq(I.planOf(100,312,e,[]).total,24);
+});
+test('two clips that overlap do not repeat those seconds', () => {
+  const {I}=mounted();
+  const e=I.mergedEdit([{in:100,out:112},{in:108,out:120}]);
+  eq(e.segs.map(s=>s.a+'-'+s.b).join(),'100-112,112-120');
+  eq(e.segs[1].trans,'cut','it simply carries on, so there is nothing to fade');
+  eq(I.planOf(100,120,e,[]).total,20);
+});
+test('a clip inside the last one adds nothing', () => {
+  const {I}=mounted();
+  eq(I.mergedEdit([{in:100,out:120},{in:105,out:110}]).segs.length,1);
+});
+test('the edits of each clip survive the join', () => {
+  const {I}=mounted();
+  const a={in:100,out:110};a.edit=I.newEdit(a);I.splitAt(a.edit,105);a.edit.segs[1].speed=0.5;
+  a.edit.freezes.push({id:'f',t:106,hold:2});a.edit.texts.push({id:'x',a:101,b:103,text:'Goal'});
+  const e=I.mergedEdit([{in:200,out:204},a]);
+  eq(e.segs.map(s=>s.speed).join(),'1,0.5,1');
+  eq(e.segs[1].trans,'cut','a cut the analyst made is left alone');
+  eq(e.texts.length,1);
+  eq(I.planOf(100,204,e,[]).total,5+10+4+2);
+});
+test('the file keeps its sound unless every clip was muted', () => {
+  const {I}=mounted();
+  const a={in:1,out:5};a.edit=I.newEdit(a);a.edit.mute=true;
+  const b={in:9,out:15};b.edit=I.newEdit(b);b.edit.mute=true;
+  eq(I.mergedEdit([a,b]).mute,true);
+  eq(I.mergedEdit([a,{in:20,out:25}]).mute,false);
+});
+test('the button is there from two clips, and one clip says why not', () => {
+  const m=mounted();
+  m.I.saveClip(10,20,'a');
+  m.I.exportAll();
+  eq(m.I.ui().exportTexts,null,'nothing started');
+  ok(/'⭳ Export all'/.test(TOOLS));
+  ok(/list\.length > 1/.test(TOOLS));
+});
+test('a playlist plays the clips this half can reach, and never hangs on the others', () => {
+  const m=mounted({win:{half:1,label:'1st Half',start:0,end:100},end:()=>100});
+  m.I.saveClip(10,20,'a');m.I.saveClip(30,40,'b');m.I.saveClip(200,210,'second half');
+  m.I.playAll();
+  eq(m.v.currentTime,10);
+  m.I.frame(20.1);
+  eq(m.v.currentTime,30,'on to the next');
+  m.v.paused=false;
+  m.I.frame(40.1);
+  eq(m.v.paused,true,'and it stops at the end of this half rather than waiting for ever');
+});
+test('Export all renders through the same pipeline, so nothing can upload', () => {
+  ok(/exportClip\(e\.segs\[0\]\.a, e\.segs\[e\.segs\.length - 1\]\.b, 'Highlights', e\)/.test(TOOLS));
+});
+
 /* ---- the export, against the source ---- */
 test('a render jumps a gap with the recorder paused, and gives up rather than hang', () => {
   ok(/rec\.pause\(\)/.test(TOOLS),'the file holds no gap');
