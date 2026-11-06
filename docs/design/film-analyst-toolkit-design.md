@@ -145,5 +145,15 @@ Kiểm tra tay trên Chrome thật, 2026-11-06, bằng `apps/portal/demo-film.ht
 | Màn hình 1280×640 | menu cuộn được, submenu nằm trong màn hình |
 | Portal thật, chưa đăng nhập, channel công khai | không lỗi trang, không request tới bảng `film_*`, Tag báo cần đăng nhập |
 
-**Chưa kiểm được ngoài đời:** luồng Tag với tài khoản thật của channel. Panel Tag đã chạy với data
-layer giả lập; RLS cần được thử sau khi migration 0027 được áp dụng.
+**RLS của 0027**, thử trên database thật ngày 2026-11-06 bằng các vai trò admin, analyst, viewer,
+người ngoài và anon, trong một khối lệnh kết thúc bằng `raise exception` nên luôn rollback. Cả 28
+tình huống đúng như mong đợi, gồm: viewer không chia sẻ được, không giả mạo được `created_by`, không
+gắn được tag vào trận của CLB khác, tag Private chỉ chủ nhân thấy, anon bị từ chối ở mức GRANT, xoá
+playlist vẫn giữ tag.
+
+Hệ quả cần biết: admin xoá được tag `channel` của người khác, nhưng không xoá được tag `private`
+của họ, vì RLS của DELETE cũng cần quyền đọc dòng đó. Đây là cố ý: ghi chú riêng là riêng.
+
+**Chưa kiểm được ngoài đời:** luồng Tag từ giao diện với tài khoản thật của channel, gồm cả các hàm
+`HNA.film` trong `supa.js`. Panel Tag đã chạy với data layer giả lập, còn phần quyền đã được thử trực
+tiếp trên database như trên.
