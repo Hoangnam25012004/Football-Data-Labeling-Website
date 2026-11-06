@@ -140,10 +140,21 @@ test('the health check probes every service and keeps Supabase awake', () => {
   notOk(/service_role|SERVICE_KEY/.test(HEALTH),'and only the publishable key is in it');
 });
 
+test('the backup really holds the match data', () => {
+  // pg_dump ignores -n once any -t is given, so each dump command names only one kind
+  const cmds=BACKUP.replace(/\\\n\s*/g,' ').split('\n').filter(l=>/pg_dump" /.test(l));
+  eq(cmds.length,2,'two dump commands');
+  cmds.forEach(c=>notOk(/ -n /.test(c)&&/ -t /.test(c),'-n and -t share a command: '+c));
+  ok(/-n public -n private -f app\.dump/.test(BACKUP),'the app schemas get a dump of their own');
+  ok(/-t auth\.users -t auth\.identities -f auth\.dump/.test(BACKUP),'and the accounts another');
+  ok(/for t in events matches match_reports clubs; do/.test(BACKUP),'the tables that matter are looked for');
+  ok(/TABLE DATA public \$t/.test(BACKUP)&&/is missing from the dump"; exit 1/.test(BACKUP),'and their absence fails the run');
+});
+
 test('the backup is encrypted before it leaves the runner', () => {
   const enc=BACKUP.indexOf('--symmetric'), up=BACKUP.indexOf('actions/upload-artifact');
   ok(enc>0&&up>enc,'gpg runs before the upload');
-  ok(/rm -f backup\.dump/.test(BACKUP),'and the clear dump is removed');
-  ok(/path: hna-db-\*\.dump\.gpg/.test(BACKUP),'only the .gpg is uploaded');
+  ok(/rm -f app\.dump auth\.dump app\.list auth\.list backup\.tar/.test(BACKUP),'and the clear files are removed');
+  ok(/path: hna-db-\*\.tar\.gpg/.test(BACKUP),'only the .gpg is uploaded');
   ok(/run=no/.test(BACKUP),'without its secrets the job stops instead of failing');
 });

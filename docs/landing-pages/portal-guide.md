@@ -10,7 +10,7 @@
 | Vào từ đâu | Link **Guidelines** dưới thanh điều khiển của Film ([portal-app.md](portal-app.md), mục 3), do `mount(..., {guide:'guide.html'})` truyền vào |
 | Design doc | [`film-guidelines-design.md`](../design/film-guidelines-design.md) |
 
-Đây là trang tài liệu tĩnh, mô tả màn hình Film và bộ công cụ analyst. `guide.js` làm đúng 3
+Đây là trang tài liệu tĩnh, mô tả màn hình Film và bộ công cụ analyst. `guide.js` làm đúng 2
 việc và không đụng tới bất cứ thứ gì ngoài trang này: nó **không** nạp Supabase, `app.js` hay
 bất kỳ script nào của channel.
 
@@ -43,37 +43,36 @@ bất kỳ script nào của channel.
 
 ## 2. Chức năng (guide.js)
 
-### 2.1 Clip demo cho từng mục
+### 2.1 Ảnh hướng dẫn
 
-Mỗi `<figure>` trong trang khai báo một clip demo. File clip nằm trên cùng bucket R2 với video
-trận đấu.
+Mỗi `<figure class="g-shot">` là một ảnh chụp thật từ trận Haiti – Saint Lucia (channel công khai),
+nằm ở `apps/portal/assets/guide/`. Thêm ảnh thì phải thêm dòng `cp` trong `deploy.yml`; test chặn
+nếu thiếu file, thiếu dòng `cp` hoặc số trên ảnh không khớp chú giải.
 
-- [`buildClips`](../../apps/portal/assets/guide.js#L86) hỏi **poster** trước. Có poster thì mới
-  dựng `<video preload="none">`, vì 13 clip cùng tải metadata ngay khi mở trang sẽ quá tốn băng
-  thông.
-- [`poster`](../../apps/portal/assets/guide.js#L52) gắn ảnh poster.
-- [`notice`](../../apps/portal/assets/guide.js#L59): file chưa có trên bucket thì thay bằng một
-  câu thông báo, không coi là lỗi. Phần chữ hướng dẫn phía trên đã đủ để làm theo.
-- [`missing`](../../apps/portal/assets/guide.js#L68) khôi phục nội dung gốc của figure khi clip
-  hoá ra không phát được.
+- Số đỏ là `<span class="g-pin">` đặt theo % trên ảnh, không vẽ vào ảnh. Nhờ vậy số luôn nét và
+  chụp lại ảnh không phải vẽ lại.
+- `<ol class="g-key">` là chú giải, đánh số bằng CSS counter.
+- Ảnh dùng `loading="lazy"`, bấm vào mở cỡ đầy đủ. `guide.js` không xử lý gì cho ảnh.
+- Ảnh 18-tag và 19-tags có nội dung mẫu, vì channel công khai không có tag thật. Không có gì được ghi
+  vào database khi chụp.
+- **Đổi giao diện Film thì phải chụp lại ảnh liên quan.** Chụp ở khung 1440×900, tỉ lệ điểm ảnh 1.5.
 
 ### 2.2 Scrollspy: tô sáng mục đang đọc
 
-[`spy`](../../apps/portal/assets/guide.js#L126), [`pick`](../../apps/portal/assets/guide.js#L137)
-và [`onScroll`](../../apps/portal/assets/guide.js#L159) tô sáng mục tương ứng ở cột Contents bên
+[`spy`](../../apps/portal/assets/guide.js#L34), [`pick`](../../apps/portal/assets/guide.js#L45)
+và [`onScroll`](../../apps/portal/assets/guide.js#L67) tô sáng mục tương ứng ở cột Contents bên
 trái khi người đọc cuộn.
 
 ### 2.3 Mục lục trên điện thoại
 
-[`mobileToc`](../../apps/portal/assets/guide.js#L176) **clone** danh sách Contents của bản
+[`mobileToc`](../../apps/portal/assets/guide.js#L84) **clone** danh sách Contents của bản
 desktop vào một `<details>` cho màn hẹp. Nhờ vậy chỉ có một danh sách cần giữ đúng.
 
-[`boot`](../../apps/portal/assets/guide.js#L190) gọi các phần trên khi trang tải.
+[`boot`](../../apps/portal/assets/guide.js#L98) gọi các phần trên khi trang tải.
 
 ## 3. Dữ liệu
 
-Không đọc hay ghi localStorage, cũng không gọi Supabase. Chỉ có các request `GET` tới bucket R2
-để lấy poster và clip.
+Không đọc hay ghi localStorage, cũng không gọi Supabase. Ảnh là file tĩnh của chính site.
 
 ## 4. Liên kết ra
 

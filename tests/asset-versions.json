@@ -20,12 +20,12 @@
     "sha256": "cbc2e14fd81922cf"
   },
   "apps/portal/assets/guide.css": {
-    "v": 1,
-    "sha256": "42295d8d8604843a"
+    "v": 2,
+    "sha256": "d56495fdfe19d4d3"
   },
   "apps/portal/assets/guide.js": {
-    "v": 1,
-    "sha256": "1b47b310621fdfaa"
+    "v": 2,
+    "sha256": "c5bbe7956c8c5030"
   },
   "apps/portal/assets/hanley-town.png": {
     "v": 1,
